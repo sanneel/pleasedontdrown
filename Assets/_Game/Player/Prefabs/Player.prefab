@@ -471,6 +471,7 @@ GameObject:
   - component: {fileID: 7976482937406028949}
   - component: {fileID: 4953528871642139978}
   - component: {fileID: 29899365693301338}
+  - component: {fileID: 2437994914444846225}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -636,6 +637,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b06ff8a4700b5d44cb8273a70eaf5c15, type: 3}
   m_Name: 
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Player.PlayerMotor
+  _swimEnterDepth: 1.25
+  _swimExitDepth: 1.05
+  _floatFeetDepth: 1.32
+  _swimSpeed: 3
+  _swimSprintSpeed: 4.7
+  _swimAccel: 7
+  _surfaceHopSpeed: 4.8
+  _airSeconds: 25
+  _airRefillPerSecond: 0.25
+  _staminaDrainPerSecond: 0.14
+  _staminaRefillPerSecond: 0.2
+  _climbMaxRise: 2.3
+  _climbDuration: 0.45
   _walkSpeed: 4.6
   _sprintSpeed: 7.4
   _crouchSpeed: 2.3
@@ -732,3 +746,18 @@ MonoBehaviour:
   - {fileID: 6249313937437892749}
   _bodyRenderer: {fileID: 6444104835348828771}
   _nameTag: {fileID: 6960788235703338024}
+--- !u!114 &2437994914444846225
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8394641480159777676}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac311e15177960840a4076c658f47bd6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.World.Water.SurfaceCrossing
+  _localPoint: {x: 0, y: 0.15, z: 0}
+  _minDownSpeed: 3
+  _fullStrengthSpeed: 10

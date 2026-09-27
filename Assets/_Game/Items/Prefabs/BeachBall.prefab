@@ -101,6 +101,8 @@ GameObject:
   - component: {fileID: 2637121421540661341}
   - component: {fileID: 3957160020710319804}
   - component: {fileID: 5392026139800103363}
+  - component: {fileID: 7889710637973091049}
+  - component: {fileID: 3687076295871795614}
   - component: {fileID: 6426193176241210426}
   - component: {fileID: 2251856993036599259}
   - component: {fileID: 3498720111040292120}
@@ -213,6 +215,37 @@ MonoBehaviour:
   _preventDespawnOnDisconnect: 1
   _defaultDespawnType: 0
   _initializedTimestamp: 0
+--- !u!114 &7889710637973091049
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6283404205336890638}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 022f266cc3e05104c8fd612007440550, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.World.Water.Buoyancy
+  _density: 0.1
+  _waterDrag: 0.8
+  _waterAngularDrag: 1.5
+  _verticalDamping: 1.5
+--- !u!114 &3687076295871795614
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6283404205336890638}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac311e15177960840a4076c658f47bd6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.World.Water.SurfaceCrossing
+  _localPoint: {x: 0, y: 0, z: 0}
+  _minDownSpeed: 2.5
+  _fullStrengthSpeed: 10
 --- !u!114 &6426193176241210426
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -10,7 +10,7 @@ namespace PleaseDontDrown.Player
     /// The root sits at the player's feet.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public class PlayerMotor : MonoBehaviour
+    public partial class PlayerMotor : MonoBehaviour
     {
         [Header("Speed (m/s)")]
         [SerializeField] private float _walkSpeed = 4.6f;
@@ -64,6 +64,7 @@ namespace PleaseDontDrown.Player
         private void Awake()
         {
             _controller = GetComponent<CharacterController>();
+            _hands = GetComponent<PlayerHands>();
             _height = _standHeight;
             ApplyHeight();
         }
@@ -95,6 +96,7 @@ namespace PleaseDontDrown.Player
                 _scriptedInput = Vector2.up;
                 _scriptedSprint = args.Length > 1 && args[1] == "sprint";
             }, cheat: true, owner: this);
+            RegisterSwimCommands();
         }
 
         private void OnDisable()
@@ -103,6 +105,7 @@ namespace PleaseDontDrown.Player
             DevCommands.Unregister("speed", this);
             DevCommands.Unregister("tp", this);
             DevCommands.Unregister("walk", this);
+            UnregisterSwimCommands();
         }
 
         public void Teleport(Vector3 position)
@@ -135,6 +138,17 @@ namespace PleaseDontDrown.Player
                 return;
             }
 
+            if (UpdateClimb())
+                return;
+
+            UpdateWater();
+            UpdateBreath(dt);
+            if (IsSwimming)
+            {
+                SwimMove(input, scripted, dt);
+                return;
+            }
+
             bool wasGrounded = IsGrounded;
             IsGrounded = _controller.isGrounded;
             if (IsGrounded) _lastGroundedTime = Time.time;
@@ -143,7 +157,7 @@ namespace PleaseDontDrown.Player
             UpdateCrouch(dt);
 
             IsSprinting = (GameInput.Sprint.IsPressed() || (scripted && _scriptedSprint)) && input.y > 0.1f && !IsCrouching;
-            float speed = (IsCrouching ? _crouchSpeed : IsSprinting ? _sprintSpeed : _walkSpeed) * SpeedMultiplier;
+            float speed = (IsCrouching ? _crouchSpeed : IsSprinting ? _sprintSpeed : _walkSpeed) * SpeedMultiplier * WadeFactor;
             Vector3 wish = (transform.right * input.x + transform.forward * input.y) * speed;
 
             var horizontal = new Vector3(_velocity.x, 0f, _velocity.z);

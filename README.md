@@ -14,12 +14,16 @@ Keep the Steam client running for online features (dev app id **480** / Spacewar
 |---|---|---|
 | Move / look | WASD / mouse | Left / right stick |
 | Sprint · Crouch · Jump | Shift · Ctrl or C · Space | L3 · B · A |
-| Use (bell, light switch, sign…) | E | X |
+| Use / pick up (bell, switch, sign, items) | E | X |
+| Throw held item (hold to charge) · Drop | Left mouse · G | RT · Y |
+| Swim: dive · rise | Ctrl · Space (underwater) | B · A |
+| Climb out onto dock / rock | Space at the surface, facing the ledge | A |
 | Pause / connection menu | Esc | Start |
 | Dev console | ` (backquote) or F2 | |
 
-Useful console commands: `help`, `noclip`, `speed 3`, `tp spawn`, `lookat x y z`, `fov 90`, `sens 0.15`,
-`timescale 0.3`, `players`, `ring`, `lights`, `screenshot [delay]` (saved to `Screenshots/`). Cheats work in the editor and dev builds.
+Useful console commands: `help`, `noclip`, `speed 3`, `tp spawn`, `lookat x y z`, `fov 90`, `sens 0.15`, `timescale 0.3`,
+`players`, `ring`, `lights`, `spawn <item> [n]` / `spawn list`, `items`, `itemdebug`, `grab`, `throw [0-1]`, `drop`,
+`waves <scale>` (storm = 3), `water`, `breath`, `screenshot [delay]` (saved to `Screenshots/`). Cheats work in the editor and dev builds.
 
 ## Test multiplayer on one PC
 1. Build: menu **PLEASE DON'T DROWN** or batch (below) → `Builds/Win64/PleaseDontDrown.exe`
@@ -32,11 +36,14 @@ Online: **Host (Steam)** → **Invite friends** in the menu. The friend needs th
 "F:/Unity/Editors/6000.3.25f1/Editor/Unity.exe" -batchmode -projectPath "F:/GameDev/PleaseDontDrown" -executeMethod PleaseDontDrown.Editor.GameSceneBuilder.BuildPlayerBatch -quit -logFile Logs/build.log
 ```
 
-Automated 2-instance smoke test (headless, no Steam):
+Automated 2-instance smoke test (headless, no Steam, on its own port so it never joins a game you're playing):
 ```bash
-Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-host-offline -pdd-quit-after 25 -logFile Logs/host.log
-Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-join localhost -pdd-quit-after 15 -logFile Logs/client.log
+Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-port 7790 -pdd-host-offline -pdd-quit-after 25 -logFile Logs/host.log
+Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-port 7790 -pdd-join localhost -pdd-quit-after 15 -logFile Logs/client.log
 ```
+
+Every connection shakes hands with its build version (`NetVersion`: app version + the stamp the scene builder writes).
+A client from a different build is refused with a clear message instead of failing on mismatched scene objects.
 
 ## Launch switches
 | Switch | Effect |
@@ -45,7 +52,8 @@ Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-join l
 | `-pdd-host-offline` | Start a local host at launch |
 | `-pdd-join <address>` | Join a local/LAN host at launch |
 | `-pdd-quit-after <sec>` | Quit after N seconds |
-| `-pdd-exec "<cmd>; <cmd>"` | Run console commands once the local player exists |
+| `-pdd-exec "<cmd>; <cmd>"` | Run console commands once the local player exists (`wait <sec>` pauses) |
+| `-pdd-port <port>` | Local/LAN port (default 7770; tests use 7790) |
 
 ## Layout
 `Assets/_Game/` game code (asmdef `PleaseDontDrown`) · `Assets/_Game/Editor/` editor tools · `Assets/ThirdParty/FishySteamworks/` vendored transport (BSD-2) · `Docs/` design.

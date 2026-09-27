@@ -52,6 +52,14 @@ namespace PleaseDontDrown.Net
             if (_tugboatIndex < 0 || _steamIndex < 0)
                 Debug.LogError("[Net] Multipass must contain both Tugboat and FishySteamworks.");
 
+            // Tests use their own port so they can never join a game someone is playing on this PC.
+            if (ushort.TryParse(DevLaunchArgs.Value("-pdd-port"), out ushort port))
+            {
+                ((Tugboat)_multipass.GetTransport(_tugboatIndex)).SetPort(port);
+                Debug.Log($"[Net] Local port {port}");
+            }
+            LobbyAuthenticator.Rejected += OnRejected;
+
             _lobby.HostLobbyReady += OnHostLobbyReady;
             _lobby.JoinedLobby += OnJoinedLobby;
             _lobby.LobbyFailed += OnLobbyFailed;
@@ -62,8 +70,11 @@ namespace PleaseDontDrown.Net
         private void OnRemoteConnectionState(FishNet.Connection.NetworkConnection conn, RemoteConnectionStateArgs args) =>
             Debug.Log($"[Net] Remote client {conn.ClientId} {args.ConnectionState} (transport {args.TransportIndex})");
 
+        private void OnRejected(string reason) => Fail($"Host refused the connection: {reason}");
+
         private void OnDestroy()
         {
+            LobbyAuthenticator.Rejected -= OnRejected;
             if (_lobby != null)
             {
                 _lobby.HostLobbyReady -= OnHostLobbyReady;

@@ -102,7 +102,7 @@ namespace PleaseDontDrown.Net
 
             CurrentLobby = new CSteamID(result.m_ulSteamIDLobby);
             SteamMatchmaking.SetLobbyData(CurrentLobby, HostIdKey, SteamBootstrap.LocalId.m_SteamID.ToString());
-            SteamMatchmaking.SetLobbyData(CurrentLobby, VersionKey, Application.version);
+            SteamMatchmaking.SetLobbyData(CurrentLobby, VersionKey, NetVersion.Current);
             HostLobbyReady?.Invoke(CurrentLobby);
         }
 
@@ -122,10 +122,10 @@ namespace PleaseDontDrown.Net
             }
 
             string hostVersion = SteamMatchmaking.GetLobbyData(lobby, VersionKey);
-            if (!string.IsNullOrEmpty(hostVersion) && hostVersion != Application.version)
+            if (!string.IsNullOrEmpty(hostVersion) && hostVersion != NetVersion.Current)
             {
                 SteamMatchmaking.LeaveLobby(lobby);
-                LobbyFailed?.Invoke($"Version mismatch: host has {hostVersion}, you have {Application.version}");
+                LobbyFailed?.Invoke($"Version mismatch: host has {hostVersion}, you have {NetVersion.Current}");
                 return;
             }
 

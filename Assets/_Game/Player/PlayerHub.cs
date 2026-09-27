@@ -119,6 +119,9 @@ namespace PleaseDontDrown.Player
             var cam = camGo.AddComponent<Camera>();
             cam.nearClipPlane = 0.05f;
             camGo.AddComponent<AudioListener>();
+            var muffle = camGo.AddComponent<AudioLowPassFilter>(); // switched on underwater by UnderwaterFx
+            muffle.cutoffFrequency = 700f;
+            muffle.enabled = false;
 
             _look.Attach(cam);
             _motor.enabled = _look.enabled = _interactor.enabled = true;

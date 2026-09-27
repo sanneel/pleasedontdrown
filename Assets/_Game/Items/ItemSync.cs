@@ -1,6 +1,7 @@
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Transporting;
+using PleaseDontDrown.World.Water;
 using UnityEngine;
 
 namespace PleaseDontDrown.Items
@@ -31,8 +32,12 @@ namespace PleaseDontDrown.Items
         private static readonly Vector3 RescuePoint = new Vector3(0f, 2f, 16f);
 
         private Rigidbody _rb;
+        private Buoyancy _buoyancy;
         private bool _held;
         private bool _sending;
+        // Follower-side "bobbing at rest": the simulator stopped sending, we bob it on the shared wave clock.
+        private bool _floatIdle;
+        private float _floatOffset;
         private float _stillTime;
         private float _lastAuthorityRequest = float.NegativeInfinity;
 
@@ -51,6 +56,7 @@ namespace PleaseDontDrown.Items
         private void Awake()
         {
             _rb = GetComponent<Rigidbody>();
+            _buoyancy = GetComponent<Buoyancy>();
             _rb.isKinematic = true; // until the network decides who simulates
             _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative; // valid for kinematic and dynamic
             // Authority can switch while a body overlaps a player or another item; don't let depenetration launch it.
@@ -86,6 +92,14 @@ namespace PleaseDontDrown.Items
             Refresh();
         }
 
+        public override void OnStartClient()
+        {
+            base.OnStartClient();
+            // Late joiner: a floating item at rest sends nothing, so start bobbing it ourselves.
+            if (!IsSimulator && _buoyancy != null && _buoyancy.IsNearSurface(_rb.position))
+                EnterFloatIdle(_rb.position.y - WaterSurface.HeightAt(_rb.position));
+        }
+
         /// <summary>Held items are positioned by the holder's hands on every machine; physics is off.</summary>
         public void SetHeld(bool held)
         {
@@ -119,8 +133,16 @@ namespace PleaseDontDrown.Items
             else if (!simulate)
             {
                 _sending = false;
+                _floatIdle = false;
                 CaptureFollowTarget();
             }
+        }
+
+        private void EnterFloatIdle(float offsetFromSurface)
+        {
+            _floatIdle = true;
+            _floatOffset = offsetFromSurface;
+            _netVelocity = _netAngularVelocity = Vector3.zero;
         }
 
         private void CaptureFollowTarget()
@@ -152,8 +174,13 @@ namespace PleaseDontDrown.Items
                 transform.position = _rb.position;
             }
 
-            bool moving = _rb.linearVelocity.sqrMagnitude > _restSpeed * _restSpeed
-                          || _rb.angularVelocity.sqrMagnitude > _restAngularSpeed * _restAngularSpeed;
+            // Floating things bob forever; for them "at rest" means no longer drifting or spinning around.
+            bool floating = _buoyancy != null && _buoyancy.InWater;
+            Vector3 v = _rb.linearVelocity;
+            Vector3 w = _rb.angularVelocity;
+            bool moving = floating
+                ? new Vector2(v.x, v.z).sqrMagnitude > _restSpeed * _restSpeed * 4f || Mathf.Abs(w.y) > _restAngularSpeed * 3f
+                : v.sqrMagnitude > _restSpeed * _restSpeed || w.sqrMagnitude > _restAngularSpeed * _restAngularSpeed;
             if (moving)
             {
                 _stillTime = 0f;
@@ -168,7 +195,10 @@ namespace PleaseDontDrown.Items
                 return;
 
             bool resting = !moving && _stillTime >= _restDelay;
-            SendState(resting ? Channel.Reliable : Channel.Unreliable);
+            if (resting && floating)
+                SendFloatRest();
+            else
+                SendState(resting ? Channel.Reliable : Channel.Unreliable);
             if (!resting)
                 return;
 
@@ -201,6 +231,35 @@ namespace PleaseDontDrown.Items
         [ObserversRpc(ExcludeOwner = true, ExcludeServer = true)]
         private void StateObservers(Vector3 position, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity,
             Channel channel = Channel.Unreliable) => ApplyState(position, rotation, velocity, angularVelocity);
+
+        private void SendFloatRest()
+        {
+            float offset = _rb.position.y - WaterSurface.HeightAt(_rb.position);
+            if (IsServerInitialized)
+                FloatRestObservers(_rb.position, _rb.rotation, offset);
+            else
+                FloatRestServer(_rb.position, _rb.rotation, offset);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void FloatRestServer(Vector3 position, Quaternion rotation, float offset, NetworkConnection caller = null)
+        {
+            if (caller != Owner) return;
+            ApplyFloatRest(position, rotation, offset);
+            FloatRestObservers(position, rotation, offset);
+        }
+
+        [ObserversRpc(ExcludeOwner = true, ExcludeServer = true)]
+        private void FloatRestObservers(Vector3 position, Quaternion rotation, float offset) => ApplyFloatRest(position, rotation, offset);
+
+        private void ApplyFloatRest(Vector3 position, Quaternion rotation, float offset)
+        {
+            if (IsSimulator) return;
+            _netPosition = position;
+            _netRotation = rotation;
+            _netTime = Time.time;
+            EnterFloatIdle(offset);
+        }
 
         [ServerRpc(RequireOwnership = false)]
         private void ReturnAuthorityServer(Vector3 position, Quaternion rotation, NetworkConnection caller = null)
@@ -236,6 +295,7 @@ namespace PleaseDontDrown.Items
         private void ApplyState(Vector3 position, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity)
         {
             if (IsSimulator) return;
+            _floatIdle = false;
             _netPosition = position;
             _netRotation = rotation;
             _netVelocity = velocity;
@@ -255,12 +315,24 @@ namespace PleaseDontDrown.Items
             if (_held || !_rb.isKinematic || IsSimulator)
                 return;
 
-            float ahead = Mathf.Min(Time.time - _netTime, _maxExtrapolation);
-            Vector3 target = _netPosition + _netVelocity * ahead;
-            Quaternion targetRotation = _netRotation;
-            float spin = _netAngularVelocity.magnitude;
-            if (spin > 0.01f)
-                targetRotation = Quaternion.AngleAxis(spin * Mathf.Rad2Deg * ahead, _netAngularVelocity / spin) * _netRotation;
+            Vector3 target;
+            Quaternion targetRotation;
+            if (_floatIdle && WaterSurface.Exists)
+            {
+                // Bob on the shared wave clock: same waves as the simulator, zero network traffic.
+                target = new Vector3(_netPosition.x, WaterSurface.HeightAt(_netPosition) + _floatOffset, _netPosition.z);
+                Vector3 normal = Vector3.Lerp(Vector3.up, WaterSurface.NormalAt(_netPosition), 0.6f);
+                targetRotation = Quaternion.FromToRotation(Vector3.up, normal) * _netRotation;
+            }
+            else
+            {
+                float ahead = Mathf.Min(Time.time - _netTime, _maxExtrapolation);
+                target = _netPosition + _netVelocity * ahead;
+                targetRotation = _netRotation;
+                float spin = _netAngularVelocity.magnitude;
+                if (spin > 0.01f)
+                    targetRotation = Quaternion.AngleAxis(spin * Mathf.Rad2Deg * ahead, _netAngularVelocity / spin) * _netRotation;
+            }
 
             // MovePosition on a kinematic body also pushes dynamic bodies it runs into (e.g. a thrown crate on the host).
             float k = 1f - Mathf.Exp(-_followSharpness * Time.fixedDeltaTime);

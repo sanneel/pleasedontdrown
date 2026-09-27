@@ -74,9 +74,41 @@ namespace PleaseDontDrown.UI
                 }
             }
 
+            DrawBreath(local.Motor, cx);
+
             _toasts.RemoveAll(t => t.Until < Time.unscaledTime);
             for (int i = 0; i < _toasts.Count; i++)
                 DrawShadowed(new Rect(cx - 400f, Screen.height * 0.16f + i * 30f, 800f, 30f), _toasts[i].Text, _toast);
+        }
+
+        /// <summary>Air and stamina bars, shown only while they're not full.</summary>
+        private void DrawBreath(PlayerMotor motor, float cx)
+        {
+            const float width = 220f;
+            float y = Screen.height - 110f;
+            if (motor.Air01 < 0.999f || motor.IsHeadUnderwater)
+            {
+                DrawBar(new Rect(cx - width * 0.5f, y, width, 10f), motor.Air01,
+                    motor.Air01 < 0.3f ? new Color(1f, 0.35f, 0.3f) : new Color(0.45f, 0.8f, 1f));
+                DrawShadowed(new Rect(cx - width * 0.5f - 60f, y - 6f, 55f, 22f), "AIR", _prompt);
+                y -= 18f;
+            }
+            if (motor.Stamina01 < 0.999f)
+            {
+                DrawBar(new Rect(cx - width * 0.5f, y, width, 8f), motor.Stamina01, new Color(1f, 0.85f, 0.35f));
+                DrawShadowed(new Rect(cx - width * 0.5f - 60f, y - 7f, 55f, 22f), "STAM", _prompt);
+            }
+            if (motor.IsOutOfBreath)
+                DrawShadowed(new Rect(cx - 300f, Screen.height * 0.3f, 600f, 34f), "<b>OUT OF AIR!</b> Get to the surface!", _toast);
+        }
+
+        private void DrawBar(Rect rect, float value, Color fill)
+        {
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(rect, _dot);
+            GUI.color = fill;
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(value), rect.height), _dot);
+            GUI.color = Color.white;
         }
 
         private static void DrawShadowed(Rect rect, string text, GUIStyle style)

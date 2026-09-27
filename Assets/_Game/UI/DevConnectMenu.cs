@@ -56,7 +56,7 @@ namespace PleaseDontDrown.UI
 
             GUILayout.BeginArea(new Rect(20, 20, 360, 440), GUI.skin.box);
             GUILayout.Label("PLEASE DON'T DROWN", _title);
-            GUILayout.Label(active ? "Paused" : "Prototype build");
+            GUILayout.Label(active ? "Paused" : $"Prototype build {NetVersion.Current}");
             GUILayout.Space(6);
             GUILayout.Label(SteamBootstrap.IsReady ? $"Steam: {SteamBootstrap.LocalName}" : "Steam: not running (offline only)");
 
