@@ -1,0 +1,20 @@
+{
+    "name": "PleaseDontDrown",
+    "rootNamespace": "PleaseDontDrown",
+    "references": [
+        "FishNet.Runtime",
+        "GameKit.Dependencies",
+        "FishySteamworks",
+        "com.rlabrecque.steamworks.net",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

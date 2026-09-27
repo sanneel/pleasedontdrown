@@ -1,0 +1,22 @@
+{
+    "name": "PleaseDontDrown.Editor",
+    "rootNamespace": "PleaseDontDrown.Editor",
+    "references": [
+        "PleaseDontDrown",
+        "FishNet.Runtime",
+        "GameKit.Dependencies",
+        "FishySteamworks",
+        "com.rlabrecque.steamworks.net"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

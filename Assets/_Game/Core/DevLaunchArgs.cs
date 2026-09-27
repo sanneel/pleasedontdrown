@@ -1,0 +1,54 @@
+using System;
+using System.Collections;
+using PleaseDontDrown.Net;
+using UnityEngine;
+
+namespace PleaseDontDrown.Core
+{
+    /// <summary>
+    /// Command-line switches for automated and multi-instance testing:
+    ///   -pdd-nosteam            skip Steam init (read by SteamBootstrap)
+    ///   -pdd-host-offline       start a local host immediately
+    ///   -pdd-join &lt;address&gt;    join a local/LAN host immediately
+    ///   -pdd-quit-after &lt;sec&gt;  quit after N seconds (smoke tests)
+    /// </summary>
+    public class DevLaunchArgs : MonoBehaviour
+    {
+        [SerializeField] private ConnectionService _connection;
+
+        public static bool Has(string flag) => Array.IndexOf(Environment.GetCommandLineArgs(), flag) >= 0;
+
+        public static string Value(string flag)
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            int i = Array.IndexOf(args, flag);
+            return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+        }
+
+        private IEnumerator Start()
+        {
+            if (float.TryParse(Value("-pdd-quit-after"), out float quitAfter))
+                StartCoroutine(QuitAfter(quitAfter));
+
+            yield return null; // let every service finish Start()
+
+            if (Has("-pdd-host-offline"))
+            {
+                Debug.Log("[Dev] Auto-hosting offline");
+                _connection.HostOffline();
+            }
+            else if (Value("-pdd-join") is { } address)
+            {
+                Debug.Log($"[Dev] Auto-joining {address}");
+                _connection.JoinOffline(address);
+            }
+        }
+
+        private static IEnumerator QuitAfter(float seconds)
+        {
+            yield return new WaitForSecondsRealtime(seconds);
+            Debug.Log("[Dev] Quit timer elapsed");
+            Application.Quit();
+        }
+    }
+}
