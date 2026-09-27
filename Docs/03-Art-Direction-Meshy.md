@@ -13,28 +13,48 @@ post-processing, the modular dock planks, the beach ball (a textured sphere), UI
   wood `#9C6B43`, foliage `#3FAE5A`, sky `#8FD3FF`.
 
 ## 2. Meshy settings (same for every asset, so everything matches)
-1. **Text to 3D** (newest model). For a tighter match between tourists, you can first make a concept image with the
-   same prompt and then use **Image to 3D**.
-2. Paste the prompt (each one below is complete and under Meshy's 600-character limit).
-   If there is a **negative prompt** field, paste the one from §3.
-3. If there's a style choice, pick **Cartoon** (not Realistic, not Low Poly) and **keep it the same for every asset**.
-4. Generate, pick the best preview, then texture/refine with **PBR** on.
-5. **Remesh** to the triangle target in the tables (quad or triangle both fine).
-6. Characters only: **Rig** it as a humanoid (auto-rig; follow its marker steps). We don't need its animations
-   (physics moves the tourists), only the skeleton. An *Idle* and a *Walk* are nice extras for later.
-7. **Download FBX** (with textures). Name it exactly like the **File** column, e.g. `tourist_dad.fbx`.
-8. Drop the files into `F:\GameDev\PleaseDontDrown\ArtSource\Meshy\`. Claude does the rest (see §9).
+Checked against Meshy's docs on 2026-09-27. Text to 3D has two steps: **Preview** (the shape) and **Texture/Refine**
+(the paint job, with its own optional texture prompt). There is no style picker any more (the style comes from the
+prompt text) and no negative prompt field.
+
+1. **Text to 3D**. AI model: **Meshy 6 Lite** on the Free plan (Free downloads only work for that model);
+   **Meshy 7.1 / latest** on Pro.
+2. Pose: **A-pose** for characters (T-xx, P-01), **none** for everything else.
+3. On Pro only: turn on **Smart Topology** (or Remesh) with the face count from the tables. On Free, skip it;
+   Claude reduces the polygons on import.
+4. Paste the **Prompt**, generate, pick the best shape.
+5. Texture step: paste the **Texture prompt** (§4 for Batch 1, the template in §4.1 for the rest), **PBR on**, 2K.
+6. Characters only: **Rig / auto-rig** as a humanoid (follow its marker steps). Only the skeleton matters; physics
+   moves the tourists. On Free, rig at least `tourist_dad` to test it.
+7. **Download FBX**, named like the **File** column (e.g. `tourist_dad.fbx`), into
+   `F:\GameDev\PleaseDontDrown\ArtSource\Meshy\`. Claude does the rest (see §9).
 
 Tip: once a tourist body looks right, use Meshy's **retexture** on that same model to make outfit variants.
 Same body = same ragdoll setup, just new clothes.
 
-## 3. Negative prompt (if the field exists)
+## 3. Free-plan test run (10 models)
+Do Batch 1 in this order, so the most important ones are done if credits run out:
+`tourist_dad` → `lifeguard` → `station_rusty` → `lifering` → `tourist_mom` → `tower` → `palm_tall` → `rock_boulder`.
+That leaves 2 spare for retries.
+
+## 4. Batch 1 texture prompts (paste in the texture step)
+| File | Texture prompt |
+|---|---|
+| `tourist_dad` | Hand-painted stylized cartoon texture with soft shading and bright saturated colors, no photo detail, no text. Sunburnt pink skin, dark brown mustache, red Hawaiian shirt with big white hibiscus flowers, royal blue swim shorts, khaki bucket hat, yellow flip-flops. |
+| `tourist_mom` | Hand-painted stylized cartoon texture with soft shading and bright saturated colors, no photo detail, no text. Warm tanned skin, brown hair, straw-yellow woven sun hat with a pink ribbon, black round sunglasses, turquoise swimsuit, sarong with pink and orange flowers, bright orange arm floaties. |
+| `lifeguard` | Hand-painted stylized cartoon texture with soft shading and bright saturated colors, no photo detail, no text, no logos. Lightly tanned skin, bright red swim shorts, white tank top with one red horizontal stripe across the chest, red cap, silver whistle on a black cord, black sunglasses, white sunscreen on the nose. |
+| `station_rusty` | Hand-painted stylized cartoon texture, warm sunny colors, soft shading, no text, no logos. Faded pale-blue painted wooden planks with chipped paint showing brown wood, rusty orange-brown corrugated metal roof, blank cream-colored sign board, dark wooden stilts, torn red flag. |
+| `tower` | Hand-painted stylized cartoon texture, warm sunny colors, soft shading, no text. White painted wooden stilts and railing with red trim, red roof, warm brown wooden ramp slats, red and white life ring. |
+| `lifering` | Hand-painted stylized cartoon texture, bright saturated colors, soft shading, no text. Bright red-orange foam ring, four clean white fabric bands, off-white rope. |
+| `palm_tall` | Hand-painted stylized cartoon texture, bright tropical colors, soft shading. Light brown trunk with darker brown ring segments, vivid green fronds with lighter yellow-green edges, brown coconuts. |
+| `rock_boulder` | Hand-painted stylized cartoon texture, soft shading. Warm grey-beige stone, lighter on top and darker at the bottom, a few white barnacles and soft green algae near the bottom. |
+
+### 4.1 Texture prompt template for everything else
 ```
-realistic, photorealistic, noisy texture, cluttered tiny details, text, letters, logo, watermark, pedestal, base, ground plane, multiple objects, blurry
+Hand-painted stylized cartoon texture with soft shading and bright saturated colors, no photo detail, no text, no logos. <list each part and its colour, e.g. "blue plastic body, white lid, grey handle">.
 ```
 
-## 4. Batch 1 — do these first (they replace what is on screen right now)
-T-01, T-02, P-01, S-01, S-04, I-01, N-01, N-03.
+Batch 1 = T-01, T-02, P-01, S-01, S-04, I-01, N-01, N-03.
 
 ## 5. Characters (rig these)
 Rules for rigging and ragdolls: full body, **A-pose**, arms not touching the body, hands open and empty, legs
