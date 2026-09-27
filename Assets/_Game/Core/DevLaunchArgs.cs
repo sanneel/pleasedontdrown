@@ -11,6 +11,7 @@ namespace PleaseDontDrown.Core
     ///   -pdd-host-offline       start a local host immediately
     ///   -pdd-join &lt;address&gt;    join a local/LAN host immediately
     ///   -pdd-quit-after &lt;sec&gt;  quit after N seconds (smoke tests)
+    ///   -pdd-noinput            ignore real input devices (automated windowed tests)
     /// </summary>
     public class DevLaunchArgs : MonoBehaviour
     {
@@ -27,6 +28,11 @@ namespace PleaseDontDrown.Core
 
         private IEnumerator Start()
         {
+            if (Has("-pdd-noinput"))
+            {
+                GameInput.IgnoreDevices = true; // tests: real mouse/keyboard can't steer this window
+                GameInput.Apply();
+            }
             if (float.TryParse(Value("-pdd-quit-after"), out float quitAfter))
                 StartCoroutine(QuitAfter(quitAfter));
 

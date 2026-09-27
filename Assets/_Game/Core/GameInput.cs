@@ -102,11 +102,18 @@ namespace PleaseDontDrown.Core
         public static void Apply()
         {
             bool play = _uiBlockers == 0;
-            if (play) _gameplay.Enable();
+            if (play && !IgnoreDevices) _gameplay.Enable();
             else _gameplay.Disable();
+            if (IgnoreDevices) _global.Disable();
             Cursor.lockState = play && LocalPlayerExists ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !play || !LocalPlayerExists;
         }
+
+        /// <summary>
+        /// Automated tests (-pdd-noinput): ignore the real mouse, keyboard and gamepad, so someone using the PC
+        /// doesn't steer a test window. Console commands still drive everything.
+        /// </summary>
+        public static bool IgnoreDevices { get; set; }
 
         /// <summary>Set by the player system; without a local player the cursor stays free (menus).</summary>
         public static bool LocalPlayerExists { get; set; }

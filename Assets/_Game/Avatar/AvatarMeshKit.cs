@@ -196,8 +196,10 @@ namespace PleaseDontDrown.Avatars
             _weights.Add(new BoneWeight { boneIndex0 = _bone, weight0 = 1f });
         }
 
-        public Mesh ToMesh(string name, Matrix4x4[] bindposes, Mesh reuse = null)
+        /// <param name="flat">Faceted low-poly shading: every triangle gets its own vertices (and so its own normal).</param>
+        public Mesh ToMesh(string name, Matrix4x4[] bindposes, Mesh reuse = null, bool flat = false)
         {
+            if (flat) Unweld();
             Mesh mesh = reuse != null ? reuse : new Mesh();
             mesh.Clear();
             mesh.name = name;
@@ -210,6 +212,24 @@ namespace PleaseDontDrown.Avatars
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        private void Unweld()
+        {
+            var vertices = new List<Vector3>(_triangles.Count);
+            var colors = new List<Color32>(_triangles.Count);
+            var weights = new List<BoneWeight>(_triangles.Count);
+            for (int i = 0; i < _triangles.Count; i++)
+            {
+                int v = _triangles[i];
+                vertices.Add(_vertices[v]);
+                colors.Add(_colors[v]);
+                weights.Add(_weights[v]);
+                _triangles[i] = i;
+            }
+            _vertices.Clear(); _vertices.AddRange(vertices);
+            _colors.Clear(); _colors.AddRange(colors);
+            _weights.Clear(); _weights.AddRange(weights);
         }
     }
 }

@@ -2,28 +2,25 @@ using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Items;
 using UnityEngine;
 using UnityEngine.Rendering;
-using Bone = PleaseDontDrown.Avatars.AvatarRig.Bone;
 
 namespace PleaseDontDrown.Player
 {
     /// <summary>
-    /// The local player's own arms and hands, How to Fish style.
+    /// The local player's own hands, How to Fish style: just two big, chunky, faceted hands floating in view
+    /// (a stub of wrist, no arms).
     ///
     /// Idle hands rest at the bottom of the view in a frame that follows where you face with a springy lag and a
     /// fixed downward tilt: they sway when you turn and come up into view when you look down. Picking something
     /// up blends each hand from wherever it is into that item's grip (palm position, finger direction, palm
     /// direction, finger curl); letting go blends back. Hands follow a thrown item out for a moment. Swimming
-    /// strokes, CPR presses, reaching for things, waving and climbing have their own poses. Arms reach the hands
-    /// with two-bone IK from shoulders below the camera. Same skin and sleeves as your character.
+    /// strokes, CPR presses, reaching for things, waving and climbing have their own poses. Same skin as your character.
     /// </summary>
     [DefaultExecutionOrder(100)]
     public class FirstPersonArms : MonoBehaviour
     {
-        private const float LengthScale = 1.15f;
-        private const float Thickness = 1.18f;
+        private const float HandSize = 1.35f;    // x life size: big cartoon hands
+        private const float MaxReach = 0.85f;    // from the eye
         private const float IdlePitch = 5f;
-        private static readonly Vector3 ShoulderL = new(-0.2f, -0.3f, 0.05f);
-        private static readonly Vector3 ShoulderR = new(0.2f, -0.3f, 0.05f);
 
         private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave }
 
@@ -31,7 +28,7 @@ namespace PleaseDontDrown.Player
         {
             public bool Right;
             public float Side;
-            public Transform Upper, Fore, Wrist;
+            public Transform Wrist;
             public HandBones Bones;
             public int Key = -1;
             public Vector3 FromPos;        // camera space, at the start of a blend
@@ -47,12 +44,12 @@ namespace PleaseDontDrown.Player
         private PlayerHub _hub;
         private Camera _camera;
         private Transform _root;
-        private readonly Transform[] _bones = new Transform[6 + 2 * HandBones.BoneCount];
+        // Two wrists, then the left hand's fingers, then the right hand's.
+        private readonly Transform[] _bones = new Transform[2 + 2 * HandBones.BoneCount];
         private readonly Hand _left = new() { Right = false, Side = -1f };
         private readonly Hand _right = new() { Right = true, Side = 1f };
         private SkinnedMeshRenderer _renderer;
         private Mesh _mesh;
-        private float _upper, _fore;
         private AvatarLook _look;
         private bool _built;
 
@@ -81,22 +78,16 @@ namespace PleaseDontDrown.Player
             if (_built && look.Equals(_look)) return;
             _look = look;
             float s = 0.93f + look.Height * 0.05f;
-            _upper = 0.29f * s * LengthScale;
-            _fore = 0.26f * s * LengthScale;
 
-            // Arm chains: upper arm (at the shoulder), forearm, wrist.
-            string[] names = { "UpperArmL", "ForearmL", "HandL", "UpperArmR", "ForearmR", "HandR" };
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 2; i++)
             {
-                if (_bones[i] == null) _bones[i] = new GameObject(names[i]).transform;
-                int chainStart = i < 3 ? 0 : 3;
-                _bones[i].SetParent(i == chainStart ? _root : _bones[i - 1], false);
+                if (_bones[i] == null) _bones[i] = new GameObject(i == 0 ? "HandL" : "HandR").transform;
+                _bones[i].SetParent(_root, false);
+                _bones[i].localPosition = new Vector3(i == 0 ? -0.2f : 0.2f, -0.35f, 0.4f);
                 _bones[i].localRotation = Quaternion.identity;
-                _bones[i].localPosition = i == chainStart ? (i == 0 ? ShoulderL : ShoulderR)
-                    : new Vector3(0f, -(i % 3 == 1 ? _upper : _fore), 0f);
             }
             SetupHand(_left, 0, s);
-            SetupHand(_right, 3, s);
+            SetupHand(_right, 1, s);
 
             var kit = new AvatarMeshKit();
             var bindposes = new Matrix4x4[_bones.Length];
@@ -105,17 +96,9 @@ namespace PleaseDontDrown.Player
             Matrix4x4 rootToWorld = _root.localToWorldMatrix;
             for (int i = 0; i < _bones.Length; i++) bindposes[i] = _bones[i].worldToLocalMatrix * rootToWorld;
             void Use(int index) => kit.SetBone(index, bindposes[index].inverse);
-            float limb = AvatarRig.LimbWidthFor(look.Build);
-            void On(Bone b) => Use(b switch
-            {
-                Bone.UpperArmL => 0, Bone.ForearmL => 1, Bone.HandL => 2,
-                Bone.UpperArmR => 3, Bone.ForearmR => 4, _ => 5
-            });
-            AvatarParts.BuildArm(kit, look, true, limb, s, On, LengthScale, Thickness);
-            AvatarParts.BuildArm(kit, look, false, limb, s, On, LengthScale, Thickness);
-            _left.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 2 : 6 + f));
-            _right.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 5 : 6 + HandBones.BoneCount + f));
-            _mesh = kit.ToMesh("FirstPersonArms", bindposes, _mesh);
+            _left.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f), lowPoly: true);
+            _right.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f), lowPoly: true);
+            _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh, flat: true);
 
             if (_renderer == null)
             {
@@ -133,17 +116,15 @@ namespace PleaseDontDrown.Player
             _built = true;
         }
 
-        private void SetupHand(Hand hand, int chain, float s)
+        private void SetupHand(Hand hand, int wrist, float s)
         {
-            hand.Upper = _bones[chain];
-            hand.Fore = _bones[chain + 1];
-            hand.Wrist = _bones[chain + 2];
-            int first = 6 + (hand.Right ? HandBones.BoneCount : 0);
+            hand.Wrist = _bones[wrist];
+            int first = 2 + (hand.Right ? HandBones.BoneCount : 0);
             var reuse = new Transform[HandBones.BoneCount];
             System.Array.Copy(_bones, first, reuse, 0, HandBones.BoneCount);
-            hand.Bones = new HandBones(hand.Wrist, hand.Side, s * AvatarRig.HandScale, reuse);
+            hand.Bones = new HandBones(hand.Wrist, hand.Side, s * HandSize, reuse);
             System.Array.Copy(hand.Bones.Bones, 0, _bones, first, HandBones.BoneCount);
-            hand.Palm = _root.TransformPoint((hand.Right ? ShoulderR : ShoulderL) + new Vector3(0f, -0.4f, 0.2f));
+            hand.Palm = hand.Wrist.position;
             hand.Rot = _root.rotation;
         }
 
@@ -259,10 +240,9 @@ namespace PleaseDontDrown.Player
             {
                 // Reach out and poke / press what we used.
                 state = State.Reach;
-                Vector3 shoulder = _root.TransformPoint(ShoulderR);
                 Vector3 target = _reach != Vector3.zero ? _reach : cam.position + cam.forward * 0.7f - cam.up * 0.15f;
-                Vector3 toTarget = Vector3.ClampMagnitude(target - shoulder, (_upper + _fore) * 0.97f);
-                palm = shoulder + toTarget;
+                Vector3 toTarget = Vector3.ClampMagnitude(target - cam.position, MaxReach);
+                palm = cam.position + toTarget;
                 rot = HandBones.Orient(toTarget, Vector3.down, side);
                 pose = HandPose.Point;
                 blend = 0.1f;
@@ -326,7 +306,7 @@ namespace PleaseDontDrown.Player
                 Vector3 origin = _hub.Head.position;
                 float swing = Mathf.Sin(_stride * Mathf.PI + (hand.Right ? 0f : Mathf.PI));
                 float walk = Mathf.Clamp01(speed / 4.5f) * (motor == null || motor.IsGrounded ? 1f : 0f);
-                var offset = new Vector3(side * 0.2f, -0.245f, 0.44f);
+                var offset = new Vector3(side * 0.23f, -0.265f, 0.45f);
                 offset += new Vector3(0f, -Mathf.Abs(Mathf.Sin(_stride * Mathf.PI)) * 0.018f * walk, swing * 0.03f * walk * (1f - _run));
                 offset += new Vector3(-side * 0.04f, Mathf.Max(0f, swing) * 0.05f, swing * 0.13f) * _run;
                 palm = origin + frame * offset;
@@ -357,18 +337,12 @@ namespace PleaseDontDrown.Player
             Solve(hand);
         }
 
-        /// <summary>Arm IK to the wrist that puts the palm where it should be; the shoulder slides forward if it can't reach.</summary>
+        /// <summary>Puts the hand so its palm is where it should be (hands float; nothing to reach with).</summary>
         private void Solve(Hand hand)
         {
-            hand.Upper.localPosition = hand.Right ? ShoulderR : ShoulderL;
-            Vector3 wrist = hand.Palm - hand.Rot * hand.Bones.PalmContact;
-            Vector3 toWrist = wrist - hand.Upper.position;
-            float reach = (_upper + _fore) * 0.985f;
-            if (toWrist.magnitude > reach) hand.Upper.position = wrist - toWrist.normalized * reach; // off-screen anyway
-
-            Vector3 elbow = -_root.up + _root.right * (hand.Side * 0.7f) - _root.forward * 0.3f;
-            IK.Solve(hand.Upper, hand.Fore, _upper, _fore, wrist, elbow, 1f, false);
-            hand.Wrist.rotation = hand.Rot;
+            Vector3 eye = _camera.transform.position;
+            Vector3 palm = eye + Vector3.ClampMagnitude(hand.Palm - eye, MaxReach + 0.3f);
+            hand.Wrist.SetPositionAndRotation(palm - hand.Rot * hand.Bones.PalmContact, hand.Rot);
             hand.Bones.Pose(hand.Pose);
         }
 

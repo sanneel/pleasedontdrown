@@ -176,25 +176,34 @@ namespace PleaseDontDrown.Avatars
         /// Adds the hand's shapes to a character mesh. <paramref name="on"/> switches to a bone: -1 = the hand (palm),
         /// otherwise a finger bone index (see <see cref="BoneIndex"/>).
         /// </summary>
-        public void BuildMesh(AvatarMeshKit kit, Color skin, Action<int> on)
+        /// <param name="lowPoly">
+        /// Chunky, faceted first-person hand (How to Fish look): fewer sides, thicker fingers, a stub of wrist that
+        /// just ends (no arm). Build the mesh with flat shading.
+        /// </param>
+        public void BuildMesh(AvatarMeshKit kit, Color skin, Action<int> on, bool lowPoly = false)
         {
             float k = _scale;
+            int big = lowPoly ? 7 : 12, small = lowPoly ? 6 : 10, rings = lowPoly ? 4 : 7, fingerSides = lowPoly ? 6 : 7;
+            float chunk = lowPoly ? 1.22f : 1f;
             on(-1);
             // Palm: a soft flattened block, a little wider across the knuckles, with the thumb's fleshy base.
-            kit.Ellipsoid(new Vector3(0f, -0.05f, 0f) * k, new Vector3(0.021f, 0.049f, 0.047f) * k, skin, segments: 12, rings: 8);
-            kit.Ellipsoid(Mirror(new Vector3(0.002f, -0.08f, 0f)) * k, new Vector3(0.02f, 0.017f, 0.048f) * k, skin, segments: 10, rings: 6);    // knuckles
-            kit.Ellipsoid(Mirror(new Vector3(-0.009f, -0.032f, 0.024f)) * k, new Vector3(0.018f, 0.028f, 0.019f) * k, skin, segments: 8, rings: 6); // thumb pad
-            kit.Ellipsoid(new Vector3(0f, -0.004f, 0f) * k, new Vector3(0.02f, 0.02f, 0.032f) * k, skin, segments: 10, rings: 6);                   // wrist
+            kit.Ellipsoid(new Vector3(0f, -0.05f, 0f) * k, new Vector3(0.021f * chunk, 0.049f, 0.047f) * k, skin, segments: big, rings: rings + 1);
+            kit.Ellipsoid(Mirror(new Vector3(0.002f, -0.08f, 0f)) * k, new Vector3(0.02f * chunk, 0.017f, 0.048f) * k, skin, segments: small, rings: rings);  // knuckles
+            kit.Ellipsoid(Mirror(new Vector3(-0.009f, -0.032f, 0.024f)) * k, new Vector3(0.018f * chunk, 0.028f, 0.019f) * k, skin, segments: small, rings: rings); // thumb pad
+            if (lowPoly)
+                kit.Limb(0.035f * k, 0.025f * k, 0.026f * k, skin, new Vector3(0f, 0.03f, 0f) * k, segments: 7, crossSection: new Vector2(0.82f, 1.15f)); // a short wrist that just ends
+            else
+                kit.Ellipsoid(new Vector3(0f, -0.004f, 0f) * k, new Vector3(0.02f, 0.02f, 0.032f) * k, skin, segments: 10, rings: 6);                             // wrist
             Color nail = Color.Lerp(skin, Color.white, 0.45f);
             for (int f = 0; f < Fingers; f++)
             {
                 for (int s = 0; s < Segments; s++)
                 {
                     on(BoneIndex(f, s));
-                    float r0 = Radii[f] * k * (1f - s * 0.1f);
+                    float r0 = Radii[f] * k * (1f - s * 0.1f) * chunk;
                     float r1 = r0 * 0.9f;
-                    kit.Limb(Lengths[f][s] * k, r0, r1, skin, segments: 7);
-                    if (s == Segments - 1)
+                    kit.Limb(Lengths[f][s] * k, r0, r1, skin, segments: fingerSides);
+                    if (s == Segments - 1 && !lowPoly)
                         kit.Ellipsoid(Mirror(new Vector3(r1 / k * 0.55f, -Lengths[f][s] * 0.75f, 0f)) * k,
                             new Vector3(0.0035f, r1 / k * 0.75f, r1 / k * 0.7f) * k, nail, segments: 6, rings: 4); // nail on the back
                 }
