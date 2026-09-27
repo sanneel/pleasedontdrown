@@ -250,7 +250,7 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 5392026139800103363}
   _networkObjectCache: {fileID: 0}
   _displayName: Beach Ball
-  _holdOffset: {x: 0.28, y: -0.3, z: 0.7}
+  _holdOffset: {x: 0.32, y: -0.36, z: 0.85}
   _holdEuler: {x: 0, y: 0, z: 0}
   _throwStrength: 1
   _pickupRange: 3.2

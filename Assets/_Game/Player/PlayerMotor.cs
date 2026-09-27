@@ -210,6 +210,10 @@ namespace PleaseDontDrown.Player
             // next physics step, so AddForce would stack up many times between steps (a beach ball at 27 m/s...).
             float desired = Mathf.Max(HorizontalSpeed, 1.5f) * _pushStrength / Mathf.Max(1f, body.mass / 6f);
             Vector3 v = body.linearVelocity;
+            // Only nudge slow, loose things. Something flying at you just bounces off; walking into it
+            // must not overwrite its momentum with a gentle push.
+            if (v.sqrMagnitude > desired * desired * 4f)
+                return;
             float along = Vector3.Dot(v, dir);
             if (along >= desired)
                 return;

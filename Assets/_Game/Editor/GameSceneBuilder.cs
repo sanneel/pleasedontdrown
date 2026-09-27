@@ -297,14 +297,14 @@ namespace PleaseDontDrown.Editor
             Material blue = GetMaterial("CoolerBlue", new Color(0.18f, 0.45f, 0.85f));
             Material dark = GetMaterial("DarkMetal", new Color(0.18f, 0.18f, 0.2f));
 
-            Item crate = BuildItem("Crate", "Crate", 8f, new Vector3(0f, -0.45f, 0.9f), Vector3.zero, 1f, wood, root =>
+            Item crate = BuildItem("Crate", "Crate", 8f, new Vector3(0f, -0.55f, 1.05f), Vector3.zero, 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cube, "Box", root, Vector3.zero, Vector3.one * 0.6f, crateWood);
                 Primitive(PrimitiveType.Cube, "BandTop", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
                 Primitive(PrimitiveType.Cube, "BandBottom", root, new Vector3(0f, -0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
             });
 
-            Item ball = BuildItem("BeachBall", "Beach Ball", 0.4f, new Vector3(0.28f, -0.3f, 0.7f), Vector3.zero, 1f, bouncy, root =>
+            Item ball = BuildItem("BeachBall", "Beach Ball", 0.4f, new Vector3(0.32f, -0.36f, 0.85f), Vector3.zero, 1f, bouncy, root =>
             {
                 Primitive(PrimitiveType.Sphere, "Ball", root, Vector3.zero, Vector3.one * 0.55f, red);
                 Primitive(PrimitiveType.Cylinder, "Band", root, Vector3.zero, new Vector3(0.56f, 0.06f, 0.56f), white, keepCollider: false);
@@ -313,7 +313,7 @@ namespace PleaseDontDrown.Editor
             }, linearDamping: 0.5f, angularDamping: 0.9f); // rolls ~10-15 m after a sprint kick instead of forever
 
             Mesh torus = GetTorusMesh("Torus", 0.28f, 0.075f);
-            Item ring = BuildItem("LifeRing", "Life Ring", 1.2f, new Vector3(0.3f, -0.28f, 0.72f), new Vector3(70f, 0f, 0f), 1.1f, rubber, root =>
+            Item ring = BuildItem("LifeRing", "Life Ring", 1.2f, new Vector3(0.45f, -0.45f, 1.0f), new Vector3(70f, -30f, 0f), 1.1f, rubber, root =>
             {
                 var go = new GameObject("Ring");
                 go.transform.SetParent(root, false);
@@ -331,7 +331,7 @@ namespace PleaseDontDrown.Editor
                 }
             }, linearDamping: 0.1f, angularDamping: 0.2f);
 
-            Item cooler = BuildItem("Cooler", "Cooler", 4f, new Vector3(0f, -0.5f, 0.8f), Vector3.zero, 1f, wood, root =>
+            Item cooler = BuildItem("Cooler", "Cooler", 4f, new Vector3(0.05f, -0.58f, 0.95f), Vector3.zero, 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.55f, 0.36f, 0.36f), blue);
                 Primitive(PrimitiveType.Cube, "Lid", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.57f, 0.07f, 0.38f), white, keepCollider: false);

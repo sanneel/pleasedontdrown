@@ -452,7 +452,7 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 6336381104561658232}
   _networkObjectCache: {fileID: 0}
   _displayName: Cooler
-  _holdOffset: {x: 0, y: -0.5, z: 0.8}
+  _holdOffset: {x: 0.05, y: -0.58, z: 0.95}
   _holdEuler: {x: 0, y: 0, z: 0}
   _throwStrength: 1
   _pickupRange: 3.2
