@@ -20,6 +20,8 @@ namespace PleaseDontDrown.UI
         private static readonly List<Toast> _toasts = new();
         private GUIStyle _prompt;
         private GUIStyle _toast;
+        private GUIStyle _slot;
+        private GUIStyle _slotKey;
         private Texture2D _dot;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -63,12 +65,23 @@ namespace PleaseDontDrown.UI
             }
 
             PlayerHands hands = local.Hands;
+            if (hands != null) DrawHotbar(hands, cx);
             if (hands != null && hands.HeldItem != null)
             {
                 string throwKey = GameInput.KeyLabel(GameInput.Primary);
                 string dropKey = GameInput.KeyLabel(GameInput.Drop);
-                DrawShadowed(new Rect(cx - 450f, Screen.height - 70f, 900f, 30f),
-                    $"Holding <b>{hands.HeldItem.DisplayName}</b>    <b>[{throwKey}]</b> or hold <b>[{dropKey}]</b> to throw    tap <b>[{dropKey}]</b> to drop", _prompt);
+                bool food = hands.HeldItem.GetComponent<Items.Edible>() != null;
+                string eat = food ? $"    hold <b>[{GameInput.KeyLabel(GameInput.Secondary)}]</b> to eat" : "";
+                DrawShadowed(new Rect(cx - 500f, Screen.height - 112f, 1000f, 30f),
+                    $"Holding <b>{hands.HeldItem.DisplayName}</b>    <b>[{throwKey}]</b> or hold <b>[{dropKey}]</b> to throw    tap <b>[{dropKey}]</b> to drop{eat}", _prompt);
+
+                if (hands.IsEating || hands.EatProgress01 > 0.01f)
+                {
+                    const float width = 160f;
+                    var back = new Rect(cx - width * 0.5f, cy + 60f, width, 8f);
+                    DrawBar(back, hands.EatProgress01, new Color(0.55f, 0.9f, 0.4f));
+                    DrawShadowed(new Rect(cx - 150f, cy + 70f, 300f, 26f), "eating...", _prompt);
+                }
 
                 if (hands.IsCharging)
                 {
@@ -89,11 +102,44 @@ namespace PleaseDontDrown.UI
                 DrawShadowed(new Rect(cx - 400f, Screen.height * 0.16f + i * 30f, 800f, 30f), _toasts[i].Text, _toast);
         }
 
-        /// <summary>Air and stamina bars, shown only while they're not full.</summary>
+        /// <summary>Four inventory slots along the bottom edge; the selected one is highlighted.</summary>
+        private void DrawHotbar(PlayerHands hands, float cx)
+        {
+            const float size = 58f, gap = 6f;
+            float total = PlayerHands.SlotCount * size + (PlayerHands.SlotCount - 1) * gap;
+            float x = cx - total * 0.5f, y = Screen.height - size - 12f;
+            for (int i = 0; i < PlayerHands.SlotCount; i++)
+            {
+                var r = new Rect(x + i * (size + gap), y, size, size);
+                bool active = i == hands.ActiveSlot;
+                GUI.color = active ? new Color(1f, 0.86f, 0.25f, 0.95f) : new Color(0f, 0f, 0f, 0.45f);
+                GUI.DrawTexture(r, _dot);
+                GUI.color = new Color(0f, 0f, 0f, active ? 0.55f : 0.25f);
+                GUI.DrawTexture(new Rect(r.x + 3f, r.y + 3f, r.width - 6f, r.height - 6f), _dot);
+                GUI.color = Color.white;
+                Items.Item item = hands.SlotItem(i);
+                if (item != null)
+                {
+                    string label = item.DisplayName.Length > 9 ? item.DisplayName.Substring(0, 8) + "." : item.DisplayName;
+                    GUI.Label(new Rect(r.x + 2f, r.y + 14f, r.width - 4f, r.height - 16f), label, _slot);
+                }
+                GUI.Label(new Rect(r.x + 4f, r.y + 1f, 20f, 16f), (i + 1).ToString(), _slotKey);
+            }
+        }
+
+        /// <summary>Air, stamina and food bars, shown only while they're not (nearly) full.</summary>
         private void DrawBreath(PlayerMotor motor, float cx)
         {
             const float width = 220f;
-            float y = Screen.height - 110f;
+            float y = Screen.height - 150f;
+            PlayerVitals vitals = PlayerHub.Local != null ? PlayerHub.Local.Vitals : null;
+            if (vitals != null && (vitals.Food01 < 0.5f || Time.time - vitals.LastAteTime < 3f))
+            {
+                DrawBar(new Rect(cx - width * 0.5f, y, width, 8f), vitals.Food01,
+                    vitals.Hungry ? new Color(1f, 0.45f, 0.25f) : new Color(0.55f, 0.9f, 0.4f));
+                DrawShadowed(new Rect(cx - width * 0.5f - 60f, y - 7f, 55f, 22f), "FOOD", _prompt);
+                y -= 18f;
+            }
             if (motor.Air01 < 0.999f || motor.IsHeadUnderwater)
             {
                 DrawBar(new Rect(cx - width * 0.5f, y, width, 10f), motor.Air01,
@@ -138,6 +184,8 @@ namespace PleaseDontDrown.UI
             }
             _prompt ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 18, richText = true, normal = { textColor = Color.white } };
             _toast ??= new GUIStyle(_prompt) { fontSize = 20, normal = { textColor = new Color(1f, 0.95f, 0.8f) } };
+            _slot ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 11, wordWrap = true, normal = { textColor = Color.white } };
+            _slotKey ??= new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold, normal = { textColor = new Color(1f, 1f, 1f, 0.8f) } };
         }
     }
 }

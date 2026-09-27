@@ -19,6 +19,11 @@ namespace PleaseDontDrown.Core
         public static InputAction Primary { get; private set; }
         public static InputAction Secondary { get; private set; }
         public static InputAction Drop { get; private set; }
+        public static InputAction Emote { get; private set; }
+        /// <summary>Inventory slots 1-4.</summary>
+        public static InputAction[] Slots { get; private set; }
+        /// <summary>Mouse wheel (y) cycles slots.</summary>
+        public static InputAction SlotScroll { get; private set; }
 
         /// <summary>Always active, even while UI is open.</summary>
         public static InputAction ToggleConsole { get; private set; }
@@ -62,6 +67,13 @@ namespace PleaseDontDrown.Core
             Secondary.AddBinding("<Gamepad>/leftTrigger");
             Drop = _gameplay.AddAction("Drop", InputActionType.Button, "<Keyboard>/g");
             Drop.AddBinding("<Gamepad>/buttonNorth");
+            Emote = _gameplay.AddAction("Emote", InputActionType.Button, "<Keyboard>/v");
+            Emote.AddBinding("<Gamepad>/dpad/up");
+            Slots = new InputAction[4];
+            for (int i = 0; i < Slots.Length; i++)
+                Slots[i] = _gameplay.AddAction($"Slot{i + 1}", InputActionType.Button, $"<Keyboard>/{i + 1}");
+            SlotScroll = _gameplay.AddAction("SlotScroll", InputActionType.Value, "<Mouse>/scroll/y");
+            SlotScroll.AddCompositeBinding("1DAxis").With("Negative", "<Gamepad>/dpad/left").With("Positive", "<Gamepad>/dpad/right");
 
             _global = new InputActionMap("Global");
             ToggleConsole = _global.AddAction("ToggleConsole", InputActionType.Button, "<Keyboard>/backquote");

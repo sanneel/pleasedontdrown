@@ -108,8 +108,11 @@ namespace PleaseDontDrown.Player
             if (IsSwimming && IsSprinting)
                 Stamina01 = Mathf.Max(0f, Stamina01 - _staminaDrainPerSecond * dt);
             else
-                Stamina01 = Mathf.Min(1f, Stamina01 + _staminaRefillPerSecond * dt);
+                Stamina01 = Mathf.Min(1f, Stamina01 + _staminaRefillPerSecond * StaminaRefillScale * dt);
         }
+
+        /// <summary>A snack (or a breather) fills stamina right up.</summary>
+        public void RestoreStamina() => Stamina01 = 1f;
 
         /// <summary>Carrying slows you down, more in water than on land.</summary>
         private float CarryFactor(float perKg)
@@ -152,7 +155,7 @@ namespace PleaseDontDrown.Player
             if (rise && IsHeadUnderwater) wish += Vector3.up;
             if (wish.sqrMagnitude > 1f) wish.Normalize();
 
-            float speed = (IsSprinting ? _swimSprintSpeed : _swimSpeed) * SpeedMultiplier * CarryFactor(0.06f);
+            float speed = (IsSprinting ? _swimSprintSpeed : _swimSpeed) * SpeedMultiplier * HungerSpeedScale * CarryFactor(0.06f);
             Vector3 target = wish * speed;
 
             bool verticalIntent = dive || (rise && IsHeadUnderwater);

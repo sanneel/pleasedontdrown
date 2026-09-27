@@ -27,7 +27,7 @@ namespace PleaseDontDrown.UI
 
         private void OnToggleMenu(InputAction.CallbackContext _)
         {
-            if (DevConsole.IsOpen || !_connection.IsActive) return; // Esc closes the console first
+            if (DevConsole.IsOpen || AvatarCustomizer.IsOpen || !_connection.IsActive) return; // Esc closes those first
             SetPause(!_pauseOpen);
         }
 
@@ -49,12 +49,12 @@ namespace PleaseDontDrown.UI
         private void OnGUI()
         {
             bool active = _connection.IsActive;
-            if (active && !_pauseOpen)
+            if ((active && !_pauseOpen) || AvatarCustomizer.IsOpen)
                 return;
 
             _title ??= new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold };
 
-            GUILayout.BeginArea(new Rect(20, 20, 360, 440), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(20, 20, 360, 480), GUI.skin.box);
             GUILayout.Label("PLEASE DON'T DROWN", _title);
             GUILayout.Label(active ? "Paused" : $"Prototype build {NetVersion.Current}");
             GUILayout.Space(6);
@@ -94,6 +94,8 @@ namespace PleaseDontDrown.UI
                 }
             }
 
+            GUILayout.Space(6);
+            if (GUILayout.Button("Customize your lifeguard", GUILayout.Height(28))) AvatarCustomizer.Open();
             GUILayout.Space(8);
             GUILayout.Label("<color=#aaaaaa>WASD move · Shift sprint · Ctrl crouch · Space jump · E use · ` console</color>",
                 new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true });

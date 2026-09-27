@@ -12,6 +12,7 @@ using FishNet.Managing.Transporting;
 using FishNet.Object;
 using FishNet.Transporting.Multipass;
 using FishNet.Transporting.Tugboat;
+using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Interaction;
 using PleaseDontDrown.Items;
@@ -252,20 +253,22 @@ namespace PleaseDontDrown.Editor
             rootSync.SetSynchronizeRotation(false);
             rootSync.SetSynchronizeScale(false);
 
-            GameObject body = Primitive(PrimitiveType.Capsule, "Body", root.transform, new Vector3(0f, 0.9f, 0f), new Vector3(0.7f, 0.9f, 0.7f),
-                GetMaterial("Player_Body", Color.white), keepCollider: false);
-
             var head = new GameObject("Head").transform;
             head.SetParent(root.transform, false);
             head.localPosition = new Vector3(0f, 1.65f, 0f);
             var headSync = head.gameObject.AddComponent<NetworkTransform>(); // local height (crouch) + pitch
             headSync.SetSynchronizeScale(false);
-            GameObject visor = Primitive(PrimitiveType.Cube, "Visor", head, new Vector3(0f, 0.02f, 0.3f), new Vector3(0.5f, 0.14f, 0.14f),
-                GetMaterial("Player_Visor", new Color(0.08f, 0.08f, 0.1f)), keepCollider: false);
-            GameObject cap = Primitive(PrimitiveType.Cube, "Cap", head, new Vector3(0f, 0.14f, 0.1f), new Vector3(0.64f, 0.08f, 0.74f),
-                GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f)), keepCollider: false);
 
-            TextMesh nameTag = WorldText(root.transform, "NameTag", new Vector3(0f, 2.2f, 0f), "Lifeguard", 64, 0.045f, Color.white);
+            // The cartoon body (built at runtime from the player's look) and its procedural animator.
+            var avatarGo = new GameObject("Avatar");
+            avatarGo.transform.SetParent(root.transform, false);
+            avatarGo.AddComponent<SkinnedMeshRenderer>();
+            var rig = avatarGo.AddComponent<AvatarRig>();
+            SetRef(rig, "_material", AvatarMaterial());
+            var animator = avatarGo.AddComponent<AvatarAnimator>();
+            SetRef(animator, "_rig", rig);
+
+            TextMesh nameTag = WorldText(root.transform, "NameTag", new Vector3(0f, 2.2f, 0f), "Lifeguard", 64, 0.045f, Color.white, onTop: true);
             nameTag.gameObject.SetActive(false);
 
             // Owner-only systems are saved DISABLED so they never run (or register commands) on remote copies.
@@ -283,6 +286,14 @@ namespace PleaseDontDrown.Editor
             Require(splashSo, "_minDownSpeed").floatValue = 3f;
             splashSo.ApplyModifiedPropertiesWithoutUndo();
             SetRef(hub, "_hands", hands);
+            var vitals = root.AddComponent<PlayerVitals>(); // food meter (owner)
+            SetRef(vitals, "_hub", hub);
+            SetRef(hub, "_vitals", vitals);
+            var avatarDriver = root.AddComponent<PlayerAvatar>(); // every machine: animates the body from synced state
+            SetRef(avatarDriver, "_hub", hub);
+            SetRef(avatarDriver, "_rig", rig);
+            SetRef(avatarDriver, "_animator", animator);
+            SetRef(hub, "_avatar", avatarDriver);
 
             var steps = root.AddComponent<PlayerFootsteps>(); // everyone's footsteps, on every machine
             SetRef(steps, "_hub", hub);
@@ -298,17 +309,7 @@ namespace PleaseDontDrown.Editor
             SetRef(hub, "_look", look);
             SetRef(hub, "_interactor", interactor);
             SetRef(hub, "_head", head);
-            SetRef(hub, "_body", body.transform);
-            SetRef(hub, "_bodyRenderer", body.GetComponent<Renderer>());
             SetRef(hub, "_nameTag", nameTag);
-            SetRefs(hub, "_selfHiddenRenderers", body.GetComponent<Renderer>(), visor.GetComponent<Renderer>(), cap.GetComponent<Renderer>());
-
-            if (MeshyArt.Player(root, body.transform, head))
-            {
-                SetRef(hub, "_bodyRenderer", null);
-                SetRefs(hub, "_selfHiddenRenderers", body.GetComponentsInChildren<Renderer>().Cast<Object>().ToArray());
-                SetRef(hub, "_modelFacing", body.transform);
-            }
 
             GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
             Object.DestroyImmediate(root);
@@ -338,23 +339,24 @@ namespace PleaseDontDrown.Editor
             Material blue = GetMaterial("CoolerBlue", new Color(0.18f, 0.45f, 0.85f));
             Material dark = GetMaterial("DarkMetal", new Color(0.18f, 0.18f, 0.2f));
 
-            Item crate = BuildItem("Crate", "Crate", 8f, new Vector3(0f, -0.55f, 1.05f), Vector3.zero, 1f, wood, root =>
+            Item crate = BuildItem("Crate", "Crate", 8f, new Vector3(0f, -0.5f, 0.86f), Vector3.zero, 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cube, "Box", root, Vector3.zero, Vector3.one * 0.6f, crateWood);
                 Primitive(PrimitiveType.Cube, "BandTop", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
                 Primitive(PrimitiveType.Cube, "BandBottom", root, new Vector3(0f, -0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
             }, density: 0.55f, waterDrag: 1.4f);
 
-            Item ball = BuildItem("BeachBall", "Beach Ball", 0.4f, new Vector3(0.32f, -0.36f, 0.85f), Vector3.zero, 1f, bouncy, root =>
+            Item ball = BuildItem("BeachBall", "Beach Ball", 0.4f, new Vector3(0.1f, -0.34f, 0.72f), Vector3.zero, 1f, bouncy, root =>
             {
                 Primitive(PrimitiveType.Sphere, "Ball", root, Vector3.zero, Vector3.one * 0.55f, red);
                 Primitive(PrimitiveType.Cylinder, "Band", root, Vector3.zero, new Vector3(0.56f, 0.06f, 0.56f), white, keepCollider: false);
                 Primitive(PrimitiveType.Cylinder, "Band2", root, Vector3.zero, new Vector3(0.56f, 0.06f, 0.56f), yellow, keepCollider: false)
                     .transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            }, linearDamping: 0.5f, angularDamping: 0.9f, density: 0.1f, waterDrag: 0.8f); // rolls ~10-15 m after a sprint kick instead of forever
+            }, linearDamping: 0.5f, angularDamping: 0.9f, density: 0.1f, waterDrag: 0.8f, // rolls ~10-15 m after a sprint kick instead of forever
+                configure: go => SetBool(go.GetComponent<Item>(), "_pocketable", true));
 
             Mesh torus = GetTorusMesh("Torus", 0.28f, 0.075f);
-            Item ring = BuildItem("LifeRing", "Life Ring", 1.2f, new Vector3(0.45f, -0.45f, 1.0f), new Vector3(70f, -30f, 0f), 1.1f, rubber, root =>
+            Item ring = BuildItem("LifeRing", "Life Ring", 1.2f, new Vector3(0.36f, -0.42f, 0.84f), new Vector3(70f, -30f, 0f), 1.1f, rubber, root =>
             {
                 var go = new GameObject("Ring");
                 go.transform.SetParent(root, false);
@@ -371,14 +373,39 @@ namespace PleaseDontDrown.Editor
                         new Vector3(0.165f, 0.165f, 0.06f), white, keepCollider: false).transform.localRotation = Quaternion.Euler(0f, -angle, 0f);
                 }
             }, linearDamping: 0.1f, angularDamping: 0.2f, density: 0.25f, waterDrag: 1.1f,
-                configure: go => go.AddComponent<Floatable>()); // tourists in the water grab it
+                configure: go =>
+                {
+                    go.AddComponent<Floatable>(); // tourists in the water grab it
+                    SetEnum(go.GetComponent<Item>(), "_grip", (int)ItemGrip.OneHand);
+                    SetBool(go.GetComponent<Item>(), "_pocketable", true);
+                });
 
-            Item cooler = BuildItem("Cooler", "Cooler", 4f, new Vector3(0.05f, -0.58f, 0.95f), Vector3.zero, 1f, wood, root =>
+            Item cooler = BuildItem("Cooler", "Cooler", 4f, new Vector3(0.02f, -0.52f, 0.8f), Vector3.zero, 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.55f, 0.36f, 0.36f), blue);
                 Primitive(PrimitiveType.Cube, "Lid", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.57f, 0.07f, 0.38f), white, keepCollider: false);
                 Primitive(PrimitiveType.Cube, "Handle", root, new Vector3(0f, 0.25f, 0f), new Vector3(0.3f, 0.04f, 0.05f), dark, keepCollider: false);
             }, density: 0.4f, waterDrag: 1.2f);
+
+            Material husk = GetMaterial("Coconut", new Color(0.45f, 0.28f, 0.15f));
+            Material huskDark = GetMaterial("CoconutDark", new Color(0.2f, 0.12f, 0.07f));
+            Item coconut = BuildItem("Coconut", "Coconut", 1.1f, new Vector3(0.24f, -0.3f, 0.55f), new Vector3(-20f, 0f, 0f), 1f, wood, root =>
+            {
+                Primitive(PrimitiveType.Sphere, "Husk", root, Vector3.zero, new Vector3(0.2f, 0.23f, 0.2f), husk);
+                for (int i = 0; i < 3; i++)
+                {
+                    float a = i * 120f * Mathf.Deg2Rad;
+                    Primitive(PrimitiveType.Sphere, "Eye", root, new Vector3(Mathf.Cos(a) * 0.035f, 0.1f, Mathf.Sin(a) * 0.035f), Vector3.one * 0.03f, huskDark, keepCollider: false);
+                }
+            }, linearDamping: 0.1f, angularDamping: 0.4f, density: 0.55f, waterDrag: 1.0f, configure: go =>
+            {
+                Item item = go.GetComponent<Item>();
+                SetBool(item, "_pocketable", true);
+                SetEnum(item, "_grip", (int)ItemGrip.OneHand);
+                AudioSource audio = SpatialAudio(go, 1.5f, 25f);
+                SetRef(go.AddComponent<Edible>(), "_audio", audio);
+                SetRef(go.AddComponent<ImpactSound>(), "_audio", audio);
+            });
 
             Item tourist = BuildTourist(torus);
 
@@ -388,7 +415,7 @@ namespace PleaseDontDrown.Editor
                 catalog = ScriptableObject.CreateInstance<ItemCatalog>();
                 AssetDatabase.CreateAsset(catalog, ItemCatalogPath);
             }
-            SetRefs(catalog, "_items", crate, ball, ring, cooler, tourist);
+            SetRefs(catalog, "_items", crate, ball, ring, cooler, coconut, tourist);
             EditorUtility.SetDirty(catalog);
             return catalog;
         }
@@ -447,11 +474,6 @@ namespace PleaseDontDrown.Editor
         /// </summary>
         private static Item BuildTourist(Mesh torus)
         {
-            Material cloth = GetMaterial("TouristCloth", Color.white);
-            Material skin = GetMaterial("TouristSkin", new Color(1f, 0.82f, 0.7f));
-            Material black = GetMaterial("TouristEyes", new Color(0.05f, 0.05f, 0.06f));
-            Material mouth = GetMaterial("TouristMouth", new Color(0.45f, 0.12f, 0.12f));
-            Material floatie = GetMaterial("Floatie", new Color(1f, 0.5f, 0.1f), smoothness: 0.6f);
             PhysicsMaterial flesh = GetPhysicsMaterial("Flesh", 0.05f, 0.7f, PhysicsMaterialCombine.Minimum);
 
             var root = new GameObject("Tourist");
@@ -470,20 +492,19 @@ namespace PleaseDontDrown.Editor
             headCol.radius = 0.15f;
             headCol.sharedMaterial = flesh;
 
-            // Visuals without colliders under one transform (squished during CPR).
+            // Visuals without colliders under one transform (squished during CPR): a cartoon body built from the
+            // tourist's synced seed at runtime; its arms and legs follow the physics limbs below.
             var visual = new GameObject("Visual").transform;
             visual.SetParent(root.transform, false);
-            GameObject torso = Primitive(PrimitiveType.Capsule, "Torso", visual, Vector3.zero, new Vector3(0.4f, 0.36f, 0.34f), cloth, keepCollider: false);
-            GameObject shorts = Primitive(PrimitiveType.Cube, "Shorts", visual, new Vector3(0f, -0.3f, 0f), new Vector3(0.42f, 0.2f, 0.3f), cloth, keepCollider: false);
-            GameObject head = Primitive(PrimitiveType.Sphere, "Head", visual, new Vector3(0f, 0.52f, 0f), Vector3.one * 0.3f, skin, keepCollider: false);
-            GameObject hair = Primitive(PrimitiveType.Sphere, "Hair", visual, new Vector3(0f, 0.6f, -0.02f), new Vector3(0.31f, 0.16f, 0.31f), cloth, keepCollider: false);
-            GameObject eyeL = Primitive(PrimitiveType.Cube, "EyeL", visual, new Vector3(-0.055f, 0.54f, 0.135f), new Vector3(0.035f, 0.035f, 0.02f), black, keepCollider: false);
-            GameObject eyeR = Primitive(PrimitiveType.Cube, "EyeR", visual, new Vector3(0.055f, 0.54f, 0.135f), new Vector3(0.035f, 0.035f, 0.02f), black, keepCollider: false);
-            GameObject mouthGo = Primitive(PrimitiveType.Cube, "Mouth", visual, new Vector3(0f, 0.465f, 0.14f), new Vector3(0.06f, 0.02f, 0.02f), mouth, keepCollider: false);
-
-            var skinParts = new List<Object> { head.GetComponent<Renderer>() };
-            var shortsParts = new List<Object> { shorts.GetComponent<Renderer>() };
-            var floaties = new List<Object>();
+            var avatarGo = new GameObject("Avatar");
+            avatarGo.transform.SetParent(visual, false);
+            avatarGo.transform.localPosition = new Vector3(0f, -1.22f, 0f);
+            avatarGo.AddComponent<SkinnedMeshRenderer>(); // exists up front so the hover outline finds it
+            var rig = avatarGo.AddComponent<AvatarRig>();
+            SetRef(rig, "_material", AvatarMaterial());
+            var rigSo = new SerializedObject(rig);
+            Require(rigSo, "_buildOnAwake").boolValue = false;
+            rigSo.ApplyModifiedPropertiesWithoutUndo();
 
             // Limbs: pivot at the shoulder / hip, hanging straight down (VictimBody's rest pose).
             void Limb(string limbName, Vector3 pivot, float mass, float length, float radius, bool arm)
@@ -501,25 +522,6 @@ namespace PleaseDontDrown.Editor
                 col.radius = radius;
                 col.height = length;
                 col.sharedMaterial = flesh;
-                GameObject look = Primitive(PrimitiveType.Capsule, "Skin", limb.transform, new Vector3(0f, -length * 0.5f, 0f),
-                    new Vector3(radius * 2f, length * 0.5f, radius * 2f), skin, keepCollider: false);
-                skinParts.Add(look.GetComponent<Renderer>());
-                if (arm)
-                {
-                    var ring = new GameObject("Floatie");
-                    ring.transform.SetParent(limb.transform, false);
-                    ring.transform.localPosition = new Vector3(0f, -0.14f, 0f);
-                    ring.transform.localScale = Vector3.one * 0.42f;
-                    ring.AddComponent<MeshFilter>().sharedMesh = torus;
-                    ring.AddComponent<MeshRenderer>().sharedMaterial = floatie;
-                    ring.SetActive(false);
-                    floaties.Add(ring);
-                }
-                else
-                {
-                    GameObject leg = Primitive(PrimitiveType.Cube, "ShortsLeg", limb.transform, new Vector3(0f, -0.1f, 0f), new Vector3(0.17f, 0.2f, 0.17f), cloth, keepCollider: false);
-                    shortsParts.Add(leg.GetComponent<Renderer>());
-                }
                 var limbFloat = new SerializedObject(limb.AddComponent<Buoyancy>());
                 Require(limbFloat, "_density").floatValue = 0.97f;
                 Require(limbFloat, "_waterDrag").floatValue = 2.2f;
@@ -549,6 +551,7 @@ namespace PleaseDontDrown.Editor
             Require(itemSo, "_carryMass").floatValue = 12f;   // the water (and adrenaline) carries most of it
             Require(itemSo, "_throwStrength").floatValue = 1f;
             Require(itemSo, "_pickupRange").floatValue = 3.4f;
+            Require(itemSo, "_grip").enumValueIndex = (int)ItemGrip.Person;
             itemSo.ApplyModifiedPropertiesWithoutUndo();
 
             var interactable = new SerializedObject(root.AddComponent<Interactable>());
@@ -558,23 +561,8 @@ namespace PleaseDontDrown.Editor
             root.AddComponent<VictimBrain>();
             var victimBody = GetOrAdd<VictimBody>(root); // VictimBrain's RequireComponent already added it
             SetRef(victimBody, "_visual", visual);
-            SetRefs(victimBody, "_eyes", eyeL.transform, eyeR.transform);
-            SetRef(victimBody, "_mouth", mouthGo.transform);
-            SetRefs(victimBody, "_shirt", torso.GetComponent<Renderer>());
-            SetRefs(victimBody, "_shorts", shortsParts.ToArray());
-            SetRefs(victimBody, "_skin", skinParts.ToArray());
-            SetRefs(victimBody, "_hair", hair.GetComponent<Renderer>());
-            SetRefs(victimBody, "_floaties", floaties.ToArray());
+            SetRef(victimBody, "_avatar", rig);
             SetRef(victimBody, "_audio", SpatialAudio(root, 3f, 70f));
-
-            if (MeshyArt.Tourist(root, visual))
-            {
-                SetRefs(victimBody, "_shirt");
-                SetRefs(victimBody, "_shorts");
-                SetRefs(victimBody, "_skin");
-                SetRefs(victimBody, "_hair");
-                SetRefs(victimBody, "_floaties");
-            }
 
             GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, $"{ItemPrefabDir}/Tourist.prefab");
             Object.DestroyImmediate(root);
@@ -596,9 +584,9 @@ namespace PleaseDontDrown.Editor
             Place("Crate", new Vector3(-3.8f, 0.92f, 9.2f), 20f);
             Place("Crate", new Vector3(-4.6f, 0.3f, 9.8f), -12f);
             Place("Beach Ball", new Vector3(4.5f, 0.3f, 14f));
-            Place("Life Ring", new Vector3(1f, 1.4f, 11.3f));
+            Place("Life Ring", new Vector3(0.9f, 1.05f, 9.3f)); // inside the shack
             Place("Life Ring", new Vector3(15.5f, 0.1f, 5f), 30f);
-            Place("Cooler", new Vector3(-1.9f, 0.6f, 10.2f), 15f);
+            Place("Cooler", new Vector3(-2.2f, 0.4f, 11.2f), 15f);
             // Already floating in the sea.
             Place("Crate", new Vector3(4f, 0.5f, -14f), 35f);
             Place("Life Ring", new Vector3(-3f, 0.2f, -17f));
@@ -640,7 +628,8 @@ namespace PleaseDontDrown.Editor
             Transform env = new GameObject("Environment").transform;
             BuildBeach(env);
             BuildStation(env);
-            MeshyArt.Palms(env, BeachHeight);
+            foreach (GameObject palm in MeshyArt.Palms(env, BeachHeight))
+                MakeShakeable(palm);
             PlaceItems(catalog);
             BuildDrillBoard(env);
             Transform[] spawns = BuildSpawnPoints();
@@ -651,7 +640,10 @@ namespace PleaseDontDrown.Editor
             rescue.AddComponent<RescueService>();
 
             new GameObject("Steam").AddComponent<SteamBootstrap>();
-            SetRef(new GameObject("GameContent").AddComponent<GameContent>(), "_items", catalog);
+            var content = new GameObject("GameContent").AddComponent<GameContent>();
+            SetRef(content, "_items", catalog);
+            SetRef(content, "_avatarMaterial", AvatarMaterial());
+            SetRef(content, "_worldTextMaterial", WorldTextMaterial());
             if (catalog == null) throw new InvalidOperationException("Item catalog missing after scene creation");
             var ui = new GameObject("UI");
             ui.AddComponent<PlayerHud>();
@@ -659,6 +651,7 @@ namespace PleaseDontDrown.Editor
             ui.AddComponent<DevTools>();
             ui.AddComponent<ItemDebugView>();
             ui.AddComponent<RescueHud>();
+            ui.AddComponent<AvatarCustomizer>();
             BuildNetworkManager(playerPrefab, spawns);
 
             AssignSceneIds(scene);
@@ -872,7 +865,24 @@ namespace PleaseDontDrown.Editor
             Primitive(PrimitiveType.Cube, "Roof", shack, new Vector3(0f, 2.9f, 0f), new Vector3(5.4f, 0.15f, 4.4f), red).transform.localRotation = Quaternion.Euler(-6f, 0f, 0f);
             Primitive(PrimitiveType.Cube, "Counter", shack, new Vector3(0f, 0.85f, 1.3f), new Vector3(3.2f, 0.9f, 0.6f), wood);
 
-            bool meshyShack = MeshyArt.Structure("station_rusty", shack, 4f);
+            // The Meshy shack, scaled up so a lifeguard fits through its door; walk in and switch the light on.
+            bool meshyShack = MeshyArt.Shack(shack, ShackScale, out MeshyArt.DoorSpec shackDoor);
+            if (meshyShack)
+            {
+                BuildDoor(shack, "ShackDoor", shackDoor, new Color(0.5f, 0.33f, 0.2f), new Color(0.36f, 0.23f, 0.14f), planks: true);
+                // A shelf along the back wall with a radio and the first-aid kit.
+                float k = ShackScale;
+                Primitive(PrimitiveType.Cube, "Shelf", shack, new Vector3(0.28f * k, 0.575f * k + 0.95f, -1.18f * k + 0.25f), new Vector3(1.4f, 0.06f, 0.42f), wood);
+                Primitive(PrimitiveType.Cube, "ShelfLegL", shack, new Vector3(0.28f * k - 0.62f, 0.575f * k + 0.47f, -1.18f * k + 0.25f), new Vector3(0.06f, 0.95f, 0.36f), wood);
+                Primitive(PrimitiveType.Cube, "ShelfLegR", shack, new Vector3(0.28f * k + 0.62f, 0.575f * k + 0.47f, -1.18f * k + 0.25f), new Vector3(0.06f, 0.95f, 0.36f), wood);
+                Primitive(PrimitiveType.Cube, "Radio", shack, new Vector3(0.28f * k - 0.3f, 0.575f * k + 1.08f, -1.18f * k + 0.25f), new Vector3(0.36f, 0.2f, 0.16f), dark, keepCollider: false);
+                Primitive(PrimitiveType.Cube, "FirstAid", shack, new Vector3(0.28f * k + 0.3f, 0.575f * k + 1.06f, -1.18f * k + 0.25f), new Vector3(0.3f, 0.16f, 0.2f),
+                    GetMaterial("FirstAidGreen", new Color(0.2f, 0.62f, 0.32f)), keepCollider: false);
+                Primitive(PrimitiveType.Cube, "FirstAidCross", shack, new Vector3(0.28f * k + 0.3f, 0.575f * k + 1.06f, -1.18f * k + 0.25f + 0.101f), new Vector3(0.12f, 0.04f, 0.01f),
+                    GetMaterial("White", new Color(0.95f, 0.95f, 0.95f)), keepCollider: false);
+                Primitive(PrimitiveType.Cube, "FirstAidCross2", shack, new Vector3(0.28f * k + 0.3f, 0.575f * k + 1.06f, -1.18f * k + 0.25f + 0.101f), new Vector3(0.04f, 0.12f, 0.01f),
+                    GetMaterial("White", new Color(0.95f, 0.95f, 0.95f)), keepCollider: false);
+            }
 
             TextMesh roofSign = WorldText(shack, "RoofSign", new Vector3(0f, 3.4f, -2.2f), "LIFEGUARD (probably)", 80, 0.06f, red.color);
             roofSign.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
@@ -892,11 +902,13 @@ namespace PleaseDontDrown.Editor
             lightSwitch.transform.localPosition = new Vector3(-2.3f, 1.35f, -1.66f);
             if (meshyShack)
             {
-                lightSwitch.transform.localPosition = new Vector3(-2.1f, 1.35f, 1.9f);
-                Primitive(PrimitiveType.Cube, "SwitchPost", shack, new Vector3(-2.1f, 0.7f, 1.95f), new Vector3(0.12f, 1.4f, 0.12f), wood);
-                bulb.transform.localPosition = new Vector3(0f, 2.35f, 1.65f);
-                roofSign.transform.localPosition = new Vector3(0f, 3.5f, 1.6f);
-                roofSign.characterSize = 0.035f;
+                // Inside: the lamp hangs from the ceiling, the switch is on the wall by the door.
+                float k = ShackScale;
+                lightSwitch.transform.localPosition = new Vector3(0.95f * k, 0.575f * k + 1.3f, 0.65f * k - 0.1f);
+                bulb.transform.localPosition = new Vector3(0.28f * k, 2.55f * k - 0.3f, -0.26f * k);
+                lamp.range = 6f;
+                roofSign.transform.localPosition = new Vector3(0.12f * k, 2.55f * k + 0.35f, 0.65f * k + 0.45f);
+                roofSign.characterSize = 0.04f;
             }
             GameObject plate = Primitive(PrimitiveType.Cube, "Plate", lightSwitch.transform, Vector3.zero, new Vector3(0.16f, 0.24f, 0.06f), dark);
             lightSwitch.AddComponent<NetworkObject>();
@@ -951,13 +963,87 @@ namespace PleaseDontDrown.Editor
             var tower = new GameObject("Tower").transform;
             TagSurface(tower.gameObject, SurfaceKind.Wood);
             tower.SetParent(env, false);
-            tower.position = new Vector3(12f, 0f, 7.5f);
+            tower.position = new Vector3(12f, 0f, 8f);
             tower.rotation = Quaternion.Euler(0f, 180f, 0f);
             foreach (Vector3 p in new[] { new Vector3(-0.8f, 1.5f, -0.8f), new Vector3(0.8f, 1.5f, -0.8f), new Vector3(-0.8f, 1.5f, 0.8f), new Vector3(0.8f, 1.5f, 0.8f) })
                 Primitive(PrimitiveType.Cube, "Leg", tower, p, new Vector3(0.15f, 3f, 0.15f), wood);
             Primitive(PrimitiveType.Cube, "Platform", tower, new Vector3(0f, 3.1f, 0f), new Vector3(2.2f, 0.2f, 2.2f), wood);
             Primitive(PrimitiveType.Cube, "Ramp", tower, new Vector3(0f, 1.5f, 2.6f), new Vector3(1f, 0.1f, 4f), wood).transform.localRotation = Quaternion.Euler(38f, 0f, 0f);
-            MeshyArt.Structure("tower", tower, 5.5f);
+            if (MeshyArt.Tower(tower, TowerScale, out MeshyArt.DoorSpec towerDoor))
+            {
+                BuildDoor(tower, "TowerDoor", towerDoor, new Color(0.47f, 0.35f, 0.28f), new Color(0.93f, 0.93f, 0.9f), planks: false);
+                // A stool to sit on and watch the water.
+                float k = TowerScale, deck = 2.285f * k;
+                Primitive(PrimitiveType.Cylinder, "StoolSeat", tower, new Vector3(0.45f, deck + 0.62f, -1.1f * k), new Vector3(0.38f, 0.03f, 0.38f), wood);
+                Primitive(PrimitiveType.Cylinder, "StoolLeg", tower, new Vector3(0.45f, deck + 0.3f, -1.1f * k), new Vector3(0.08f, 0.3f, 0.08f), wood);
+            }
+        }
+
+        /// <summary>A palm you can shake for coconuts (Interact on the trunk).</summary>
+        private static void MakeShakeable(GameObject palm)
+        {
+            palm.AddComponent<NetworkObject>();
+            var tree = palm.AddComponent<PalmTree>();
+            Transform model = palm.transform.childCount > 0 ? palm.transform.GetChild(0) : null;
+            SetRef(tree, "_model", model);
+            SetRef(tree, "_audio", SpatialAudio(palm, 3f, 35f));
+            var so = new SerializedObject(tree);
+            Require(so, "_crownHeight").floatValue = palm.GetComponentsInChildren<Renderer>().Select(r => r.bounds.max.y).DefaultIfEmpty(6f).Max() - palm.transform.position.y - 1.4f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            ConfigureInteractable(palm.AddComponent<Interactable>(), palm.GetComponents<Collider>(),
+                palm.GetComponentsInChildren<Renderer>(), 3f);
+        }
+
+        private const float ShackScale = 1.45f;
+        private const float TowerScale = 1.2f;
+
+        /// <summary>
+        /// A hinged, networked door in a structure's doorway, plus a frame around the gap that hides the cut edges
+        /// of the Meshy wall. <paramref name="planks"/> adds a board-and-brace pattern (old shack door).
+        /// </summary>
+        private static void BuildDoor(Transform parent, string name, MeshyArt.DoorSpec spec, Color leafColor, Color frameColor, bool planks)
+        {
+            Material leafMat = GetMaterial(name + "Leaf", leafColor);
+            Material trimMat = GetMaterial(name + "Frame", frameColor);
+            Material darker = GetMaterial(name + "Boards", leafColor * 0.78f);
+            Material brass = GetMaterial("Brass", new Color(0.85f, 0.65f, 0.25f), metallic: 0.8f, smoothness: 0.7f);
+            float w = spec.Width, h = spec.Height, dir = spec.LeafDirection;
+            const float thick = 0.06f, trim = 0.09f;
+
+            var root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            root.transform.localPosition = spec.Hinge;
+            var hinge = new GameObject("Hinge").transform;
+            hinge.SetParent(root.transform, false);
+
+            GameObject leaf = Primitive(PrimitiveType.Cube, "Leaf", hinge, new Vector3(dir * w * 0.5f, h * 0.5f, 0f), new Vector3(w - 0.02f, h - 0.02f, thick), leafMat);
+            TagSurface(leaf, SurfaceKind.Wood);
+            var extras = new List<Renderer> { leaf.GetComponent<Renderer>() };
+            if (planks)
+            {
+                for (int i = 1; i < 4; i++)
+                    extras.Add(Primitive(PrimitiveType.Cube, "Groove", hinge, new Vector3(dir * w * i / 4f, h * 0.5f, spec.WallFacing * thick * 0.5f),
+                        new Vector3(0.015f, h - 0.06f, 0.01f), darker, keepCollider: false).GetComponent<Renderer>());
+                foreach (float y in new[] { 0.22f, 0.78f })
+                    extras.Add(Primitive(PrimitiveType.Cube, "Brace", hinge, new Vector3(dir * w * 0.5f, h * y, spec.WallFacing * (thick * 0.5f + 0.012f)),
+                        new Vector3(w - 0.1f, 0.1f, 0.025f), darker, keepCollider: false).GetComponent<Renderer>());
+            }
+            foreach (float side in new[] { 1f, -1f })
+                extras.Add(Primitive(PrimitiveType.Sphere, "Knob", hinge, new Vector3(dir * (w - 0.1f), h * 0.47f, side * (thick * 0.5f + 0.025f)),
+                    Vector3.one * 0.06f, brass, keepCollider: false).GetComponent<Renderer>());
+
+            // Frame around the gap (outside the swing, so the door never catches on it).
+            float mid = dir * w * 0.5f;
+            Primitive(PrimitiveType.Cube, "JambHinge", root.transform, new Vector3(-dir * trim * 0.5f, h * 0.5f, 0f), new Vector3(trim, h + trim, 0.26f), trimMat, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "JambLatch", root.transform, new Vector3(dir * (w + trim * 0.5f), h * 0.5f, 0f), new Vector3(trim, h + trim, 0.26f), trimMat, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "Head", root.transform, new Vector3(mid, h + trim * 0.5f, 0f), new Vector3(w + trim * 2f, trim, 0.26f), trimMat, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "Sill", root.transform, new Vector3(mid, 0.01f, 0f), new Vector3(w + trim * 2f, 0.02f, 0.26f), trimMat, keepCollider: false);
+
+            root.AddComponent<NetworkObject>();
+            var door = root.AddComponent<Door>();
+            SetRef(door, "_hinge", hinge);
+            SetRef(door, "_audio", SpatialAudio(root, 2f, 25f));
+            ConfigureInteractable(root.AddComponent<Interactable>(), new[] { leaf.GetComponent<Collider>() }, extras.ToArray(), 2.8f);
         }
 
         /// <summary>Red board by the spawn: starts a rescue drill (a tourist in trouble out in the water).</summary>
@@ -1096,14 +1182,15 @@ namespace PleaseDontDrown.Editor
             return go;
         }
 
-        private static TextMesh WorldText(Transform parent, string name, Vector3 localPos, string text, int fontSize, float characterSize, Color color)
+        /// <param name="onTop">Drawn over everything (name tags); otherwise hidden behind walls like any object.</param>
+        private static TextMesh WorldText(Transform parent, string name, Vector3 localPos, string text, int fontSize, float characterSize, Color color, bool onTop = false)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localPos;
             var mesh = go.AddComponent<TextMesh>();
             mesh.font = BuiltinFont;
-            go.GetComponent<MeshRenderer>().sharedMaterial = BuiltinFont.material;
+            go.GetComponent<MeshRenderer>().sharedMaterial = onTop ? BuiltinFont.material : WorldTextMaterial();
             mesh.text = text;
             mesh.fontSize = fontSize;
             mesh.characterSize = characterSize;
@@ -1227,6 +1314,32 @@ namespace PleaseDontDrown.Editor
             return mesh;
         }
 
+        /// <summary>Depth-tested 3D text; GameContent keeps its font texture current at runtime.</summary>
+        private static Material WorldTextMaterial()
+        {
+            const string path = "Assets/_Game/Data/Shaders/WorldText.shader";
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+            if (shader == null) throw new FileNotFoundException("WorldText shader missing", path);
+            Material mat = LoadOrCreateMaterial("WorldText", shader);
+            mat.mainTexture = BuiltinFont.material.mainTexture;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>The one material every character uses (vertex colours + toon light).</summary>
+        public static Material AvatarMaterial()
+        {
+            const string path = "Assets/_Game/Data/Shaders/Avatar.shader";
+            var shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
+            if (shader == null) throw new FileNotFoundException("Avatar shader missing", path);
+            Material mat = LoadOrCreateMaterial("Avatar", shader);
+            mat.SetFloat("_Ambient", 0.55f);
+            mat.SetFloat("_Rim", 0.28f);
+            mat.enableInstancing = true;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
         private static Material LoadOrCreateMaterial(string name, Shader shader)
         {
             Directory.CreateDirectory(MaterialDir);
@@ -1253,6 +1366,20 @@ namespace PleaseDontDrown.Editor
 
         private static SerializedProperty Require(SerializedObject so, string name) =>
             so.FindProperty(name) ?? throw new MissingFieldException(so.targetObject.GetType().Name, name);
+
+        private static void SetBool(Object target, string field, bool value)
+        {
+            var so = new SerializedObject(target);
+            Require(so, field).boolValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void SetEnum(Object target, string field, int value)
+        {
+            var so = new SerializedObject(target);
+            Require(so, field).enumValueIndex = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
 
         private static void SetRef(Object target, string field, Object value)
         {

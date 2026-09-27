@@ -6,11 +6,16 @@ Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP �
 * Architecture and milestones: [Docs/02-Technical-Architecture.md](Docs/02-Technical-Architecture.md)
 * Art direction + Meshy prompts: [Docs/03-Art-Direction-Meshy.md](Docs/03-Art-Direction-Meshy.md) (exports go in `ArtSource/Meshy/`)
 
-## Meshy art
+## Art
 
-Five Desktop GLBs are integrated: tourist, lifeguard, shack, watchtower, and palms.
-See [asset setup and limitations](Docs/04-Meshy-Integration.md). The character exports
-are static poses; rigged exports are needed for limb and locomotion animation.
+* **Characters** (lifeguards and tourists) are cartoon avatars built in code (`Assets/_Game/Avatar/`): one skinned
+  mesh per character from rounded shapes, animated procedurally (walk/run with planted feet, crouch, jump, crawl,
+  breaststroke, treading water, carrying, throwing, CPR, eating, waving, looking around, blinking). Players pick their
+  look in **Customize your lifeguard** (menu); tourists get a random look from their seed. Your own view shows
+  first-person arms that grab what you hold, stroke when you swim and press during CPR.
+* **Meshy GLBs**: shack, watchtower and palms (decimated). The shack (x1.45) and tower (x1.2) are scaled so you can
+  walk in: their painted doors are cut out and replaced with real doors. The Meshy characters were static poses
+  (no skeleton), so they are no longer used; see [Meshy integration](Docs/04-Meshy-Integration.md).
 
 ## Open the project
 Unity Hub → **Add → Add project from disk** → `F:\GameDev\PleaseDontDrown`, then open `Assets/_Game/Scenes/Game.unity` and press Play.
@@ -21,7 +26,10 @@ Keep the Steam client running for online features (dev app id **480** / Spacewar
 |---|---|---|
 | Move / look | WASD / mouse | Left / right stick |
 | Sprint · Crouch · Jump | Shift · Ctrl or C · Space | L3 · B · A |
-| Use / pick up (bell, switch, sign, items, tourists) | E | X |
+| Use / pick up (bell, switch, sign, doors, palms, items, tourists) | E | X |
+| Inventory slots (small things go in your pockets) | 1-4 / mouse wheel | D-pad left / right |
+| Eat the food in your hands (coconut) | Hold right mouse | Hold LT |
+| Wave | V | D-pad up |
 | CPR on an unconscious tourist on land (keep tapping) | Right mouse | LT |
 | Throw held item (hold to charge) | Left mouse, or hold G | RT, or hold Y |
 | Drop held item | Tap G | Tap Y |
@@ -29,6 +37,9 @@ Keep the Steam client running for online features (dev app id **480** / Spacewar
 | Climb out onto dock / rock | Space in the water, facing the ledge | A |
 | Pause / connection menu | Esc | Start |
 | Dev console | ` (backquote) or F2 | |
+
+**Food:** your food meter empties over a shift (faster when sprinting or swimming). Hungry lifeguards get their breath
+back slowly. Shake a palm (E on the trunk) and a coconut drops; hold right mouse with it in hand to eat it.
 
 **Rescue drill:** press E on the red *RESCUE DRILL* board by the spawn. A tourist appears 25-40 m out and the bell rings.
 Swim out, grab them (E) and tow them to the shallows. If they go unconscious, carry them onto the sand, put them down (tap G)

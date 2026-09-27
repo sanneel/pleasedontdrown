@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using PleaseDontDrown.Avatars;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -46,8 +47,21 @@ namespace PleaseDontDrown.Editor
                 if (line.Length == 0 || line.StartsWith("#")) continue;
                 string[] p = line.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
                 float F(int k) => float.Parse(p[k], CultureInfo.InvariantCulture);
-                RenderSettings.fog = p[1] != "top"; // haze would hide a map view
-                if (p[1] == "top")
+                if (p[0] == "avatar")
+                {
+                    SpawnAvatar(p);
+                    continue;
+                }
+                RenderSettings.fog = p[1] != "top" && p[1] != "ortho"; // haze would hide a map view
+                if (p[1] == "ortho")
+                {
+                    // name ortho cx cy cz yaw size: horizontal orthographic view (size = visible height in metres).
+                    camera.orthographic = true;
+                    camera.orthographicSize = F(6) * 0.5f;
+                    Quaternion rot = Quaternion.Euler(0f, F(5), 0f);
+                    camera.transform.SetPositionAndRotation(new Vector3(F(2), F(3), F(4)) - rot * Vector3.forward * (p.Length > 7 ? F(7) : 6f), rot);
+                }
+                else if (p[1] == "top")
                 {
                     camera.orthographic = true;
                     camera.orthographicSize = F(4) * 0.5f;
@@ -62,6 +76,75 @@ namespace PleaseDontDrown.Editor
                 }
                 Render(camera, p[0]);
             }
+        }
+
+        /// <summary>
+        /// <c>avatar &lt;lifeguard|tourist:seed|random:seed&gt; x y z yaw [pose]</c> places a posed character for the next shots.
+        /// Poses: idle walk run crouch jump swim tread dive hold carry charge throw eat cpr wave interact.
+        /// </summary>
+        private static void SpawnAvatar(string[] p)
+        {
+            float F(int k) => float.Parse(p[k], CultureInfo.InvariantCulture);
+            string[] lookSpec = p[1].Split(':');
+            int seed = lookSpec.Length > 1 ? int.Parse(lookSpec[1]) : 0;
+            AvatarLook look = lookSpec[0] switch
+            {
+                "tourist" => AvatarLook.RandomTourist(seed),
+                "random" => AvatarLook.Random(new System.Random(seed)),
+                _ => AvatarLook.Lifeguard
+            };
+            AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
+            var go = new GameObject("ReviewAvatar");
+            go.transform.position = new Vector3(F(2), F(3), F(4));
+            var rig = go.AddComponent<AvatarRig>();
+            rig.Build(look);
+            var animator = go.AddComponent<AvatarAnimator>();
+            animator.Rig = rig;
+            string pose = p.Length > 6 ? p[6] : "idle";
+            float yaw = F(5);
+            Vector3 forward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+            go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            var m = new AvatarMotion { FacingYaw = yaw, Grounded = true };
+            Vector3 chest = go.transform.position + Vector3.up * 1.2f;
+            switch (pose)
+            {
+                case "walk": m.Velocity = forward * 2.2f; break;
+                case "run": m.Velocity = forward * 7f; m.Sprinting = true; break;
+                case "crouch": m.Crouch = 1f; break;
+                case "jump": m.Grounded = false; m.Velocity = forward * 3f; break;
+                case "swim": m.Swimming = true; m.Velocity = forward * 3f; break;
+                case "tread": m.Swimming = true; break;
+                case "dive": m.Swimming = true; m.Underwater = true; m.LookPitch = 35f; m.Velocity = forward * 2.5f; break;
+                case "hold":
+                    m.Holding = true; m.TwoHanded = true;
+                    m.GripLeft = chest + forward * 0.55f - go.transform.right * 0.25f;
+                    m.GripRight = chest + forward * 0.55f + go.transform.right * 0.25f;
+                    break;
+                case "carry":
+                    m.Holding = true; m.CarryingPerson = true;
+                    m.GripLeft = chest + forward * 0.45f - go.transform.right * 0.3f - Vector3.up * 0.2f;
+                    m.GripRight = chest + forward * 0.45f + go.transform.right * 0.3f - Vector3.up * 0.25f;
+                    break;
+                case "charge": m.Charge = 1f; break;
+                case "eat": m.Eating = true; break;
+                case "cpr": m.Cpr = true; m.CprPoint = go.transform.position + forward * 0.6f + Vector3.up * 0.2f; break;
+            }
+            animator.Motion = m;
+            // Face the camera first, so grips computed from "right" below are the avatar's right.
+            go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            for (int i = 0; i < 90; i++)
+            {
+                AvatarAnimator.TimeOverride = 100f + i / 30f;
+                animator.Tick(1f / 30f);
+            }
+            AvatarGesture gesture = pose switch { "throw" => AvatarGesture.Throw, "wave" => AvatarGesture.Wave, "interact" => AvatarGesture.Interact, _ => AvatarGesture.None };
+            if (gesture != AvatarGesture.None)
+            {
+                animator.Play(gesture);
+                AvatarAnimator.TimeOverride = 103f + (gesture == AvatarGesture.Wave ? 0.6f : 0.12f);
+                animator.Tick(1f / 30f);
+            }
+            AvatarAnimator.TimeOverride = null;
         }
 
         private static void Render(Camera camera, string name)

@@ -364,6 +364,7 @@ namespace PleaseDontDrown.Rescue
         public void OnSecondary(PlayerHub player)
         {
             _body.Pump(); // feel it right away; the host counts it
+            if (player != null) player.ShowPump(_body.ChestPoint);
             CprPumpServer();
         }
 
@@ -399,6 +400,8 @@ namespace PleaseDontDrown.Rescue
         {
             if (LocalConnection != null && LocalConnection.ClientId == pumperId) return; // already squished locally
             _body.Pump();
+            foreach (PlayerHub p in PlayerHub.All)
+                if (p.OwnerId == pumperId) p.ShowPump(_body.ChestPoint);
         }
 
         // ------------------------------------------------------------------ announcements (every machine)

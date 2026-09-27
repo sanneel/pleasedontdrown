@@ -1,21 +1,31 @@
+using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Items;
+using PleaseDontDrown.UI;
 using UnityEngine;
 
 namespace PleaseDontDrown.Player
 {
     /// <summary>
-    /// Carrying and throwing.
+    /// Carrying, pockets, throwing and eating.
+    ///
+    /// Four inventory slots (1-4 / mouse wheel). The selected slot is what's in your hands; small things (a life
+    /// ring, a ball, coconuts) wait hidden in the other slots, big ones (crates, people) have to be put down before
+    /// you can switch. Which item sits in which slot lives on the items (host-owned), the selected slot on PlayerHub,
+    /// so everyone agrees on what you hold.
     ///
     /// Local player: the held item stays a live rigidbody and is steered to a hold point in front of the camera
     /// with velocities every physics step (glides in after pickup, lags with weight, slides along walls instead of
     /// clipping through them, gets unstuck if it falls far behind). Tap Drop to let go, hold Drop (or Primary) to
     /// charge a throw; the item pulls back while charging. A throw before the host confirmed the pickup is queued.
+    /// Hold Secondary with food in hand to eat it.
     ///
-    /// Remote players: the item is glued to their head each frame.
+    /// Remote players: the held item is glued in front of their head each frame; pocketed items ride along, hidden.
     /// </summary>
     public class PlayerHands : MonoBehaviour
     {
+        public const int SlotCount = 4;
+
         [SerializeField] private PlayerHub _hub;
         [SerializeField] private Transform _head;
 
@@ -34,7 +44,17 @@ namespace PleaseDontDrown.Player
         [SerializeField] private float _tapTime = 0.18f;
         [SerializeField] private float _chargePullback = 0.28f;
 
+        [Header("Seen by others")]
+        [Tooltip("Remote players' held items sit closer to their body than in first person, so their arms reach them.")]
+        [SerializeField] private Vector3 _remoteHoldScale = new(0.9f, 0.85f, 0.66f);
+
+        [Header("Eating")]
+        [SerializeField] private Vector3 _mouthOffset = new(0.03f, -0.13f, 0.3f);
+        [SerializeField] private float _biteInterval = 0.42f;
+
         private enum ChargeSource { None, Primary, Drop }
+
+        public enum GripKind { None, OneHand, TwoHands, Person }
 
         private ChargeSource _chargeSource;
         private float _chargeStart;
@@ -43,27 +63,103 @@ namespace PleaseDontDrown.Player
         private float _stuckTime;
         private float? _queuedThrow;   // charge (0..1), or -1 for a plain drop
         private float _queuedAt;
+        private bool _chargeAnnounced;
+        private int _localSlot;
+        private Item _lastHeld;
+        private float _eatProgress;
+        private float _nextBite;
+        private float _eatBlend;
+        private float _scriptedEatUntil = float.NegativeInfinity;
 
-        public Item HeldItem { get; private set; }
+        private readonly Item[] _slots = new Item[SlotCount];
+        private int _slotsFrame = -1;
+
+        /// <summary>The item in your hands (the selected slot).</summary>
+        public Item HeldItem => SlotItem(ActiveSlot);
+        /// <summary>Selected slot: predicted for our own player, synced for everyone else.</summary>
+        public int ActiveSlot => IsLocal ? _localSlot : _hub.SyncedActiveSlot;
+        /// <summary>Holding food to the mouth.</summary>
+        public bool IsEating { get; private set; }
+        public float EatProgress01 => _eatProgress;
         public bool IsCharging => _chargeSource != ChargeSource.None && Charge01 > 0f;
         public float Charge01 { get; private set; }
 
         private bool IsLocal => _hub.IsOwner;
 
+        // ------------------------------------------------------------------ slots
+
+        /// <summary>What's in a slot right now (items know their holder and slot; cached per frame).</summary>
+        public Item SlotItem(int slot)
+        {
+            if (slot < 0 || slot >= SlotCount) return null;
+            if (_slotsFrame != Time.frameCount) RebuildSlots();
+            return _slots[slot];
+        }
+
+        private void RebuildSlots()
+        {
+            _slotsFrame = Time.frameCount;
+            System.Array.Clear(_slots, 0, SlotCount);
+            foreach (Item item in Item.All)
+            {
+                if (item.Holder != _hub) continue;
+                int slot = item.Slot;
+                if (slot >= 0 && slot < SlotCount && _slots[slot] == null) _slots[slot] = item;
+            }
+        }
+
+        /// <summary>Call when an item's holder or slot changed (so the per-frame cache is rebuilt now).</summary>
+        internal void Invalidate() => _slotsFrame = -1;
+
+        public int FirstFreeSlot()
+        {
+            for (int i = 0; i < SlotCount; i++)
+            {
+                int slot = (ActiveSlot + i) % SlotCount;
+                if (SlotItem(slot) == null) return slot;
+            }
+            return -1;
+        }
+
+        /// <summary>Switch hands to another slot. Refused while holding something too big to pocket.</summary>
+        public bool SelectSlot(int slot)
+        {
+            if (!IsLocal || slot < 0 || slot >= SlotCount || slot == _localSlot) return false;
+            Item current = HeldItem;
+            if (current != null && !current.Pocketable)
+            {
+                PlayerHud.ShowToast($"Hands full: put the {current.DisplayName} down first ([{GameInput.KeyLabel(GameInput.Drop)}])", 2.5f);
+                return false;
+            }
+            StopEating();
+            CancelCharge();
+            _localSlot = slot;
+            _hub.RequestActiveSlot(slot);
+            OnActiveSlotChanged();
+            return true;
+        }
+
+        /// <summary>The selected slot changed (ours, or a remote player's synced one): items move between hands and pockets.</summary>
+        internal void OnActiveSlotChanged()
+        {
+            Invalidate();
+            foreach (Item item in Item.All)
+                if (item.Holder == _hub) item.RefreshHeldState();
+            ResetHoldState();
+        }
+
         // ------------------------------------------------------------------ called by Item
 
         internal void OnItemGained(Item item)
         {
-            if (HeldItem == item) return;
-            HeldItem = item;
-            ResetHoldState();
+            Invalidate();
+            if (item == HeldItem) ResetHoldState();
         }
 
         internal void OnItemLost(Item item)
         {
-            if (HeldItem != item) return;
-            HeldItem = null;
-            ResetHoldState();
+            Invalidate();
+            if (item == _lastHeld) ResetHoldState();
         }
 
         private void ResetHoldState()
@@ -74,19 +170,27 @@ namespace PleaseDontDrown.Player
             _heldSince = Time.time;
             _stuckTime = 0f;
             _queuedThrow = null;
+            _lastHeld = HeldItem;
+            StopEating();
         }
 
         // ------------------------------------------------------------------ actions (local player)
 
         public void TryPickUp(Item item)
         {
-            if (!IsLocal || item == null || item == HeldItem || item.IsHeld)
+            if (!IsLocal || item == null || item.IsHeld)
                 return;
-            if (HeldItem != null)
-                Drop();
-            HeldItem = item;
+            Item current = HeldItem;
+            if (current != null)
+            {
+                // Pocket what we hold if we can, otherwise swap it for the new thing.
+                int free = current.Pocketable ? FirstFreeSlot() : -1;
+                if (free >= 0) SelectSlot(free);
+                else Drop();
+            }
+            item.RequestPickUp(_hub, ActiveSlot);
+            Invalidate();
             ResetHoldState();
-            item.RequestPickUp(_hub);
         }
 
         /// <summary>Throw with a charge from 0 (lob) to 1 (full power). Queued until the host confirms the pickup.</summary>
@@ -123,12 +227,66 @@ namespace PleaseDontDrown.Player
                 spin = Random.insideUnitSphere * (2f + 6f * charge);
             }
 
-            HeldItem = null;
-            ResetHoldState();
+            StopEating();
             item.Release(_hub, velocity, spin);
+            Invalidate();
+            ResetHoldState();
+            if (charge >= 0f) _hub.Gesture(AvatarGesture.Throw);
+            else if (_chargeAnnounced) _hub.Gesture(AvatarGesture.ChargeEnd);
+            _chargeAnnounced = false;
+        }
+
+        private void CancelCharge()
+        {
+            if (_chargeAnnounced) _hub.Gesture(AvatarGesture.ChargeEnd);
+            _chargeAnnounced = false;
+            _chargeSource = ChargeSource.None;
+            Charge01 = 0f;
         }
 
         private Transform AimTransform => _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _head;
+
+        // ------------------------------------------------------------------ eating
+
+        private void StopEating()
+        {
+            if (!IsEating) return;
+            IsEating = false;
+            if (IsLocal) _hub.Gesture(AvatarGesture.EatStop);
+        }
+
+        private void UpdateEating(Item item)
+        {
+            Edible food = item != null ? item.GetComponent<Edible>() : null;
+            bool pressed = GameInput.Secondary.IsPressed() || Time.time < _scriptedEatUntil;
+            bool wants = food != null && pressed && _chargeSource == ChargeSource.None && item.IsConfirmedHolder(_hub);
+            if (!wants)
+            {
+                StopEating();
+                _eatProgress = Mathf.Max(0f, _eatProgress - Time.deltaTime * 0.5f);
+                return;
+            }
+            if (!IsEating)
+            {
+                IsEating = true;
+                _nextBite = Time.time + _biteInterval * 0.6f;
+                _hub.Gesture(AvatarGesture.EatStart);
+            }
+            _eatProgress += Time.deltaTime / Mathf.Max(0.2f, food.Seconds);
+            if (Time.time >= _nextBite)
+            {
+                _nextBite = Time.time + _biteInterval;
+                food.PlayBite();
+            }
+            if (_eatProgress < 1f) return;
+
+            _eatProgress = 0f;
+            StopEating();
+            if (_hub.Vitals != null) _hub.Vitals.Eat(food.Food);
+            PlayerHud.ShowToast($"Mmm, {item.DisplayName.ToLowerInvariant()}.", 2f);
+            food.Consume(_hub);
+            Invalidate();
+        }
 
         // ------------------------------------------------------------------ commands
 
@@ -139,6 +297,14 @@ namespace PleaseDontDrown.Player
                 args => GrabCommand(args.Length > 0 ? args[0] : null), owner: this);
             DevCommands.Register("throw", "[charge 0..1]", "Throw the held item.", args => Throw(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 1f), owner: this);
             DevCommands.Register("drop", "", "Drop the held item.", _ => Drop(), owner: this);
+            DevCommands.Register("eat", "[seconds]", "Hold 'eat' on autopilot (automated tests).", args =>
+                _scriptedEatUntil = Time.time + (args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 2.5f), cheat: true, owner: this);
+            DevCommands.Register("slot", "<1-4>", "Select an inventory slot.", args => SelectSlot(Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) - 1), owner: this);
+            DevCommands.Register("inventory", "", "What's in each slot.", _ =>
+            {
+                for (int i = 0; i < SlotCount; i++)
+                    DevCommands.Print($"  {i + 1}{(i == ActiveSlot ? "*" : " ")} {(SlotItem(i) != null ? SlotItem(i).DisplayName : "-")}");
+            }, owner: this);
         }
 
         private void OnDisable()
@@ -146,6 +312,9 @@ namespace PleaseDontDrown.Player
             DevCommands.Unregister("grab", this);
             DevCommands.Unregister("throw", this);
             DevCommands.Unregister("drop", this);
+            DevCommands.Unregister("slot", this);
+            DevCommands.Unregister("eat", this);
+            DevCommands.Unregister("inventory", this);
         }
 
         /// <summary>The hub calls this once it knows we're the local player (commands register only then).</summary>
@@ -159,22 +328,32 @@ namespace PleaseDontDrown.Player
 
         private void Update()
         {
-            if (!IsLocal || HeldItem == null)
+            if (HeldItem != _lastHeld) ResetHoldState(); // something new in our hands (pickup, slot, host decision)
+            if (!IsLocal)
+                return;
+
+            if (GameInput.GameplayActive) ReadSlotInput();
+
+            Item held = HeldItem;
+            if (held == null)
                 return;
 
             if (_queuedThrow.HasValue)
             {
-                if (HeldItem.IsConfirmedHolder(_hub)) RequestRelease(_queuedThrow.Value);
+                if (held.IsConfirmedHolder(_hub)) RequestRelease(_queuedThrow.Value);
                 else if (Time.time - _queuedAt > 1f) _queuedThrow = null; // host never confirmed; forget it
                 return;
             }
 
             if (!GameInput.GameplayActive)
             {
-                _chargeSource = ChargeSource.None;
-                Charge01 = 0f;
+                CancelCharge();
+                StopEating();
                 return;
             }
+
+            UpdateEating(held);
+            if (IsEating || HeldItem == null) return;
 
             if (_chargeSource == ChargeSource.None)
             {
@@ -185,18 +364,36 @@ namespace PleaseDontDrown.Player
             if (_chargeSource == ChargeSource.None)
                 return;
 
-            float held = Time.time - _chargeStart;
+            float heldFor = Time.time - _chargeStart;
             // Drop only starts charging after a tap's worth of time, so a quick tap is a plain drop.
-            float chargeTime = _chargeSource == ChargeSource.Drop ? held - _tapTime : held;
+            float chargeTime = _chargeSource == ChargeSource.Drop ? heldFor - _tapTime : heldFor;
             Charge01 = Mathf.Clamp01(chargeTime / _chargeTime);
+            if (!_chargeAnnounced && Charge01 > 0.05f)
+            {
+                _chargeAnnounced = true; // others see the wind-up
+                _hub.Gesture(AvatarGesture.ChargeStart);
+            }
 
             InputActionReleased(out bool released);
             if (!released)
                 return;
             ChargeSource source = _chargeSource;
             _chargeSource = ChargeSource.None;
-            if (source == ChargeSource.Drop && held < _tapTime) Drop();
+            if (source == ChargeSource.Drop && heldFor < _tapTime) Drop();
             else Throw(Charge01);
+        }
+
+        private void ReadSlotInput()
+        {
+            for (int i = 0; i < SlotCount; i++)
+                if (GameInput.Slots[i].WasPressedThisFrame())
+                {
+                    SelectSlot(i);
+                    return;
+                }
+            float scroll = GameInput.SlotScroll.ReadValue<float>();
+            if (Mathf.Abs(scroll) > 0.01f && _chargeSource == ChargeSource.None)
+                SelectSlot((_localSlot + (scroll < 0f ? 1 : SlotCount - 1)) % SlotCount);
         }
 
         private void BeginCharge(ChargeSource source)
@@ -204,6 +401,7 @@ namespace PleaseDontDrown.Player
             _chargeSource = source;
             _chargeStart = Time.time;
             Charge01 = 0f;
+            _chargeAnnounced = false;
         }
 
         private void InputActionReleased(out bool released) =>
@@ -253,7 +451,19 @@ namespace PleaseDontDrown.Player
 
         private void LateUpdate()
         {
-            // Remote holders: glue the item to their (synced) head.
+            bool eating = IsLocal ? IsEating : _hub.Avatar != null && _hub.Avatar.RemoteEating;
+            _eatBlend = Mathf.MoveTowards(_eatBlend, eating ? 1f : 0f, Time.deltaTime * 4f);
+
+            // Pocketed items ride along with us, hidden (so they drop right here if we leave).
+            Vector3 hip = transform.position + Vector3.up * 0.9f;
+            int active = ActiveSlot;
+            for (int i = 0; i < SlotCount; i++)
+            {
+                Item pocketed = i == active ? null : SlotItem(i);
+                if (pocketed != null && pocketed.Sync.Body.isKinematic) pocketed.PlaceInHand(hip, pocketed.transform.rotation);
+            }
+
+            // Remote holders: glue the held item to their (synced) head.
             Item item = HeldItem;
             if (IsLocal || item == null) return;
             GetHoldTarget(item, out Vector3 target, out Quaternion rotation);
@@ -267,6 +477,13 @@ namespace PleaseDontDrown.Player
         {
             Transform aim = IsLocal ? AimTransform : _head;
             item.GetHoldPose(_hub, out Vector3 holdOffset, out Quaternion holdRotation, out float pitchFollow);
+            if (!IsLocal) holdOffset = Vector3.Scale(holdOffset, _remoteHoldScale);
+            // Eating: up to the mouth, with a little bob per bite.
+            if (_eatBlend > 0f)
+            {
+                float chew = IsLocal && IsEating ? Mathf.Sin(Time.time * 15f) * 0.012f : 0f;
+                holdOffset = Vector3.Lerp(holdOffset, _mouthOffset + new Vector3(0f, chew, 0f), Mathf.SmoothStep(0f, 1f, _eatBlend));
+            }
             // Wind-up: pull the item back (and a little down) while a throw charges.
             float pull = Mathf.SmoothStep(0f, 1f, Charge01);
             Vector3 offset = holdOffset + new Vector3(0.05f, -0.06f, -_chargePullback) * pull;
@@ -284,6 +501,54 @@ namespace PleaseDontDrown.Player
             Quaternion frame = Quaternion.Euler(pitch * pitchFollow, yaw, 0f);
             position = aim.position + frame * offset;
             rotation = frame * holdRotation * windUp;
+        }
+
+        /// <summary>
+        /// Where the hands go on the held item, in world space: both hands just outside the sides of bigger things,
+        /// one hand under small ones or on the rim of a ring, and under the back and knees of a person.
+        /// </summary>
+        public GripKind GetGrips(out Vector3 left, out Vector3 right)
+        {
+            left = right = Vector3.zero;
+            Item item = HeldItem;
+            if (item == null) return GripKind.None;
+            Transform frame = IsLocal ? AimTransform : _head;
+            Vector3 up = Vector3.up;
+            Vector3 side = Vector3.ProjectOnPlane(frame.right, up);
+            side = side.sqrMagnitude > 1e-4f ? side.normalized : frame.right;
+
+            if (item.Grip == ItemGrip.Person)
+            {
+                Transform body = item.transform;
+                Vector3 a = body.position + body.up * 0.24f - up * 0.14f; // under the shoulders
+                Vector3 b = body.position - body.up * 0.32f - up * 0.14f; // under the knees
+                bool aRight = Vector3.Dot(a - b, side) > 0f;
+                right = aRight ? a : b;
+                left = aRight ? b : a;
+                return GripKind.Person;
+            }
+
+            Bounds bounds = item.VisualBounds;
+            Vector3 c = bounds.center, e = bounds.extents;
+            float halfWidth = Mathf.Abs(side.x) * e.x + Mathf.Abs(side.y) * e.y + Mathf.Abs(side.z) * e.z;
+            Vector3 toUs = Vector3.ProjectOnPlane(frame.position - c, up);
+            toUs = toUs.sqrMagnitude > 1e-4f ? toUs.normalized : -frame.forward;
+            float depth = Mathf.Abs(toUs.x) * e.x + Mathf.Abs(toUs.z) * e.z;
+            ItemGrip style = item.Grip != ItemGrip.Auto ? item.Grip
+                : bounds.size.x < 0.36f && bounds.size.y < 0.36f && bounds.size.z < 0.36f ? ItemGrip.OneHand : ItemGrip.TwoHands;
+            if (style == ItemGrip.OneHand)
+            {
+                right = halfWidth > 0.2f
+                    ? c + side * (halfWidth * 0.85f) + toUs * (depth * 0.5f)                       // the rim of a ring
+                    : c + side * (halfWidth * 0.6f + 0.02f) - up * (e.y * 0.55f) + toUs * (depth * 0.2f); // cupped under its side
+                left = right;
+                return GripKind.OneHand;
+            }
+            // On the near corners, just outside the sides: the hands wrap round the front of the item where we can see them.
+            Vector3 near = toUs * (depth * 0.8f) + up * (e.y * 0.1f);
+            left = c - side * (halfWidth + 0.02f) + near;
+            right = c + side * (halfWidth + 0.02f) + near;
+            return GripKind.TwoHands;
         }
 
         /// <summary>Angular velocity (rad/s per unit speed) that turns <paramref name="from"/> toward <paramref name="to"/>.</summary>

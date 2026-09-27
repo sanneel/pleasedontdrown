@@ -81,6 +81,10 @@ namespace PleaseDontDrown.Player
         public Vector3 Velocity => Noclip || _rb == null ? Vector3.zero : _rb.linearVelocity;
         public bool Noclip { get; set; }
         public float SpeedMultiplier { get; set; } = 1f;
+        /// <summary>Set by PlayerVitals: starving lifeguards are slower.</summary>
+        public float HungerSpeedScale { get; set; } = 1f;
+        /// <summary>Set by PlayerVitals: hungry lifeguards get their breath back slowly.</summary>
+        public float StaminaRefillScale { get; set; } = 1f;
         private Quaternion Facing => _look != null ? _look.YawRotation : Quaternion.identity;
         private float TotalGravity => -Physics.gravity.y + _extraGravity;
 
@@ -217,7 +221,7 @@ namespace PleaseDontDrown.Player
             IsSprinting = _sprintHeld && _moveInput.y > 0.1f && !IsCrouching;
             float targetSpeed = IsCrouching ? _crouchSpeed : IsSprinting ? _sprintSpeed : _walkSpeed;
             _maxSpeed = Mathf.SmoothDamp(_maxSpeed, targetSpeed, ref _maxSpeedVelocity, _speedEaseTime, Mathf.Infinity, dt);
-            float speed = _maxSpeed * SpeedMultiplier * WadeFactor * CarryFactor(0.015f);
+            float speed = _maxSpeed * SpeedMultiplier * HungerSpeedScale * WadeFactor * CarryFactor(0.015f);
             Vector3 wish = Facing * new Vector3(_moveInput.x, 0f, _moveInput.y) * speed;
 
             Vector3 v = _rb.linearVelocity;

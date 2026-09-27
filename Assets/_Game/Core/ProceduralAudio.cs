@@ -16,6 +16,7 @@ namespace PleaseDontDrown.Core
         private static void ResetStatics()
         {
             _bell = _click = _splash = _waterStep = _cough = _thump = null;
+            _crunch = _rustle = _bonk = _creak = _shut = null;
             _steps = null;
             _cries = null;
         }
@@ -176,6 +177,50 @@ namespace PleaseDontDrown.Core
         {
             float f = Mathf.Lerp(95f, 55f, t / 0.2f);
             return Mathf.Sin(2f * Mathf.PI * f * t) * Mathf.Exp(-22f * t) * Mathf.Clamp01(t / 0.003f) * 0.8f;
+        });
+
+        private static AudioClip _crunch, _rustle, _bonk, _creak, _shut;
+
+        /// <summary>A bite of something crunchy.</summary>
+        public static AudioClip Crunch => _crunch != null ? _crunch : _crunch = Noise("Crunch", 0.16f, 91, 0.75f, 0.3f, 26f, 0.8f);
+
+        /// <summary>Palm fronds shaking.</summary>
+        public static AudioClip Rustle => _rustle != null ? _rustle : _rustle = Build("Rustle", 1.1f, RustleWave());
+
+        private static System.Func<float, float> RustleWave()
+        {
+            var rng = new System.Random(57);
+            float low = 0f;
+            return t =>
+            {
+                float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+                low += (noise - low) * 0.45f;
+                float flutter = 0.55f + 0.45f * Mathf.Sin(t * 43f) * Mathf.Sin(t * 17f);
+                return (noise - low) * 0.5f * flutter * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 1.1f));
+            };
+        }
+
+        /// <summary>Hollow coconut knock.</summary>
+        public static AudioClip Bonk => _bonk != null ? _bonk : _bonk = Build("Bonk", 0.35f, t =>
+        {
+            float f = Mathf.Lerp(430f, 250f, t / 0.35f);
+            return (Mathf.Sin(2f * Mathf.PI * f * t) * 0.7f + Mathf.Sin(2f * Mathf.PI * f * 2.3f * t) * 0.3f) * Mathf.Exp(-14f * t) * Mathf.Clamp01(t / 0.002f) * 0.8f;
+        });
+
+        /// <summary>Old door hinge.</summary>
+        public static AudioClip Creak => _creak != null ? _creak : _creak = Build("Creak", 0.55f, t =>
+        {
+            float f = 170f + 55f * Mathf.Sin(t * 7f) + 20f * Mathf.Sin(t * 31f);
+            float saw = 2f * (t * f - Mathf.Floor(t * f + 0.5f));
+            return saw * 0.22f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.55f));
+        });
+
+        /// <summary>Wooden door closing.</summary>
+        public static AudioClip Shut => _shut != null ? _shut : _shut = Build("Shut", 0.25f, t =>
+        {
+            float thud = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(90f, 60f, t / 0.25f) * t) * Mathf.Exp(-18f * t);
+            float click = (Mathf.PerlinNoise(t * 7000f, 0.2f) * 2f - 1f) * Mathf.Exp(-80f * t);
+            return (thud * 0.8f + click * 0.4f) * Mathf.Clamp01(t / 0.002f);
         });
 
         /// <summary>Low-passed noise burst: cutoff falls from <paramref name="brightStart"/> to <paramref name="brightEnd"/>.</summary>

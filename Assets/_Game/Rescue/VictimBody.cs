@@ -1,4 +1,5 @@
 using System;
+using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Items;
 using PleaseDontDrown.Player;
@@ -36,13 +37,10 @@ namespace PleaseDontDrown.Rescue
         }
 
         [SerializeField] private Transform _visual;
-        [SerializeField] private Transform[] _eyes;
-        [SerializeField] private Transform _mouth;
-        [SerializeField] private Renderer[] _shirt;
-        [SerializeField] private Renderer[] _shorts;
-        [SerializeField] private Renderer[] _skin;
-        [SerializeField] private Renderer[] _hair;
-        [SerializeField] private GameObject[] _floaties;
+        [Tooltip("The cartoon body; its arms and legs follow the physics limbs.")]
+        [SerializeField] private AvatarRig _avatar;
+        [Tooltip("Torso-space height of the hips (where the leg joints are).")]
+        [SerializeField] private float _hipY = -0.3f;
         [SerializeField] private AudioSource _audio;
         [SerializeField] private Vector3 _headLocal = new Vector3(0f, 0.52f, 0f);
 
@@ -72,7 +70,6 @@ namespace PleaseDontDrown.Rescue
         private Buoyancy _buoyancy;
         private Limb[] _limbs = Array.Empty<Limb>();
         private Vector3 _lastRootPosition;
-        private MaterialPropertyBlock _props;
 
         private float _dunk;               // 0..1, how far under the current dunk pushes the head
         private float _nextDunkAt;
@@ -89,6 +86,8 @@ namespace PleaseDontDrown.Rescue
 
         /// <summary>Where the mouth and nose are: underwater here = no air.</summary>
         public Vector3 HeadPosition => transform.TransformPoint(_headLocal);
+        /// <summary>Middle of the chest, where CPR hands go.</summary>
+        public Vector3 ChestPoint => transform.position + transform.forward * 0.17f + transform.up * 0.12f;
         /// <summary>The float (life ring...) this person is holding onto, if any. Found on every machine.</summary>
         public Floatable HeldFloat { get; private set; }
 
@@ -99,7 +98,6 @@ namespace PleaseDontDrown.Rescue
             _item = GetComponent<Item>();
             _brain = GetComponent<VictimBrain>();
             _buoyancy = GetComponent<Buoyancy>();
-            _props = new MaterialPropertyBlock();
             _rb.solverIterations = 12;
             _rb.solverVelocityIterations = 4;
             BuildLimbs();
@@ -138,45 +136,15 @@ namespace PleaseDontDrown.Rescue
 
         // ------------------------------------------------------------------ looks
 
-        private static readonly Color[] Shirts =
-        {
-            new(1f, 0.35f, 0.55f), new(0.2f, 0.85f, 0.75f), new(1f, 0.6f, 0.1f), new(0.55f, 0.35f, 0.95f),
-            new(0.3f, 0.9f, 0.3f), new(1f, 0.9f, 0.2f), new(0.2f, 0.55f, 1f), new(0.95f, 0.25f, 0.2f)
-        };
-        private static readonly Color[] Skins =
-        {
-            new(1f, 0.82f, 0.7f), new(1f, 0.62f, 0.55f) /* sunburnt */, new(0.87f, 0.68f, 0.5f),
-            new(0.68f, 0.48f, 0.33f), new(0.45f, 0.3f, 0.2f), new(0.95f, 0.72f, 0.6f)
-        };
-        private static readonly Color[] Hairs =
-        {
-            new(0.15f, 0.1f, 0.07f), new(0.45f, 0.28f, 0.12f), new(0.9f, 0.78f, 0.45f), new(0.6f, 0.6f, 0.62f), new(0.75f, 0.3f, 0.12f)
-        };
-
-        /// <summary>Same seed, same tourist on every machine: shirt, shorts, skin, hair, arm floaties, voice.</summary>
+        /// <summary>Same seed, same tourist on every machine: body, clothes, hat, glasses, floaties, voice.</summary>
         public void ApplyLooks(int seed)
         {
-            var rng = new System.Random(seed);
-            Color shirt = Shirts[rng.Next(Shirts.Length)];
-            Color shorts = Color.Lerp(Shirts[rng.Next(Shirts.Length)], new Color(0.15f, 0.2f, 0.35f), 0.55f);
-            Color skin = Skins[rng.Next(Skins.Length)];
-            Color hair = Hairs[rng.Next(Hairs.Length)];
-            Paint(_shirt, shirt);
-            Paint(_shorts, shorts);
-            Paint(_skin, skin);
-            Paint(_hair, hair);
-            bool floaties = rng.NextDouble() < 0.35;
-            foreach (GameObject f in _floaties)
-                if (f != null) f.SetActive(floaties);
-            _voice = rng.Next(4);
-        }
-
-        private void Paint(Renderer[] renderers, Color color)
-        {
-            _props.SetColor("_BaseColor", color);
-            _props.SetColor("_Color", color);
-            foreach (Renderer r in renderers)
-                if (r != null) r.SetPropertyBlock(_props);
+            _voice = Mathf.Abs(seed % 4);
+            if (_avatar == null) return;
+            _avatar.Build(AvatarLook.RandomTourist(seed));
+            // Hips of the cartoon body on the torso's hip joints.
+            _avatar.transform.localPosition = new Vector3(0f, _hipY - _avatar.HipHeight, 0f);
+            _avatar.transform.localRotation = Quaternion.identity;
         }
 
         /// <summary>A CPR compression: a squish and a thump (local visual, every machine).</summary>
@@ -201,14 +169,14 @@ namespace PleaseDontDrown.Rescue
             if (towing)
             {
                 // Lifeguard tow: on their back at the surface, a little ahead and to the right (keeps your view clear).
-                offset = new Vector3(0.45f, -0.5f, 1.25f);
+                offset = new Vector3(0.42f, -0.48f, 1.0f);
                 rotation = Quaternion.LookRotation(Vector3.up, Vector3.back);
                 pitchFollow = 0f;
             }
             else
             {
                 // Carried across the arms, face up, head to the right.
-                offset = new Vector3(0.05f, -0.85f, 0.95f);
+                offset = new Vector3(0.05f, -0.64f, 0.62f); // close to the chest, in both arms
                 rotation = Quaternion.LookRotation(Vector3.up, Vector3.right);
                 pitchFollow = 0.3f;
             }
@@ -260,14 +228,43 @@ namespace PleaseDontDrown.Rescue
 
         private void UpdateFace(VictimState state)
         {
-            float eye = state is VictimState.Unconscious or VictimState.Lost ? 0.15f
-                : state is VictimState.Panicking or VictimState.Drowning ? 1.4f : 1f;
-            foreach (Transform e in _eyes)
-                if (e != null) e.localScale = new Vector3(0.035f, 0.035f * eye, 0.02f);
-            if (_mouth != null)
+            if (_avatar == null) return;
+            float eyes = state is VictimState.Unconscious or VictimState.Lost ? 0.1f
+                : state is VictimState.Panicking or VictimState.Drowning ? 1.45f : 1f;
+            float mouth = state switch
             {
-                float open = state.IsStruggling() ? 2.4f : state == VictimState.Saved ? 1.6f : 0.6f;
-                _mouth.localScale = new Vector3(0.06f, 0.02f * open, 0.02f);
+                VictimState.Panicking => 0.75f + 0.25f * Mathf.Sin(Time.time * 11f),
+                VictimState.Drowning => 0.9f,
+                VictimState.Distressed => 0.45f,
+                VictimState.Saved => 0.55f,
+                _ => 0.05f
+            };
+            float brows = state.IsStruggling() ? -1f : state == VictimState.Saved ? 0.2f : 0f;
+            _avatar.SetExpression(eyes, mouth, brows);
+        }
+
+        /// <summary>The cartoon body's arms and legs follow the simulated limbs (elbows and knees bend by mood).</summary>
+        private void LateUpdate()
+        {
+            if (_avatar == null || !_avatar.IsBuilt) return;
+            VictimState state = _brain.State;
+            float armBend, legBend;
+            if (!state.IsConscious()) { armBend = 8f; legBend = 6f; }
+            else if (_item.IsHeld) { armBend = 25f; legBend = 30f; }
+            else if (state.IsStruggling()) { armBend = 30f + 15f * Mathf.Sin(Time.time * 5f); legBend = 35f + 20f * Mathf.Sin(Time.time * 4f); }
+            else if (_wading) { armBend = 20f; legBend = 15f; }
+            else { armBend = 15f; legBend = 4f; }
+
+            foreach (Limb limb in _limbs)
+            {
+                AvatarRig.Bone upper = limb.Kind switch
+                {
+                    LimbKind.ArmL => AvatarRig.Bone.UpperArmL, LimbKind.ArmR => AvatarRig.Bone.UpperArmR,
+                    LimbKind.LegL => AvatarRig.Bone.ThighL, _ => AvatarRig.Bone.ThighR
+                };
+                AvatarRig.Bone lower = upper + 1;
+                _avatar[upper].rotation = limb.Body.transform.rotation; // both hang down their local -Y at rest
+                _avatar[lower].localRotation = limb.IsArm ? Quaternion.Euler(-armBend, 0f, 0f) : Quaternion.Euler(legBend, 0f, 0f);
             }
         }
 
@@ -304,6 +301,8 @@ namespace PleaseDontDrown.Rescue
             }
             else if (!state.IsConscious() && !_brain.IsAshore && WaterSurface.Exists && WaterSurface.DepthOf(transform.position) > 0.2f)
                 Topple(); // (not in the shallows: CPR needs them on their back)
+            else if (!state.IsConscious() && transform.up.y > 0.35f && _rb.linearVelocity.sqrMagnitude < 4f)
+                FallOnBack(); // passed out on the sand: flat on the back, ready for CPR
         }
 
         /// <summary>Unconscious in the water: slowly tip over face-down instead of sinking like a statue.</summary>
@@ -311,6 +310,13 @@ namespace PleaseDontDrown.Rescue
         {
             Vector3 tilt = Vector3.Cross(transform.forward, Vector3.down);
             _rb.AddTorque(tilt * 6f - _rb.angularVelocity * 1f, ForceMode.Acceleration);
+        }
+
+        /// <summary>Out cold but still sitting up on land: tip over backwards.</summary>
+        private void FallOnBack()
+        {
+            Vector3 axis = Vector3.Cross(transform.up, -transform.forward); // turns "up" toward "back"
+            _rb.AddTorque(axis * 9f - _rb.angularVelocity * 1.5f, ForceMode.Acceleration);
         }
 
         /// <summary>The torso jumped (snap, unstuck pop, teleport): bring the limbs along instead of stretching the joints.</summary>

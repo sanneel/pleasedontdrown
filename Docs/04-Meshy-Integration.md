@@ -14,6 +14,20 @@ Importer documentation: https://github.com/Unity-Technologies/com.unity.cloud.gl
 | palm_tall | Meshy_AI_Tall_stylized_palm_tr_0927162514_texture.glb | Six beach palms |
 | station_rusty | Meshy_AI_Tiny_run_down_wooden__0927162045_texture.glb | Lifeguard shack |
 
+## Update, 27 September 2026 (evening)
+
+* **Characters are no longer Meshy models.** Both GLBs were static sculptures (the lifeguard with a raised fist and
+  a hand on the hip), so nothing could move their arms. Lifeguards and tourists now use the code-built avatars in
+  `Assets/_Game/Avatar/` (customizable, procedurally animated). The GLBs stay in the repo for a future rigged
+  version: regenerate in an A-pose and use Meshy's auto-rig (or Mixamo), then map its bones to `AvatarRig.Bone`.
+* **Decimated in Blender** (`ArtSource/Tools/decimate_glb.py`): palm 130k -> 14k, tower 229k -> 24k,
+  shack 289k -> 26k triangles. The originals stay in `ArtSource/Meshy/`.
+* **Walk-in buildings.** The shack is built at 1.45x and the tower at 1.2x so a lifeguard fits through the doors.
+  `MeshyArt.CutOpening` removes the painted door's triangles (saved to `Assets/_Game/Art/Generated/`), and the scene
+  builder puts a hinged, networked `Door` with a frame in the gap. The GLB materials are double-sided, so the inside
+  walls show the planks. Measurements come from orthographic renders (`ReviewCapture`, `ortho` shots).
+* **Textures are still 4K and uncompressed in builds** (about 50 MB per GLB); downscale/compress before release.
+
 ## Rebuilding
 
 The existing **PLEASE DON'T DROWN > Rebuild Game scene** command includes these assets.

@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
+using PleaseDontDrown.UI;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace PleaseDontDrown.Player
 {
@@ -20,15 +21,15 @@ namespace PleaseDontDrown.Player
         [SerializeField] private PlayerLook _look;
         [SerializeField] private PlayerInteractor _interactor;
         [SerializeField] private PlayerHands _hands;
+        [SerializeField] private PlayerAvatar _avatar;
+        [SerializeField] private PlayerVitals _vitals;
         [SerializeField] private Transform _head;
-        [SerializeField] private Transform _body;
-        [Tooltip("Hidden for the local player (they still cast shadows).")]
-        [SerializeField] private Renderer[] _selfHiddenRenderers;
-        [SerializeField] private Renderer _bodyRenderer;
-        [SerializeField] private Transform _modelFacing;
         [SerializeField] private TextMesh _nameTag;
 
         private readonly SyncVar<string> _displayName = new SyncVar<string>();
+        private readonly SyncVar<ulong> _avatarLook = new SyncVar<ulong>();
+        private readonly SyncVar<byte> _activeSlot = new SyncVar<byte>();
+        private FirstPersonArms _arms;
 
         private static readonly List<PlayerHub> _all = new();
 
@@ -41,12 +42,16 @@ namespace PleaseDontDrown.Player
         public PlayerLook Look => _look;
         public PlayerInteractor Interactor => _interactor;
         public PlayerHands Hands => _hands;
+        public PlayerAvatar Avatar => _avatar;
+        public PlayerVitals Vitals => _vitals;
+        /// <summary>Selected inventory slot as the host knows it (our own player predicts; see PlayerHands).</summary>
+        public int SyncedActiveSlot => _activeSlot.Value;
+        public FirstPersonArms Arms => _arms;
         public Transform Head => _head;
+        public AvatarLook AvatarLook => AvatarLook.Unpack(_avatarLook.Value);
         /// <summary>The body capsule (items ignore it while this player holds or has just thrown them).</summary>
         public Collider BodyCollider { get; private set; }
 
-        private float _standingHeadY;
-        private float _standingBodyScaleY;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -72,9 +77,9 @@ namespace PleaseDontDrown.Player
         private void Awake()
         {
             _displayName.OnChange += OnNameChanged;
+            _avatarLook.OnChange += OnLookChanged;
+            _activeSlot.OnChange += OnActiveSlotChanged;
             BodyCollider = GetComponent<CapsuleCollider>();
-            _standingHeadY = _head.localPosition.y;
-            _standingBodyScaleY = _body.localScale.y;
             // Owner-only systems start off; OnStartClient enables them for the local player.
             _motor.enabled = _look.enabled = _interactor.enabled = false;
         }
@@ -84,8 +89,7 @@ namespace PleaseDontDrown.Player
             base.OnStartClient();
             _all.Add(this);
             _nameTag.color = Color.HSVToRGB(Mathf.Repeat(OwnerId * 0.2718f + 0.05f, 1f), 0.6f, 0.95f);
-            if (_bodyRenderer != null)
-                _bodyRenderer.material.color = Color.HSVToRGB(Mathf.Repeat(OwnerId * 0.2718f + 0.05f, 1f), 0.6f, 0.95f);
+            _avatar.ApplyLook(AvatarLook); // already synced for a late joiner; the uniform otherwise
             Debug.Log($"[Player] spawned for owner {OwnerId} (mine: {IsOwner}) at {transform.position}");
 
             if (IsOwner)
@@ -117,6 +121,8 @@ namespace PleaseDontDrown.Player
             if (Local != this) return;
 
             DevCommands.Unregister("spawn", this);
+            DevCommands.Unregister("wave", this);
+            AvatarCustomizer.LookChanged -= SetLook;
             Local = null;
             GameInput.LocalPlayerExists = false;
             GameInput.Apply();
@@ -127,8 +133,7 @@ namespace PleaseDontDrown.Player
         private void SetupLocal()
         {
             Local = this;
-            foreach (Renderer r in _selfHiddenRenderers)
-                if (r != null) r.shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+            _avatar.SetLocal(true); // we only see our own body's shadow...
             _nameTag.gameObject.SetActive(false);
 
             var camGo = new GameObject("PlayerCamera") { tag = "MainCamera" };
@@ -140,16 +145,81 @@ namespace PleaseDontDrown.Player
             muffle.cutoffFrequency = 700f;
             muffle.enabled = false;
 
+            _arms = camGo.AddComponent<FirstPersonArms>(); // ...and our arms
+            _arms.Init(this, cam);
             _look.Attach(cam);
             _motor.enabled = _look.enabled = _interactor.enabled = true;
             _hands.RefreshLocal();
             DevCommands.Register("spawn", "<item> [count]", "Spawn items in front of you (see 'spawn list').", SpawnCommand, cheat: true, owner: this);
+            DevCommands.Register("wave", "", "Wave (also the V key).", _ => Gesture(AvatarGesture.Wave), owner: this);
+            SetLook(AvatarCustomizer.LocalLook);
+            AvatarCustomizer.LookChanged += SetLook;
 
             SceneCameras.SetMenuCameraActive(false);
             GameInput.LocalPlayerExists = true;
             GameInput.Apply();
             SetNameServer(SteamBootstrap.LocalName);
             LocalPlayerChanged?.Invoke(this);
+        }
+
+        // ------------------------------------------------------------------ inventory
+
+        /// <summary>Owner: tell everyone which slot is in our hands.</summary>
+        public void RequestActiveSlot(int slot)
+        {
+            if (IsOwner) SetActiveSlotServer((byte)Mathf.Clamp(slot, 0, PlayerHands.SlotCount - 1));
+        }
+
+        [ServerRpc]
+        private void SetActiveSlotServer(byte slot) => _activeSlot.Value = slot;
+
+        private void OnActiveSlotChanged(byte prev, byte next, bool asServer)
+        {
+            if (!IsOwner && _hands != null) _hands.OnActiveSlotChanged(); // our own player already switched locally
+        }
+
+        // ------------------------------------------------------------------ looks & gestures
+
+        /// <summary>Owner: wear this look (shown right away here, synced to everyone).</summary>
+        public void SetLook(AvatarLook look)
+        {
+            if (!IsOwner) return;
+            _avatar.ApplyLook(look);
+            if (_arms != null) _arms.Build(look);
+            SetLookServer(look.Pack());
+        }
+
+        [ServerRpc]
+        private void SetLookServer(ulong packed) => _avatarLook.Value = AvatarLook.Unpack(packed).Pack(); // normalised
+
+        private void OnLookChanged(ulong prev, ulong next, bool asServer)
+        {
+            if (asServer && IsClientStarted) return; // a host applies it once, as a client
+            AvatarLook look = AvatarLook.Unpack(next);
+            _avatar.ApplyLook(look);
+            if (_arms != null) _arms.Build(look);
+        }
+
+        /// <summary>Owner: play a gesture (throw, reach, wave...) here and on everyone else's screen.</summary>
+        public void Gesture(AvatarGesture gesture, Vector3 point = default)
+        {
+            if (!IsOwner) return;
+            _avatar.OnGesture(gesture);
+            if (_arms != null) _arms.Play(gesture, point);
+            GestureServer(gesture);
+        }
+
+        [ServerRpc]
+        private void GestureServer(AvatarGesture gesture) => GestureObservers(gesture);
+
+        [ObserversRpc(ExcludeOwner = true)]
+        private void GestureObservers(AvatarGesture gesture) => _avatar.OnGesture(gesture);
+
+        /// <summary>This player pressed a chest for CPR (called on every machine; see VictimBrain).</summary>
+        public void ShowPump(Vector3 chest)
+        {
+            _avatar.OnPump(chest);
+            if (_arms != null) _arms.OnPump(chest);
         }
 
         [ServerRpc]
@@ -197,18 +267,16 @@ namespace PleaseDontDrown.Player
             if (!asServer) Debug.Log($"[Player] owner {OwnerId} is now called '{next}'");
         }
 
+        private void Update()
+        {
+            if (IsOwner && GameInput.GameplayActive && GameInput.Emote.WasPressedThisFrame())
+                Gesture(AvatarGesture.Wave);
+        }
+
         private void LateUpdate()
         {
-            if (_modelFacing != null)
-                _modelFacing.rotation = Quaternion.Euler(0f, _head.eulerAngles.y, 0f);
             if (IsOwner) return;
-
-            // Remote players: the synced head height drives the body (crouching), the name tag faces our camera.
-            float crouch = Mathf.InverseLerp(_standingHeadY, _standingHeadY * 0.62f, _head.localPosition.y);
-            Vector3 s = _body.localScale;
-            _body.localScale = new Vector3(s.x, Mathf.Lerp(_standingBodyScaleY, _standingBodyScaleY * 0.65f, crouch), s.z);
-            _body.localPosition = new Vector3(0f, _body.localScale.y, 0f);
-
+            // Remote players: the name tag faces our camera.
             Camera cam = Camera.main;
             if (cam != null && _nameTag.gameObject.activeSelf)
                 _nameTag.transform.rotation = cam.transform.rotation;

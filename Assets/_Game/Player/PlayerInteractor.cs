@@ -48,9 +48,23 @@ namespace PleaseDontDrown.Player
             CurrentSecondaryPrompt = _current != null && handsFree ? _current.GetSecondaryPrompt(_hub) : null;
 
             if (_current != null && GameInput.Interact.WasPressedThisFrame())
+            {
+                _hub.Gesture(Avatars.AvatarGesture.Interact, TargetPoint(cam));
                 _current.Interact(_hub);
+            }
             else if (CurrentSecondaryPrompt != null && GameInput.Secondary.WasPressedThisFrame())
                 _current.InteractSecondary(_hub);
+        }
+
+        /// <summary>Where on the target the hand reaches (closest point of its collider to the crosshair ray).</summary>
+        private Vector3 TargetPoint(Camera cam)
+        {
+            if (_current == null || cam == null) return Vector3.zero;
+            Transform view = cam.transform;
+            if (FirstHit(view.position, view.forward, _rayDistance, out RaycastHit hit) && Interactable.FromCollider(hit.collider) == _current)
+                return hit.point;
+            Collider c = _current.GetComponentInChildren<Collider>();
+            return c != null ? c.ClosestPoint(view.position + view.forward * 1.2f) : _current.transform.position;
         }
 
         private Interactable FindTarget(Transform view)
