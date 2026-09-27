@@ -154,16 +154,16 @@ namespace PleaseDontDrown.Avatars
         }
 
         /// <summary>
-        /// One arm (upper arm, forearm, mitten hand) with its sleeve and floatie. Also used for the first-person arms,
+        /// One arm (upper arm and forearm) with its sleeve and floatie. Also used for the first-person arms,
         /// which stretch their segments (<paramref name="length"/>) so hands reach items held in front of the camera.
         /// </summary>
-        public static void BuildArm(AvatarMeshKit kit, AvatarLook look, bool left, float limb, float s, Action<Bone> on, float length = 1f)
+        public static void BuildArm(AvatarMeshKit kit, AvatarLook look, bool left, float limb, float s, Action<Bone> on, float length = 1f, float thickness = 1f)
         {
             Vector3 V(float x, float y, float z) => new Vector3(x, y, z) * s;
             Color skin = look.SkinColor;
             Color top = look.TopTint;
             on(left ? Bone.UpperArmL : Bone.UpperArmR);
-            float r0 = 0.056f * limb * s, r1 = 0.047f * limb * s, len = 0.29f * s * length;
+            float r0 = 0.056f * limb * s * thickness, r1 = 0.048f * limb * s * thickness, len = 0.29f * s * length;
             kit.Limb(len, r0, r1, skin);
             float sleeve = look.Top switch { TopStyle.TShirt => 0.5f, TopStyle.Hawaiian => 0.55f, TopStyle.RashGuard => 1f, _ => 0f };
             if (sleeve > 0f)
@@ -172,14 +172,12 @@ namespace PleaseDontDrown.Avatars
                 kit.Torus(V(0f, -0.12f * length, 0f), 0.075f * limb * s, 0.038f * s, Floatie, segments: 14, tubeSegments: 8);
 
             on(left ? Bone.ForearmL : Bone.ForearmR);
-            float f0 = 0.046f * limb * s, f1 = 0.038f * limb * s, flen = 0.26f * s * length;
+            float f0 = 0.049f * limb * s * thickness, f1 = 0.041f * limb * s * thickness, flen = 0.26f * s * length;
             kit.Limb(flen, f0, f1, skin);
             if (look.Top == TopStyle.RashGuard)
                 kit.Limb(flen * 0.92f, f0 + 0.009f * s, f1 + 0.009f * s, top);
 
-            on(left ? Bone.HandL : Bone.HandR);
-            kit.Ellipsoid(V(0f, -0.052f, 0.004f), V(0.05f, 0.066f, 0.03f), skin, segments: 10, rings: 7);
-            kit.Limb(0.05f * s, 0.018f * s, 0.015f * s, skin, V(0f, -0.022f, 0.028f), Quaternion.Euler(-38f, 0f, 0f), segments: 8);
+            // (The hand itself, with jointed fingers, is built by HandBones.)
         }
 
         /// <summary>A few flower dots on the surface of an ellipsoid (Hawaiian shirt).</summary>

@@ -339,7 +339,7 @@ namespace PleaseDontDrown.Editor
             Material blue = GetMaterial("CoolerBlue", new Color(0.18f, 0.45f, 0.85f));
             Material dark = GetMaterial("DarkMetal", new Color(0.18f, 0.18f, 0.2f));
 
-            Item crate = BuildItem("Crate", "Crate", 8f, new Vector3(0f, -0.5f, 0.86f), Vector3.zero, 1f, wood, root =>
+            Item crate = BuildItem("Crate", "Crate", 8f, new Vector3(0f, -0.45f, 0.84f), Vector3.zero, 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cube, "Box", root, Vector3.zero, Vector3.one * 0.6f, crateWood);
                 Primitive(PrimitiveType.Cube, "BandTop", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
@@ -378,9 +378,15 @@ namespace PleaseDontDrown.Editor
                     go.AddComponent<Floatable>(); // tourists in the water grab it
                     SetEnum(go.GetComponent<Item>(), "_grip", (int)ItemGrip.OneHand);
                     SetBool(go.GetComponent<Item>(), "_pocketable", true);
+                    // Right fist round the tube on the ring's outer edge (the edge that ends up at your right).
+                    var grip = new GameObject("GripRight").transform;
+                    grip.SetParent(go.transform, false);
+                    grip.localPosition = new Vector3(0.28f + 0.075f + 0.018f, 0f, 0f);
+                    grip.localRotation = Quaternion.LookRotation(Vector3.down, Vector3.right); // fingers through the ring, palm on the tube
+                    SetRef(go.GetComponent<Item>(), "_gripRight", grip);
                 });
 
-            Item cooler = BuildItem("Cooler", "Cooler", 4f, new Vector3(0.02f, -0.52f, 0.8f), Vector3.zero, 1f, wood, root =>
+            Item cooler = BuildItem("Cooler", "Cooler", 4f, new Vector3(0.02f, -0.46f, 0.76f), Vector3.zero, 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.55f, 0.36f, 0.36f), blue);
                 Primitive(PrimitiveType.Cube, "Lid", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.57f, 0.07f, 0.38f), white, keepCollider: false);

@@ -12,7 +12,10 @@ Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP �
   mesh per character from rounded shapes, animated procedurally (walk/run with planted feet, crouch, jump, crawl,
   breaststroke, treading water, carrying, throwing, CPR, eating, waving, looking around, blinking). Players pick their
   look in **Customize your lifeguard** (menu); tourists get a random look from their seed. Your own view shows
-  first-person arms that grab what you hold, stroke when you swim and press during CPR.
+  first-person arms and hands (How to Fish style): real hands with a thumb and jointed fingers that rest at the bottom
+  of the view, trail your turns, and blend into each item's grip (palms on a box's sides, fingers spread over a ball,
+  a coconut cupped in the palm, a fist round the life ring's tube; items can carry hand-placed `GripRight/GripLeft`
+  transforms), stroke when you swim, press flat during CPR, point at what you use and follow a throw out.
 * **Meshy GLBs**: shack, watchtower and palms (decimated). The shack (x1.45) and tower (x1.2) are scaled so you can
   walk in: their painted doors are cut out and replaced with real doors. The Meshy characters were static poses
   (no skeleton), so they are no longer used; see [Meshy integration](Docs/04-Meshy-Integration.md).

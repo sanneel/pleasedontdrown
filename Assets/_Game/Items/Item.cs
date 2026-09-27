@@ -43,6 +43,11 @@ namespace PleaseDontDrown.Items
         [SerializeField] private ItemGrip _grip;
         [Tooltip("Small enough to keep in an inventory slot. Big things must be carried in your hands.")]
         [SerializeField] private bool _pocketable;
+        [Header("Authored hand grips (optional)")]
+        [Tooltip("Where the right palm goes: forward = where the fingers point, down = where the palm faces.")]
+        [SerializeField] private Transform _gripRight;
+        [SerializeField] private Transform _gripLeft;
+        [SerializeField] private Avatars.HandPose _gripPose = new(0.9f, 0.7f, 0f);
 
         private readonly SyncVar<PlayerHub> _holder = new SyncVar<PlayerHub>();
         private readonly SyncVar<byte> _slot = new SyncVar<byte>();
@@ -70,6 +75,9 @@ namespace PleaseDontDrown.Items
         public float CarryMass => _carryMass > 0f ? _carryMass : Mass;
         public ItemGrip Grip => _grip;
         public bool Pocketable => _pocketable;
+        public Transform GripRight => _gripRight;
+        public Transform GripLeft => _gripLeft;
+        public Avatars.HandPose GripPose => _gripPose;
 
         /// <summary>Inventory slot of the holder this item is in (our prediction first).</summary>
         public int Slot => _predictedHolder != null && _predictedSlot >= 0 ? _predictedSlot : _slot.Value;

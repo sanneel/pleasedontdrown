@@ -25,9 +25,15 @@ namespace PleaseDontDrown.Avatars
 
         private static Material _sharedMaterial;
 
-        private readonly Transform[] _bones = new Transform[(int)Bone.Count];
-        private readonly Vector3[] _restPosition = new Vector3[(int)Bone.Count];
-        private readonly Quaternion[] _restRotation = new Quaternion[(int)Bone.Count];
+        /// <summary>Cartoon hands are drawn this much bigger than life (same factor in first person).</summary>
+        public const float HandScale = 1.15f;
+        // Body bones (Bone enum) first, then the left hand's fingers, then the right hand's.
+        private const int FingerStart = (int)Bone.Count;
+        private const int BoneTotal = FingerStart + 2 * HandBones.BoneCount;
+
+        private readonly Transform[] _bones = new Transform[BoneTotal];
+        private readonly Vector3[] _restPosition = new Vector3[BoneTotal];
+        private readonly Quaternion[] _restRotation = new Quaternion[BoneTotal];
         private SkinnedMeshRenderer _renderer;
         private Mesh _mesh;
         private bool _built;
@@ -43,6 +49,9 @@ namespace PleaseDontDrown.Avatars
         public float HipHeight { get; private set; }
         public float EyeHeight { get; private set; }
         public SkinnedMeshRenderer Renderer => _renderer;
+        public HandBones LeftHand { get; private set; }
+        public HandBones RightHand { get; private set; }
+        public HandBones Hand(bool right) => right ? RightHand : LeftHand;
         public bool IsBuilt => _built;
         /// <summary>Raised after every (re)build, so animators can re-read lengths.</summary>
         public event System.Action Rebuilt;
@@ -75,13 +84,16 @@ namespace PleaseDontDrown.Avatars
         /// <summary>Resets every bone to its rest pose.</summary>
         public void ResetPose()
         {
-            for (int i = 0; i < _bones.Length; i++)
+            for (int i = 0; i < FingerStart; i++)
             {
                 if (_bones[i] == null) continue;
                 _bones[i].localPosition = _restPosition[i];
                 _bones[i].localRotation = _restRotation[i];
                 _bones[i].localScale = Vector3.one;
             }
+            // Fingers rest slightly curled (animators and ragdolls pose them over this).
+            LeftHand?.Pose(HandPose.Relaxed);
+            RightHand?.Pose(HandPose.Relaxed);
         }
 
         public void SetShadowsOnly(bool shadowsOnly)
@@ -174,6 +186,16 @@ namespace PleaseDontDrown.Avatars
                 Make(left ? Bone.BrowL : Bone.BrowR, Bone.Head, new Vector3(0.058f * side, 0.215f, 0.142f) * AvatarParts.HeadScale);
             }
             Make(Bone.Mouth, Bone.Head, new Vector3(0f, 0.068f, 0.145f) * AvatarParts.HeadScale);
+
+            // Fingers: keep the same transforms across rebuilds.
+            var leftFingers = new Transform[HandBones.BoneCount];
+            var rightFingers = new Transform[HandBones.BoneCount];
+            System.Array.Copy(_bones, FingerStart, leftFingers, 0, HandBones.BoneCount);
+            System.Array.Copy(_bones, FingerStart + HandBones.BoneCount, rightFingers, 0, HandBones.BoneCount);
+            LeftHand = new HandBones(_bones[(int)Bone.HandL], -1f, s * HandScale, leftFingers);
+            RightHand = new HandBones(_bones[(int)Bone.HandR], 1f, s * HandScale, rightFingers);
+            System.Array.Copy(LeftHand.Bones, 0, _bones, FingerStart, HandBones.BoneCount);
+            System.Array.Copy(RightHand.Bones, 0, _bones, FingerStart + HandBones.BoneCount, HandBones.BoneCount);
             ResetPose();
         }
 
@@ -185,8 +207,21 @@ namespace PleaseDontDrown.Avatars
             for (int i = 0; i < _bones.Length; i++)
                 bindposes[i] = _bones[i].worldToLocalMatrix * rootToWorld;
 
+            // Bind with straight fingers (the rest pose), whatever pose they were left in.
+            LeftHand.ResetPose();
+            RightHand.ResetPose();
+            for (int i = FingerStart; i < BoneTotal; i++)
+                bindposes[i] = _bones[i].worldToLocalMatrix * rootToWorld;
+
             void On(Bone bone) => kit.SetBone((int)bone, bindposes[(int)bone].inverse);
             AvatarParts.Build(kit, look, BodyFor(look.Build).Width, BodyFor(look.Build).Belly, BodyFor(look.Build).Limb, BodyFor(look.Build).Shoulder, Scale, On);
+            void HandMesh(HandBones hand, Bone handBone, int first) => hand.BuildMesh(kit, look.SkinColor, f =>
+            {
+                int index = f < 0 ? (int)handBone : first + f;
+                kit.SetBone(index, bindposes[index].inverse);
+            });
+            HandMesh(LeftHand, Bone.HandL, FingerStart);
+            HandMesh(RightHand, Bone.HandR, FingerStart + HandBones.BoneCount);
 
             _mesh = kit.ToMesh("Avatar", bindposes, _mesh);
             if (_renderer == null)

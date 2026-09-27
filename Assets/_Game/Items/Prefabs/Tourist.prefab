@@ -791,6 +791,15 @@ MonoBehaviour:
   _carryMass: 12
   _grip: 3
   _pocketable: 0
+  _gripRight: {fileID: 0}
+  _gripLeft: {fileID: 0}
+  _gripPose:
+    Thumb: 0.7
+    Index: 0.9
+    Middle: 0.9
+    Ring: 0.9
+    Pinky: 0.9
+    Spread: 0
 --- !u!114 &7793420296876453761
 MonoBehaviour:
   m_ObjectHideFlags: 0

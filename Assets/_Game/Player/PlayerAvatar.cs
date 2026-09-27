@@ -134,7 +134,7 @@ namespace PleaseDontDrown.Player
 
             if (hands != null)
             {
-                PlayerHands.GripKind grip = hands.GetGrips(out m.GripLeft, out m.GripRight);
+                PlayerHands.GripKind grip = hands.GetGrip(out m.GripLeft, out m.GripRight);
                 m.Holding = grip != PlayerHands.GripKind.None;
                 m.TwoHanded = grip == PlayerHands.GripKind.TwoHands;
                 m.CarryingPerson = grip == PlayerHands.GripKind.Person;

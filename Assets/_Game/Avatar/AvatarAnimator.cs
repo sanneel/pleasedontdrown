@@ -21,7 +21,7 @@ namespace PleaseDontDrown.Avatars
         public bool Holding;          // hands on an item (grips below)
         public bool TwoHanded;
         public bool CarryingPerson;
-        public Vector3 GripLeft, GripRight; // world
+        public HandGrip GripLeft, GripRight; // world palm points, finger/palm directions, finger curls
         public float Charge;          // 0..1 throw wind-up
         public bool Eating;
         public bool Cpr;
@@ -63,6 +63,8 @@ namespace PleaseDontDrown.Avatars
         private float _gestureStart;
         private float _lastPump = -10f;
         private float _nextBlink;
+        private float _dt;
+        private HandPose _poseL = HandPose.Relaxed, _poseR = HandPose.Relaxed;
         private float _blinkUntil;
 
         public AvatarRig Rig
@@ -92,6 +94,7 @@ namespace PleaseDontDrown.Avatars
         public void Tick(float dt)
         {
             if (_rig == null || !_rig.IsBuilt) return;
+            _dt = dt;
             UpdateBlends(dt);
             _rig.ResetPose();
             PoseBody();
@@ -279,6 +282,65 @@ namespace PleaseDontDrown.Avatars
 
             ArmIKLayers();
             GestureLayer();
+            PoseHands();
+        }
+
+        /// <summary>
+        /// Wrists and fingers: loose fists when running, flat when swimming or pressing a chest, the grip's hand pose
+        /// on held things (palm on the item, fingers wrapped round), an open hand to wave, a pointing finger to press.
+        /// </summary>
+        private void PoseHands()
+        {
+            AvatarMotion m = Motion;
+            Vector3 fwd = transform.forward;
+            for (int i = 0; i < 2; i++)
+            {
+                bool right = i == 1;
+                float side = right ? 1f : -1f;
+                HandBones hand = _rig.Hand(right);
+                if (hand == null) continue;
+                HandPose pose = HandPose.Lerp(HandPose.Relaxed, HandPose.LooseFist, _run * _move * (1f - _swim));
+                pose = HandPose.Lerp(pose, HandPose.Swim, _swim);
+                Quaternion? rotation = null;
+                float weight = 0f;
+
+                HandGrip grip = right ? m.GripRight : m.GripLeft;
+                bool usesGrip = grip.Active && (right || m.TwoHanded || m.CarryingPerson);
+                if (usesGrip && _hold > 0.01f)
+                {
+                    weight = _hold * (1f - _cpr);
+                    rotation = grip.Rotation(side);
+                    pose = HandPose.Lerp(pose, grip.Pose, weight);
+                }
+                if (_cpr > 0.01f)
+                {
+                    rotation = HandBones.Orient(fwd, Vector3.down, side);
+                    weight = _cpr;
+                    pose = HandPose.Lerp(pose, HandPose.Flat, _cpr);
+                }
+                if (right && _eat > 0.01f) pose = HandPose.Lerp(pose, HandPose.Cup, _eat);
+                if (right && GestureActive(AvatarGesture.Wave, 1.6f))
+                {
+                    rotation = HandBones.Orient(Vector3.up, fwd, side);
+                    weight = Mathf.Clamp01(Mathf.Min(GestureT(1.6f) / 0.15f, (1f - GestureT(1.6f)) / 0.15f));
+                    pose = HandPose.Lerp(pose, HandPose.Wave, weight);
+                }
+                else if (right && GestureActive(AvatarGesture.Interact, 0.4f))
+                    pose = HandPose.Lerp(pose, HandPose.Point, Mathf.Sin(GestureT(0.4f) * Mathf.PI));
+
+                if (rotation.HasValue && weight > 0f)
+                    hand.Hand.rotation = Quaternion.Slerp(hand.Hand.rotation, rotation.Value, weight);
+                if (right)
+                {
+                    _poseR = HandPose.Towards(_poseR, pose, 14f, _dt);
+                    hand.Pose(_poseR);
+                }
+                else
+                {
+                    _poseL = HandPose.Towards(_poseL, pose, 14f, _dt);
+                    hand.Pose(_poseL);
+                }
+            }
         }
 
         private void PoseSwimArm(Transform upper, Transform fore, float side, int index)
@@ -318,7 +380,7 @@ namespace PleaseDontDrown.Avatars
             if (_hold > 0.01f)
             {
                 float w = _hold * (1f - _cpr);
-                Vector3 gl = m.GripLeft, gr = m.GripRight;
+                Vector3 gl = m.GripLeft.Point, gr = m.GripRight.Point;
                 if (!m.TwoHanded && !m.CarryingPerson)
                 {
                     // One hand under it, the other relaxed.

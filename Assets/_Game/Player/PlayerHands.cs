@@ -83,6 +83,10 @@ namespace PleaseDontDrown.Player
         public float EatProgress01 => _eatProgress;
         public bool IsCharging => _chargeSource != ChargeSource.None && Charge01 > 0f;
         public float Charge01 { get; private set; }
+        /// <summary>The item we last threw, when, and how hard (first-person hands follow it out briefly).</summary>
+        public Item LastThrown { get; private set; }
+        public float LastThrowTime { get; private set; } = -10f;
+        public float LastThrowCharge { get; private set; }
 
         private bool IsLocal => _hub.IsOwner;
 
@@ -228,6 +232,12 @@ namespace PleaseDontDrown.Player
             }
 
             StopEating();
+            if (charge >= 0f)
+            {
+                LastThrown = item;
+                LastThrowTime = Time.time;
+                LastThrowCharge = charge;
+            }
             item.Release(_hub, velocity, spin);
             Invalidate();
             ResetHoldState();
@@ -504,27 +514,39 @@ namespace PleaseDontDrown.Player
         }
 
         /// <summary>
-        /// Where the hands go on the held item, in world space: both hands just outside the sides of bigger things,
-        /// one hand under small ones or on the rim of a ring, and under the back and knees of a person.
+        /// How the hands hold the item in our hands (world space), How to Fish style: a palm position, finger and
+        /// palm directions and a finger pose per hand. Both hands on the near sides of boxes, spread over a ball,
+        /// one hand cupped under small things or hooked over the rim of a ring, under the back and knees of a person.
         /// </summary>
-        public GripKind GetGrips(out Vector3 left, out Vector3 right)
+        public GripKind GetGrip(out HandGrip left, out HandGrip right) => GetGrip(HeldItem, out left, out right);
+
+        /// <summary>The same for any item (hands that stay with a thrown item for a moment use this).</summary>
+        public GripKind GetGrip(Item item, out HandGrip left, out HandGrip right)
         {
-            left = right = Vector3.zero;
-            Item item = HeldItem;
+            left = right = default;
             if (item == null) return GripKind.None;
+            // Hand-placed grips on the item win (fingers along the grip's forward, palm toward its down).
+            if (item.GripRight != null || item.GripLeft != null)
+            {
+                if (item.GripRight != null) right = new HandGrip(item.GripRight.position, item.GripRight.forward, -item.GripRight.up, item.GripPose);
+                if (item.GripLeft != null) left = new HandGrip(item.GripLeft.position, item.GripLeft.forward, -item.GripLeft.up, item.GripPose);
+                return item.GripRight != null && item.GripLeft != null ? GripKind.TwoHands : GripKind.OneHand;
+            }
+
             Transform frame = IsLocal ? AimTransform : _head;
             Vector3 up = Vector3.up;
             Vector3 side = Vector3.ProjectOnPlane(frame.right, up);
             side = side.sqrMagnitude > 1e-4f ? side.normalized : frame.right;
+            Vector3 fwd = Vector3.Cross(side, up); // horizontal forward
 
             if (item.Grip == ItemGrip.Person)
             {
                 Transform body = item.transform;
-                Vector3 a = body.position + body.up * 0.24f - up * 0.14f; // under the shoulders
-                Vector3 b = body.position - body.up * 0.32f - up * 0.14f; // under the knees
+                Vector3 a = body.position + body.up * 0.24f - up * 0.15f; // under the shoulders
+                Vector3 b = body.position - body.up * 0.32f - up * 0.15f; // under the knees
                 bool aRight = Vector3.Dot(a - b, side) > 0f;
-                right = aRight ? a : b;
-                left = aRight ? b : a;
+                right = new HandGrip(aRight ? a : b, fwd, up, HandPose.Carry);
+                left = new HandGrip(aRight ? b : a, fwd, up, HandPose.Carry);
                 return GripKind.Person;
             }
 
@@ -532,22 +554,46 @@ namespace PleaseDontDrown.Player
             Vector3 c = bounds.center, e = bounds.extents;
             float halfWidth = Mathf.Abs(side.x) * e.x + Mathf.Abs(side.y) * e.y + Mathf.Abs(side.z) * e.z;
             Vector3 toUs = Vector3.ProjectOnPlane(frame.position - c, up);
-            toUs = toUs.sqrMagnitude > 1e-4f ? toUs.normalized : -frame.forward;
+            toUs = toUs.sqrMagnitude > 1e-4f ? toUs.normalized : -fwd;
             float depth = Mathf.Abs(toUs.x) * e.x + Mathf.Abs(toUs.z) * e.z;
             ItemGrip style = item.Grip != ItemGrip.Auto ? item.Grip
                 : bounds.size.x < 0.36f && bounds.size.y < 0.36f && bounds.size.z < 0.36f ? ItemGrip.OneHand : ItemGrip.TwoHands;
+
             if (style == ItemGrip.OneHand)
             {
-                right = halfWidth > 0.2f
-                    ? c + side * (halfWidth * 0.85f) + toUs * (depth * 0.5f)                       // the rim of a ring
-                    : c + side * (halfWidth * 0.6f + 0.02f) - up * (e.y * 0.55f) + toUs * (depth * 0.2f); // cupped under its side
-                left = right;
+                if (halfWidth > 0.2f)
+                {
+                    // A ring: palm on top of the tube at its near-right edge, fingers curled round it.
+                    Vector3 rim = c + side * (halfWidth * 0.84f) + toUs * (depth * 0.45f) + up * 0.04f;
+                    right = new HandGrip(rim, (fwd - side * 0.25f).normalized, -up, HandPose.LooseFist);
+                }
+                else
+                {
+                    // Small things sit in the palm, fingers wrapped round.
+                    Vector3 under = c - up * (e.y * 0.92f) + toUs * (depth * 0.12f);
+                    right = new HandGrip(under, (fwd - side * 0.2f).normalized, up, HandPose.Cup);
+                }
                 return GripKind.OneHand;
             }
-            // On the near corners, just outside the sides: the hands wrap round the front of the item where we can see them.
-            Vector3 near = toUs * (depth * 0.8f) + up * (e.y * 0.1f);
-            left = c - side * (halfWidth + 0.02f) + near;
-            right = c + side * (halfWidth + 0.02f) + near;
+
+            bool round = item.GetComponentInChildren<SphereCollider>() != null;
+            if (round)
+            {
+                // A ball: palms on its sides, fingers spread up and over it.
+                Vector3 l = c - side * (halfWidth * 0.97f) + toUs * (depth * 0.28f);
+                Vector3 r = c + side * (halfWidth * 0.97f) + toUs * (depth * 0.28f);
+                Vector3 over = (up * 0.55f - toUs * 0.6f).normalized;
+                left = new HandGrip(l, over, (c - l).normalized, HandPose.BallGrip);
+                right = new HandGrip(r, over, (c - r).normalized, HandPose.BallGrip);
+                return GripKind.TwoHands;
+            }
+
+            // A box: palms flat on the sides near the front corners (outside the silhouette, so we see them),
+            // fingers pointing away along the sides.
+            Vector3 near = toUs * (depth * 0.7f) + up * (e.y * 0.3f);
+            Vector3 along = (-toUs * 0.85f - up * 0.35f).normalized;
+            left = new HandGrip(c - side * (halfWidth + 0.012f) + near, along, side, HandPose.BoxGrip);
+            right = new HandGrip(c + side * (halfWidth + 0.012f) + near, along, -side, HandPose.BoxGrip);
             return GripKind.TwoHands;
         }
 

@@ -266,6 +266,18 @@ namespace PleaseDontDrown.Rescue
                 _avatar[upper].rotation = limb.Body.transform.rotation; // both hang down their local -Y at rest
                 _avatar[lower].localRotation = limb.IsArm ? Quaternion.Euler(-armBend, 0f, 0f) : Quaternion.Euler(legBend, 0f, 0f);
             }
+
+            // Hands: limp when out cold, clawing at the water in a panic, reaching open-handed while going under.
+            HandPose hands = state switch
+            {
+                VictimState.Panicking => HandPose.Lerp(HandPose.Wave, HandPose.Cup, 0.5f + 0.5f * Mathf.Sin(Time.time * 9f)),
+                VictimState.Drowning => HandPose.Wave,
+                VictimState.Distressed => HandPose.Wave,
+                VictimState.Saved => HandPose.Wave,
+                _ => HandPose.Relaxed
+            };
+            _avatar.LeftHand?.Pose(hands);
+            _avatar.RightHand?.Pose(hands);
         }
 
         private void UpdateSquish()

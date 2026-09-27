@@ -117,13 +117,13 @@ namespace PleaseDontDrown.Editor
                 case "dive": m.Swimming = true; m.Underwater = true; m.LookPitch = 35f; m.Velocity = forward * 2.5f; break;
                 case "hold":
                     m.Holding = true; m.TwoHanded = true;
-                    m.GripLeft = chest + forward * 0.55f - go.transform.right * 0.25f;
-                    m.GripRight = chest + forward * 0.55f + go.transform.right * 0.25f;
+                    m.GripLeft = new HandGrip(chest + forward * 0.5f - go.transform.right * 0.3f, forward, go.transform.right, HandPose.BoxGrip);
+                    m.GripRight = new HandGrip(chest + forward * 0.5f + go.transform.right * 0.3f, forward, -go.transform.right, HandPose.BoxGrip);
                     break;
                 case "carry":
                     m.Holding = true; m.CarryingPerson = true;
-                    m.GripLeft = chest + forward * 0.45f - go.transform.right * 0.3f - Vector3.up * 0.2f;
-                    m.GripRight = chest + forward * 0.45f + go.transform.right * 0.3f - Vector3.up * 0.25f;
+                    m.GripLeft = new HandGrip(chest + forward * 0.45f - go.transform.right * 0.3f - Vector3.up * 0.2f, forward, Vector3.up, HandPose.Carry);
+                    m.GripRight = new HandGrip(chest + forward * 0.45f + go.transform.right * 0.3f - Vector3.up * 0.25f, forward, Vector3.up, HandPose.Carry);
                     break;
                 case "charge": m.Charge = 1f; break;
                 case "eat": m.Eating = true; break;
