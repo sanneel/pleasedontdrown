@@ -25,6 +25,7 @@ namespace PleaseDontDrown.Player
         [Tooltip("Hidden for the local player (they still cast shadows).")]
         [SerializeField] private Renderer[] _selfHiddenRenderers;
         [SerializeField] private Renderer _bodyRenderer;
+        [SerializeField] private Transform _modelFacing;
         [SerializeField] private TextMesh _nameTag;
 
         private readonly SyncVar<string> _displayName = new SyncVar<string>();
@@ -82,6 +83,7 @@ namespace PleaseDontDrown.Player
         {
             base.OnStartClient();
             _all.Add(this);
+            _nameTag.color = Color.HSVToRGB(Mathf.Repeat(OwnerId * 0.2718f + 0.05f, 1f), 0.6f, 0.95f);
             if (_bodyRenderer != null)
                 _bodyRenderer.material.color = Color.HSVToRGB(Mathf.Repeat(OwnerId * 0.2718f + 0.05f, 1f), 0.6f, 0.95f);
             Debug.Log($"[Player] spawned for owner {OwnerId} (mine: {IsOwner}) at {transform.position}");
@@ -197,6 +199,8 @@ namespace PleaseDontDrown.Player
 
         private void LateUpdate()
         {
+            if (_modelFacing != null)
+                _modelFacing.rotation = Quaternion.Euler(0f, _head.eulerAngles.y, 0f);
             if (IsOwner) return;
 
             // Remote players: the synced head height drives the body (crouching), the name tag faces our camera.

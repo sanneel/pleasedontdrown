@@ -303,6 +303,13 @@ namespace PleaseDontDrown.Editor
             SetRef(hub, "_nameTag", nameTag);
             SetRefs(hub, "_selfHiddenRenderers", body.GetComponent<Renderer>(), visor.GetComponent<Renderer>(), cap.GetComponent<Renderer>());
 
+            if (MeshyArt.Player(root, body.transform, head))
+            {
+                SetRef(hub, "_bodyRenderer", null);
+                SetRefs(hub, "_selfHiddenRenderers", body.GetComponentsInChildren<Renderer>().Cast<Object>().ToArray());
+                SetRef(hub, "_modelFacing", body.transform);
+            }
+
             GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
             Object.DestroyImmediate(root);
             return saved.GetComponent<NetworkObject>();
@@ -560,6 +567,15 @@ namespace PleaseDontDrown.Editor
             SetRefs(victimBody, "_floaties", floaties.ToArray());
             SetRef(victimBody, "_audio", SpatialAudio(root, 3f, 70f));
 
+            if (MeshyArt.Tourist(root, visual))
+            {
+                SetRefs(victimBody, "_shirt");
+                SetRefs(victimBody, "_shorts");
+                SetRefs(victimBody, "_skin");
+                SetRefs(victimBody, "_hair");
+                SetRefs(victimBody, "_floaties");
+            }
+
             GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, $"{ItemPrefabDir}/Tourist.prefab");
             Object.DestroyImmediate(root);
             return saved.GetComponent<Item>();
@@ -624,6 +640,7 @@ namespace PleaseDontDrown.Editor
             Transform env = new GameObject("Environment").transform;
             BuildBeach(env);
             BuildStation(env);
+            MeshyArt.Palms(env);
             PlaceItems(catalog);
             BuildDrillBoard(env);
             Transform[] spawns = BuildSpawnPoints();
@@ -824,6 +841,8 @@ namespace PleaseDontDrown.Editor
             Primitive(PrimitiveType.Cube, "Roof", shack, new Vector3(0f, 2.9f, 0f), new Vector3(5.4f, 0.15f, 4.4f), red).transform.localRotation = Quaternion.Euler(-6f, 0f, 0f);
             Primitive(PrimitiveType.Cube, "Counter", shack, new Vector3(0f, 0.85f, 1.3f), new Vector3(3.2f, 0.9f, 0.6f), wood);
 
+            bool meshyShack = MeshyArt.Structure("station_rusty", shack, 4f);
+
             TextMesh roofSign = WorldText(shack, "RoofSign", new Vector3(0f, 3.4f, -2.2f), "LIFEGUARD (probably)", 80, 0.06f, red.color);
             roofSign.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
 
@@ -840,6 +859,14 @@ namespace PleaseDontDrown.Editor
             var lightSwitch = new GameObject("LightSwitch");
             lightSwitch.transform.SetParent(shack, false);
             lightSwitch.transform.localPosition = new Vector3(-2.3f, 1.35f, -1.66f);
+            if (meshyShack)
+            {
+                lightSwitch.transform.localPosition = new Vector3(-2.1f, 1.35f, 1.9f);
+                Primitive(PrimitiveType.Cube, "SwitchPost", shack, new Vector3(-2.1f, 0.7f, 1.95f), new Vector3(0.12f, 1.4f, 0.12f), wood);
+                bulb.transform.localPosition = new Vector3(0f, 2.35f, 1.65f);
+                roofSign.transform.localPosition = new Vector3(0f, 3.5f, 1.6f);
+                roofSign.characterSize = 0.035f;
+            }
             GameObject plate = Primitive(PrimitiveType.Cube, "Plate", lightSwitch.transform, Vector3.zero, new Vector3(0.16f, 0.24f, 0.06f), dark);
             lightSwitch.AddComponent<NetworkObject>();
             var toggle = lightSwitch.AddComponent<ToggleLight>();
@@ -898,6 +925,7 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Leg", tower, p, new Vector3(0.15f, 3f, 0.15f), wood);
             Primitive(PrimitiveType.Cube, "Platform", tower, new Vector3(0f, 3.1f, 0f), new Vector3(2.2f, 0.2f, 2.2f), wood);
             Primitive(PrimitiveType.Cube, "Ramp", tower, new Vector3(0f, 1.5f, 2.6f), new Vector3(1f, 0.1f, 4f), wood).transform.localRotation = Quaternion.Euler(38f, 0f, 0f);
+            MeshyArt.Structure("tower", tower, 5.5f);
         }
 
         /// <summary>Red board by the spawn: starts a rescue drill (a tourist in trouble out in the water).</summary>

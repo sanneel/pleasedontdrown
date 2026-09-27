@@ -6,6 +6,12 @@ Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP �
 * Architecture and milestones: [Docs/02-Technical-Architecture.md](Docs/02-Technical-Architecture.md)
 * Art direction + Meshy prompts: [Docs/03-Art-Direction-Meshy.md](Docs/03-Art-Direction-Meshy.md) (exports go in `ArtSource/Meshy/`)
 
+## Meshy art
+
+Five Desktop GLBs are integrated: tourist, lifeguard, shack, watchtower, and palms.
+See [asset setup and limitations](Docs/04-Meshy-Integration.md). The character exports
+are static poses; rigged exports are needed for limb and locomotion animation.
+
 ## Open the project
 Unity Hub → **Add → Add project from disk** → `F:\GameDev\PleaseDontDrown`, then open `Assets/_Game/Scenes/Game.unity` and press Play.
 Keep the Steam client running for online features (dev app id **480** / Spacewar, see `steam_appid.txt`).
