@@ -18,6 +18,7 @@ namespace PleaseDontDrown.Core
         public static InputAction Interact { get; private set; }
         public static InputAction Primary { get; private set; }
         public static InputAction Secondary { get; private set; }
+        public static InputAction Drop { get; private set; }
 
         /// <summary>Always active, even while UI is open.</summary>
         public static InputAction ToggleConsole { get; private set; }
@@ -59,6 +60,8 @@ namespace PleaseDontDrown.Core
             Primary.AddBinding("<Gamepad>/rightTrigger");
             Secondary = _gameplay.AddAction("Secondary", InputActionType.Button, "<Mouse>/rightButton");
             Secondary.AddBinding("<Gamepad>/leftTrigger");
+            Drop = _gameplay.AddAction("Drop", InputActionType.Button, "<Keyboard>/g");
+            Drop.AddBinding("<Gamepad>/buttonNorth");
 
             _global = new InputActionMap("Global");
             ToggleConsole = _global.AddAction("ToggleConsole", InputActionType.Button, "<Keyboard>/backquote");

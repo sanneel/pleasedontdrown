@@ -14,6 +14,7 @@ using FishNet.Transporting.Multipass;
 using FishNet.Transporting.Tugboat;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Interaction;
+using PleaseDontDrown.Items;
 using PleaseDontDrown.Net;
 using PleaseDontDrown.Player;
 using PleaseDontDrown.UI;
@@ -39,6 +40,10 @@ namespace PleaseDontDrown.Editor
         private const string ScenePath = "Assets/_Game/Scenes/Game.unity";
         private const string PlayerPrefabPath = "Assets/_Game/Player/Prefabs/Player.prefab";
         private const string MaterialDir = "Assets/_Game/Data/Materials";
+        private const string PhysicsDir = "Assets/_Game/Data/Physics";
+        private const string MeshDir = "Assets/_Game/Data/Meshes";
+        private const string ItemPrefabDir = "Assets/_Game/Items/Prefabs";
+        private const string ItemCatalogPath = "Assets/_Game/Data/ItemCatalog.asset";
         private const string OutlineShaderPath = "Assets/_Game/Data/Shaders/Outline.shader";
         private const string OutlineLayerName = "Outlined";
         private const string OutlineFeatureName = "HoverOutline";
@@ -92,8 +97,9 @@ namespace PleaseDontDrown.Editor
             int outlineLayer = EnsureLayer(OutlineLayerName);
             SetupOutlineRendering(outlineLayer);
             NetworkObject player = BuildPlayerPrefab();
+            ItemCatalog catalog = BuildItems();
             RefreshFishNetPrefabs();
-            BuildScene(player);
+            BuildScene(player, catalog);
             AssetDatabase.SaveAssets();
         }
 
@@ -243,8 +249,12 @@ namespace PleaseDontDrown.Editor
             var motor = root.AddComponent<PlayerMotor>();
             var look = root.AddComponent<PlayerLook>();
             var interactor = root.AddComponent<PlayerInteractor>();
+            var hands = root.AddComponent<PlayerHands>(); // runs on every machine (places held items)
             var hub = root.AddComponent<PlayerHub>();
             motor.enabled = look.enabled = interactor.enabled = false;
+            SetRef(hands, "_hub", hub);
+            SetRef(hands, "_head", head);
+            SetRef(hub, "_hands", hands);
 
             SetRef(motor, "_head", head);
             SetRef(look, "_head", head);
@@ -268,7 +278,141 @@ namespace PleaseDontDrown.Editor
         // Scene
         // =====================================================================
 
-        private static void BuildScene(NetworkObject playerPrefab)
+        // =====================================================================
+        // Items
+        // =====================================================================
+
+        private static ItemCatalog BuildItems()
+        {
+            Directory.CreateDirectory(ItemPrefabDir);
+            PhysicsMaterial bouncy = GetPhysicsMaterial("Bouncy", 0.78f, 0.35f, PhysicsMaterialCombine.Maximum);
+            PhysicsMaterial rubber = GetPhysicsMaterial("Rubber", 0.3f, 0.8f, PhysicsMaterialCombine.Average);
+            PhysicsMaterial wood = GetPhysicsMaterial("WoodPhysics", 0.1f, 0.6f, PhysicsMaterialCombine.Average);
+
+            Material crateWood = GetMaterial("CrateWood", new Color(0.72f, 0.52f, 0.3f));
+            Material crateBand = GetMaterial("CrateBand", new Color(0.45f, 0.3f, 0.17f));
+            Material white = GetMaterial("White", new Color(0.95f, 0.95f, 0.95f));
+            Material red = GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f));
+            Material yellow = GetMaterial("BallYellow", new Color(1f, 0.83f, 0.2f));
+            Material blue = GetMaterial("CoolerBlue", new Color(0.18f, 0.45f, 0.85f));
+            Material dark = GetMaterial("DarkMetal", new Color(0.18f, 0.18f, 0.2f));
+
+            Item crate = BuildItem("Crate", "Crate", 8f, new Vector3(0f, -0.45f, 0.9f), Vector3.zero, 1f, wood, root =>
+            {
+                Primitive(PrimitiveType.Cube, "Box", root, Vector3.zero, Vector3.one * 0.6f, crateWood);
+                Primitive(PrimitiveType.Cube, "BandTop", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
+                Primitive(PrimitiveType.Cube, "BandBottom", root, new Vector3(0f, -0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
+            });
+
+            Item ball = BuildItem("BeachBall", "Beach Ball", 0.4f, new Vector3(0.28f, -0.3f, 0.7f), Vector3.zero, 1f, bouncy, root =>
+            {
+                Primitive(PrimitiveType.Sphere, "Ball", root, Vector3.zero, Vector3.one * 0.55f, red);
+                Primitive(PrimitiveType.Cylinder, "Band", root, Vector3.zero, new Vector3(0.56f, 0.06f, 0.56f), white, keepCollider: false);
+                Primitive(PrimitiveType.Cylinder, "Band2", root, Vector3.zero, new Vector3(0.56f, 0.06f, 0.56f), yellow, keepCollider: false)
+                    .transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            }, linearDamping: 0.5f, angularDamping: 0.9f); // rolls ~10-15 m after a sprint kick instead of forever
+
+            Mesh torus = GetTorusMesh("Torus", 0.28f, 0.075f);
+            Item ring = BuildItem("LifeRing", "Life Ring", 1.2f, new Vector3(0.3f, -0.28f, 0.72f), new Vector3(70f, 0f, 0f), 1.1f, rubber, root =>
+            {
+                var go = new GameObject("Ring");
+                go.transform.SetParent(root, false);
+                go.AddComponent<MeshFilter>().sharedMesh = torus;
+                go.AddComponent<MeshRenderer>().sharedMaterial = red;
+                var col = go.AddComponent<MeshCollider>();
+                col.sharedMesh = torus;
+                col.convex = true;
+                for (int i = 0; i < 4; i++)
+                {
+                    float angle = 45f + i * 90f;
+                    float rad = angle * Mathf.Deg2Rad;
+                    Primitive(PrimitiveType.Cube, "Tape", root, new Vector3(Mathf.Cos(rad) * 0.28f, 0f, Mathf.Sin(rad) * 0.28f),
+                        new Vector3(0.165f, 0.165f, 0.06f), white, keepCollider: false).transform.localRotation = Quaternion.Euler(0f, -angle, 0f);
+                }
+            }, linearDamping: 0.1f, angularDamping: 0.2f);
+
+            Item cooler = BuildItem("Cooler", "Cooler", 4f, new Vector3(0f, -0.5f, 0.8f), Vector3.zero, 1f, wood, root =>
+            {
+                Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.55f, 0.36f, 0.36f), blue);
+                Primitive(PrimitiveType.Cube, "Lid", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.57f, 0.07f, 0.38f), white, keepCollider: false);
+                Primitive(PrimitiveType.Cube, "Handle", root, new Vector3(0f, 0.25f, 0f), new Vector3(0.3f, 0.04f, 0.05f), dark, keepCollider: false);
+            });
+
+            var catalog = AssetDatabase.LoadAssetAtPath<ItemCatalog>(ItemCatalogPath);
+            if (catalog == null)
+            {
+                catalog = ScriptableObject.CreateInstance<ItemCatalog>();
+                AssetDatabase.CreateAsset(catalog, ItemCatalogPath);
+            }
+            SetRefs(catalog, "_items", crate, ball, ring, cooler);
+            EditorUtility.SetDirty(catalog);
+            return catalog;
+        }
+
+        private static Item BuildItem(string file, string displayName, float mass, Vector3 holdOffset, Vector3 holdEuler, float throwStrength,
+            PhysicsMaterial physics, Action<Transform> buildVisual, float linearDamping = 0.05f, float angularDamping = 0.1f)
+        {
+            var root = new GameObject(file);
+            var body = root.AddComponent<Rigidbody>();
+            body.mass = mass;
+            body.linearDamping = linearDamping;
+            body.angularDamping = angularDamping;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+
+            buildVisual(root.transform);
+            foreach (Collider c in root.GetComponentsInChildren<Collider>())
+                c.sharedMaterial = physics;
+
+            var nob = root.AddComponent<NetworkObject>();
+            var nobSo = new SerializedObject(nob);
+            Require(nobSo, "_preventDespawnOnDisconnect").boolValue = true; // items outlive the player who last touched them
+            nobSo.ApplyModifiedPropertiesWithoutUndo();
+
+            root.AddComponent<ItemSync>();
+            var item = root.AddComponent<Item>();
+            var itemSo = new SerializedObject(item);
+            Require(itemSo, "_displayName").stringValue = displayName;
+            Require(itemSo, "_holdOffset").vector3Value = holdOffset;
+            Require(itemSo, "_holdEuler").vector3Value = holdEuler;
+            Require(itemSo, "_throwStrength").floatValue = throwStrength;
+            itemSo.ApplyModifiedPropertiesWithoutUndo();
+
+            var interactable = root.AddComponent<Interactable>(); // colliders + renderers: all children
+            var interactableSo = new SerializedObject(interactable);
+            Require(interactableSo, "_maxDistance").floatValue = 3f;
+            interactableSo.ApplyModifiedPropertiesWithoutUndo();
+
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, $"{ItemPrefabDir}/{file}.prefab");
+            Object.DestroyImmediate(root);
+            return saved.GetComponent<Item>();
+        }
+
+        private static void PlaceItems(ItemCatalog catalog)
+        {
+            var parent = new GameObject("Items").transform;
+            void Place(string itemName, Vector3 position, float yaw = 0f)
+            {
+                Item prefab = catalog.Find(itemName);
+                var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab.gameObject, parent.gameObject.scene);
+                instance.transform.SetParent(parent, true);
+                instance.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            }
+
+            Place("Crate", new Vector3(-3.8f, 0.3f, 9.2f), 8f);
+            Place("Crate", new Vector3(-3.8f, 0.92f, 9.2f), 20f);
+            Place("Crate", new Vector3(-4.6f, 0.3f, 9.8f), -12f);
+            Place("Beach Ball", new Vector3(4.5f, 0.3f, 14f));
+            Place("Life Ring", new Vector3(1f, 1.4f, 11.3f));
+            Place("Life Ring", new Vector3(11f, 0.1f, 6.5f), 30f);
+            Place("Cooler", new Vector3(-1.9f, 0.6f, 10.2f), 15f);
+        }
+
+        // =====================================================================
+        // Scene
+        // =====================================================================
+
+        private static void BuildScene(NetworkObject playerPrefab, ItemCatalog catalog)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath)!);
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
@@ -287,13 +431,16 @@ namespace PleaseDontDrown.Editor
             Transform env = new GameObject("Environment").transform;
             BuildBeach(env);
             BuildStation(env);
+            PlaceItems(catalog);
             Transform[] spawns = BuildSpawnPoints();
 
             new GameObject("Steam").AddComponent<SteamBootstrap>();
+            SetRef(new GameObject("GameContent").AddComponent<GameContent>(), "_items", catalog);
             var ui = new GameObject("UI");
             ui.AddComponent<PlayerHud>();
             ui.AddComponent<DevConsole>();
             ui.AddComponent<DevTools>();
+            ui.AddComponent<ItemDebugView>();
             BuildNetworkManager(playerPrefab, spawns);
 
             AssignSceneIds(scene);
@@ -304,7 +451,8 @@ namespace PleaseDontDrown.Editor
         private static void BuildBeach(Transform env)
         {
             Primitive(PrimitiveType.Cube, "Sand", env, new Vector3(0f, -0.5f, 15f), new Vector3(80f, 1f, 30f), GetMaterial("Sand", new Color(0.93f, 0.84f, 0.62f)));
-            Primitive(PrimitiveType.Cube, "Seabed", env, new Vector3(0f, -3f, -60f), new Vector3(300f, 1f, 120f), GetMaterial("Seabed", new Color(0.62f, 0.56f, 0.42f)));
+            // Seabed under everything, so anything thrown past the sand still lands somewhere.
+            Primitive(PrimitiveType.Cube, "Seabed", env, new Vector3(0f, -3f, -20f), new Vector3(300f, 1f, 300f), GetMaterial("Seabed", new Color(0.62f, 0.56f, 0.42f)));
             // Water: visual only until M3 (no collider, so you can wade down to the seabed).
             GameObject water = Primitive(PrimitiveType.Plane, "Water", env, new Vector3(0f, -0.35f, -60f), new Vector3(30f, 1f, 12f),
                 GetMaterial("Water", new Color(0.15f, 0.55f, 0.75f)), keepCollider: false);
@@ -576,6 +724,73 @@ namespace PleaseDontDrown.Editor
             }
             EditorUtility.SetDirty(mat);
             return mat;
+        }
+
+        private static PhysicsMaterial GetPhysicsMaterial(string name, float bounciness, float friction, PhysicsMaterialCombine bounceCombine)
+        {
+            Directory.CreateDirectory(PhysicsDir);
+            string path = $"{PhysicsDir}/{name}.asset";
+            var mat = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>(path);
+            if (mat == null)
+            {
+                mat = new PhysicsMaterial(name);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.bounciness = bounciness;
+            mat.dynamicFriction = friction;
+            mat.staticFriction = friction;
+            mat.bounceCombine = bounceCombine;
+            mat.frictionCombine = PhysicsMaterialCombine.Average;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>Torus in the XZ plane (hole along Y). Updated in place so references keep working across rebuilds.</summary>
+        private static Mesh GetTorusMesh(string name, float radius, float tube, int radialSegments = 32, int tubeSegments = 14)
+        {
+            Directory.CreateDirectory(MeshDir);
+            string path = $"{MeshDir}/{name}.asset";
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            bool isNew = mesh == null;
+            if (isNew) mesh = new Mesh { name = name };
+            mesh.Clear();
+
+            var vertices = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var triangles = new List<int>();
+            for (int i = 0; i <= radialSegments; i++)
+            {
+                float u = i / (float)radialSegments * Mathf.PI * 2f;
+                var center = new Vector3(Mathf.Cos(u) * radius, 0f, Mathf.Sin(u) * radius);
+                for (int j = 0; j <= tubeSegments; j++)
+                {
+                    float v = j / (float)tubeSegments * Mathf.PI * 2f;
+                    var normal = new Vector3(Mathf.Cos(u) * Mathf.Cos(v), Mathf.Sin(v), Mathf.Sin(u) * Mathf.Cos(v));
+                    vertices.Add(center + normal * tube);
+                    normals.Add(normal);
+                    uvs.Add(new Vector2(i / (float)radialSegments, j / (float)tubeSegments));
+                }
+            }
+            int ring = tubeSegments + 1;
+            for (int i = 0; i < radialSegments; i++)
+            {
+                for (int j = 0; j < tubeSegments; j++)
+                {
+                    int a = i * ring + j, b = (i + 1) * ring + j;
+                    // Clockwise when seen from outside (Unity's front face).
+                    triangles.AddRange(new[] { a, a + 1, b, b, a + 1, b + 1 });
+                }
+            }
+            mesh.SetVertices(vertices);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateBounds();
+            mesh.RecalculateTangents();
+            if (isNew) AssetDatabase.CreateAsset(mesh, path);
+            EditorUtility.SetDirty(mesh);
+            return mesh;
         }
 
         private static Material LoadOrCreateMaterial(string name, Shader shader)

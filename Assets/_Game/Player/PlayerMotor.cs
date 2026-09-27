@@ -36,6 +36,9 @@ namespace PleaseDontDrown.Player
         [SerializeField] private Transform _head;
 
         private CharacterController _controller;
+        private Vector2 _scriptedInput;
+        private bool _scriptedSprint;
+        private float _scriptedUntil = float.NegativeInfinity;
         private Vector3 _velocity;
         private Vector3 _externalVelocity;
         private float _lastGroundedTime = float.NegativeInfinity;
@@ -47,7 +50,12 @@ namespace PleaseDontDrown.Player
         public bool IsSprinting { get; private set; }
         public bool IsCrouching { get; private set; }
         public float HorizontalSpeed { get; private set; }
+        /// <summary>Current world velocity (thrown items inherit it).</summary>
+        public Vector3 Velocity => Noclip ? Vector3.zero : _velocity + _externalVelocity;
         public bool Noclip { get; set; }
+
+        [Header("Pushing items")]
+        [SerializeField] private float _pushStrength = 1.3f;
         public float SpeedMultiplier { get; set; } = 1f;
 
         /// <summary>Fired when touching ground after falling; argument is the downward speed at impact.</summary>
@@ -81,6 +89,12 @@ namespace PleaseDontDrown.Player
                     ? _spawnPoint
                     : new Vector3(DevCommands.ParseFloat(args, 0), DevCommands.ParseFloat(args, 1), DevCommands.ParseFloat(args, 2)));
             }, cheat: true, owner: this);
+            DevCommands.Register("walk", "<seconds> [sprint]", "Walk forward on autopilot (automated tests).", args =>
+            {
+                _scriptedUntil = Time.time + DevCommands.ParseFloat(args, 0);
+                _scriptedInput = Vector2.up;
+                _scriptedSprint = args.Length > 1 && args[1] == "sprint";
+            }, cheat: true, owner: this);
         }
 
         private void OnDisable()
@@ -88,6 +102,7 @@ namespace PleaseDontDrown.Player
             DevCommands.Unregister("noclip", this);
             DevCommands.Unregister("speed", this);
             DevCommands.Unregister("tp", this);
+            DevCommands.Unregister("walk", this);
         }
 
         public void Teleport(Vector3 position)
@@ -111,6 +126,8 @@ namespace PleaseDontDrown.Player
         {
             float dt = Time.deltaTime;
             Vector2 input = GameInput.GameplayActive ? Vector2.ClampMagnitude(GameInput.Move.ReadValue<Vector2>(), 1f) : Vector2.zero;
+            bool scripted = Time.time < _scriptedUntil;
+            if (scripted) input = _scriptedInput;
 
             if (Noclip)
             {
@@ -125,7 +142,7 @@ namespace PleaseDontDrown.Player
 
             UpdateCrouch(dt);
 
-            IsSprinting = GameInput.Sprint.IsPressed() && input.y > 0.1f && !IsCrouching;
+            IsSprinting = (GameInput.Sprint.IsPressed() || (scripted && _scriptedSprint)) && input.y > 0.1f && !IsCrouching;
             float speed = (IsCrouching ? _crouchSpeed : IsSprinting ? _sprintSpeed : _walkSpeed) * SpeedMultiplier;
             Vector3 wish = (transform.right * input.x + transform.forward * input.y) * speed;
 
@@ -162,6 +179,44 @@ namespace PleaseDontDrown.Player
 
             if (transform.position.y < -25f)
                 Teleport(_spawnPoint);
+        }
+
+        /// <summary>
+        /// Walking into a loose item pushes it (kicking the beach ball). If another machine simulates it,
+        /// ask for authority first; the push lands a round trip later.
+        /// </summary>
+        private void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            Rigidbody body = hit.collider.attachedRigidbody;
+            if (body == null || hit.moveDirection.y < -0.5f) // standing on top of it
+                return;
+            var sync = body.GetComponent<Items.ItemSync>();
+            if (sync == null)
+                return;
+            if (!sync.IsSimulator)
+            {
+                sync.RequestAuthority();
+                return;
+            }
+            if (body.isKinematic)
+                return;
+
+            var dir = new Vector3(hit.moveDirection.x, 0f, hit.moveDirection.z);
+            if (dir.sqrMagnitude < 1e-4f)
+                return;
+            dir.Normalize();
+
+            // Set the velocity instead of adding force: this callback runs every frame, but forces only apply on the
+            // next physics step, so AddForce would stack up many times between steps (a beach ball at 27 m/s...).
+            float desired = Mathf.Max(HorizontalSpeed, 1.5f) * _pushStrength / Mathf.Max(1f, body.mass / 6f);
+            Vector3 v = body.linearVelocity;
+            float along = Vector3.Dot(v, dir);
+            if (along >= desired)
+                return;
+            v += dir * (desired - along);
+            if (body.mass < 1f)
+                v.y = Mathf.Max(v.y, desired * 0.3f); // light things pop up a little when kicked
+            body.linearVelocity = v;
         }
 
         private void UpdateCrouch(float dt)

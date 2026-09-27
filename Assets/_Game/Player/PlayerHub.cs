@@ -19,6 +19,7 @@ namespace PleaseDontDrown.Player
         [SerializeField] private PlayerMotor _motor;
         [SerializeField] private PlayerLook _look;
         [SerializeField] private PlayerInteractor _interactor;
+        [SerializeField] private PlayerHands _hands;
         [SerializeField] private Transform _head;
         [SerializeField] private Transform _body;
         [Tooltip("Hidden for the local player (they still cast shadows).")]
@@ -38,6 +39,7 @@ namespace PleaseDontDrown.Player
         public PlayerMotor Motor => _motor;
         public PlayerLook Look => _look;
         public PlayerInteractor Interactor => _interactor;
+        public PlayerHands Hands => _hands;
         public Transform Head => _head;
 
         private float _standingHeadY;
@@ -85,12 +87,19 @@ namespace PleaseDontDrown.Player
             else _nameTag.gameObject.SetActive(true);
         }
 
+        public override void OnStopServer()
+        {
+            base.OnStopServer();
+            Items.Item.ServerDropAllHeldBy(this);
+        }
+
         public override void OnStopClient()
         {
             base.OnStopClient();
             _all.Remove(this);
             if (Local != this) return;
 
+            DevCommands.Unregister("spawn", this);
             Local = null;
             GameInput.LocalPlayerExists = false;
             GameInput.Apply();
@@ -113,6 +122,8 @@ namespace PleaseDontDrown.Player
 
             _look.Attach(cam);
             _motor.enabled = _look.enabled = _interactor.enabled = true;
+            _hands.RefreshLocal();
+            DevCommands.Register("spawn", "<item> [count]", "Spawn items in front of you (see 'spawn list').", SpawnCommand, cheat: true, owner: this);
 
             SceneCameras.SetMenuCameraActive(false);
             GameInput.LocalPlayerExists = true;
@@ -127,6 +138,37 @@ namespace PleaseDontDrown.Player
             displayName = (displayName ?? string.Empty).Trim();
             if (displayName.Length == 0) displayName = $"Lifeguard {OwnerId}";
             _displayName.Value = displayName.Length > 24 ? displayName.Substring(0, 24) : displayName;
+        }
+
+        private void SpawnCommand(string[] args)
+        {
+            Items.ItemCatalog catalog = GameContent.Items;
+            if (catalog == null) throw new InvalidOperationException("no item catalog in this scene");
+            if (args.Length == 0 || args[0] == "list")
+            {
+                foreach (Items.Item item in catalog.Items)
+                    DevCommands.Print($"  {item.DisplayName}");
+                return;
+            }
+            if (catalog.Find(args[0]) == null) throw new ArgumentException($"no item called '{args[0]}'");
+            int count = args.Length > 1 ? Mathf.Clamp((int)DevCommands.ParseFloat(args, 1), 1, 20) : 1;
+            Vector3 spot = _head.position + _head.forward * 2f;
+            SpawnItemServer(args[0], spot, count);
+        }
+
+        [ServerRpc]
+        private void SpawnItemServer(string itemName, Vector3 position, int count)
+        {
+            Items.Item prefab = GameContent.Items != null ? GameContent.Items.Find(itemName) : null;
+            if (prefab == null || !DevCommands.CheatsAllowed) return;
+            count = Mathf.Clamp(count, 1, 20);
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 p = position + Vector3.up * (0.7f * i) + UnityEngine.Random.insideUnitSphere * 0.1f;
+                Items.Item spawned = Instantiate(prefab, p, Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
+                Spawn(spawned.gameObject);
+            }
+            Debug.Log($"[Item] {DisplayName} spawned {count}x {prefab.DisplayName}");
         }
 
         private void OnNameChanged(string prev, string next, bool asServer)

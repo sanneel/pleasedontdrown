@@ -54,6 +54,26 @@ namespace PleaseDontDrown.UI
                 DrawShadowed(new Rect(cx - 300f, cy + 28f, 600f, 30f), $"<b>[{key}]</b> {local.Interactor.CurrentPrompt}", _prompt);
             }
 
+            PlayerHands hands = local.Hands;
+            if (hands != null && hands.HeldItem != null)
+            {
+                string throwKey = GameInput.KeyLabel(GameInput.Primary);
+                string dropKey = GameInput.KeyLabel(GameInput.Drop);
+                DrawShadowed(new Rect(cx - 400f, Screen.height - 70f, 800f, 30f),
+                    $"Holding <b>{hands.HeldItem.DisplayName}</b>    <b>[{throwKey}]</b> throw (hold to charge)    <b>[{dropKey}]</b> drop", _prompt);
+
+                if (hands.IsCharging)
+                {
+                    const float width = 140f;
+                    var back = new Rect(cx - width * 0.5f, cy + 60f, width, 8f);
+                    GUI.color = new Color(0f, 0f, 0f, 0.5f);
+                    GUI.DrawTexture(back, _dot);
+                    GUI.color = Color.Lerp(new Color(1f, 0.9f, 0.4f), new Color(1f, 0.35f, 0.2f), hands.Charge01);
+                    GUI.DrawTexture(new Rect(back.x, back.y, width * hands.Charge01, back.height), _dot);
+                    GUI.color = Color.white;
+                }
+            }
+
             _toasts.RemoveAll(t => t.Until < Time.unscaledTime);
             for (int i = 0; i < _toasts.Count; i++)
                 DrawShadowed(new Rect(cx - 400f, Screen.height * 0.16f + i * 30f, 800f, 30f), _toasts[i].Text, _toast);

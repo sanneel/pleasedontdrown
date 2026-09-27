@@ -52,7 +52,19 @@ namespace PleaseDontDrown.Core
                 yield return new WaitForSecondsRealtime(1f);
                 Debug.Log($"[Dev] Executing: {commands}");
                 DevCommands.Output += line => Debug.Log($"[Console] {line}");
-                DevCommands.Execute(commands);
+                // "wait <seconds>" pauses the script between commands.
+                foreach (string raw in commands.Split(';'))
+                {
+                    string command = raw.Trim();
+                    if (command.StartsWith("wait ") && float.TryParse(command.Substring(5), System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out float seconds))
+                    {
+                        yield return new WaitForSecondsRealtime(seconds);
+                        continue;
+                    }
+                    Debug.Log($"[Dev] > {command}");
+                    DevCommands.Execute(command);
+                }
             }
         }
 
