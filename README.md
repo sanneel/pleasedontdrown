@@ -15,15 +15,26 @@ Keep the Steam client running for online features (dev app id **480** / Spacewar
 | Move / look | WASD / mouse | Left / right stick |
 | Sprint · Crouch · Jump | Shift · Ctrl or C · Space | L3 · B · A |
 | Use / pick up (bell, switch, sign, items) | E | X |
-| Throw held item (hold to charge) · Drop | Left mouse · G | RT · Y |
+| Throw held item (hold to charge) | Left mouse, or hold G | RT, or hold Y |
+| Drop held item | Tap G | Tap Y |
 | Swim: dive · rise | Ctrl · Space (underwater) | B · A |
-| Climb out onto dock / rock | Space at the surface, facing the ledge | A |
+| Climb out onto dock / rock | Space in the water, facing the ledge | A |
 | Pause / connection menu | Esc | Start |
 | Dev console | ` (backquote) or F2 | |
 
 Useful console commands: `help`, `noclip`, `speed 3`, `tp spawn`, `lookat x y z`, `fov 90`, `sens 0.15`, `timescale 0.3`,
 `players`, `ring`, `lights`, `spawn <item> [n]` / `spawn list`, `items`, `itemdebug`, `grab`, `throw [0-1]`, `drop`,
-`waves <scale>` (storm = 3), `water`, `breath`, `screenshot [delay]` (saved to `Screenshots/`). Cheats work in the editor and dev builds.
+`waves <scale>` (storm = 3), `water`, `breath`, `knock x y z`, `use`, `targetdebug`, `contacts`, `screenshot [delay]` (saved to `Screenshots/`).
+Cheats work in the editor and dev builds.
+
+## Feel (modelled on How to Fish)
+* **Physics-body player**: a rigidbody capsule (75 kg) whose velocity is shaped each physics step: eased walk/sprint,
+  ground acceleration and braking, air control that keeps momentum, extra gravity, coyote time + jump buffer,
+  slides off steep slopes, steps up low ledges (≤ 0.36 m), knockback with a moment of lost control. Shoves crates, kicks balls.
+* **Physics-held items**: the item stays a live body steered to a hold point by velocity, so it glides in after pickup,
+  lags with its weight, slides along walls instead of clipping, and pulls back while a throw charges. Others see it glued to your head.
+* **Grab targeting**: exact crosshair hit first, otherwise a capsule around the view line picks the visible item nearest the crosshair.
+* **Camera**: stepped head bob, strafe roll, landing dip, sprint FOV. Surface footsteps (sand, wood, rock, shallow water).
 
 ## Test multiplayer on one PC
 1. Build: menu **PLEASE DON'T DROWN** or batch (below) → `Builds/Win64/PleaseDontDrown.exe`

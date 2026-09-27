@@ -41,6 +41,8 @@ namespace PleaseDontDrown.Player
         public PlayerInteractor Interactor => _interactor;
         public PlayerHands Hands => _hands;
         public Transform Head => _head;
+        /// <summary>The body capsule (items ignore it while this player holds or has just thrown them).</summary>
+        public Collider BodyCollider { get; private set; }
 
         private float _standingHeadY;
         private float _standingBodyScaleY;
@@ -69,6 +71,7 @@ namespace PleaseDontDrown.Player
         private void Awake()
         {
             _displayName.OnChange += OnNameChanged;
+            BodyCollider = GetComponent<CapsuleCollider>();
             _standingHeadY = _head.localPosition.y;
             _standingBodyScaleY = _body.localScale.y;
             // Owner-only systems start off; OnStartClient enables them for the local player.
@@ -83,8 +86,20 @@ namespace PleaseDontDrown.Player
                 _bodyRenderer.material.color = Color.HSVToRGB(Mathf.Repeat(OwnerId * 0.2718f + 0.05f, 1f), 0.6f, 0.95f);
             Debug.Log($"[Player] spawned for owner {OwnerId} (mine: {IsOwner}) at {transform.position}");
 
-            if (IsOwner) SetupLocal();
-            else _nameTag.gameObject.SetActive(true);
+            if (IsOwner)
+            {
+                SetupLocal();
+            }
+            else
+            {
+                // Other players: their machine simulates them; here the body is a kinematic capsule the
+                // NetworkTransform moves (we still collide with it). Facing lives on the synced head, so the body stays unrotated.
+                var body = GetComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.interpolation = RigidbodyInterpolation.None;
+                PlayerLook.ResetBodyRotation(transform);
+                _nameTag.gameObject.SetActive(true);
+            }
         }
 
         public override void OnStopServer()

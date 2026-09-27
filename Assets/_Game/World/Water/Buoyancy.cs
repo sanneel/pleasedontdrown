@@ -22,6 +22,8 @@ namespace PleaseDontDrown.World.Water
         private Vector3[] _probes;   // local-space centers
         private float _probeRadius;
 
+        /// <summary>Set while the object is held: no floating forces.</summary>
+        public bool Suspended { get; set; }
         public bool InWater { get; private set; }
         public float SubmergedFraction { get; private set; }
         public float Density => _density;
@@ -75,7 +77,7 @@ namespace PleaseDontDrown.World.Water
 
         private void FixedUpdate()
         {
-            if (_rb.isKinematic || !WaterSurface.Exists)
+            if (_rb.isKinematic || Suspended || !WaterSurface.Exists)
             {
                 InWater = false;
                 SubmergedFraction = 0f;

@@ -59,8 +59,8 @@ namespace PleaseDontDrown.UI
             {
                 string throwKey = GameInput.KeyLabel(GameInput.Primary);
                 string dropKey = GameInput.KeyLabel(GameInput.Drop);
-                DrawShadowed(new Rect(cx - 400f, Screen.height - 70f, 800f, 30f),
-                    $"Holding <b>{hands.HeldItem.DisplayName}</b>    <b>[{throwKey}]</b> throw (hold to charge)    <b>[{dropKey}]</b> drop", _prompt);
+                DrawShadowed(new Rect(cx - 450f, Screen.height - 70f, 900f, 30f),
+                    $"Holding <b>{hands.HeldItem.DisplayName}</b>    <b>[{throwKey}]</b> or hold <b>[{dropKey}]</b> to throw    tap <b>[{dropKey}]</b> to drop", _prompt);
 
                 if (hands.IsCharging)
                 {

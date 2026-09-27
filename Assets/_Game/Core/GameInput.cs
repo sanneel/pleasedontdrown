@@ -99,8 +99,31 @@ namespace PleaseDontDrown.Core
         /// <summary>Set by the player system; without a local player the cursor stays free (menus).</summary>
         public static bool LocalPlayerExists { get; set; }
 
-        /// <summary>Short key label for prompts, e.g. "E".</summary>
-        public static string KeyLabel(InputAction action) =>
-            action.GetBindingDisplayString(0, InputBinding.DisplayStringOptions.DontIncludeInteractions);
+        /// <summary>
+        /// Short key label for prompts, e.g. "E". Built from the binding path (the physical key), not the active
+        /// keyboard layout: on non-English layouts the display string would otherwise show local letters (e.g. "ð" for G).
+        /// </summary>
+        public static string KeyLabel(InputAction action)
+        {
+            if (action == null || action.bindings.Count == 0) return "?";
+            string path = action.bindings[0].effectivePath;
+            int slash = path.LastIndexOf('/');
+            string key = slash >= 0 ? path.Substring(slash + 1) : path;
+            switch (key)
+            {
+                case "leftButton": return "LMB";
+                case "rightButton": return "RMB";
+                case "middleButton": return "MMB";
+                case "space": return "Space";
+                case "leftShift": case "rightShift": return "Shift";
+                case "leftCtrl": case "rightCtrl": return "Ctrl";
+                case "leftAlt": case "rightAlt": return "Alt";
+                case "escape": return "Esc";
+                case "backquote": return "`";
+                case "enter": return "Enter";
+                case "tab": return "Tab";
+            }
+            return key.Length == 1 ? key.ToUpperInvariant() : char.ToUpperInvariant(key[0]) + key.Substring(1);
+        }
     }
 }

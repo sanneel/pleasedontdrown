@@ -231,17 +231,24 @@ namespace PleaseDontDrown.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(PlayerPrefabPath)!);
 
             var root = new GameObject("Player");
-            var controller = root.AddComponent<CharacterController>();
-            controller.height = 1.8f;
-            controller.radius = 0.35f;
-            controller.center = new Vector3(0f, 0.9f, 0f);
-            controller.stepOffset = 0.35f;
-            controller.slopeLimit = 50f;
-            controller.skinWidth = 0.04f;
-            controller.minMoveDistance = 0f;
+            // Physics body (How to Fish style): a rigidbody capsule that shoves items and can be knocked around.
+            var physicsBody = root.AddComponent<Rigidbody>();
+            physicsBody.mass = 75f;
+            physicsBody.linearDamping = 0f;
+            physicsBody.angularDamping = 0f;
+            physicsBody.freezeRotation = true;      // facing lives on the head, the body never rotates
+            physicsBody.interpolation = RigidbodyInterpolation.Interpolate;
+            physicsBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            var capsule = root.AddComponent<CapsuleCollider>();
+            capsule.height = 1.8f;
+            capsule.radius = 0.35f;
+            capsule.center = new Vector3(0f, 0.9f, 0f);
+            // No friction: the motor controls speed itself, and walls shouldn't grab you when you slide along them.
+            capsule.sharedMaterial = GetPhysicsMaterial("PlayerBody", 0f, 0f, PhysicsMaterialCombine.Minimum, PhysicsMaterialCombine.Minimum);
 
             root.AddComponent<NetworkObject>();
-            var rootSync = root.AddComponent<NetworkTransform>();   // position + yaw, client authoritative
+            var rootSync = root.AddComponent<NetworkTransform>();   // position only, client authoritative
+            rootSync.SetSynchronizeRotation(false);
             rootSync.SetSynchronizeScale(false);
 
             GameObject body = Primitive(PrimitiveType.Capsule, "Body", root.transform, new Vector3(0f, 0.9f, 0f), new Vector3(0.7f, 0.9f, 0.7f),
@@ -275,6 +282,12 @@ namespace PleaseDontDrown.Editor
             Require(splashSo, "_minDownSpeed").floatValue = 3f;
             splashSo.ApplyModifiedPropertiesWithoutUndo();
             SetRef(hub, "_hands", hands);
+
+            var steps = root.AddComponent<PlayerFootsteps>(); // everyone's footsteps, on every machine
+            SetRef(steps, "_hub", hub);
+            AudioSource stepAudio = SpatialAudio(root, 2f, 30f);
+            stepAudio.volume = 0.8f;
+            SetRef(steps, "_audio", stepAudio);
 
             SetRef(motor, "_head", head);
             SetRef(look, "_head", head);
@@ -521,14 +534,19 @@ namespace PleaseDontDrown.Editor
             var dock = new GameObject("Dock").transform;
             dock.SetParent(env, false);
             dock.position = new Vector3(-8f, 0f, 0f);
-            Primitive(PrimitiveType.Cube, "Deck", dock, new Vector3(0f, 0.175f, -8f), new Vector3(2.4f, 0.25f, 22f), wood);
+            TagSurface(dock.gameObject, SurfaceKind.Wood);
+            Primitive(PrimitiveType.Cube, "Deck", dock, new Vector3(0f, 0.175f, -6.5f), new Vector3(2.4f, 0.25f, 25f), wood); // land end at z=6, a step-able 0.3 m above the sand
             for (float z = 2f; z >= -18f; z -= 4f)
                 foreach (float x in new[] { -1.1f, 1.1f })
                     Primitive(PrimitiveType.Cube, "Post", dock, new Vector3(x, -2.2f, z), new Vector3(0.22f, 4.8f, 0.22f), wood);
 
             // Rocks to swim to.
-            Primitive(PrimitiveType.Sphere, "Rock", env, new Vector3(14f, -3.2f, -30f), new Vector3(7f, 5f, 6f), rock).transform.rotation = Quaternion.Euler(8f, 30f, -5f);
-            Primitive(PrimitiveType.Sphere, "Rock", env, new Vector3(-20f, -4.5f, -44f), new Vector3(9f, 6f, 7f), rock).transform.rotation = Quaternion.Euler(-6f, 70f, 4f);
+            GameObject rockA = Primitive(PrimitiveType.Sphere, "Rock", env, new Vector3(14f, -3.2f, -30f), new Vector3(7f, 5f, 6f), rock);
+            rockA.transform.rotation = Quaternion.Euler(8f, 30f, -5f);
+            TagSurface(rockA, SurfaceKind.Rock);
+            GameObject rockB = Primitive(PrimitiveType.Sphere, "Rock", env, new Vector3(-20f, -4.5f, -44f), new Vector3(9f, 6f, 7f), rock);
+            rockB.transform.rotation = Quaternion.Euler(-6f, 70f, 4f);
+            TagSurface(rockB, SurfaceKind.Rock);
 
             // Swim-zone buoy line.
             var buoys = new GameObject("SwimZoneBuoys").transform;
@@ -654,6 +672,7 @@ namespace PleaseDontDrown.Editor
 
             // The saddest lifeguard shack imaginable.
             var shack = new GameObject("Station_Shack").transform;
+            TagSurface(shack.gameObject, SurfaceKind.Wood);
             shack.SetParent(env, false);
             shack.position = new Vector3(0f, 0f, 10f);
             Primitive(PrimitiveType.Cube, "Floor", shack, new Vector3(0f, 0.2f, 0f), new Vector3(5f, 0.4f, 4f), wood);
@@ -729,6 +748,7 @@ namespace PleaseDontDrown.Editor
 
             // Lifeguard tower.
             var tower = new GameObject("Tower").transform;
+            TagSurface(tower.gameObject, SurfaceKind.Wood);
             tower.SetParent(env, false);
             tower.position = new Vector3(12f, 0f, 4f);
             foreach (Vector3 p in new[] { new Vector3(-0.8f, 1.5f, -0.8f), new Vector3(0.8f, 1.5f, -0.8f), new Vector3(-0.8f, 1.5f, 0.8f), new Vector3(0.8f, 1.5f, 0.8f) })
@@ -912,7 +932,15 @@ namespace PleaseDontDrown.Editor
             return mat;
         }
 
-        private static PhysicsMaterial GetPhysicsMaterial(string name, float bounciness, float friction, PhysicsMaterialCombine bounceCombine)
+        private static void TagSurface(GameObject go, SurfaceKind kind)
+        {
+            var so = new SerializedObject(go.AddComponent<SurfaceType>());
+            Require(so, "_kind").enumValueIndex = (int)kind;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static PhysicsMaterial GetPhysicsMaterial(string name, float bounciness, float friction, PhysicsMaterialCombine bounceCombine,
+            PhysicsMaterialCombine frictionCombine = PhysicsMaterialCombine.Average)
         {
             Directory.CreateDirectory(PhysicsDir);
             string path = $"{PhysicsDir}/{name}.asset";
@@ -926,7 +954,7 @@ namespace PleaseDontDrown.Editor
             mat.dynamicFriction = friction;
             mat.staticFriction = friction;
             mat.bounceCombine = bounceCombine;
-            mat.frictionCombine = PhysicsMaterialCombine.Average;
+            mat.frictionCombine = frictionCombine;
             EditorUtility.SetDirty(mat);
             return mat;
         }

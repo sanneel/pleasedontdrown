@@ -34,6 +34,8 @@ namespace PleaseDontDrown.Items
         private Rigidbody _rb;
         private Buoyancy _buoyancy;
         private bool _held;
+        private bool _heldLocally;
+        private float _lastContactTime = float.NegativeInfinity;
         private bool _sending;
         // Follower-side "bobbing at rest": the simulator stopped sending, we bob it on the shared wave clock.
         private bool _floatIdle;
@@ -49,6 +51,8 @@ namespace PleaseDontDrown.Items
         private float _netTime;
 
         public Rigidbody Body => _rb;
+        /// <summary>Touching something right now (held items use this to slide along walls instead of fighting them).</summary>
+        public bool IsTouching => Time.time - _lastContactTime < 0.1f;
         /// <summary>True on the one machine that runs physics for this body.</summary>
         public bool IsSimulator => Owner.IsValid ? IsOwner : IsServerInitialized;
         public string AuthorityLabel => Owner.IsValid ? $"client {Owner.ClientId}" : "host";
@@ -100,13 +104,29 @@ namespace PleaseDontDrown.Items
                 EnterFloatIdle(_rb.position.y - WaterSurface.HeightAt(_rb.position));
         }
 
-        /// <summary>Held items are positioned by the holder's hands on every machine; physics is off.</summary>
-        public void SetHeld(bool held)
+        /// <summary>
+        /// Held items: on the holder's machine the body stays dynamic (gravity off) and the hands steer it with
+        /// velocities, so it bumps into walls and feels heavy. On every other machine it's kinematic and glued
+        /// to the holder's head. Nothing is streamed while held.
+        /// </summary>
+        public void SetHeld(bool held, bool heldLocally = false)
         {
-            if (_held == held) return;
+            if (_held == held && _heldLocally == heldLocally) return;
+            bool released = _held && !held;
             _held = held;
+            _heldLocally = held && heldLocally;
+            if (_buoyancy != null) _buoyancy.Suspended = held;
             Refresh();
+            if (released && IsSimulator)
+            {
+                // Just thrown or dropped by us: start streaming right away.
+                _sending = true;
+                _stillTime = 0f;
+            }
         }
+
+        private void OnCollisionEnter(Collision _) => _lastContactTime = Time.time;
+        private void OnCollisionStay(Collision _) => _lastContactTime = Time.time;
 
         /// <summary>Ask the host to let us simulate this body (e.g. we walked into it). Rate limited.</summary>
         public void RequestAuthority()
@@ -119,9 +139,19 @@ namespace PleaseDontDrown.Items
 
         private void Refresh()
         {
-            bool simulate = IsSimulator && !_held;
+            _rb.useGravity = !_held;
+            if (_held)
+            {
+                _sending = false;
+                _floatIdle = false;
+                _rb.isKinematic = !_heldLocally;
+                _rb.interpolation = _heldLocally ? RigidbodyInterpolation.Interpolate : RigidbodyInterpolation.None;
+                return;
+            }
+
+            bool simulate = IsSimulator;
             bool wasKinematic = _rb.isKinematic;
-            _rb.interpolation = _held ? RigidbodyInterpolation.None : RigidbodyInterpolation.Interpolate;
+            _rb.interpolation = RigidbodyInterpolation.Interpolate;
             _rb.isKinematic = !simulate;
 
             if (simulate && wasKinematic)

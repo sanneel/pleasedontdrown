@@ -141,24 +141,24 @@ namespace PleaseDontDrown.Items
 
         // ------------------------------------------------------------------ release / throw
 
-        /// <summary>Called by the holder's hands (local owner). Physics starts here immediately; the host is told.</summary>
-        public void Release(PlayerHub holder, Vector3 position, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity)
+        /// <summary>
+        /// Called by the holder's hands (local owner). The item is already a live body in our hands, so the throw
+        /// starts from exactly where it is; the host is told.
+        /// </summary>
+        public void Release(PlayerHub holder, Vector3 velocity, Vector3 angularVelocity)
         {
             _predictedHolder = null;
             _releasePending = true;
             ApplyHeldState();
 
             Rigidbody body = _sync.Body;
-            transform.SetPositionAndRotation(position, rotation);
-            body.position = position;
-            body.rotation = rotation;
             if (!body.isKinematic)
             {
                 body.linearVelocity = velocity;
                 body.angularVelocity = angularVelocity;
             }
             StartCoroutine(IgnoreHolderBriefly(holder));
-            ReleaseServer(position, rotation, velocity);
+            ReleaseServer(body.position, body.rotation, velocity);
         }
 
         [ServerRpc]
@@ -186,15 +186,20 @@ namespace PleaseDontDrown.Items
                     item.ServerForceDrop();
         }
 
+        /// <summary>Just-released items pass through the thrower for a moment so they don't bounce off our own body.</summary>
         private IEnumerator IgnoreHolderBriefly(PlayerHub holder)
         {
-            var controller = holder != null ? holder.GetComponent<CharacterController>() : null;
-            if (controller == null) yield break;
-            foreach (Collider c in _colliders) Physics.IgnoreCollision(c, controller, true);
+            Collider body = holder != null ? holder.BodyCollider : null;
+            if (body == null) yield break;
+            SetIgnoreCollision(body, true);
             yield return new WaitForSeconds(0.35f);
-            if (controller == null) yield break;
+            if (body != null && Holder != holder) SetIgnoreCollision(body, false);
+        }
+
+        private void SetIgnoreCollision(Collider other, bool ignore)
+        {
             foreach (Collider c in _colliders)
-                if (c != null) Physics.IgnoreCollision(c, controller, false);
+                if (c != null && other != null) Physics.IgnoreCollision(c, other, ignore);
         }
 
         // ------------------------------------------------------------------ state
@@ -214,13 +219,19 @@ namespace PleaseDontDrown.Items
 
         private void ApplyHeldState()
         {
-            bool held = IsHeld;
+            PlayerHub holder = Holder;
+            bool held = holder != null;
+            // Our own hands steer a live body (it collides with the world, but not with us);
+            // everyone else sees it glued to the holder with its colliders off.
+            bool heldLocally = held && holder == PlayerHub.Local;
             foreach (Collider c in _colliders)
-                if (c != null) c.enabled = !held;
-            _sync.SetHeld(held);
+                if (c != null) c.enabled = !held || heldLocally;
+            if (heldLocally && holder.BodyCollider != null)
+                SetIgnoreCollision(holder.BodyCollider, true);
+            _sync.SetHeld(held, heldLocally);
         }
 
-        /// <summary>Hands call this every frame while holding (on every machine).</summary>
+        /// <summary>Remote holders' hands glue the item to their head every frame.</summary>
         public void PlaceInHand(Vector3 position, Quaternion rotation) => transform.SetPositionAndRotation(position, rotation);
     }
 }

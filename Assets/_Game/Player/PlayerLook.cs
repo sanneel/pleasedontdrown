@@ -4,10 +4,11 @@ using UnityEngine;
 namespace PleaseDontDrown.Player
 {
     /// <summary>
-    /// Mouse / stick look (yaw on the body, pitch on the head, which remote players see via the synced head),
-    /// plus camera feel: sprint FOV kick, head bob and a landing dip. Owner only.
+    /// Mouse / stick look. Yaw and pitch both live on the head (which is network-synced, so others see where you
+    /// look); the physics body never rotates. Also owns camera feel: sprint FOV kick, strafe roll, a stepped
+    /// head bob and a landing dip. Owner only.
     /// </summary>
-    [DefaultExecutionOrder(-10)] // rotate before PlayerMotor reads transform.forward
+    [DefaultExecutionOrder(-10)]
     public class PlayerLook : MonoBehaviour
     {
         private const string SensitivityKey = "pdd.look.sensitivity";
@@ -15,16 +16,22 @@ namespace PleaseDontDrown.Player
 
         [SerializeField] private Transform _head;
         [SerializeField] private PlayerMotor _motor;
-        [SerializeField] private float _stickDegreesPerSecond = 170f;
+        [SerializeField] private float _stickDegreesPerSecond = 180f;
+
+        [Header("Camera feel")]
         [SerializeField] private float _sprintFovBoost = 7f;
-        [SerializeField] private float _bobAmplitude = 0.035f;
-        [SerializeField] private float _bobStrideLength = 1.1f;
-        [SerializeField] private float _landDipPerSpeed = 0.012f;
+        [SerializeField] private float _strafeRoll = 1.4f;
+        [SerializeField] private float _bobVertical = 0.045f;
+        [SerializeField] private float _bobHorizontal = 0.03f;
+        [SerializeField] private float _walkStride = 1.5f;
+        [SerializeField] private float _landDipPerSpeed = 0.014f;
 
         private Camera _camera;
+        private float _yaw;
         private float _pitch;
         private float _fovBoost;
-        private float _bobPhase;
+        private float _roll;
+        private float _stridePhase;
         private float _bobWeight;
         private float _dip;
         private float _dipVelocity;
@@ -32,11 +39,22 @@ namespace PleaseDontDrown.Player
         public Camera Camera => _camera;
         public float Sensitivity { get; private set; }
         public float BaseFov { get; private set; }
+        public float Yaw => _yaw;
+        /// <summary>Horizontal facing, used for movement.</summary>
+        public Quaternion YawRotation => Quaternion.Euler(0f, _yaw, 0f);
+
+        /// <summary>Raised on each footfall of the camera bob (for footstep sounds).</summary>
+        public event System.Action Step;
 
         public void Attach(Camera cam)
         {
             _camera = cam;
             _camera.fieldOfView = BaseFov;
+            // Take the spawn facing from the body, then keep the body unrotated (it's a physics capsule).
+            // Reset the rigidbody too: with interpolation it writes its own rotation back onto the transform.
+            _yaw = transform.eulerAngles.y;
+            ResetBodyRotation(transform);
+            ApplyHead();
         }
 
         private void Awake()
@@ -61,20 +79,8 @@ namespace PleaseDontDrown.Player
                 DevCommands.Print($"fov = {BaseFov}");
             }, owner: this);
             DevCommands.Register("lookat", "<x> <y> <z>", "Aim the camera at a world point.", args =>
-            {
-                var target = new Vector3(DevCommands.ParseFloat(args, 0), DevCommands.ParseFloat(args, 1), DevCommands.ParseFloat(args, 2));
-                LookAt(target);
-            }, cheat: true, owner: this);
-        }
-
-        public void LookAt(Vector3 worldPoint)
-        {
-            Vector3 dir = worldPoint - _head.position;
-            var flat = new Vector3(dir.x, 0f, dir.z);
-            if (flat.sqrMagnitude > 1e-6f)
-                transform.rotation = Quaternion.LookRotation(flat, Vector3.up);
-            _pitch = Mathf.Clamp(-Mathf.Atan2(dir.y, flat.magnitude) * Mathf.Rad2Deg, -88f, 88f);
-            _head.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+                LookAt(new Vector3(DevCommands.ParseFloat(args, 0), DevCommands.ParseFloat(args, 1), DevCommands.ParseFloat(args, 2))),
+                cheat: true, owner: this);
         }
 
         private void OnDisable()
@@ -83,6 +89,26 @@ namespace PleaseDontDrown.Player
             DevCommands.Unregister("sens", this);
             DevCommands.Unregister("fov", this);
             DevCommands.Unregister("lookat", this);
+        }
+
+        public void LookAt(Vector3 worldPoint)
+        {
+            Vector3 dir = worldPoint - _head.position;
+            var flat = new Vector3(dir.x, 0f, dir.z);
+            if (flat.sqrMagnitude > 1e-6f)
+                _yaw = Quaternion.LookRotation(flat, Vector3.up).eulerAngles.y;
+            _pitch = Mathf.Clamp(-Mathf.Atan2(dir.y, flat.magnitude) * Mathf.Rad2Deg, -88f, 88f);
+            ApplyHead();
+        }
+
+        private void ApplyHead() => _head.localRotation = Quaternion.Euler(_pitch, _yaw, 0f);
+
+        /// <summary>Players' bodies never rotate; facing lives on the head.</summary>
+        public static void ResetBodyRotation(Transform body)
+        {
+            if (body.TryGetComponent(out Rigidbody rb))
+                rb.rotation = Quaternion.identity;
+            body.rotation = Quaternion.identity;
         }
 
         private void Update()
@@ -94,9 +120,9 @@ namespace PleaseDontDrown.Player
             Vector2 stick = GameInput.LookStick.ReadValue<Vector2>() * (_stickDegreesPerSecond * Time.deltaTime);
             Vector2 look = mouse + stick;
 
-            transform.Rotate(0f, look.x, 0f, Space.Self);
+            _yaw = Mathf.Repeat(_yaw + look.x, 360f);
             _pitch = Mathf.Clamp(_pitch - look.y, -88f, 88f);
-            _head.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+            ApplyHead();
         }
 
         private void LateUpdate()
@@ -109,19 +135,27 @@ namespace PleaseDontDrown.Player
             _fovBoost = Mathf.Lerp(_fovBoost, targetBoost, 1f - Mathf.Exp(-8f * dt));
             _camera.fieldOfView = BaseFov + _fovBoost;
 
-            // Bob advances with distance walked, so it matches footsteps at any speed.
-            float moving = _motor.IsGrounded ? Mathf.Clamp01(_motor.HorizontalSpeed / 4f) : 0f;
-            _bobWeight = Mathf.Lerp(_bobWeight, moving, 1f - Mathf.Exp(-10f * dt));
-            _bobPhase += _motor.HorizontalSpeed * dt / _bobStrideLength * Mathf.PI;
-            float bobY = Mathf.Abs(Mathf.Sin(_bobPhase)) * _bobAmplitude * _bobWeight;
-            float bobX = Mathf.Sin(_bobPhase) * _bobAmplitude * 0.5f * _bobWeight;
+            // Lean a touch into strafes.
+            _roll = Mathf.Lerp(_roll, -_motor.StrafeInput * _strafeRoll, 1f - Mathf.Exp(-6f * dt));
 
-            // Landing dip: a critically damped spring back to zero.
-            _dip = Mathf.SmoothDamp(_dip, 0f, ref _dipVelocity, 0.12f);
+            // Bob: one full cycle per two steps, driven by distance walked so it matches any speed.
+            bool walking = _motor.IsGrounded && !_motor.IsSwimming && _motor.HorizontalSpeed > 0.4f;
+            _bobWeight = Mathf.Lerp(_bobWeight, walking ? Mathf.Clamp01(_motor.HorizontalSpeed / 4.5f) : 0f, 1f - Mathf.Exp(-9f * dt));
+            float previousPhase = _stridePhase;
+            if (walking)
+                _stridePhase += _motor.HorizontalSpeed * dt / _walkStride;
+            if (Mathf.Floor(_stridePhase) > Mathf.Floor(previousPhase))
+                Step?.Invoke(); // a foot came down
+            float step = _stridePhase * Mathf.PI;
+            float bobY = -Mathf.Abs(Mathf.Sin(step)) * _bobVertical * _bobWeight;       // dips on each footfall
+            float bobX = Mathf.Sin(step * 0.5f) * _bobHorizontal * _bobWeight;         // sways once per two steps
+
+            _dip = Mathf.SmoothDamp(_dip, 0f, ref _dipVelocity, 0.14f);
 
             _camera.transform.localPosition = new Vector3(bobX, bobY - _dip, 0f);
+            _camera.transform.localRotation = Quaternion.Euler(_dip * 12f, 0f, _roll);
         }
 
-        private void OnLanded(float impactSpeed) => _dip = Mathf.Min(0.25f, impactSpeed * _landDipPerSpeed);
+        private void OnLanded(float impactSpeed) => _dip = Mathf.Min(0.3f, impactSpeed * _landDipPerSpeed);
     }
 }
