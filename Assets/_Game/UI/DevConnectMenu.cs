@@ -6,40 +6,57 @@ using UnityEngine.InputSystem;
 namespace PleaseDontDrown.UI
 {
     /// <summary>
-    /// Temporary IMGUI connection menu for M0 testing. F1 toggles it while in a session.
-    /// Replaced by the real main menu later.
+    /// Temporary IMGUI main/pause menu. Always shown when not in a session; Esc toggles it in-game.
+    /// Replaced by the real menus later.
     /// </summary>
     public class DevConnectMenu : MonoBehaviour
     {
         [SerializeField] private ConnectionService _connection;
 
-        private bool _visibleInSession;
+        private bool _pauseOpen;
         private string _lanAddress = "localhost";
         private GUIStyle _title;
 
+        private void OnEnable() => GameInput.ToggleMenu.performed += OnToggleMenu;
+
+        private void OnDisable()
+        {
+            GameInput.ToggleMenu.performed -= OnToggleMenu;
+            SetPause(false);
+        }
+
+        private void OnToggleMenu(InputAction.CallbackContext _)
+        {
+            if (DevConsole.IsOpen || !_connection.IsActive) return; // Esc closes the console first
+            SetPause(!_pauseOpen);
+        }
+
+        private void SetPause(bool open)
+        {
+            if (open == _pauseOpen) return;
+            _pauseOpen = open;
+            if (open) GameInput.PushUI();
+            else GameInput.PopUI();
+        }
+
         private void Update()
         {
-            if (Keyboard.current != null && Keyboard.current.f1Key.wasPressedThisFrame)
-            {
-                _visibleInSession = !_visibleInSession;
-                Cursor.lockState = _visibleInSession ? CursorLockMode.None : CursorLockMode.Locked;
-            }
+            // Session ended while paused (host left, kicked...): drop the pause blocker.
+            if (_pauseOpen && !_connection.IsActive)
+                SetPause(false);
         }
 
         private void OnGUI()
         {
             bool active = _connection.IsActive;
-            if (active && !_visibleInSession)
-            {
-                GUI.Label(new Rect(10, 10, 400, 22), "F1: connection menu");
+            if (active && !_pauseOpen)
                 return;
-            }
 
             _title ??= new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold };
 
-            GUILayout.BeginArea(new Rect(20, 20, 360, 420), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(20, 20, 360, 440), GUI.skin.box);
             GUILayout.Label("PLEASE DON'T DROWN", _title);
-            GUILayout.Label("M0 network test build");
+            GUILayout.Label(active ? "Paused" : "Prototype build");
             GUILayout.Space(6);
             GUILayout.Label(SteamBootstrap.IsReady ? $"Steam: {SteamBootstrap.LocalName}" : "Steam: not running (offline only)");
 
@@ -66,20 +83,23 @@ namespace PleaseDontDrown.UI
                     GUILayout.Label($"Ping: {nm.TimeManager.RoundTripTime} ms");
                 if (SteamLobbyService.InLobby)
                     GUILayout.Label($"Lobby: {SteamLobbyService.CurrentLobby.m_SteamID}");
+                GUILayout.Space(6);
+                if (GUILayout.Button("Resume", GUILayout.Height(30))) SetPause(false);
                 if (_connection.Mode == ConnectionMode.Steam && GUILayout.Button("Invite friends", GUILayout.Height(28)))
                     _connection.InviteFriends();
-                if (GUILayout.Button("Leave", GUILayout.Height(28)))
+                if (GUILayout.Button(nm.IsServerStarted ? "End session" : "Leave", GUILayout.Height(28)))
                 {
-                    _visibleInSession = false;
+                    SetPause(false);
                     _connection.Leave();
                 }
             }
 
+            GUILayout.Space(8);
+            GUILayout.Label("<color=#aaaaaa>WASD move · Shift sprint · Ctrl crouch · Space jump · E use · ` console</color>",
+                new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true });
+
             if (!string.IsNullOrEmpty(_connection.LastError))
-            {
-                GUILayout.Space(6);
-                GUILayout.Label($"<color=#ff8080>{_connection.LastError}</color>");
-            }
+                GUILayout.Label($"<color=#ff8080>{_connection.LastError}</color>", new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true });
             GUILayout.EndArea();
         }
     }

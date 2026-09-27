@@ -42,6 +42,18 @@ namespace PleaseDontDrown.Core
                 Debug.Log($"[Dev] Auto-joining {address}");
                 _connection.JoinOffline(address);
             }
+
+            // Console commands to run once our player exists, e.g. -pdd-exec "ring; lights".
+            if (Value("-pdd-exec") is { } commands)
+            {
+                float deadline = Time.realtimeSinceStartup + 15f;
+                while (Player.PlayerHub.Local == null && Time.realtimeSinceStartup < deadline)
+                    yield return null;
+                yield return new WaitForSecondsRealtime(1f);
+                Debug.Log($"[Dev] Executing: {commands}");
+                DevCommands.Output += line => Debug.Log($"[Console] {line}");
+                DevCommands.Execute(commands);
+            }
         }
 
         private static IEnumerator QuitAfter(float seconds)

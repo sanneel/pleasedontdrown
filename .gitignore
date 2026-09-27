@@ -34,3 +34,4 @@ crashlytics-build.properties
 *.apk
 *.aab
 *.unitypackage
+/[Ss]creenshots/
