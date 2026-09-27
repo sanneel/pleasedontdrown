@@ -83,13 +83,22 @@ namespace PleaseDontDrown.Editor
             return true;
         }
 
-        public static void Palms(Transform env)
+        /// <summary>Palm spots (x, z) around the island; the first six frame the station.</summary>
+        public static readonly Vector2[] PalmSpots =
         {
-            Vector3[] spots = { new(-13f, 0f, 12f), new(-18f, 0f, 21f), new(13f, 0f, 19f),
-                new(23f, 0f, 9f), new(-26f, 0f, 4f), new(28f, 0f, 24f) };
-            for (int i = 0; i < spots.Length; i++)
+            new(-13f, 12f), new(-18f, 21f), new(13f, 19f), new(23f, 11f), new(-26f, 8f), new(28f, 24f),
+            new(-40f, 16f), new(-52f, 31f), new(-34f, 44f), new(-12f, 52f), new(8f, 38f), new(20f, 58f),
+            new(44f, 20f), new(58f, 37f), new(40f, 47f), new(-64f, 18f)
+        };
+
+        public static void Palms(Transform env, Func<float, float, float> groundHeight)
+        {
+            for (int i = 0; i < PalmSpots.Length; i++)
             {
-                var palm = Place("palm_tall", env, 6.5f + i % 3 * 0.65f, spots[i], i * 67f);
+                Vector2 s = PalmSpots[i];
+                // Sink the foot a little so the trunk never floats over a dune slope.
+                var spot = new Vector3(s.x, groundHeight(s.x, s.y) - 0.15f, s.y);
+                var palm = Place("palm_tall", env, 6.5f + i % 3 * 0.65f, spot, i * 67f);
                 if (palm == null) continue;
                 // A narrow trunk proxy leaves the canopy open and avoids expensive mesh collision.
                 var col = palm.AddComponent<CapsuleCollider>();

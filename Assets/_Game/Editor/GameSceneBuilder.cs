@@ -597,7 +597,7 @@ namespace PleaseDontDrown.Editor
             Place("Crate", new Vector3(-4.6f, 0.3f, 9.8f), -12f);
             Place("Beach Ball", new Vector3(4.5f, 0.3f, 14f));
             Place("Life Ring", new Vector3(1f, 1.4f, 11.3f));
-            Place("Life Ring", new Vector3(11f, 0.1f, 6.5f), 30f);
+            Place("Life Ring", new Vector3(15.5f, 0.1f, 5f), 30f);
             Place("Cooler", new Vector3(-1.9f, 0.6f, 10.2f), 15f);
             // Already floating in the sea.
             Place("Crate", new Vector3(4f, 0.5f, -14f), 35f);
@@ -640,7 +640,7 @@ namespace PleaseDontDrown.Editor
             Transform env = new GameObject("Environment").transform;
             BuildBeach(env);
             BuildStation(env);
-            MeshyArt.Palms(env);
+            MeshyArt.Palms(env, BeachHeight);
             PlaceItems(catalog);
             BuildDrillBoard(env);
             Transform[] spawns = BuildSpawnPoints();
@@ -680,6 +680,13 @@ namespace PleaseDontDrown.Editor
             terrain.AddComponent<MeshFilter>().sharedMesh = mesh;
             terrain.AddComponent<MeshRenderer>().sharedMaterial = sand;
             terrain.AddComponent<MeshCollider>().sharedMesh = mesh;
+            var seabed = new SerializedObject(terrain.AddComponent<Seabed>()); // calms the waves over the shallows and the island
+            Require(seabed, "_grid").objectReferenceValue = mesh;
+            Require(seabed, "_min").vector2Value = new Vector2(TerrainMinX, TerrainMinZ);
+            Require(seabed, "_step").floatValue = TerrainStep;
+            Require(seabed, "_countX").intValue = Mathf.RoundToInt((TerrainMaxX - TerrainMinX) / TerrainStep) + 1;
+            Require(seabed, "_countZ").intValue = Mathf.RoundToInt((TerrainMaxZ - TerrainMinZ) / TerrainStep) + 1;
+            seabed.ApplyModifiedPropertiesWithoutUndo();
 
             // The ocean: waves (CPU + shader), host-synced wave size, underwater camera effects, splashes.
             var ocean = new GameObject("Ocean");
@@ -724,10 +731,34 @@ namespace PleaseDontDrown.Editor
         private const float WaterLevel = -0.35f;
         private const string OceanShaderPath = "Assets/_Game/Data/Shaders/Ocean.shader";
 
-        /// <summary>Beach height at a point: flat sand inland, a curvy shoreline, shelving to ~9 m deep offshore.</summary>
+        // The island: a rounded rectangle of sand whose long side (the station beach) faces the open sea toward -z.
+        private static readonly Vector2 IslandCenter = new(0f, 38f);
+        private static readonly Vector2 IslandHalfSize = new(80f, 34f);
+        private const float IslandCornerRadius = 28f;
+        private const float TerrainMinX = -160f, TerrainMaxX = 160f, TerrainMinZ = -170f, TerrainMaxZ = 150f, TerrainStep = 2f;
+
+        /// <summary>
+        /// Distance inland from the island's edge in "profile" metres (the old straight beach used z here, so the
+        /// station beach keeps exactly its shape). Grows toward the middle of the island, negative out at sea.
+        /// </summary>
+        private static float ShoreCoordinate(float x, float z)
+        {
+            var p = new Vector2(Mathf.Abs(x - IslandCenter.x), Mathf.Abs(z - IslandCenter.y));
+            Vector2 q = p - (IslandHalfSize - Vector2.one * IslandCornerRadius);
+            float outside = new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude;
+            float inside = Mathf.Min(Mathf.Max(q.x, q.y), 0f);
+            float distanceOut = outside + inside - IslandCornerRadius; // rounded-box signed distance, + outside
+            float front = IslandCenter.y - IslandHalfSize.y;          // z of the station beach's edge
+            // Curvy coast: the old gentle wave along the station beach, plus lumpier bays away from the station.
+            float wild = Mathf.Clamp01((Mathf.Abs(x) - 25f) / 30f + Mathf.Clamp01((z - 20f) / 20f));
+            float wobble = 4f * Mathf.Sin(x * 0.045f) + wild * (Mathf.PerlinNoise(x * 0.025f + 3.7f, z * 0.025f + 1.3f) - 0.5f) * 14f;
+            return front - distanceOut + wobble;
+        }
+
+        /// <summary>Beach height at a point: flat sand inland, a curvy shoreline all round, shelving to ~9 m deep offshore.</summary>
         private static float BeachHeight(float x, float z)
         {
-            float shore = z + 4f * Mathf.Sin(x * 0.045f); // curvy shoreline, straight around the station (x ~ 0)
+            float shore = ShoreCoordinate(x, z); // straight around the station (x ~ 0)
             (float z, float h)[] profile = { (-170f, -9f), (-90f, -8f), (-45f, -4.5f), (-20f, -2.3f), (-6f, -0.9f), (4f, 0f), (100f, 0f) };
             float h = profile[0].h;
             for (int i = 0; i < profile.Length - 1; i++)
@@ -739,14 +770,14 @@ namespace PleaseDontDrown.Editor
             }
             if (shore > profile[^1].z) h = 0f;
             // Dunes inland, gentle ripples on the seabed.
-            float dunes = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(22f, 45f, z)) * (Mathf.PerlinNoise(x * 0.04f + 10f, z * 0.04f) * 2.2f);
+            float dunes = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(20f, 36f, shore)) * (Mathf.PerlinNoise(x * 0.04f + 10f, z * 0.04f) * 2.2f);
             float ripples = shore < -2f ? (Mathf.PerlinNoise(x * 0.15f, z * 0.15f) - 0.5f) * 0.3f : 0f;
             return h + dunes + ripples;
         }
 
         private static Mesh GetBeachMesh()
         {
-            const float minX = -150f, maxX = 150f, minZ = -170f, maxZ = 90f, step = 2f;
+            const float minX = TerrainMinX, maxX = TerrainMaxX, minZ = TerrainMinZ, maxZ = TerrainMaxZ, step = TerrainStep;
             int nx = Mathf.RoundToInt((maxX - minX) / step) + 1;
             int nz = Mathf.RoundToInt((maxZ - minZ) / step) + 1;
             var vertices = new Vector3[nx * nz];
@@ -916,11 +947,12 @@ namespace PleaseDontDrown.Editor
             readableSo.ApplyModifiedPropertiesWithoutUndo();
             ConfigureInteractable(sign.AddComponent<Interactable>(), new[] { board.GetComponent<Collider>() }, new[] { board.GetComponent<Renderer>() }, 3f);
 
-            // Lifeguard tower.
+            // Lifeguard tower: door, window and ramp face the sea (run straight down the ramp into the water).
             var tower = new GameObject("Tower").transform;
             TagSurface(tower.gameObject, SurfaceKind.Wood);
             tower.SetParent(env, false);
-            tower.position = new Vector3(12f, 0f, 4f);
+            tower.position = new Vector3(12f, 0f, 7.5f);
+            tower.rotation = Quaternion.Euler(0f, 180f, 0f);
             foreach (Vector3 p in new[] { new Vector3(-0.8f, 1.5f, -0.8f), new Vector3(0.8f, 1.5f, -0.8f), new Vector3(-0.8f, 1.5f, 0.8f), new Vector3(0.8f, 1.5f, 0.8f) })
                 Primitive(PrimitiveType.Cube, "Leg", tower, p, new Vector3(0.15f, 3f, 0.15f), wood);
             Primitive(PrimitiveType.Cube, "Platform", tower, new Vector3(0f, 3.1f, 0f), new Vector3(2.2f, 0.2f, 2.2f), wood);

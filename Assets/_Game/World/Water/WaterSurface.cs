@@ -97,7 +97,7 @@ namespace PleaseDontDrown.World.Water
             float h = 0f;
             for (int i = 0; i < w._count; i++)
                 h += w._amp[i] * Mathf.Sin(w._k[i].x * x + w._k[i].y * z + w._omega[i] * t + w._phase[i]);
-            return w._waterLevel + h * scale;
+            return w._waterLevel + h * scale * Seabed.WaveFactor(x, z, w._waterLevel);
         }
 
         /// <summary>Surface normal at a world position.</summary>
@@ -110,7 +110,7 @@ namespace PleaseDontDrown.World.Water
             Vector2 slope = Vector2.zero;
             for (int i = 0; i < w._count; i++)
                 slope += w._k[i] * (w._amp[i] * Mathf.Cos(w._k[i].x * position.x + w._k[i].y * position.z + w._omega[i] * t + w._phase[i]));
-            slope *= scale;
+            slope *= scale * Seabed.WaveFactor(position.x, position.z, w._waterLevel);
             return new Vector3(-slope.x, 1f, -slope.y).normalized;
         }
 

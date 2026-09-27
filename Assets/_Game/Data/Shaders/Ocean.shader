@@ -53,6 +53,20 @@ Shader "PleaseDontDrown/Ocean"
             float _PDD_WaveTime;
             float _PDD_WaterLevel;
             float4 _PDD_OceanCenter;  // xy grid center (world x,z), z fade start, w fade end (half extents)
+            // Set by Seabed.cs: ground heights under the sea. Waves calm down in the shallows and vanish under the island.
+            TEXTURE2D(_PDD_Seabed);
+            SAMPLER(sampler_PDD_Seabed);
+            float4 _PDD_SeabedRect;   // xy world min corner, zw 1 / world size
+            float4 _PDD_SeabedParams; // x enabled, y 1 / calm depth
+
+            // MUST match Seabed.WaveFactor (C#).
+            float SeabedCalm(float2 xz)
+            {
+                if (_PDD_SeabedParams.x < 0.5) return 1.0;
+                float2 uv = (xz - _PDD_SeabedRect.xy) * _PDD_SeabedRect.zw;
+                float ground = SAMPLE_TEXTURE2D_LOD(_PDD_Seabed, sampler_PDD_Seabed, uv, 0).r;
+                return smoothstep(0.0, 1.0, saturate((_PDD_WaterLevel - ground) * _PDD_SeabedParams.y));
+            }
 
             struct Attributes
             {
@@ -74,6 +88,7 @@ Shader "PleaseDontDrown/Ocean"
                 float2 d = abs(xz - _PDD_OceanCenter.xy);
                 float edge = max(d.x, d.y);
                 float fade = 1.0 - saturate((edge - _PDD_OceanCenter.z) / max(_PDD_OceanCenter.w - _PDD_OceanCenter.z, 0.001));
+                fade *= SeabedCalm(xz);
                 float h = 0.0;
                 slope = 0.0;
                 [unroll]
