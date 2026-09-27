@@ -108,8 +108,12 @@ holding a striped beach umbrella in one tentacle`. Add the usual style ending to
 * Keeps the grey-box version as a fallback until all of a set exists, so the game never breaks mid-way.
 
 ## 10. Rules (legal and store)
-* **Licence:** check your Meshy plan. Free-tier generations have been public and CC BY 4.0 (attribution needed);
-  paid plans give private assets you can use commercially. Use a plan that allows commercial use for anything that ships.
+* **Licence** (meshy.ai/pricing, checked 2026-09-27): Free = 100 credits/month (up to 10 assets and 10 downloads,
+  downloads use Meshy 6 Lite), no Remesh, outputs **CC BY 4.0** (commercial use allowed, but Meshy must be credited,
+  and they're public). Pro (~$20/month, 1,000 credits, up to 100 assets) = private and customer-owned, Remesh,
+  retries, unlimited downloads. The licence follows the plan you were on when you generated the asset.
+  Plan: test the style on Free with Batch 1, then do the final set in one month of Pro. If any Free-plan model
+  ships, add "3D models made with Meshy (meshy.ai), CC BY 4.0" to the credits.
 * **Steam:** the store page must disclose AI-generated content (Steam's content survey asks). Keep a list of which
   assets came from Meshy (this file is that list).
 * **No Red Cross emblem** (red cross on white is legally protected). Use a white cross on green, or a heart.
