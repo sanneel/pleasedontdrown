@@ -14,7 +14,8 @@ Keep the Steam client running for online features (dev app id **480** / Spacewar
 |---|---|---|
 | Move / look | WASD / mouse | Left / right stick |
 | Sprint · Crouch · Jump | Shift · Ctrl or C · Space | L3 · B · A |
-| Use / pick up (bell, switch, sign, items) | E | X |
+| Use / pick up (bell, switch, sign, items, tourists) | E | X |
+| CPR on an unconscious tourist on land (keep tapping) | Right mouse | LT |
 | Throw held item (hold to charge) | Left mouse, or hold G | RT, or hold Y |
 | Drop held item | Tap G | Tap Y |
 | Swim: dive · rise | Ctrl · Space (underwater) | B · A |
@@ -22,9 +23,15 @@ Keep the Steam client running for online features (dev app id **480** / Spacewar
 | Pause / connection menu | Esc | Start |
 | Dev console | ` (backquote) or F2 | |
 
+**Rescue drill:** press E on the red *RESCUE DRILL* board by the spawn. A tourist appears 25-40 m out and the bell rings.
+Swim out, grab them (E) and tow them to the shallows. If they go unconscious, carry them onto the sand, put them down (tap G)
+and tap the right mouse button for CPR before their time runs out. Tourists near a floating life ring grab it and calm down.
+
 Useful console commands: `help`, `noclip`, `speed 3`, `tp spawn`, `lookat x y z`, `fov 90`, `sens 0.15`, `timescale 0.3`,
 `players`, `ring`, `lights`, `spawn <item> [n]` / `spawn list`, `items`, `itemdebug`, `grab`, `throw [0-1]`, `drop`,
-`waves <scale>` (storm = 3), `water`, `breath`, `knock x y z`, `use`, `targetdebug`, `contacts`, `screenshot [delay]` (saved to `Screenshots/`).
+`waves <scale>` (storm = 3), `water`, `breath`, `knock x y z`, `use`, `use2`, `targetdebug`, `contacts`, `screenshot [delay]` (saved to `Screenshots/`),
+`grab [name]`, `drill`, `victims`, `victim [distance] [state]`, `vset <state|air|panic|condition> <value>` (nearest tourist),
+`cpr [pumps]`, `clearvictims`, `ragdoll`.
 Cheats work in the editor and dev builds.
 
 ## Feel (modelled on How to Fish)

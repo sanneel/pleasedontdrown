@@ -10,6 +10,13 @@ using UnityEngine;
 
 namespace PleaseDontDrown.Items
 {
+    /// <summary>Optional on an item: decides how it sits in the hands (a tourist is carried and towed differently from a crate).</summary>
+    public interface IHoldPose
+    {
+        /// <param name="pitchFollow">How much the pose follows looking up/down (1 = fully, 0 = only turning).</param>
+        void GetHoldPose(PlayerHub holder, out Vector3 offset, out Quaternion rotation, out float pitchFollow);
+    }
+
     /// <summary>
     /// Anything a player can pick up, carry and throw. The host owns "who is holding it" (SyncVar);
     /// the holder is also the physics owner (<see cref="ItemSync"/>), so a throw simulates on the thrower's machine.
@@ -20,19 +27,25 @@ namespace PleaseDontDrown.Items
     public class Item : NetworkBehaviour, IInteractionHandler
     {
         [SerializeField] private string _displayName = "Thing";
+        [SerializeField] private string _pickUpVerb = "Pick up";
         [Tooltip("Where the item sits relative to the holder's head (x right, y up, z forward).")]
         [SerializeField] private Vector3 _holdOffset = new Vector3(0.3f, -0.32f, 0.75f);
         [SerializeField] private Vector3 _holdEuler;
         [Tooltip("Multiplier on throw speed (after mass scaling).")]
         [SerializeField] private float _throwStrength = 1f;
         [SerializeField] private float _pickupRange = 3.2f;
+        [Tooltip("How heavy it feels to carry (slows the holder). 0 = the body's mass.")]
+        [SerializeField] private float _carryMass;
 
         private readonly SyncVar<PlayerHub> _holder = new SyncVar<PlayerHub>();
 
         private static readonly List<Item> _all = new();
+        private static readonly Dictionary<Collider, Item> _byCollider = new();
 
         private ItemSync _sync;
-        private Collider[] _colliders;
+        private IHoldPose _holdPose;
+        private Collider[] _colliders;       // everything, including parts with their own bodies (ragdoll limbs)
+        private Collider[] _bodyColliders;   // only the ones on the main body (switched off while someone else holds it)
         private PlayerHub _predictedHolder;
         private bool _releasePending;
 
@@ -43,6 +56,27 @@ namespace PleaseDontDrown.Items
         public Quaternion HoldRotation => Quaternion.Euler(_holdEuler);
         public float ThrowStrength => _throwStrength;
         public float Mass => _sync.Body.mass;
+        public float CarryMass => _carryMass > 0f ? _carryMass : Mass;
+
+        /// <summary>The item a collider belongs to (also finds ragdoll limbs), or null.</summary>
+        public static Item FromCollider(Collider c) => c != null && _byCollider.TryGetValue(c, out Item item) ? item : null;
+
+        public bool OwnsCollider(Collider c) => c != null && _byCollider.TryGetValue(c, out Item item) && item == this;
+
+        /// <summary>Per-instance name (e.g. a tourist's), set on every machine by whoever knows it.</summary>
+        public void SetDisplayName(string displayName) => _displayName = displayName;
+
+        public void GetHoldPose(PlayerHub holder, out Vector3 offset, out Quaternion rotation, out float pitchFollow)
+        {
+            if (_holdPose != null)
+            {
+                _holdPose.GetHoldPose(holder, out offset, out rotation, out pitchFollow);
+                return;
+            }
+            offset = _holdOffset;
+            rotation = HoldRotation;
+            pitchFollow = 1f;
+        }
 
         /// <summary>Holder as seen on this machine: our own prediction wins until the host answers.</summary>
         public PlayerHub Holder => _releasePending ? null : _predictedHolder != null ? _predictedHolder : _holder.Value;
@@ -55,6 +89,7 @@ namespace PleaseDontDrown.Items
         private static void ResetStatics()
         {
             _all.Clear();
+            _byCollider.Clear();
             DevCommands.Register("items", "", "List items, who simulates them and who holds them.", _ =>
             {
                 foreach (Item i in _all)
@@ -67,8 +102,19 @@ namespace PleaseDontDrown.Items
         private void Awake()
         {
             _sync = GetComponent<ItemSync>();
+            _holdPose = GetComponent<IHoldPose>();
             _colliders = GetComponentsInChildren<Collider>(true);
+            _bodyColliders = System.Array.FindAll(_colliders, c => c.attachedRigidbody == _sync.Body);
+            foreach (Collider c in _colliders)
+                _byCollider[c] = this;
             _holder.OnChange += OnHolderChanged;
+        }
+
+        private void OnDestroy()
+        {
+            foreach (Collider c in _colliders)
+                if (c != null && _byCollider.TryGetValue(c, out Item owner) && owner == this)
+                    _byCollider.Remove(c);
         }
 
         public override void OnStartNetwork()
@@ -92,7 +138,7 @@ namespace PleaseDontDrown.Items
         public bool CanInteract(PlayerHub player) => !IsHeld && player.Hands != null;
 
         public string GetPrompt(PlayerHub player) =>
-            player.Hands != null && player.Hands.HeldItem != null ? $"Swap for {_displayName}" : $"Pick up {_displayName}";
+            player.Hands != null && player.Hands.HeldItem != null ? $"Swap for {_displayName}" : $"{_pickUpVerb} {_displayName}";
 
         public void OnInteract(PlayerHub player) => player.Hands.TryPickUp(this);
 
@@ -222,9 +268,9 @@ namespace PleaseDontDrown.Items
             PlayerHub holder = Holder;
             bool held = holder != null;
             // Our own hands steer a live body (it collides with the world, but not with us);
-            // everyone else sees it glued to the holder with its colliders off.
+            // everyone else sees it glued to the holder with its colliders off (dangling limbs keep theirs).
             bool heldLocally = held && holder == PlayerHub.Local;
-            foreach (Collider c in _colliders)
+            foreach (Collider c in _bodyColliders)
                 if (c != null) c.enabled = !held || heldLocally;
             if (heldLocally && holder.BodyCollider != null)
                 SetIgnoreCollision(holder.BodyCollider, true);

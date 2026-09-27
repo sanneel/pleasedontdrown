@@ -16,6 +16,17 @@ namespace PleaseDontDrown.Interaction
     }
 
     /// <summary>
+    /// Optional second action on the same object, on the Secondary button (e.g. CPR on a tourist you could also pick up).
+    /// </summary>
+    public interface IInteractionSecondary
+    {
+        bool CanSecondary(PlayerHub player);
+        string GetSecondaryPrompt(PlayerHub player);
+        /// <summary>Runs on the interacting player's machine.</summary>
+        void OnSecondary(PlayerHub player);
+    }
+
+    /// <summary>
     /// The "look at it and press E" part of a world object: owns the colliders that can be targeted,
     /// the hover outline, and forwards the interaction to the <see cref="IInteractionHandler"/> on the same object.
     /// </summary>
@@ -33,6 +44,7 @@ namespace PleaseDontDrown.Interaction
 
         private readonly Dictionary<Renderer, int> _originalLayers = new();
         private IInteractionHandler _handler;
+        private IInteractionSecondary _secondary;
         private bool _outlined;
 
         public float MaxDistance => _maxDistance;
@@ -50,6 +62,7 @@ namespace PleaseDontDrown.Interaction
         private void Awake()
         {
             _handler = GetComponent<IInteractionHandler>();
+            _secondary = GetComponent<IInteractionSecondary>();
             if (_handler == null)
                 Debug.LogWarning($"[Interact] {name} has no IInteractionHandler.", this);
             if (_colliders == null || _colliders.Length == 0)
@@ -81,6 +94,16 @@ namespace PleaseDontDrown.Interaction
         {
             if (CanInteract(player))
                 _handler.OnInteract(player);
+        }
+
+        public bool CanSecondary(PlayerHub player) => _secondary != null && isActiveAndEnabled && _secondary.CanSecondary(player);
+
+        public string GetSecondaryPrompt(PlayerHub player) => CanSecondary(player) ? _secondary.GetSecondaryPrompt(player) : null;
+
+        public void InteractSecondary(PlayerHub player)
+        {
+            if (CanSecondary(player))
+                _secondary.OnSecondary(player);
         }
 
         /// <summary>Moves the visuals onto the "Outlined" layer, which a URP RenderObjects pass draws with an outline shader.</summary>

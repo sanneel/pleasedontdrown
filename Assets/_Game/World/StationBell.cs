@@ -42,12 +42,15 @@ namespace PleaseDontDrown.World
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void RingServer(NetworkConnection caller = null)
+        private void RingServer(NetworkConnection caller = null) => ServerRing(PlayerHub.NameOf(caller));
+
+        /// <summary>Host: ring it (players, drills, later the emergency director).</summary>
+        [Server]
+        public void ServerRing(string who)
         {
             if (Time.time - _lastRingTime < _cooldown)
                 return;
             _lastRingTime = Time.time;
-            string who = PlayerHub.NameOf(caller);
             Debug.Log($"[Bell] rung by {who}");
             RingObservers(who);
         }

@@ -42,7 +42,8 @@ namespace PleaseDontDrown.UI
             float cx = Screen.width * 0.5f;
             float cy = Screen.height * 0.5f;
 
-            bool hovering = !string.IsNullOrEmpty(local.Interactor.CurrentPrompt);
+            string secondary = local.Interactor.CurrentSecondaryPrompt;
+            bool hovering = !string.IsNullOrEmpty(local.Interactor.CurrentPrompt) || !string.IsNullOrEmpty(secondary);
             float size = hovering ? 8f : 4f;
             GUI.color = hovering ? new Color(1f, 0.86f, 0.25f) : new Color(1f, 1f, 1f, 0.8f);
             GUI.DrawTexture(new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size), _dot);
@@ -50,8 +51,15 @@ namespace PleaseDontDrown.UI
 
             if (hovering)
             {
-                string key = GameInput.KeyLabel(GameInput.Interact);
-                DrawShadowed(new Rect(cx - 300f, cy + 28f, 600f, 30f), $"<b>[{key}]</b> {local.Interactor.CurrentPrompt}", _prompt);
+                float y = cy + 28f;
+                if (!string.IsNullOrEmpty(local.Interactor.CurrentPrompt))
+                {
+                    string key = GameInput.KeyLabel(GameInput.Interact);
+                    DrawShadowed(new Rect(cx - 300f, y, 600f, 30f), $"<b>[{key}]</b> {local.Interactor.CurrentPrompt}", _prompt);
+                    y += 26f;
+                }
+                if (!string.IsNullOrEmpty(secondary))
+                    DrawShadowed(new Rect(cx - 300f, y, 600f, 30f), $"<b>[{GameInput.KeyLabel(GameInput.Secondary)}]</b> {secondary}", _prompt);
             }
 
             PlayerHands hands = local.Hands;

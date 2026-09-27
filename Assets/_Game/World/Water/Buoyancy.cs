@@ -26,7 +26,12 @@ namespace PleaseDontDrown.World.Water
         public bool Suspended { get; set; }
         public bool InWater { get; private set; }
         public float SubmergedFraction { get; private set; }
-        public float Density => _density;
+        /// <summary>Can change at runtime (an unconscious swimmer sinks, a conscious one floats).</summary>
+        public float Density
+        {
+            get => _density;
+            set => _density = Mathf.Clamp(value, 0.02f, 2f);
+        }
 
         private void Awake()
         {
@@ -34,14 +39,17 @@ namespace PleaseDontDrown.World.Water
             BuildProbes();
         }
 
-        /// <summary>Probe layout from the object's local mesh bounds: one probe for round things, five otherwise.</summary>
+        /// <summary>
+        /// Probe layout from the object's local mesh bounds: one probe for round things, five otherwise.
+        /// Only meshes that move with this body count (a ragdoll's limbs have their own bodies and buoyancy).
+        /// </summary>
         private void BuildProbes()
         {
             Bounds local = default;
             bool any = false;
             foreach (MeshFilter mf in GetComponentsInChildren<MeshFilter>())
             {
-                if (mf.sharedMesh == null) continue;
+                if (mf.sharedMesh == null || mf.GetComponentInParent<Rigidbody>() != _rb) continue;
                 Matrix4x4 toRoot = transform.worldToLocalMatrix * mf.transform.localToWorldMatrix;
                 Bounds b = mf.sharedMesh.bounds;
                 Vector3 c = b.center, e = b.extents;

@@ -135,7 +135,8 @@ namespace PleaseDontDrown.Player
         private void OnEnable()
         {
             if (!IsLocal) return;
-            DevCommands.Register("grab", "", "Pick up the item you look at (or the nearest one).", _ => GrabCommand(), owner: this);
+            DevCommands.Register("grab", "[name]", "Pick up the item you look at, or the nearest one (optionally matching a name, e.g. 'grab tourist').",
+                args => GrabCommand(args.Length > 0 ? args[0] : null), owner: this);
             DevCommands.Register("throw", "[charge 0..1]", "Throw the held item.", args => Throw(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 1f), owner: this);
             DevCommands.Register("drop", "", "Drop the held item.", _ => Drop(), owner: this);
         }
@@ -265,11 +266,24 @@ namespace PleaseDontDrown.Player
         private void GetHoldTarget(Item item, out Vector3 position, out Quaternion rotation)
         {
             Transform aim = IsLocal ? AimTransform : _head;
+            item.GetHoldPose(_hub, out Vector3 holdOffset, out Quaternion holdRotation, out float pitchFollow);
             // Wind-up: pull the item back (and a little down) while a throw charges.
             float pull = Mathf.SmoothStep(0f, 1f, Charge01);
-            Vector3 offset = item.HoldOffset + new Vector3(0.05f, -0.06f, -_chargePullback) * pull;
-            position = aim.TransformPoint(offset);
-            rotation = aim.rotation * item.HoldRotation * Quaternion.Euler(-25f * pull, 0f, 0f);
+            Vector3 offset = holdOffset + new Vector3(0.05f, -0.06f, -_chargePullback) * pull;
+            Quaternion windUp = Quaternion.Euler(-25f * pull, 0f, 0f);
+            if (pitchFollow >= 0.999f)
+            {
+                position = aim.TransformPoint(offset);
+                rotation = aim.rotation * holdRotation * windUp;
+                return;
+            }
+            // Big things (a person) only partly follow looking up and down, so they don't end up under your feet.
+            Vector3 f = aim.forward;
+            float yaw = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+            float pitch = -Mathf.Asin(Mathf.Clamp(f.y, -1f, 1f)) * Mathf.Rad2Deg;
+            Quaternion frame = Quaternion.Euler(pitch * pitchFollow, yaw, 0f);
+            position = aim.position + frame * offset;
+            rotation = frame * holdRotation * windUp;
         }
 
         /// <summary>Angular velocity (rad/s per unit speed) that turns <paramref name="from"/> toward <paramref name="to"/>.</summary>
@@ -282,21 +296,26 @@ namespace PleaseDontDrown.Player
             return axis * (angle * Mathf.Deg2Rad);
         }
 
-        private void GrabCommand()
+        private void GrabCommand(string filter)
         {
+            bool Matches(Item i) => filter == null ||
+                                    i.DisplayName.IndexOf(filter, System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    i.name.IndexOf(filter, System.StringComparison.OrdinalIgnoreCase) >= 0;
             Item target = null;
             if (_hub.Interactor != null && _hub.Interactor.Current != null)
                 target = _hub.Interactor.Current.GetComponent<Item>();
+            if (target != null && !Matches(target)) target = null;
             if (target == null)
             {
-                float best = 3.5f * 3.5f;
+                float range = filter != null ? 6f : 4f;
+                float best = range * range;
                 foreach (Item i in Item.All)
                 {
                     float d = (i.transform.position - transform.position).sqrMagnitude;
-                    if (!i.IsHeld && d < best) { best = d; target = i; }
+                    if (!i.IsHeld && d < best && Matches(i)) { best = d; target = i; }
                 }
             }
-            if (target == null) DevCommands.Print("nothing to grab within 3.5 m");
+            if (target == null) DevCommands.Print($"nothing{(filter != null ? $" matching '{filter}'" : "")} to grab nearby");
             else TryPickUp(target);
         }
     }

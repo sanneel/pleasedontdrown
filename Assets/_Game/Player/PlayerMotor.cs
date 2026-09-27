@@ -338,7 +338,7 @@ namespace PleaseDontDrown.Player
         {
             if (c == _capsule) return true;
             Item held = _hands != null ? _hands.HeldItem : null;
-            return held != null && c.attachedRigidbody != null && c.attachedRigidbody == held.Sync.Body;
+            return held != null && held.OwnsCollider(c); // includes a carried tourist's dangling legs
         }
 
         private bool CastIgnoringSelf(Vector3 origin, float radius, Vector3 direction, float distance, out RaycastHit best)
@@ -420,8 +420,9 @@ namespace PleaseDontDrown.Player
         /// <summary>Bumping an item someone else simulates: ask for it, so the next steps shove it for real.</summary>
         private static void ClaimIfItem(Collision collision)
         {
-            if (collision.rigidbody != null && collision.rigidbody.TryGetComponent(out ItemSync sync) && !sync.IsSimulator)
-                sync.RequestAuthority();
+            Item item = Item.FromCollider(collision.collider);
+            if (item != null && !item.Sync.IsSimulator && collision.rigidbody == item.Sync.Body)
+                item.Sync.RequestAuthority();
         }
 
         // ------------------------------------------------------------------ noclip

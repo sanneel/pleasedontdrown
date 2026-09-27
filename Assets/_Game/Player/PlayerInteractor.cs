@@ -26,6 +26,8 @@ namespace PleaseDontDrown.Player
 
         public Interactable Current => _current;
         public string CurrentPrompt { get; private set; }
+        /// <summary>Second action on the target (Secondary button), only while the hands are free.</summary>
+        public string CurrentSecondaryPrompt { get; private set; }
 
         private void Update()
         {
@@ -42,9 +44,13 @@ namespace PleaseDontDrown.Player
             }
 
             CurrentPrompt = _current != null ? _current.GetPrompt(_hub) : null;
+            bool handsFree = _hub.Hands == null || _hub.Hands.HeldItem == null;
+            CurrentSecondaryPrompt = _current != null && handsFree ? _current.GetSecondaryPrompt(_hub) : null;
 
             if (_current != null && GameInput.Interact.WasPressedThisFrame())
                 _current.Interact(_hub);
+            else if (CurrentSecondaryPrompt != null && GameInput.Secondary.WasPressedThisFrame())
+                _current.InteractSecondary(_hub);
         }
 
         private Interactable FindTarget(Transform view)
@@ -87,7 +93,7 @@ namespace PleaseDontDrown.Player
         }
 
         private bool Usable(Interactable candidate, float distance) =>
-            candidate != null && distance <= candidate.MaxDistance && candidate.CanInteract(_hub);
+            candidate != null && distance <= candidate.MaxDistance && (candidate.CanInteract(_hub) || candidate.CanSecondary(_hub));
 
         /// <summary>Nothing solid between the eye and the target (other than the target itself).</summary>
         private bool InPlainSight(Vector3 origin, Vector3 point, Interactable target)
@@ -119,7 +125,7 @@ namespace PleaseDontDrown.Player
         {
             if (c == _hub.BodyCollider) return true;
             var held = _hub.Hands != null ? _hub.Hands.HeldItem : null;
-            return held != null && c.attachedRigidbody != null && c.attachedRigidbody == held.Sync.Body;
+            return held != null && held.OwnsCollider(c);
         }
 
         private void OnEnable()
@@ -128,6 +134,11 @@ namespace PleaseDontDrown.Player
             {
                 DevCommands.Print(_current != null ? $"using {_current.name}: {CurrentPrompt}" : "nothing targeted");
                 if (_current != null) _current.Interact(_hub);
+            }, cheat: true, owner: this);
+            DevCommands.Register("use2", "", "Press Secondary on whatever is targeted (automated tests).", _ =>
+            {
+                DevCommands.Print(_current != null ? $"secondary on {_current.name}: {CurrentSecondaryPrompt ?? "(not available)"}" : "nothing targeted");
+                if (_current != null) _current.InteractSecondary(_hub);
             }, cheat: true, owner: this);
             DevCommands.Register("targetdebug", "", "Explain what the interaction targeting sees right now.", _ => ExplainTargeting(), owner: this);
         }
@@ -160,10 +171,12 @@ namespace PleaseDontDrown.Player
         private void OnDisable()
         {
             DevCommands.Unregister("use", this);
+            DevCommands.Unregister("use2", this);
             DevCommands.Unregister("targetdebug", this);
             if (_current != null) _current.SetOutlined(false);
             _current = null;
             CurrentPrompt = null;
+            CurrentSecondaryPrompt = null;
         }
     }
 }

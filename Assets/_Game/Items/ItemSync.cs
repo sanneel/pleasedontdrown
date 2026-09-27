@@ -14,6 +14,8 @@ namespace PleaseDontDrown.Items
     /// the body kinematic and smoothly follows (with a little extrapolation). Whoever touches an item (picks it up,
     /// throws it, bumps into it) becomes its owner, so their interaction feels instant. When the body comes to rest,
     /// it sends one final reliable state, hands authority back to the host and goes silent.
+    /// Bodies that move on their own (a tourist treading water) set <see cref="KeepAwake"/>: they stream while
+    /// awake and go back to the host once nobody has touched them for a few seconds.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class ItemSync : NetworkBehaviour
@@ -42,6 +44,8 @@ namespace PleaseDontDrown.Items
         private float _floatOffset;
         private float _stillTime;
         private float _lastAuthorityRequest = float.NegativeInfinity;
+        private float _lastInteractionTime = float.NegativeInfinity;
+        private const float SelfMovingHandBack = 3f;
 
         // Latest state received from the simulator (used while following).
         private Vector3 _netPosition;
@@ -51,6 +55,9 @@ namespace PleaseDontDrown.Items
         private float _netTime;
 
         public Rigidbody Body => _rb;
+        public Buoyancy Buoyancy => _buoyancy;
+        /// <summary>Set while the body moves by itself (a struggling swimmer): never counts as "at rest".</summary>
+        public bool KeepAwake { get; set; }
         /// <summary>Touching something right now (held items use this to slide along walls instead of fighting them).</summary>
         public bool IsTouching => Time.time - _lastContactTime < 0.1f;
         /// <summary>True on the one machine that runs physics for this body.</summary>
@@ -85,6 +92,7 @@ namespace PleaseDontDrown.Items
         public override void OnOwnershipServer(NetworkConnection prevOwner)
         {
             base.OnOwnershipServer(prevOwner);
+            _lastInteractionTime = Time.time;
             Refresh();
             if (prevOwner.IsValid || Owner.IsValid) // skip the initial "nobody -> nobody" at spawn
                 Debug.Log($"[Item] {name} simulator -> {AuthorityLabel}");
@@ -93,6 +101,7 @@ namespace PleaseDontDrown.Items
         public override void OnOwnershipClient(NetworkConnection prevOwner)
         {
             base.OnOwnershipClient(prevOwner);
+            _lastInteractionTime = Time.time;
             Refresh();
         }
 
@@ -114,6 +123,7 @@ namespace PleaseDontDrown.Items
             if (_held == held && _heldLocally == heldLocally) return;
             bool released = _held && !held;
             _held = held;
+            _lastInteractionTime = Time.time;
             _heldLocally = held && heldLocally;
             if (_buoyancy != null) _buoyancy.Suspended = held;
             Refresh();
@@ -125,8 +135,14 @@ namespace PleaseDontDrown.Items
             }
         }
 
-        private void OnCollisionEnter(Collision _) => _lastContactTime = Time.time;
-        private void OnCollisionStay(Collision _) => _lastContactTime = Time.time;
+        private void OnCollisionEnter(Collision c) => OnContact(c);
+        private void OnCollisionStay(Collision c) => OnContact(c);
+
+        private void OnContact(Collision c)
+        {
+            _lastContactTime = Time.time;
+            if (c.rigidbody != null) _lastInteractionTime = Time.time; // pushed by a player or another body
+        }
 
         /// <summary>Ask the host to let us simulate this body (e.g. we walked into it). Rate limited.</summary>
         public void RequestAuthority()
@@ -204,8 +220,24 @@ namespace PleaseDontDrown.Items
                 transform.position = _rb.position;
             }
 
+            if (KeepAwake)
+            {
+                _stillTime = 0f;
+                _sending = true;
+                SendState(Channel.Unreliable);
+                // Whoever bumped or threw a struggling swimmer hands it back to the host once it's left alone.
+                if (Owner.IsValid && Time.time - _lastInteractionTime > SelfMovingHandBack)
+                {
+                    _lastInteractionTime = Time.time; // don't repeat while the hand-back is on its way
+                    if (IsServerInitialized) RemoveOwnership();
+                    else ReturnAuthorityServer(_rb.position, _rb.rotation);
+                }
+                return;
+            }
+
             // Floating things bob forever; for them "at rest" means no longer drifting or spinning around.
-            bool floating = _buoyancy != null && _buoyancy.InWater;
+            // (Only at the surface: something lying on the seabed rests like it would on land.)
+            bool floating = _buoyancy != null && _buoyancy.InWater && _buoyancy.SubmergedFraction < 0.98f;
             Vector3 v = _rb.linearVelocity;
             Vector3 w = _rb.angularVelocity;
             bool moving = floating

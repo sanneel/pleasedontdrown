@@ -115,7 +115,7 @@ namespace PleaseDontDrown.Player
         private float CarryFactor(float perKg)
         {
             var item = _hands != null ? _hands.HeldItem : null;
-            return item == null ? 1f : 1f / (1f + item.Mass * perKg);
+            return item == null ? 1f : 1f / (1f + item.CarryMass * perKg);
         }
 
         private void SwimMove(float dt)

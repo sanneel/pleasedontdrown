@@ -305,10 +305,12 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 7299156693065452422}
   _networkObjectCache: {fileID: 0}
   _displayName: Crate
+  _pickUpVerb: Pick up
   _holdOffset: {x: 0, y: -0.55, z: 1.05}
   _holdEuler: {x: 0, y: 0, z: 0}
   _throwStrength: 1
   _pickupRange: 3.2
+  _carryMass: 0
 --- !u!114 &3225510899168428843
 MonoBehaviour:
   m_ObjectHideFlags: 0

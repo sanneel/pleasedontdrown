@@ -86,8 +86,14 @@ Straight from the study, which was proven to work:
 2. Others go kinematic and blend with a short curve.
 3. Authority transfers to whoever **grabs / throws / hits / tethers / seats** it.
 4. At rest → hand back to the host → stop sending.
-5. Multi-body ragdolls (victims) also sync key joint rotations (compressed).
-6. Items on a vehicle are synced in the vehicle's local space.
+5. Ragdolls (victims) sync **only the torso**. The limbs are local bodies on joints on every machine,
+   posed by joint drives from the synced state (waving, thrashing, limp), so they dangle naturally everywhere
+   for free. Limbs live outside the torso's hierarchy (moving the torso transform must not drag them rigidly)
+   and are shifted along when the torso snaps or teleports.
+6. Bodies that move by themselves (a struggling swimmer) set `KeepAwake`: always streamed, never "at rest",
+   and handed back to the host 3 s after the last touch. "Float rest" only applies at the surface
+   (something lying on the seabed rests like it would on land).
+7. Items on a vehicle are synced in the vehicle's local space.
 
 ## 6. New systems (not in How to Fish)
 
@@ -116,6 +122,24 @@ director cost, cooldown, "spotted on spawn?" flag.
   The link breaks when panic drops (float given, teammate pulls, stun) or the pair reaches the shallows.
 * Being on a Floatable or vehicle, or being held calmly, reduces panic.
 * Unconscious → carryable ragdoll; the condition timer starts; CPR is required.
+
+**As built (M4):**
+* `Rescue/VictimBrain` (host): SyncVars name, look seed, state, air, panic, condition, CPR progress, ashore.
+  Panic rises in deep water (faster with the head under); air drains while panicking/drowning (faster with the
+  head under). Held by a lifeguard or hanging on a `Floatable` = calming + breathing. Conscious and in water
+  shallower than `Shore.StandDepth` (0.9 m) = **Saved** (credited to the holder, or whoever let go < 8 s ago);
+  a saved tourist only gets back in trouble deeper than `Shore.DeepDepth` (1.4 m) so waves can't flip it.
+  Timeline when ignored: ~20 s distressed, ~35 s panicking, ~9 s drowning, then 90 s of condition.
+* `Rescue/VictimBody` (every machine): torso + head body (the `Item`), four limb bodies with `ConfigurableJoint`
+  slerp drives. Where the torso is simulated it swims: float spring holding the head out, upright torque,
+  panic dunks, thrashing, drift to a held float; unconscious = denser (sinks slowly) and tips face-down.
+  Saved/fine tourists stand and wade up the seabed slope, then sit on the sand. It also provides the hold pose
+  (`IHoldPose`: carried across the arms on land, towed on their back at the surface in water).
+* CPR placeholder until M6: unconscious + ashore + not held → Secondary button pumps (15 pumps, decays when
+  nobody pumps, condition drains slower meanwhile). `IInteractionSecondary` adds the second prompt.
+* `Rescue/RescueService` (scene): drills from the station board (random deep spot, bell, announcement),
+  console commands, and the spawn API the director (M9) will use. `UI/RescueHud`: markers (edge-pinned
+  off-screen) with state, distance, air or time left, CPR progress, and the carry hint.
 
 ### 6.3 Rope / tether system
 Lesson from the fishing rod: **a rope is a distance joint with a max length**, not a simulated chain.
@@ -226,3 +250,6 @@ PleaseDontDrown/                  (git repo root = Unity project)
 | **M10** | Station upgrades (visual) + save/load | Vertical slice complete |
 
 After the slice: rescue-line gun + ropes, shark + water cannon/harpoon, currents, more zones, the Octopus.
+
+Progress: M0–M4 done (plus a "feel pass" between M3 and M4: physics-body player, physics-held items).
+M4 also brought a first taste of M6/M7: placeholder tap-CPR, and tourists grabbing a floating life ring.

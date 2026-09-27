@@ -283,10 +283,12 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 5392026139800103363}
   _networkObjectCache: {fileID: 0}
   _displayName: Beach Ball
+  _pickUpVerb: Pick up
   _holdOffset: {x: 0.32, y: -0.36, z: 0.85}
   _holdEuler: {x: 0, y: 0, z: 0}
   _throwStrength: 1
   _pickupRange: 3.2
+  _carryMass: 0
 --- !u!114 &3498720111040292120
 MonoBehaviour:
   m_ObjectHideFlags: 0

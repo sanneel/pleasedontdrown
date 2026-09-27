@@ -17,6 +17,7 @@ using PleaseDontDrown.Interaction;
 using PleaseDontDrown.Items;
 using PleaseDontDrown.Net;
 using PleaseDontDrown.Player;
+using PleaseDontDrown.Rescue;
 using PleaseDontDrown.UI;
 using PleaseDontDrown.World;
 using PleaseDontDrown.World.Water;
@@ -362,7 +363,8 @@ namespace PleaseDontDrown.Editor
                     Primitive(PrimitiveType.Cube, "Tape", root, new Vector3(Mathf.Cos(rad) * 0.28f, 0f, Mathf.Sin(rad) * 0.28f),
                         new Vector3(0.165f, 0.165f, 0.06f), white, keepCollider: false).transform.localRotation = Quaternion.Euler(0f, -angle, 0f);
                 }
-            }, linearDamping: 0.1f, angularDamping: 0.2f, density: 0.25f, waterDrag: 1.1f);
+            }, linearDamping: 0.1f, angularDamping: 0.2f, density: 0.25f, waterDrag: 1.1f,
+                configure: go => go.AddComponent<Floatable>()); // tourists in the water grab it
 
             Item cooler = BuildItem("Cooler", "Cooler", 4f, new Vector3(0.05f, -0.58f, 0.95f), Vector3.zero, 1f, wood, root =>
             {
@@ -371,20 +373,22 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Handle", root, new Vector3(0f, 0.25f, 0f), new Vector3(0.3f, 0.04f, 0.05f), dark, keepCollider: false);
             }, density: 0.4f, waterDrag: 1.2f);
 
+            Item tourist = BuildTourist(torus);
+
             var catalog = AssetDatabase.LoadAssetAtPath<ItemCatalog>(ItemCatalogPath);
             if (catalog == null)
             {
                 catalog = ScriptableObject.CreateInstance<ItemCatalog>();
                 AssetDatabase.CreateAsset(catalog, ItemCatalogPath);
             }
-            SetRefs(catalog, "_items", crate, ball, ring, cooler);
+            SetRefs(catalog, "_items", crate, ball, ring, cooler, tourist);
             EditorUtility.SetDirty(catalog);
             return catalog;
         }
 
         private static Item BuildItem(string file, string displayName, float mass, Vector3 holdOffset, Vector3 holdEuler, float throwStrength,
             PhysicsMaterial physics, Action<Transform> buildVisual, float linearDamping = 0.05f, float angularDamping = 0.1f,
-            float density = 0.5f, float waterDrag = 1.2f)
+            float density = 0.5f, float waterDrag = 1.2f, Action<GameObject> configure = null)
         {
             var root = new GameObject(file);
             var body = root.AddComponent<Rigidbody>();
@@ -423,8 +427,140 @@ namespace PleaseDontDrown.Editor
             var interactableSo = new SerializedObject(interactable);
             Require(interactableSo, "_maxDistance").floatValue = 3f;
             interactableSo.ApplyModifiedPropertiesWithoutUndo();
+            configure?.Invoke(root);
 
             GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, $"{ItemPrefabDir}/{file}.prefab");
+            Object.DestroyImmediate(root);
+            return saved.GetComponent<Item>();
+        }
+
+        /// <summary>
+        /// A tourist: torso body (the networked Item, with the head on it) plus four limb bodies that VictimBody joints
+        /// on at runtime. Colours are neutral here; each instance is painted from its synced seed.
+        /// </summary>
+        private static Item BuildTourist(Mesh torus)
+        {
+            Material cloth = GetMaterial("TouristCloth", Color.white);
+            Material skin = GetMaterial("TouristSkin", new Color(1f, 0.82f, 0.7f));
+            Material black = GetMaterial("TouristEyes", new Color(0.05f, 0.05f, 0.06f));
+            Material mouth = GetMaterial("TouristMouth", new Color(0.45f, 0.12f, 0.12f));
+            Material floatie = GetMaterial("Floatie", new Color(1f, 0.5f, 0.1f), smoothness: 0.6f);
+            PhysicsMaterial flesh = GetPhysicsMaterial("Flesh", 0.05f, 0.7f, PhysicsMaterialCombine.Minimum);
+
+            var root = new GameObject("Tourist");
+            var body = root.AddComponent<Rigidbody>();
+            body.mass = 30f;
+            body.linearDamping = 0.1f;
+            body.angularDamping = 0.6f;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            var torsoCol = root.AddComponent<CapsuleCollider>();
+            torsoCol.radius = 0.2f;
+            torsoCol.height = 0.72f;
+            torsoCol.sharedMaterial = flesh;
+            var headCol = root.AddComponent<SphereCollider>();
+            headCol.center = new Vector3(0f, 0.52f, 0f);
+            headCol.radius = 0.15f;
+            headCol.sharedMaterial = flesh;
+
+            // Visuals without colliders under one transform (squished during CPR).
+            var visual = new GameObject("Visual").transform;
+            visual.SetParent(root.transform, false);
+            GameObject torso = Primitive(PrimitiveType.Capsule, "Torso", visual, Vector3.zero, new Vector3(0.4f, 0.36f, 0.34f), cloth, keepCollider: false);
+            GameObject shorts = Primitive(PrimitiveType.Cube, "Shorts", visual, new Vector3(0f, -0.3f, 0f), new Vector3(0.42f, 0.2f, 0.3f), cloth, keepCollider: false);
+            GameObject head = Primitive(PrimitiveType.Sphere, "Head", visual, new Vector3(0f, 0.52f, 0f), Vector3.one * 0.3f, skin, keepCollider: false);
+            GameObject hair = Primitive(PrimitiveType.Sphere, "Hair", visual, new Vector3(0f, 0.6f, -0.02f), new Vector3(0.31f, 0.16f, 0.31f), cloth, keepCollider: false);
+            GameObject eyeL = Primitive(PrimitiveType.Cube, "EyeL", visual, new Vector3(-0.055f, 0.54f, 0.135f), new Vector3(0.035f, 0.035f, 0.02f), black, keepCollider: false);
+            GameObject eyeR = Primitive(PrimitiveType.Cube, "EyeR", visual, new Vector3(0.055f, 0.54f, 0.135f), new Vector3(0.035f, 0.035f, 0.02f), black, keepCollider: false);
+            GameObject mouthGo = Primitive(PrimitiveType.Cube, "Mouth", visual, new Vector3(0f, 0.465f, 0.14f), new Vector3(0.06f, 0.02f, 0.02f), mouth, keepCollider: false);
+
+            var skinParts = new List<Object> { head.GetComponent<Renderer>() };
+            var shortsParts = new List<Object> { shorts.GetComponent<Renderer>() };
+            var floaties = new List<Object>();
+
+            // Limbs: pivot at the shoulder / hip, hanging straight down (VictimBody's rest pose).
+            void Limb(string limbName, Vector3 pivot, float mass, float length, float radius, bool arm)
+            {
+                var limb = new GameObject(limbName);
+                limb.transform.SetParent(root.transform, false);
+                limb.transform.localPosition = pivot;
+                var rb = limb.AddComponent<Rigidbody>();
+                rb.mass = mass;
+                rb.linearDamping = 0.05f;
+                rb.angularDamping = 0.5f;
+                rb.interpolation = RigidbodyInterpolation.Interpolate;
+                var col = limb.AddComponent<CapsuleCollider>();
+                col.center = new Vector3(0f, -length * 0.5f, 0f);
+                col.radius = radius;
+                col.height = length;
+                col.sharedMaterial = flesh;
+                GameObject look = Primitive(PrimitiveType.Capsule, "Skin", limb.transform, new Vector3(0f, -length * 0.5f, 0f),
+                    new Vector3(radius * 2f, length * 0.5f, radius * 2f), skin, keepCollider: false);
+                skinParts.Add(look.GetComponent<Renderer>());
+                if (arm)
+                {
+                    var ring = new GameObject("Floatie");
+                    ring.transform.SetParent(limb.transform, false);
+                    ring.transform.localPosition = new Vector3(0f, -0.14f, 0f);
+                    ring.transform.localScale = Vector3.one * 0.42f;
+                    ring.AddComponent<MeshFilter>().sharedMesh = torus;
+                    ring.AddComponent<MeshRenderer>().sharedMaterial = floatie;
+                    ring.SetActive(false);
+                    floaties.Add(ring);
+                }
+                else
+                {
+                    GameObject leg = Primitive(PrimitiveType.Cube, "ShortsLeg", limb.transform, new Vector3(0f, -0.1f, 0f), new Vector3(0.17f, 0.2f, 0.17f), cloth, keepCollider: false);
+                    shortsParts.Add(leg.GetComponent<Renderer>());
+                }
+                var limbFloat = new SerializedObject(limb.AddComponent<Buoyancy>());
+                Require(limbFloat, "_density").floatValue = 0.97f;
+                Require(limbFloat, "_waterDrag").floatValue = 2.2f;
+                limbFloat.ApplyModifiedPropertiesWithoutUndo();
+            }
+            Limb("ArmL", new Vector3(-0.27f, 0.26f, 0f), 3f, 0.6f, 0.06f, true);
+            Limb("ArmR", new Vector3(0.27f, 0.26f, 0f), 3f, 0.6f, 0.06f, true);
+            Limb("LegL", new Vector3(-0.1f, -0.33f, 0f), 6f, 0.8f, 0.075f, false);
+            Limb("LegR", new Vector3(0.1f, -0.33f, 0f), 6f, 0.8f, 0.075f, false);
+
+            var nob = root.AddComponent<NetworkObject>();
+            var nobSo = new SerializedObject(nob);
+            Require(nobSo, "_preventDespawnOnDisconnect").boolValue = true;
+            nobSo.ApplyModifiedPropertiesWithoutUndo();
+
+            var buoyancy = new SerializedObject(root.AddComponent<Buoyancy>());
+            Require(buoyancy, "_density").floatValue = 0.95f;
+            Require(buoyancy, "_waterDrag").floatValue = 1.8f;
+            buoyancy.ApplyModifiedPropertiesWithoutUndo();
+            root.AddComponent<SurfaceCrossing>();
+            root.AddComponent<ItemSync>();
+
+            var item = root.AddComponent<Item>();
+            var itemSo = new SerializedObject(item);
+            Require(itemSo, "_displayName").stringValue = "Tourist";
+            Require(itemSo, "_pickUpVerb").stringValue = "Carry";
+            Require(itemSo, "_carryMass").floatValue = 12f;   // the water (and adrenaline) carries most of it
+            Require(itemSo, "_throwStrength").floatValue = 1f;
+            Require(itemSo, "_pickupRange").floatValue = 3.4f;
+            itemSo.ApplyModifiedPropertiesWithoutUndo();
+
+            var interactable = new SerializedObject(root.AddComponent<Interactable>());
+            Require(interactable, "_maxDistance").floatValue = 3.2f;
+            interactable.ApplyModifiedPropertiesWithoutUndo();
+
+            root.AddComponent<VictimBrain>();
+            var victimBody = GetOrAdd<VictimBody>(root); // VictimBrain's RequireComponent already added it
+            SetRef(victimBody, "_visual", visual);
+            SetRefs(victimBody, "_eyes", eyeL.transform, eyeR.transform);
+            SetRef(victimBody, "_mouth", mouthGo.transform);
+            SetRefs(victimBody, "_shirt", torso.GetComponent<Renderer>());
+            SetRefs(victimBody, "_shorts", shortsParts.ToArray());
+            SetRefs(victimBody, "_skin", skinParts.ToArray());
+            SetRefs(victimBody, "_hair", hair.GetComponent<Renderer>());
+            SetRefs(victimBody, "_floaties", floaties.ToArray());
+            SetRef(victimBody, "_audio", SpatialAudio(root, 3f, 70f));
+
+            GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, $"{ItemPrefabDir}/Tourist.prefab");
             Object.DestroyImmediate(root);
             return saved.GetComponent<Item>();
         }
@@ -489,7 +625,13 @@ namespace PleaseDontDrown.Editor
             BuildBeach(env);
             BuildStation(env);
             PlaceItems(catalog);
+            BuildDrillBoard(env);
             Transform[] spawns = BuildSpawnPoints();
+
+            // Rescues: drills now, the emergency director later.
+            var rescue = new GameObject("Rescue");
+            rescue.AddComponent<NetworkObject>();
+            rescue.AddComponent<RescueService>();
 
             new GameObject("Steam").AddComponent<SteamBootstrap>();
             SetRef(new GameObject("GameContent").AddComponent<GameContent>(), "_items", catalog);
@@ -499,6 +641,7 @@ namespace PleaseDontDrown.Editor
             ui.AddComponent<DevConsole>();
             ui.AddComponent<DevTools>();
             ui.AddComponent<ItemDebugView>();
+            ui.AddComponent<RescueHud>();
             BuildNetworkManager(playerPrefab, spawns);
 
             AssignSceneIds(scene);
@@ -755,6 +898,23 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Leg", tower, p, new Vector3(0.15f, 3f, 0.15f), wood);
             Primitive(PrimitiveType.Cube, "Platform", tower, new Vector3(0f, 3.1f, 0f), new Vector3(2.2f, 0.2f, 2.2f), wood);
             Primitive(PrimitiveType.Cube, "Ramp", tower, new Vector3(0f, 1.5f, 2.6f), new Vector3(1f, 0.1f, 4f), wood).transform.localRotation = Quaternion.Euler(38f, 0f, 0f);
+        }
+
+        /// <summary>Red board by the spawn: starts a rescue drill (a tourist in trouble out in the water).</summary>
+        private static void BuildDrillBoard(Transform env)
+        {
+            Material wood = GetMaterial("Wood", new Color(0.55f, 0.36f, 0.22f));
+            Material red = GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f));
+            var board = new GameObject("DrillBoard");
+            board.transform.SetParent(env, false);
+            board.transform.position = new Vector3(4.6f, 0f, 12.6f);
+            board.transform.rotation = Quaternion.Euler(0f, 135f, 0f); // text faces the spawn area
+            Primitive(PrimitiveType.Cube, "Post", board.transform, new Vector3(0f, 0.75f, 0f), new Vector3(0.12f, 1.5f, 0.12f), wood);
+            GameObject panel = Primitive(PrimitiveType.Cube, "Panel", board.transform, new Vector3(0f, 1.6f, 0f), new Vector3(1.5f, 0.8f, 0.08f), red);
+            TextMesh text = WorldText(board.transform, "Text", new Vector3(0f, 1.6f, -0.05f), "RESCUE DRILL\n<size=44>throws a tourist in the sea</size>", 72, 0.028f, Color.white);
+            text.richText = true;
+            board.AddComponent<DrillBoard>();
+            ConfigureInteractable(board.AddComponent<Interactable>(), new[] { panel.GetComponent<Collider>() }, new[] { panel.GetComponent<Renderer>() }, 3f);
         }
 
         private static Transform[] BuildSpawnPoints()

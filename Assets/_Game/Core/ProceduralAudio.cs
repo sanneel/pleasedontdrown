@@ -15,8 +15,9 @@ namespace PleaseDontDrown.Core
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
-            _bell = _click = _splash = _waterStep = null;
+            _bell = _click = _splash = _waterStep = _cough = _thump = null;
             _steps = null;
+            _cries = null;
         }
 
         /// <summary>Brass hand bell: inharmonic partials with individual decay rates.</summary>
@@ -99,6 +100,83 @@ namespace PleaseDontDrown.Core
                 return (knock * 0.6f + scuff) * Mathf.Clamp01(t / 0.002f);
             });
         }
+
+        private static AudioClip[] _cries;
+        private static AudioClip _cough;
+        private static AudioClip _thump;
+
+        /// <summary>
+        /// A wobbly "heeelp!"-ish cry: a voiced tone (harmonics shaped by two vowel formants) that rises and falls,
+        /// with vibrato and a breathy edge. Four voices (low to high).
+        /// </summary>
+        public static AudioClip Cry(int voice)
+        {
+            if (_cries == null || _cries[0] == null)
+            {
+                _cries = new AudioClip[4];
+                float[] pitches = { 170f, 225f, 290f, 360f };
+                for (int v = 0; v < 4; v++)
+                    _cries[v] = BuildCry(v, pitches[v]);
+            }
+            return _cries[Mathf.Clamp(voice, 0, 3)];
+        }
+
+        private static AudioClip BuildCry(int v, float f0)
+        {
+            const float length = 0.85f;
+            var rng = new System.Random(900 + v);
+            float phase = 0f;
+            float breath = 0f;
+            return Build($"Cry{v}", length, t =>
+            {
+                float u = t / length;
+                float glide = 1f + 0.35f * Mathf.Sin(Mathf.PI * Mathf.Min(1f, u * 1.4f)) - 0.25f * u;
+                float f = f0 * glide * (1f + 0.025f * Mathf.Sin(2f * Mathf.PI * 6.5f * t));
+                phase += 2f * Mathf.PI * f / SampleRate;
+                // Vowel moves from "e" (help) to "a" (aaah).
+                float f1 = Mathf.Lerp(550f, 780f, u), f2 = Mathf.Lerp(1850f, 1200f, u);
+                float s = 0f;
+                for (int h = 1; h <= 16; h++)
+                {
+                    float fh = f * h;
+                    float amp = Mathf.Exp(-Sq((fh - f1) / 180f)) + 0.6f * Mathf.Exp(-Sq((fh - f2) / 260f)) + 0.05f / h;
+                    s += amp * Mathf.Sin(phase * h);
+                }
+                breath += ((float)(rng.NextDouble() * 2.0 - 1.0) - breath) * 0.3f;
+                float envelope = Mathf.Clamp01(t / 0.05f) * Mathf.Clamp01((length - t) / 0.25f);
+                return (s * 0.22f + breath * 0.08f) * envelope;
+            });
+        }
+
+        private static float Sq(float x) => x * x;
+
+        /// <summary>Two rough coughs: noisy bursts over a low grunt.</summary>
+        public static AudioClip Cough
+        {
+            get
+            {
+                if (_cough != null) return _cough;
+                var rng = new System.Random(4242);
+                float low = 0f;
+                _cough = Build("Cough", 0.75f, t =>
+                {
+                    float local = t < 0.3f ? t : t - 0.34f;
+                    if (local < 0f) return 0f;
+                    float env = Mathf.Clamp01(local / 0.01f) * Mathf.Exp(-11f * local);
+                    low += ((float)(rng.NextDouble() * 2.0 - 1.0) - low) * 0.25f;
+                    float grunt = Mathf.Sin(2f * Mathf.PI * 140f * t) * 0.4f;
+                    return (low * 1.4f + grunt) * env * 0.7f;
+                });
+                return _cough;
+            }
+        }
+
+        /// <summary>Soft chest-compression thump.</summary>
+        public static AudioClip Thump => _thump != null ? _thump : _thump = Build("Thump", 0.2f, t =>
+        {
+            float f = Mathf.Lerp(95f, 55f, t / 0.2f);
+            return Mathf.Sin(2f * Mathf.PI * f * t) * Mathf.Exp(-22f * t) * Mathf.Clamp01(t / 0.003f) * 0.8f;
+        });
 
         /// <summary>Low-passed noise burst: cutoff falls from <paramref name="brightStart"/> to <paramref name="brightEnd"/>.</summary>
         private static AudioClip Noise(string name, float seconds, int seed, float brightStart, float brightEnd, float decay, float gain)
