@@ -231,10 +231,10 @@ namespace PleaseDontDrown.Avatars
         private void BuildSmooth(AvatarMeshKit kit, Color skin, Action<int> on)
         {
             float k = _scale;
-            const float chunk = 1.25f;
+            const float chunk = 0.92f; // slim fingers, like How to Fish
             on(-1);
-            kit.Ellipsoid(new Vector3(0f, -0.054f, 0f) * k, new Vector3(0.025f, 0.056f, 0.05f) * k, skin, segments: 18, rings: 12);
-            kit.Limb(0.05f * k, 0.028f * k, 0.03f * k, skin, new Vector3(0f, 0.035f, 0f) * k, segments: 14, crossSection: new Vector2(0.85f, 1.15f));
+            kit.Ellipsoid(new Vector3(0f, -0.054f, 0f) * k, new Vector3(0.017f, 0.054f, 0.045f) * k, skin, segments: 18, rings: 12);
+            kit.Limb(0.05f * k, 0.021f * k, 0.023f * k, skin, new Vector3(0f, 0.035f, 0f) * k, segments: 14, crossSection: new Vector2(0.8f, 1.15f));
             for (int f = 0; f < Fingers; f++)
             {
                 for (int s = 0; s < Segments; s++)
