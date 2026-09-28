@@ -79,11 +79,30 @@ namespace PleaseDontDrown.Story
             _nextAmbientLoss = Time.time + 90f;
             TitleObservers("CHAPTER 1", "The first island");
             yield return new WaitForSeconds(2f);
-            SetObjective("Talk to Sandy at the Lost & Found kiosk");
+            // Sandy spots the new lifeguard and comes over (press E to talk sooner).
+            SetObjective("Sandy is coming over to meet you");
             Marker("Sandy", _sandy.NetworkObject);
             Coroutine waving = StartCoroutine(WaveNowAndThen(_sandy));
-            yield return WaitTalk(_sandy, "Talk to Sandy");
+            _sandy.ServerShout("Yoo-hoo! You there! Lifeguard!", false);
+            _sandy.ServerSetTalkable(true, "Talk to Sandy");
+            _talks.Clear();
+            PlayerHub greeted = null;
+            float giveUp = Time.time + 25f;
+            while (Time.time < giveUp && !_talks.Exists(t => t.npc == _sandy))
+            {
+                greeted = StoryNpc.NearestPlayer(_sandy.transform.position, 500f);
+                if (greeted != null)
+                {
+                    Vector3 to = greeted.transform.position - _sandy.transform.position;
+                    to.y = 0f;
+                    if (to.magnitude < 2.4f) break;
+                    _sandy.ServerMoveTo(greeted.transform.position - to.normalized * 1.8f, 2.4f);
+                }
+                yield return new WaitForSeconds(0.4f);
+            }
             StopCoroutine(waving);
+            _sandy.ServerStop();
+            if (greeted != null) _sandy.ServerFace(greeted.transform.position);
             _sandy.ServerSetTalkable(false);
             NoMarker();
             _sandy.ServerSetMood(AvatarMood.Happy);
@@ -91,8 +110,9 @@ namespace PleaseDontDrown.Story
             yield return Say(_sandy, "The tourists on this island can't swim to save their lives. Literally. When someone's in trouble, the bell rings and you go and get them.");
             yield return Say(_sandy, "Drag them onto the sand. If they're out cold: push on the chest. The ladies need a bit of air too, mouth-to-mouth. The men... a good smack in the face usually does it.");
             yield return Say(_sandy, "And they lose EVERYTHING. Wallets, phones, sunglasses. You find something, you bring it to me, and I pay you.");
-            yield return Say(_sandy, "Go on then. I think somebody's already waving out there.");
+            yield return Say(_sandy, "I'll be at my kiosk if you need me. And I'll shout if I see anything. Go on then!");
             _sandy.ServerSetMood(AvatarMood.Neutral);
+            StartCoroutine(SandyGoesHome());
             // Something to find right away.
             if (_lostItemSpots.Length > 0)
             {
@@ -100,6 +120,14 @@ namespace PleaseDontDrown.Story
                 if (first != null && first.TryGetComponent(out LostItem lost)) lost.ServerSetup("Brenda", false);
             }
             _nextAmbientLoss = Time.time + 60f;
+        }
+
+        private IEnumerator SandyGoesHome()
+        {
+            _sandy.ServerFace(null);
+            _sandy.ServerMoveTo(_sandyHome, 2f);
+            while (_sandy.IsMoving) yield return new WaitForSeconds(0.3f);
+            _sandy.ServerFace(_sandyHome + Quaternion.Euler(0f, _sandyHomeYaw, 0f) * Vector3.forward * 5f);
         }
 
         private IEnumerator WaveNowAndThen(StoryNpc npc)
@@ -115,20 +143,83 @@ namespace PleaseDontDrown.Story
         {
             _island = _island1;
             NoMarker();
-            // Five tourists, three of them women: F, M, F, M, F.
+            // Five tourists, three of them women: F, M, F, M, F. Sandy shouts tips the first time each thing happens.
+            Coroutine hints = StartCoroutine(GuideHints());
             yield return RescueWave(_island1, 5, "Rescue tourists", i => Profile(_island1, i % 2 == 0 ? 1 : 0));
+            StopCoroutine(hints);
             yield return Say(_sandy, "Five in one morning! Not bad, not bad at all.");
+        }
+
+        /// <summary>Sandy is the guide: the first time each step of a rescue comes up, she shouts what to do.</summary>
+        private IEnumerator GuideHints()
+        {
+            bool spotted = false, towing = false, cpr = false, breath = false, punch = false, revived = false, found = false;
+            while (true)
+            {
+                foreach (VictimBrain v in VictimBrain.All)
+                {
+                    if (!spotted && v.State.IsStruggling() && !v.Item.IsHeld)
+                    {
+                        spotted = true;
+                        StartCoroutine(Say(_sandy, $"(shouting) Look, out there! {v.Name}'s in trouble! Swim out, grab {(v.IsFemale ? "her" : "him")} with E and bring {(v.IsFemale ? "her" : "him")} back!"));
+                    }
+                    else if (!towing && v.Item.IsHeld && v.State.IsStruggling())
+                    {
+                        towing = true;
+                        StartCoroutine(Say(_sandy, "(shouting) That's it! Keep the head up and swim back to the beach!"));
+                    }
+                    else if (!cpr && v.State == VictimState.Unconscious && v.IsAshore && !v.Item.IsHeld)
+                    {
+                        cpr = true;
+                        StartCoroutine(Say(_sandy, $"(shouting) {v.Name} isn't breathing! Kneel down and push on the chest: right mouse, again and again!"));
+                    }
+                    else if (!breath && v.State == VictimState.Unconscious && v.NextCprStep == CprStep.Breath)
+                    {
+                        breath = true;
+                        StartCoroutine(Say(_sandy, "(shouting) Now give her air! Mouth-to-mouth! Right mouse!"));
+                    }
+                    else if (!punch && v.State == VictimState.Unconscious && v.NextCprStep == CprStep.Punch)
+                    {
+                        punch = true;
+                        StartCoroutine(Say(_sandy, "(shouting) Men are tougher. Wake him up: punch him right in the face! Right mouse!"));
+                    }
+                    else if (!revived && v.State == VictimState.Saved)
+                    {
+                        revived = true;
+                        StartCoroutine(Say(_sandy, "(shouting) You did it! See? Nothing to it!"));
+                    }
+                }
+                if (!found)
+                    foreach (Item i in Item.All)
+                        if (i.IsHeld && i.TryGetComponent(out LostItem l) && !l.IsStolen)
+                        {
+                            found = true;
+                            StartCoroutine(Say(_sandy, $"(shouting) Ooh, somebody's {l.Kind.ToLowerInvariant()}? Bring it to my kiosk, I'll pay you!"));
+                            break;
+                        }
+                yield return new WaitForSeconds(0.3f);
+            }
         }
 
         private IEnumerator Thief()
         {
             _island = _island1;
             Vector3 spawn = _island1.RobberSpawn != null ? _island1.RobberSpawn.position : new Vector3(-30f, 0f, 22f);
+            // He robs somebody sunbathing: they jump up screaming.
+            BeachCrowd crowd = BeachCrowd.Nearest(spawn);
+            StoryNpc victim = crowd != null ? crowd.Borrow(BeachCrowd.Activity.Sunbathe, spawn, 200f) : null;
+            bool borrowed = victim != null;
+            if (borrowed)
+            {
+                Vector3 away = Vector3.ProjectOnPlane(victim.transform.position - new Vector3(0f, 0f, -20f), Vector3.up).normalized;
+                spawn = victim.transform.position + away * 2.5f + Vector3.Cross(Vector3.up, away) * 1.5f;
+            }
+            else victim = SpawnNpc("Gloria", NpcRole.Guest, GuestLook(7171, 1), spawn + new Vector3(-3f, 0f, 2f), 90f);
             StoryNpc robber = SpawnNpc("Robber", NpcRole.Robber, RobberLook, spawn, 90f, 3);
-            StoryNpc victim = SpawnNpc("Gloria", NpcRole.Guest, GuestLook(7171, 1), spawn + new Vector3(-3f, 0f, 2f), 90f);
             victim.ServerSetPose(AvatarPose.Scared);
             victim.ServerSetMood(AvatarMood.Scared);
-            victim.ServerShout("THIEF!! He's got our stuff!", true);
+            victim.ServerShout("THIEF!! He's got my bag!", true);
+            string owner = victim.Name;
             robber.ServerFlee(true, _island1.LandArea);
             SetObjective("Catch the thief! Punch him with an empty hand (left mouse).");
             Marker("THIEF", robber.NetworkObject);
@@ -147,7 +238,7 @@ namespace PleaseDontDrown.Story
             yield return new WaitForSeconds(1.8f);
             robber.ServerSetPose(AvatarPose.Kneel);
             robber.ServerSetMood(AvatarMood.Scared);
-            Scatter(robber.transform.position, ("Wallet", "Gloria", true), ("Phone", "Hank", true), ("Watch", "Rita", true));
+            Scatter(robber.transform.position, ("Wallet", owner, true), ("Phone", "Hank", true), ("Watch", "Rita", true));
             yield return Say(robber, "OK! OK! Take it! Take it all! It's not even mine!");
             yield return You("Get lost. And stay off my beach.");
             // Let him go: he scrambles up and runs off.
@@ -160,7 +251,8 @@ namespace PleaseDontDrown.Story
             victim.ServerSetMood(AvatarMood.Happy);
             yield return Say(victim, "My wallet! Could you give it to Sandy at the Lost & Found? I'll pick it up there.");
             StartCoroutine(RemoveLater(robber, 12f));
-            StartCoroutine(RemoveLater(victim, 30f));
+            if (borrowed) crowd.Return(victim); // back to the towel
+            else StartCoroutine(RemoveLater(victim, 30f));
         }
 
         private IEnumerator RemoveLater(Component thing, float seconds)
@@ -177,7 +269,7 @@ namespace PleaseDontDrown.Story
             foreach (Item i in Item.All)
                 if (i.TryGetComponent(out LostItem l) && l.IsStolen) lying++;
             if (lying == 0 && _lostItemSpots.Length > 0)
-                Scatter(_lostItemSpots[0].position, ("Wallet", "Gloria", true), ("Phone", "Hank", true), ("Watch", "Rita", true));
+                Scatter(_lostItemSpots[0].position, ("Wallet", "Linda", true), ("Phone", "Hank", true), ("Watch", "Rita", true));
 
             const int need = 3;
             int returned = 0;
@@ -194,7 +286,7 @@ namespace PleaseDontDrown.Story
                 if (returned > 0 && !firstLine && returned < need)
                 {
                     firstLine = true;
-                    StartCoroutine(Say(_sandy, "Gloria's wallet? Where did you find this?"));
+                    StartCoroutine(Say(_sandy, "Somebody's wallet? Where did you find this?"));
                 }
                 // The thief's loot can end up in the sea: if it's all gone, count what's left as returned.
                 int left = 0;
@@ -231,7 +323,11 @@ namespace PleaseDontDrown.Story
             {
                 if (her == null || !her.IsSpawned || her.State == VictimState.Lost)
                 {
-                    if (friend != null) Remove(friend);
+                    if (friend != null)
+                    {
+                        if (_friendCrowd != null && _friendCrowd.IsMember(friend)) _friendCrowd.Return(friend);
+                        else Remove(friend);
+                    }
                     yield return new WaitForSeconds(3f);
                     her = SpawnStoryTourist(_island1, profile, 2f, 5f);
                     if (her == null)
@@ -239,10 +335,22 @@ namespace PleaseDontDrown.Story
                         yield return new WaitForSeconds(1f);
                         continue;
                     }
-                    // Her friend stands at the water's edge yelling for help (she herself makes no sound at all).
-                    Vector3 edge = BeachPointFrom(her.transform.position, _island1);
-                    Vector3 face = her.transform.position - edge;
-                    friend = SpawnNpc("Carla", NpcRole.Bystander, GuestLook(4242, 1), edge, Quaternion.LookRotation(new Vector3(face.x, 0f, face.z)).eulerAngles.y);
+                    // Her friend, swimming next to her, yells for help (she herself makes no sound at all).
+                    BeachCrowd crowd = BeachCrowd.Nearest(her.transform.position);
+                    friend = crowd != null ? crowd.Borrow(BeachCrowd.Activity.Swim, her.transform.position, 80f) : null;
+                    _friendCrowd = friend != null ? crowd : null;
+                    if (friend != null)
+                    {
+                        Vector3 side = her.transform.position - friend.transform.position;
+                        side.y = 0f;
+                        friend.ServerMoveTo(her.transform.position - (side.sqrMagnitude > 0.01f ? side.normalized : Vector3.right) * 1.6f, 2.6f);
+                    }
+                    else
+                    {
+                        Vector3 edge = BeachPointFrom(her.transform.position, _island1);
+                        Vector3 face = her.transform.position - edge;
+                        friend = SpawnNpc("Carla", NpcRole.Bystander, GuestLook(4242, 1), edge, Quaternion.LookRotation(new Vector3(face.x, 0f, face.z)).eulerAngles.y);
+                    }
                     friend.ServerSetPose(AvatarPose.Scared);
                     friend.ServerSetMood(AvatarMood.Scared);
                     friend.ServerKeepShouting("HELP! My friend went under!", her.transform.position);
@@ -251,7 +359,7 @@ namespace PleaseDontDrown.Story
                         RescueService.Instance.ServerRingBell("story");
                         RescueService.Instance.ServerAnnounce("<color=#ffd060><b>Someone is screaming for help at the water's edge!</b></color>");
                     }
-                    SetObjective("Someone is shouting for help at the water's edge!");
+                    SetObjective("Someone out in the water is screaming for help!");
                     Marker("HELP!", friend.NetworkObject);
                 }
                 if (_rescued.Contains(her)) break;
@@ -278,6 +386,7 @@ namespace PleaseDontDrown.Story
         }
 
         private StoryNpc _silentFriend;
+        private BeachCrowd _friendCrowd;
         private VictimBrain _silentOne;
 
         private IEnumerator DrugReveal()
@@ -292,7 +401,11 @@ namespace PleaseDontDrown.Story
                 yield return Say(_silentFriend, "It was that guy with the backpack! The one who's always running around!");
             yield return You("Pills on this beach... So there are drugs on this island.");
             yield return You("And I bet I know whose backpack they're in.");
-            if (_silentFriend != null) StartCoroutine(RemoveLater(_silentFriend, 25f));
+            if (_silentFriend != null)
+            {
+                if (_friendCrowd != null && _friendCrowd.IsMember(_silentFriend)) _friendCrowd.Return(_silentFriend); // back to swimming
+                else StartCoroutine(RemoveLater(_silentFriend, 25f));
+            }
             _silentFriend = null;
         }
 

@@ -7,7 +7,7 @@ namespace PleaseDontDrown.Avatars
     public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot }
 
     /// <summary>Whole-body poses held for a while (story characters, knockouts).</summary>
-    public enum AvatarPose : byte { Normal, Down, Kneel, Scared, HandsUp }
+    public enum AvatarPose : byte { Normal, Down, Kneel, Scared, HandsUp, Lie, LieFront, Sit }
 
     /// <summary>Face on top of the automatic expression.</summary>
     public enum AvatarMood : byte { Neutral, Happy, Scared, Angry, Hurt }
@@ -73,6 +73,9 @@ namespace PleaseDontDrown.Avatars
         private float _kneel;
         private float _scared;
         private float _handsUp;
+        private float _lie;
+        private float _lieFront;
+        private float _sit;
         private Vector3 _gesturePoint;
         private Vector3 _smoothVelocity;
         private AvatarGesture _gesture;
@@ -164,6 +167,9 @@ namespace PleaseDontDrown.Avatars
             _kneel = Mathf.MoveTowards(_kneel, m.Pose == AvatarPose.Kneel ? 1f : 0f, dt * 4f);
             _scared = Mathf.MoveTowards(_scared, m.Pose == AvatarPose.Scared ? 1f : 0f, dt * 5f);
             _handsUp = Mathf.MoveTowards(_handsUp, m.Pose == AvatarPose.HandsUp ? 1f : 0f, dt * 5f);
+            _lie = Mathf.MoveTowards(_lie, m.Pose == AvatarPose.Lie ? 1f : 0f, dt * 2f);
+            _lieFront = Mathf.MoveTowards(_lieFront, m.Pose == AvatarPose.LieFront ? 1f : 0f, dt * 2f);
+            _sit = Mathf.MoveTowards(_sit, m.Pose == AvatarPose.Sit ? 1f : 0f, dt * 2.5f);
 
             // One cycle = two steps; stride grows with speed so feet don't skate.
             float stride = Mathf.Lerp(0.62f, 1.05f, _run) * _rig.Scale;
@@ -562,7 +568,87 @@ namespace PleaseDontDrown.Avatars
                 }
             }
 
+            BeachPoses(hips, upperL, foreL, upperR, foreR, s);
             AimedGestures(upperL, foreL, upperR, foreR);
+        }
+
+        /// <summary>
+        /// Lazing about on a towel: on the back with the hands behind the head and one knee up, on the belly
+        /// propped on the elbows with a lazy kick, or sitting leaning back on the hands.
+        /// </summary>
+        private void BeachPoses(Transform hips, Transform upperL, Transform foreL, Transform upperR, Transform foreR, float s)
+        {
+            float t = Now;
+            if (_lie > 0.01f)
+            {
+                float w = _lie;
+                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.12f * s, -0.45f * s), w);
+                hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(-90f, 0f, 0f), w);
+                B(Bone.Spine).localRotation = Quaternion.Slerp(B(Bone.Spine).localRotation, Quaternion.identity, w);
+                B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(Mathf.Sin(t * 1.2f) * 1.5f, 0f, 0f), w);
+                B(Bone.Neck).localRotation = Quaternion.Slerp(B(Bone.Neck).localRotation, Quaternion.Euler(12f, 0f, 0f), w);
+                B(Bone.Head).localRotation = Quaternion.Slerp(B(Bone.Head).localRotation, Quaternion.Euler(8f, 0f, 0f), w);
+                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(0f, 0f, -150f), w);
+                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-125f, 0f, 0f), w);
+                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(0f, 0f, 150f), w);
+                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-125f, 0f, 0f), w);
+                foreach (bool left in new[] { true, false })
+                {
+                    float side = left ? -1f : 1f;
+                    Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
+                    bool kneeUp = !left;
+                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, kneeUp ? Quaternion.Euler(-45f, 0f, 6f * side) : Quaternion.Euler(0f, 0f, 8f * side), w);
+                    shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kneeUp ? 85f : 4f, 0f, 0f), w);
+                    foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(kneeUp ? -40f : -45f, 0f, 0f), w);
+                }
+            }
+
+            if (_lieFront > 0.01f)
+            {
+                float w = _lieFront;
+                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.13f * s, -0.45f * s), w);
+                hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(90f, 0f, 0f), w);
+                B(Bone.Spine).localRotation = Quaternion.Slerp(B(Bone.Spine).localRotation, Quaternion.Euler(-8f, 0f, 0f), w);
+                B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(-12f, 0f, 0f), w);
+                B(Bone.Neck).localRotation = Quaternion.Slerp(B(Bone.Neck).localRotation, Quaternion.Euler(-35f, 0f, 0f), w);
+                B(Bone.Head).localRotation = Quaternion.Slerp(B(Bone.Head).localRotation, Quaternion.Euler(-25f, 0f, 0f), w);
+                // Propped on the elbows, chin on the hands.
+                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(-150f, 0f, -18f), w);
+                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-95f, 0f, 0f), w);
+                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-150f, 0f, 18f), w);
+                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-95f, 0f, 0f), w);
+                foreach (bool left in new[] { true, false })
+                {
+                    float side = left ? -1f : 1f;
+                    Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
+                    float kick = 55f + 35f * Mathf.Sin(t * 1.6f + (left ? 0f : 2.2f)); // lazy feet in the air
+                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(0f, 0f, 6f * side), w);
+                    shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kick, 0f, 0f), w);
+                    foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(40f, 0f, 0f), w);
+                }
+            }
+
+            if (_sit > 0.01f)
+            {
+                float w = _sit;
+                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.14f * s, 0f), w);
+                hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(-14f, 0f, 0f), w);
+                B(Bone.Spine).localRotation = Quaternion.Slerp(B(Bone.Spine).localRotation, Quaternion.Euler(4f, 0f, 0f), w);
+                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(38f, 0f, -16f), w);
+                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
+                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(38f, 0f, 16f), w);
+                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
+                foreach (bool left in new[] { true, false })
+                {
+                    float side = left ? -1f : 1f;
+                    Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
+                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-80f, 0f, 9f * side), w);
+                    shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(left ? 20f : 55f, 0f, 0f), w);
+                    foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(-20f, 0f, 0f), w);
+                }
+                _rig.LeftHand?.Pose(HandPose.Flat);
+                _rig.RightHand?.Pose(HandPose.Flat);
+            }
         }
 
         private void AimedGestures(Transform upperL, Transform foreL, Transform upperR, Transform foreR)
@@ -651,6 +737,7 @@ namespace PleaseDontDrown.Avatars
             }
             if (Motion.Talking) mouth = 0.12f + 0.5f * Mathf.Abs(Mathf.Sin(t * 13f) * Mathf.Sin(t * 5.3f + 1f));
             if (_down > 0.5f) { eyes = 0.08f; mouth = 0.45f; }
+            else if (_lie > 0.5f && !Motion.Talking) { eyes = 0.12f; mouth = 0.05f; brows = 0.2f; } // soaking up the sun
             if (GestureActive(AvatarGesture.Breath, 1.1f)) mouth = 0.6f;
             _rig.SetExpression(eyes, mouth, brows);
         }

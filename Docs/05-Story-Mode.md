@@ -15,12 +15,12 @@ marker, and waits for its condition. Money is one shared team wallet. Everything
 
 | # | Beat | What the player does | Done when |
 |---|---|---|---|
-| 1.1 | **Meet Sandy** | You spawn; Sandy (about 50, blonde, coral shirt, teal apron) waves from her Lost & Found kiosk. Talk to her (E). She explains the job: rescue tourists; they lose things; bring finds to Lost & Found and she pays. | Dialogue ends |
-| 1.2 | **First shift** | Rescue **5 tourists**. The director sends them one at a time: **3 of them women** (bikini tops). Women need CPR: chest compressions (the chest jiggles on each push) and **mouth-to-mouth**. Men get CPR and a **punch in the face** to wake up. Tourists also drop lost items on the beach (wallet, phone, sunglasses, watch). | 5 rescued |
-| 1.3 | **The thief** | A tourist yells "THIEF!". A robber runs along the beach. Catch him and punch him (3 hits): he drops **3 stolen items** and runs off (you let him go). | Robber beaten |
+| 1.1 | **Meet Sandy** | You spawn and Sandy (about 50, blonde, coral shirt) walks over to you from her Lost & Found kiosk and explains the job: rescue tourists; they lose things; bring finds to Lost & Found and she pays. Then she goes back to her kiosk. | Dialogue ends |
+| 1.2 | **First shift** | Rescue **5 tourists**, who were swimming a moment ago. **3 of them are women** (bikinis). On island 1 everyone collapses once pulled out, so every rescue ends in CPR: women get compressions (the chest jiggles on each push) and **mouth-to-mouth**, men get compressions and a **punch in the face**. Sandy shouts a tip the first time each step comes up. Lost things turn up next to people's towels. | 5 rescued |
+| 1.3 | **The thief** | A robber grabs a sunbather's bag; she jumps up screaming "THIEF!". Catch him and punch him (3 hits): he drops **3 stolen items** and runs off (you let him go). | Robber beaten |
 | 1.4 | **Return the loot** | Bring the 3 stolen items to Lost & Found. Handing them in, Sandy says there's a robber on the island and gets scared. | 3 returned |
 | 1.5 | **Three more** | Rescue **3 men**. | 3 rescued |
-| 1.6 | **The silent one** | A woman sinks **without a sound** (no waving, no shouting); a guest next to her on the shore yells "HELP!". Swim out, bring her in, revive her (CPR + mouth-to-mouth). | Revived |
+| 1.6 | **The silent one** | A woman sinks **without a sound** (no waving, no shouting); her friend swims over next to her yelling "HELP!". Swim out, bring her in, revive her (CPR + mouth-to-mouth). | Revived |
 | 1.7 | **Drugs?** | She says she blacked out after taking some pill a guy on the beach gave her. So there are **drugs** on the island. | Dialogue ends |
 | 1.8 | **One more** | Rescue 1 man. | 1 rescued |
 | 1.9 | **The thief again** | The robber is back. Chase him and **hit him 5 times**: he falls, his bag bursts open and **2-3 baggies** fall out. You say you'll have him arrested; he begs and offers his **jet ski keys** to be let go. Take the keys. | Keys picked up |
@@ -149,6 +149,13 @@ wear bikinis or swimsuits. The customizer has a *Figure* row. `AvatarAnimator` g
 the CPR window, flatline time, silent drowning and bleed time. New state `Injured` (shark bite, on land, bleeding).
 CPR is a sequence on RMB: 5 compressions (chest squish + jiggle), then 2 rescue breaths for women (the lifeguard
 leans to the face) or a punch for men (head snaps, *POW!*), repeated until revived. Revive = +$80.
+
+**The beach crowd** (`Story/BeachCrowd.cs`, one per island): people sunbathing on towels (on the back with the hands
+behind the head, on the belly kicking their feet, sitting up), wading in the shallows and swimming about; they turn over
+now and then and chat when you press E. They're `StoryNpc`s (no physics). When the story needs someone in trouble it
+takes a swimmer from the crowd, so the person you saw swimming is the one who starts drowning; scenes borrow people
+(the thief's victim, the silent woman's friend) and give them back. Swimmers are topped up out of sight. Towels and
+umbrellas are placed by the builder on dry sand away from buildings and palms.
 
 **Story places.** Island 1: Sandy's Lost & Found kiosk right of the spawn, the robber's jet ski tied to the dock.
 Island 2 (~200 m south, same terrain mesh): the Grand Coral Hotel (reception desk = shop, infirmary bed, first-aid

@@ -57,6 +57,8 @@ namespace PleaseDontDrown.Story
         private float _lookYaw;
         private GameObject _bag;
         private float _nextTalkRequest;
+        private CapsuleCollider _bodyCollider;
+        private SphereCollider _headCollider;
 
         // Host.
         private Vector3? _moveTarget;
@@ -75,12 +77,22 @@ namespace PleaseDontDrown.Story
 
         public string Name => string.IsNullOrEmpty(_name.Value) ? "Someone" : _name.Value;
         public NpcRole Role => _role.Value;
+        public AvatarLook Look => AvatarLook.Unpack(_look.Value);
+        public ulong LookPacked => _look.Value;
         public AvatarPose Pose => _pose.Value;
         public int Health => _health.Value;
         public int MaxHealth => _maxHealth.Value;
         public bool IsDefeated => _maxHealth.Value > 0 && _health.Value <= 0;
         public bool IsTalkable => _talkable.Value;
-        public Vector3 HeadPosition => transform.position + Vector3.up * (_pose.Value == AvatarPose.Down ? 0.3f : 1.75f);
+        public Vector3 HeadPosition => _pose.Value switch
+        {
+            AvatarPose.Down or AvatarPose.Lie or AvatarPose.LieFront => transform.position + Vector3.up * 0.3f,
+            AvatarPose.Sit => transform.position + Vector3.up * 1f,
+            AvatarPose.Kneel => transform.position + Vector3.up * 1.3f,
+            _ => transform.position + Vector3.up * 1.75f
+        };
+        /// <summary>Treading water (in water deeper than it can stand in).</summary>
+        public bool IsSwimming => WaterSurface.Exists && WaterSurface.HeightAt(transform.position) - transform.position.y > 1.1f;
         public bool IsMoving => _moveTarget.HasValue;
 
         public Color SpeechColor => _role.Value switch
@@ -109,6 +121,43 @@ namespace PleaseDontDrown.Story
                 if (!string.IsNullOrEmpty(next)) gameObject.name = $"Npc_{next}";
             };
             _hasBag.OnChange += (_, next, _) => ShowBag(next);
+            _pose.OnChange += (_, next, _) => FitColliders(next);
+            _bodyCollider = GetComponent<CapsuleCollider>();
+            _headCollider = GetComponent<SphereCollider>();
+        }
+
+        /// <summary>Lying people are long and low, sitting ones short: the colliders follow (walk past, punch the right spot).</summary>
+        private void FitColliders(AvatarPose pose)
+        {
+            if (_bodyCollider == null) return;
+            switch (pose)
+            {
+                case AvatarPose.Down:
+                case AvatarPose.Lie:
+                case AvatarPose.LieFront:
+                    _bodyCollider.direction = 2;
+                    _bodyCollider.center = new Vector3(0f, 0.18f, -0.45f);
+                    _bodyCollider.height = 1.8f;
+                    _bodyCollider.radius = 0.2f;
+                    if (_headCollider != null) _headCollider.center = new Vector3(0f, 0.2f, pose == AvatarPose.LieFront ? 0.35f : -1.3f);
+                    break;
+                case AvatarPose.Sit:
+                case AvatarPose.Kneel:
+                    float h = pose == AvatarPose.Sit ? 0.95f : 1.3f;
+                    _bodyCollider.direction = 1;
+                    _bodyCollider.center = new Vector3(0f, h * 0.5f, 0f);
+                    _bodyCollider.height = h;
+                    _bodyCollider.radius = 0.3f;
+                    if (_headCollider != null) _headCollider.center = new Vector3(0f, h - 0.1f, 0f);
+                    break;
+                default:
+                    _bodyCollider.direction = 1;
+                    _bodyCollider.center = new Vector3(0f, 0.9f, 0f);
+                    _bodyCollider.height = 1.8f;
+                    _bodyCollider.radius = 0.32f;
+                    if (_headCollider != null) _headCollider.center = new Vector3(0f, 1.62f, 0f);
+                    break;
+            }
         }
 
         public override void OnStartNetwork()
@@ -131,6 +180,7 @@ namespace PleaseDontDrown.Story
             ApplyLook(_look.Value);
             if (_nameTag != null) _nameTag.text = Name;
             ShowBag(_hasBag.Value);
+            FitColliders(_pose.Value);
         }
 
         // ------------------------------------------------------------------ host API
@@ -168,6 +218,14 @@ namespace PleaseDontDrown.Story
         {
             _moveTarget = target;
             _moveSpeed = run ? _runSpeed : _walkSpeed;
+        }
+
+        /// <summary>Host: move at a given speed (m/s), e.g. a slow swim.</summary>
+        [Server]
+        public void ServerMoveTo(Vector3 target, float speed)
+        {
+            _moveTarget = target;
+            _moveSpeed = Mathf.Max(0.1f, speed);
         }
 
         [Server] public void ServerStop() => _moveTarget = null;
@@ -400,11 +458,11 @@ namespace PleaseDontDrown.Story
         /// <summary>Don't stand inside each other (a gang of pirates spreads out around their target).</summary>
         private void Separate(float dt)
         {
-            if (_pose.Value == AvatarPose.Down) return;
+            if (!IsUpright(_pose.Value)) return;
             Vector3 p = transform.position, push = Vector3.zero;
             foreach (StoryNpc other in _all)
             {
-                if (other == this || other._ride != null || other._pose.Value == AvatarPose.Down) continue;
+                if (other == this || other._ride != null || !IsUpright(other._pose.Value)) continue;
                 Vector3 d = p - other.transform.position;
                 d.y = 0f;
                 float distance = d.magnitude;
@@ -415,6 +473,8 @@ namespace PleaseDontDrown.Story
             if (push.sqrMagnitude > 1e-6f) transform.position = Grounded(p + Vector3.ClampMagnitude(push, 1f) * Mathf.Min(1f, dt * 6f));
         }
 
+        private static bool IsUpright(AvatarPose pose) => pose is AvatarPose.Normal or AvatarPose.Scared or AvatarPose.HandsUp;
+
         private void Face(Vector3 direction, float dt, float rate)
         {
             direction.y = 0f;
@@ -423,12 +483,28 @@ namespace PleaseDontDrown.Story
             transform.rotation = Quaternion.Slerp(transform.rotation, want, 1f - Mathf.Exp(-rate * dt));
         }
 
+        /// <summary>Feet on the ground, or treading water with the head out where it's too deep to stand.</summary>
         private static Vector3 Grounded(Vector3 p)
         {
-            float ground = Shore.GroundHeightAt(p + Vector3.up * 2.5f);
-            if (!float.IsNaN(ground)) p.y = ground;
+            // Swimmers look for the seabed just above themselves, so a dock overhead isn't mistaken for the ground.
+            bool swimming = WaterSurface.Exists && WaterSurface.HeightAt(p) - p.y > 1f;
+            float ground = Shore.GroundHeightAt(p + Vector3.up * (swimming ? 0.9f : 2.5f));
+            if (float.IsNaN(ground)) return p;
+            if (WaterSurface.Exists)
+            {
+                float surface = WaterSurface.HeightAt(p);
+                if (surface - ground > SwimDepth)
+                {
+                    p.y = surface - SwimDepth;
+                    return p;
+                }
+            }
+            p.y = ground;
             return p;
         }
+
+        /// <summary>Feet this far under the surface when swimming (mouth just out of the water).</summary>
+        private const float SwimDepth = 1.4f;
 
         // ------------------------------------------------------------------ looks
 

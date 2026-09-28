@@ -262,9 +262,15 @@ namespace PleaseDontDrown.Editor
             Transform kiosk = BuildKiosk(env, kioskPos, kioskYaw, out LostAndFound lostAndFound);
             StoryNpc sandy = PlaceNpc(npcPrefab, story, "Sandy", OnGround(kiosk.TransformPoint(new Vector3(1.7f, 0f, 0.9f))), kioskYaw);
 
-            var lostSpots = new List<Transform>();
-            for (int i = 0; i < LostItemSpots.Length; i++)
-                lostSpots.Add(Point(story, $"LostItemSpot_{i}", OnGround(LostItemSpots[i]), 0f));
+            // The beach crowd: towels and umbrellas, sunbathers on them, people wading and swimming.
+            Transform[] towels1 = BuildTowels(env, "Island1", Island1TowelXs, seaTowardPositiveZ: false, startZ: -15f, Island1Avoid(), seed: 11);
+            BuildCrowd(story, "BeachCrowd_Island1", npcPrefab, towels1, new Vector2(-24f, 20f), new Vector2(-34f, -8f),
+                new Vector2(-32f, 32f), new Vector2(-14f, 4f), swimmers: 7, waders: 3, seed: 1000);
+
+            // Lost things turn up by the shore in front of the station (first spot) and next to people's towels.
+            var lostSpots = new List<Transform> { Point(story, "LostItemSpot_0", OnGround(LostItemSpots[0]), 0f) };
+            for (int i = 0; i < towels1.Length; i += 2)
+                lostSpots.Add(Point(story, $"LostItemSpot_{lostSpots.Count}", OnGround(towels1[i].position + towels1[i].right * 1.1f), 0f));
             Transform robberSpawn = Point(story, "RobberSpawn", OnGround(RobberSpawn), 90f);
 
             // The robber's jet ski, tied up by the dock.
@@ -281,6 +287,9 @@ namespace PleaseDontDrown.Editor
             Transform pirateStart = Point(story, "PirateBoatStart", OnWater(PirateBoatStart),
                 Quaternion.LookRotation(PirateLanding - PirateBoatStart).eulerAngles.y);
             Vehicle pirateBoat = BuildPirateBoat(env, OnWater(PirateBoatParked), 30f);
+            Transform[] towels2 = BuildTowels(env, "Island2", Island2TowelXs, seaTowardPositiveZ: true, startZ: -195f, Island2Avoid(), seed: 22);
+            BuildCrowd(story, "BeachCrowd_Island2", npcPrefab, towels2, new Vector2(-18f, 56f), new Vector2(-198f, -180f),
+                new Vector2(-22f, 60f), new Vector2(-216f, -204f), swimmers: 5, waders: 2, seed: 2000);
 
             // ---------------------------------------------------------------- the director
             var directorGo = new GameObject("StoryDirector");
@@ -312,15 +321,16 @@ namespace PleaseDontDrown.Editor
             SetRefs(director, "_lostItemSpots", lostSpots.ToArray());
 
             var so = new SerializedObject(director);
+            // Island 1: everyone pulled out collapses and needs CPR (the design wants every CPR moment seen).
             SetIsland(Require(so, "_island1"), "The first island", new Vector2(-20f, 16f), new Vector2(-36f, -18f), Vector3.forward,
-                seconds: 20f, condition: 60f, flatline: 0f, land: new Rect(-45f, 6f, 90f, 42f), robberSpawn, null);
+                seconds: 20f, condition: 60f, flatline: 0f, land: new Rect(-45f, 6f, 90f, 42f), robberSpawn, null, needsCpr: true);
             SetIsland(Require(so, "_island2"), "The hotel island", new Vector2(-20f, 58f), new Vector2(-194f, -181f), Vector3.back,
-                seconds: 10f, condition: 45f, flatline: 12f, land: new Rect(-35f, -276f, 110f, 54f), null, arrival);
+                seconds: 10f, condition: 45f, flatline: 12f, land: new Rect(-35f, -276f, 110f, 54f), null, arrival, needsCpr: false);
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void SetIsland(SerializedProperty island, string name, Vector2 seaX, Vector2 seaZ, Vector3 shoreward,
-            float seconds, float condition, float flatline, Rect land, Transform robberSpawn, Transform arrival)
+            float seconds, float condition, float flatline, Rect land, Transform robberSpawn, Transform arrival, bool needsCpr)
         {
             island.FindPropertyRelative("Name").stringValue = name;
             island.FindPropertyRelative("SeaX").vector2Value = seaX;
@@ -336,6 +346,110 @@ namespace PleaseDontDrown.Editor
             profile.FindPropertyRelative("FlatlineAfter").floatValue = flatline;
             profile.FindPropertyRelative("BleedSeconds").floatValue = 60f;
             profile.FindPropertyRelative("Silent").boolValue = false;
+            profile.FindPropertyRelative("NeedsCpr").boolValue = needsCpr;
+        }
+
+        // =====================================================================
+        // The beach crowd
+        // =====================================================================
+
+        private static readonly float[] Island1TowelXs = { -41f, -37f, -33f, -29f, -25f, -21f, -17f, 15.5f, 19f, 22.5f, 26f, 30f, 34f, 38f, 42f };
+        private static readonly float[] Island2TowelXs = { -24f, -19f, -13f, 6f, 10f, 14f, 26f, 30f, 34f, 39f, 44f, 49f };
+
+        /// <summary>Things towels must keep clear of on island 1 (x, z, radius).</summary>
+        private static List<Vector3> Island1Avoid()
+        {
+            var list = new List<Vector3>
+            {
+                new(0f, 10f, 5f), new(12f, 8f, 4f), new(-8f, 2f, 2.6f), new(-8f, 6f, 2.6f), new(8.5f, 17.5f, 3.5f), new(0f, 15f, 4.5f),
+                new(4.6f, 12.6f, 2f), new(-5f, 12.5f, 1.8f), new(-4f, 9.5f, 2.5f), new(-2.2f, 11.2f, 1.5f), new(15.5f, 5f, 1.2f),
+                new(4.5f, 14f, 1.2f), new(LostItemSpots[0].x, LostItemSpots[0].z, 1.5f), new(RobberSpawn.x, RobberSpawn.z, 2f)
+            };
+            foreach (Vector2 palm in MeshyArt.PalmSpots) list.Add(new Vector3(palm.x, palm.y, 1.8f));
+            return list;
+        }
+
+        private static List<Vector3> Island2Avoid() => new()
+        {
+            new(-2f, -214f, 3f), new(-2f, -219f, 3f), new(20f, -237f, 3f), new(PirateLanding.x, PirateLanding.z, 3f), new(Island2Spawn.x, Island2Spawn.z, 2.5f)
+        };
+
+        /// <summary>
+        /// Towels along a beach: for each x, walk in from the sea to dry sand and go a few metres further; skip spots
+        /// near buildings, palms and paths. Every other towel gets an umbrella. Returns the towel points
+        /// (middle of the towel, forward = feet toward the sea).
+        /// </summary>
+        private static Transform[] BuildTowels(Transform env, string name, float[] xs, bool seaTowardPositiveZ, float startZ, List<Vector3> avoid, int seed)
+        {
+            Color[] towelColors =
+            {
+                new(0.95f, 0.35f, 0.35f), new(0.25f, 0.6f, 0.95f), new(1f, 0.82f, 0.25f), new(0.35f, 0.8f, 0.5f),
+                new(0.95f, 0.5f, 0.8f), new(1f, 0.6f, 0.2f), new(0.6f, 0.45f, 0.9f), new(0.3f, 0.85f, 0.85f)
+            };
+            Color[] umbrellaColors = { new(0.95f, 0.3f, 0.25f), new(0.2f, 0.65f, 0.7f), new(1f, 0.85f, 0.3f), new(0.98f, 0.96f, 0.9f) };
+            Material white = GetMaterial("White", new Color(0.95f, 0.95f, 0.95f));
+            Material pole = GetMaterial("UmbrellaPole", new Color(0.85f, 0.85f, 0.82f));
+            var rng = new System.Random(seed);
+            var root = new GameObject($"BeachTowels_{name}").transform;
+            root.SetParent(env, false);
+            float inlandStep = seaTowardPositiveZ ? -0.5f : 0.5f;
+            var towels = new List<Transform>();
+            int n = 0;
+            foreach (float baseX in xs)
+            {
+                float x = baseX + (float)(rng.NextDouble() - 0.5) * 1.5f;
+                float z = startZ;
+                for (int i = 0; i < 400 && BeachHeight(x, z) < WaterLevel + 0.3f; i++) z += inlandStep;
+                z += Mathf.Sign(inlandStep) * (3.5f + (float)rng.NextDouble() * 4.5f);
+                float y = BeachHeight(x, z);
+                if (Mathf.Abs(BeachHeight(x, z + 1f) - BeachHeight(x, z - 1f)) > 0.5f || Mathf.Abs(BeachHeight(x + 1f, z) - BeachHeight(x - 1f, z)) > 0.5f) continue;
+                bool blocked = false;
+                foreach (Vector3 a in avoid)
+                    if (new Vector2(x - a.x, z - a.y).sqrMagnitude < (a.z + 1.3f) * (a.z + 1.3f)) blocked = true;
+                if (blocked) continue;
+                float yaw = (seaTowardPositiveZ ? 0f : 180f) + (float)(rng.NextDouble() - 0.5) * 40f;
+                var towel = new GameObject($"Towel_{n}").transform;
+                towel.SetParent(root, false);
+                towel.SetPositionAndRotation(new Vector3(x, y + 0.012f, z), Quaternion.Euler(0f, yaw, 0f));
+                Material cloth = GetMaterial($"Towel{n % towelColors.Length}", towelColors[n % towelColors.Length]);
+                Primitive(PrimitiveType.Cube, "Cloth", towel, Vector3.zero, new Vector3(0.95f, 0.02f, 1.95f), cloth, keepCollider: false);
+                Primitive(PrimitiveType.Cube, "Stripe", towel, new Vector3(0f, 0.004f, -0.7f), new Vector3(0.95f, 0.02f, 0.18f), white, keepCollider: false);
+                if (n % 2 == 0)
+                {
+                    // Beach umbrella beside it: a pole you bump into, a canopy you don't.
+                    var umbrella = new GameObject("Umbrella").transform;
+                    umbrella.SetParent(towel, false);
+                    umbrella.localPosition = new Vector3(1.05f, 0f, -0.3f);
+                    Primitive(PrimitiveType.Cylinder, "Pole", umbrella, new Vector3(0f, 1.1f, 0f), new Vector3(0.07f, 1.1f, 0.07f), pole);
+                    Material canopy = GetMaterial($"Umbrella{(n / 2) % umbrellaColors.Length}", umbrellaColors[(n / 2) % umbrellaColors.Length]);
+                    Primitive(PrimitiveType.Sphere, "Canopy", umbrella, new Vector3(0f, 2.15f, 0f), new Vector3(2.3f, 0.45f, 2.3f), canopy, keepCollider: false)
+                        .transform.localRotation = Quaternion.Euler(0f, 0f, 6f);
+                }
+                towels.Add(towel);
+                n++;
+            }
+            Debug.Log($"[Build] {towels.Count} towels on {name}");
+            return towels.ToArray();
+        }
+
+        private static void BuildCrowd(Transform parent, string name, GameObject npcPrefab, Transform[] towels, Vector2 swimX, Vector2 swimZ,
+            Vector2 wadeX, Vector2 wadeZ, int swimmers, int waders, int seed)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<NetworkObject>();
+            var crowd = go.AddComponent<BeachCrowd>();
+            SetRef(crowd, "_npcPrefab", npcPrefab.GetComponent<StoryNpc>());
+            SetRefs(crowd, "_towels", towels);
+            var so = new SerializedObject(crowd);
+            Require(so, "_swimX").vector2Value = swimX;
+            Require(so, "_swimZ").vector2Value = swimZ;
+            Require(so, "_wadeX").vector2Value = wadeX;
+            Require(so, "_wadeZ").vector2Value = wadeZ;
+            Require(so, "_swimmers").intValue = swimmers;
+            Require(so, "_waders").intValue = waders;
+            Require(so, "_seed").intValue = seed;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static Vector3 OnGround(Vector3 p) => new(p.x, BeachHeight(p.x, p.z), p.z);

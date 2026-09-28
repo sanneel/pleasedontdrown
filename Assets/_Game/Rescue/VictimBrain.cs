@@ -19,7 +19,7 @@ namespace PleaseDontDrown.Rescue
     public enum VictimEvent : byte
     {
         InTrouble, Panicking, GoingUnder, Unconscious, Calmed, Saved, Revived, Lost, SelfRescue,
-        Flatline, Zapped, Bitten, InjuredAshore, Hospitalized
+        Flatline, Zapped, Bitten, InjuredAshore, Hospitalized, Collapsed
     }
 
     /// <summary>How a tourist behaves in trouble (story beats and island difficulty set this; drills use the default).</summary>
@@ -38,7 +38,11 @@ namespace PleaseDontDrown.Rescue
         public bool Silent;
         [Tooltip("Seconds a shark-bite victim can bleed before they're lost.")]
         public float BleedSeconds;
+        [Tooltip("Collapses once out of the water even if still awake: always needs CPR (so nobody misses that part).")]
+        public bool NeedsCpr;
         public string Name;
+        [Tooltip("Packed AvatarLook to wear (a beach swimmer turning into this tourist). 0 = from the seed.")]
+        public ulong Look;
 
         public static TouristProfile Default => new() { Figure = -1, BleedSeconds = 60f };
     }
@@ -139,6 +143,7 @@ namespace PleaseDontDrown.Rescue
         private float _flatlineAfter;
         private float _bleedSeconds = 60f;
         private bool _hospitalized;
+        private bool _needsCpr;
 
         public static IReadOnlyList<VictimBrain> All => _all;
         /// <summary>Host: a tourist was saved, revived, lost... (with whoever gets the credit, if anyone).</summary>
@@ -229,7 +234,7 @@ namespace PleaseDontDrown.Rescue
         [Server]
         public void ServerSetup(string displayName, int seed, VictimState state, float panic, float air, TouristProfile profile)
         {
-            AvatarLook look = AvatarLook.RandomTourist(seed, profile.Figure);
+            AvatarLook look = profile.Look != 0 ? AvatarLook.Unpack(profile.Look) : AvatarLook.RandomTourist(seed, profile.Figure);
             _seed.Value = seed;
             _look.Value = look.Pack();
             _name.Value = !string.IsNullOrEmpty(profile.Name) ? profile.Name : !string.IsNullOrEmpty(displayName) ? displayName : RandomName(look.Feminine);
@@ -237,6 +242,7 @@ namespace PleaseDontDrown.Rescue
             _drownSeconds = Mathf.Max(0f, profile.SecondsToUnconscious);
             _flatlineAfter = Mathf.Max(0f, profile.FlatlineAfter);
             _bleedSeconds = profile.BleedSeconds > 0f ? profile.BleedSeconds : 60f;
+            _needsCpr = profile.NeedsCpr;
             _conditionTotal.Value = profile.ConditionSeconds > 0f ? profile.ConditionSeconds : _conditionSeconds;
             _panic.Value = Mathf.Clamp(panic, 0f, 100f);
             _air.Value = Mathf.Clamp01(air);
@@ -446,7 +452,9 @@ namespace PleaseDontDrown.Rescue
             else SetState(target, e);
         }
 
-        private void PassOut()
+        private void PassOut() => PassOut(VictimEvent.Unconscious, null);
+
+        private void PassOut(VictimEvent e, string text, PlayerHub credit = null)
         {
             _air.Value = 0f;
             _condition.Value = 1f;
@@ -455,7 +463,7 @@ namespace PleaseDontDrown.Rescue
             _cprCount.Value = 0;
             _flatline.Value = false;
             _cprHelpers.Clear();
-            SetState(VictimState.Unconscious, VictimEvent.Unconscious);
+            SetState(VictimState.Unconscious, e, text, credit);
         }
 
         private void UpdateBleeding(float dt)
@@ -479,6 +487,13 @@ namespace PleaseDontDrown.Rescue
             {
                 // Out of the water but still bleeding: they need a hospital bed.
                 SetState(VictimState.Injured, VictimEvent.InjuredAshore, $"{Name} is out of the water but bleeding badly. Carry {They} to the infirmary!", rescuer);
+                return;
+            }
+            if (_needsCpr)
+            {
+                // Swallowed half the sea: out cold the moment they're out of it. Whoever carries them keeps them.
+                _needsCpr = false;
+                PassOut(VictimEvent.Collapsed, $"{Name} swallowed half the sea and collapsed! Lay {They} on the sand and do CPR!", rescuer);
                 return;
             }
             if (held) _item.ServerForceDrop(); // put down in the shallows
@@ -701,6 +716,10 @@ namespace PleaseDontDrown.Rescue
                 case VictimEvent.GoingUnder:
                     FloatingText.Spawn(above, "blub...", new Color(0.6f, 0.85f, 1f), 0.8f);
                     PlayerHud.ShowToast($"{Name} is going under!");
+                    break;
+                case VictimEvent.Collapsed:
+                    FloatingText.Spawn(above, "*collapses*", new Color(1f, 0.45f, 0.3f), 1.1f, 1.6f);
+                    PlayerHud.ShowToast($"<color=#ff7060><b>{text}</b></color>", 5f);
                     break;
                 case VictimEvent.Unconscious:
                     FloatingText.Spawn(above, "!!!", new Color(1f, 0.3f, 0.25f), 1.2f);

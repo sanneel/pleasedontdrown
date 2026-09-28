@@ -106,6 +106,8 @@ namespace PleaseDontDrown.Story
         private readonly List<GameObject> _spawnedActors = new();
         private IslandSetup _island;
         private float _nextAmbientLoss;
+        private Vector3 _sandyHome;
+        private float _sandyHomeYaw;
 
         public static StoryDirector Instance { get; private set; }
         public string Chapter => _chapter.Value;
@@ -195,7 +197,11 @@ namespace PleaseDontDrown.Story
         private void SetupResidents()
         {
             if (_sandy != null)
+            {
                 _sandy.ServerSetup("Sandy", NpcRole.Guide, SandyLook);
+                _sandyHome = _sandy.transform.position;
+                _sandyHomeYaw = _sandy.transform.eulerAngles.y;
+            }
             if (_receptionist != null)
                 _receptionist.ServerSetup("Marisol", NpcRole.Receptionist, ReceptionistLook);
             if (_receptionist != null) _receptionist.ServerSetTalkable(false);
@@ -206,6 +212,8 @@ namespace PleaseDontDrown.Story
         private void StartAt(int index)
         {
             StopAllCoroutines(); // the beat and anything it started (waving, delayed lines...)
+            foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
+            if (_sandy != null && index > 0) StartCoroutine(SandyGoesHome()); // interrupted mid-walk: back to the kiosk
             CleanupActors();
             _running = true;
             _runner = StartCoroutine(RunFrom(index));
@@ -448,8 +456,23 @@ namespace PleaseDontDrown.Story
         private VictimBrain SpawnStoryTourist(IslandSetup island, TouristProfile profile, float minDepth = 2f, float maxDepth = 7f)
         {
             RescueService rescue = RescueService.Instance;
-            if (rescue == null || !rescue.TryFindSeaSpot(island.SeaX, island.SeaZ, minDepth, maxDepth, out Vector3 spot)) return null;
-            VictimBrain v = rescue.SpawnVictim(spot, Random.Range(-40f, 40f), VictimState.Distressed, 30f, 1f, profile);
+            if (rescue == null) return null;
+            Vector3 spot;
+            float yaw = Random.Range(-40f, 40f);
+            // Someone who was swimming out there gets into trouble (same face, same swimsuit).
+            BeachCrowd crowd = BeachCrowd.Nearest(new Vector3((island.SeaX.x + island.SeaX.y) * 0.5f, 0f, (island.SeaZ.x + island.SeaZ.y) * 0.5f));
+            StoryNpc swimmer = crowd != null ? crowd.TakeSwimmer(profile.Figure, island.SeaX, island.SeaZ, minDepth) : null;
+            if (swimmer != null)
+            {
+                spot = swimmer.transform.position;
+                spot.y = WaterSurface.Exists ? WaterSurface.HeightAt(spot) - 0.4f : spot.y;
+                yaw = swimmer.transform.eulerAngles.y;
+                profile.Look = swimmer.LookPacked;
+                if (string.IsNullOrEmpty(profile.Name)) profile.Name = swimmer.Name;
+                Despawn(swimmer.gameObject);
+            }
+            else if (!rescue.TryFindSeaSpot(island.SeaX, island.SeaZ, minDepth, maxDepth, out spot)) return null;
+            VictimBrain v = rescue.SpawnVictim(spot, yaw, VictimState.Distressed, 30f, 1f, profile);
             if (v == null) return null;
             _waveTourists.Add(v);
             if (!profile.Silent)
@@ -458,7 +481,7 @@ namespace PleaseDontDrown.Story
                 float distance = DistanceToBeach(spot, island);
                 rescue.ServerAnnounce($"<color=#ffd060><b>HELP!</b></color> {v.Name} is in trouble in the water, {distance:F0} m out!");
             }
-            Debug.Log($"[Story] tourist {v.Name} ({(v.IsFemale ? "F" : "M")}{(profile.Silent ? ", silent" : "")}) at {spot:F1}");
+            Debug.Log($"[Story] tourist {v.Name} ({(v.IsFemale ? "F" : "M")}{(profile.Silent ? ", silent" : "")}{(swimmer != null ? ", was swimming" : "")}) at {spot:F1}");
             return v;
         }
 
