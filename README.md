@@ -6,7 +6,8 @@ Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP �
 * **Story mode** (chapters 1-2: Sandy, the robber, the hotel island, sharks, pirates): [Docs/05-Story-Mode.md](Docs/05-Story-Mode.md)
 * Architecture and milestones: [Docs/02-Technical-Architecture.md](Docs/02-Technical-Architecture.md)
 * Art direction + Meshy prompts: [Docs/03-Art-Direction-Meshy.md](Docs/03-Art-Direction-Meshy.md) (exports go in `ArtSource/Meshy/`)
-* **Everything to generate in Meshy** (checklist, prompts, order): [Docs/06-Meshy-Asset-List.md](Docs/06-Meshy-Asset-List.md)
+* **Everything to generate in Meshy** (checklist, prompts, order): [Docs/06-Meshy-Asset-List.md](Docs/06-Meshy-Asset-List.md);
+  island 1 only, Free plan (characters via an A-pose picture): [Docs/07-Meshy-Island-1.md](Docs/07-Meshy-Island-1.md)
 
 ## Art
 
@@ -18,8 +19,9 @@ Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP �
   fingers that float at the bottom of the view, trail your turns, and blend into each item's grip (palms on a box's sides, fingers spread over a ball,
   a coconut cupped in the palm, a fist round the life ring's tube; items can carry hand-placed `GripRight/GripLeft`
   transforms), stroke when you swim, press flat during CPR, point at what you use and follow a throw out.
-* **Meshy GLBs**: shack, watchtower and palms (decimated). The shack (x1.45) and tower (x1.2) are scaled so you can
-  walk in: their painted doors are cut out and replaced with real doors. The Meshy characters were static poses
+* **Meshy GLBs**: shack, watchtower and palms (decimated). The shack (x1.45) and tower (x1.2, and x1.5 wider) are
+  scaled so you can walk in: their painted doors are cut out and replaced with real doors. Sign lettering is painted
+  into textures by `ArtSource/Tools/make_signs.py` (Roboto, Apache 2.0). The Meshy characters were static poses
   (no skeleton), so they are no longer used; see [Meshy integration](Docs/04-Meshy-Integration.md).
 
 ## Open the project

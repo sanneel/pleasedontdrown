@@ -1027,13 +1027,13 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Leg", tower, p, new Vector3(0.15f, 3f, 0.15f), wood);
             Primitive(PrimitiveType.Cube, "Platform", tower, new Vector3(0f, 3.1f, 0f), new Vector3(2.2f, 0.2f, 2.2f), wood);
             Primitive(PrimitiveType.Cube, "Ramp", tower, new Vector3(0f, 1.5f, 2.6f), new Vector3(1f, 0.1f, 4f), wood).transform.localRotation = Quaternion.Euler(38f, 0f, 0f);
-            if (MeshyArt.Tower(tower, TowerScale, out MeshyArt.DoorSpec towerDoor))
+            if (MeshyArt.Tower(tower, TowerScale, TowerWiden, out MeshyArt.DoorSpec towerDoor))
             {
                 BuildDoor(tower, "TowerDoor", towerDoor, new Color(0.47f, 0.35f, 0.28f), new Color(0.93f, 0.93f, 0.9f), planks: false);
                 // A stool to sit on and watch the water.
                 float k = TowerScale, deck = 2.285f * k;
-                Primitive(PrimitiveType.Cylinder, "StoolSeat", tower, new Vector3(0.45f, deck + 0.62f, -1.1f * k), new Vector3(0.38f, 0.03f, 0.38f), wood);
-                Primitive(PrimitiveType.Cylinder, "StoolLeg", tower, new Vector3(0.45f, deck + 0.3f, -1.1f * k), new Vector3(0.08f, 0.3f, 0.08f), wood);
+                Primitive(PrimitiveType.Cylinder, "StoolSeat", tower, new Vector3(0.45f * TowerWiden, deck + 0.62f, -1.1f * k), new Vector3(0.38f, 0.03f, 0.38f), wood);
+                Primitive(PrimitiveType.Cylinder, "StoolLeg", tower, new Vector3(0.45f * TowerWiden, deck + 0.3f, -1.1f * k), new Vector3(0.08f, 0.3f, 0.08f), wood);
             }
         }
 
@@ -1054,6 +1054,7 @@ namespace PleaseDontDrown.Editor
 
         private const float ShackScale = 1.45f;
         private const float TowerScale = 1.2f;
+        private const float TowerWiden = 1.5f; // sideways only: a roomier cabin, same height
 
         /// <summary>
         /// A hinged, networked door in a structure's doorway, plus a frame around the gap that hides the cut edges

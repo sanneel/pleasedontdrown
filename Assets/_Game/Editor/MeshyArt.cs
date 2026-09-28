@@ -12,7 +12,8 @@ namespace PleaseDontDrown.Editor
     {
         private const string DirectoryPath = "Assets/_Game/Art/Meshy";
 
-        public static GameObject Place(string asset, Transform parent, float height, Vector3 feet, float yaw = 0f)
+        /// <param name="widen">Extra stretch along the model's x (sideways), e.g. a roomier tower cabin.</param>
+        public static GameObject Place(string asset, Transform parent, float height, Vector3 feet, float yaw = 0f, float widen = 1f)
         {
             string path = $"{DirectoryPath}/{asset}.glb";
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
@@ -27,8 +28,9 @@ namespace PleaseDontDrown.Editor
             go.transform.localRotation = Quaternion.identity;
             var bounds = LocalBounds(go.transform);
             float scale = height / bounds.size.y;
-            go.transform.localScale = Vector3.one * scale;
-            go.transform.localPosition = feet - new Vector3(bounds.center.x, bounds.min.y, bounds.center.z) * scale;
+            var scales = new Vector3(scale * widen, scale, scale);
+            go.transform.localScale = scales;
+            go.transform.localPosition = feet - Vector3.Scale(new Vector3(bounds.center.x, bounds.min.y, bounds.center.z), scales);
             // Rotate around the normalized foot pivot, not the source file's arbitrary origin.
             var pivot = new GameObject(asset + "_Pivot").transform;
             pivot.SetParent(parent, false);
@@ -122,28 +124,29 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>
-        /// The watch tower (turned to face the sea by its parent), scaled so its cabin fits a person.
+        /// The watch tower (turned to face the sea by its parent), scaled so its cabin fits a person and stretched
+        /// sideways by <paramref name="widen"/> so a few lifeguards fit in it.
         /// Measured at 5.5 m: cabin x -0.98..0.96, z -1.95..-0.20, deck top 2.285, eaves 4.26; door x -0.70..-0.02, top 4.175;
         /// deck z -2.4..0.15, x -1.51..1.51; the ramp runs down toward +z.
         /// </summary>
-        public static bool Tower(Transform parent, float scale, out DoorSpec door)
+        public static bool Tower(Transform parent, float scale, float widen, out DoorSpec door)
         {
             door = default;
-            var model = Place("tower", parent, 5.5f * scale, Vector3.zero);
+            var model = Place("tower", parent, 5.5f * scale, Vector3.zero, widen: widen);
             if (model == null) return false;
             ClearPrimitives(parent, model);
-            float k = scale;
-            float x0 = -0.98f * k, x1 = 0.96f * k, z0 = -1.95f * k, z1 = -0.20f * k, deck = 2.285f * k, eaves = 4.26f * k;
-            float dx0 = -0.70f * k, dx1 = -0.02f * k, dTop = 4.175f * k;
+            float k = scale, kx = scale * widen;
+            float x0 = -0.98f * kx, x1 = 0.96f * kx, z0 = -1.95f * k, z1 = -0.20f * k, deck = 2.285f * k, eaves = 4.26f * k;
+            float dx0 = -0.70f * kx, dx1 = -0.02f * kx, dTop = 4.175f * k;
             CutOpening(model, parent, new Bounds(new Vector3((dx0 + dx1) * 0.5f, (deck + 0.03f + dTop + 0.03f) * 0.5f, z1),
                 new Vector3(dx1 - dx0 + 0.05f, dTop - deck + 0.02f, 0.4f)), "tower_door");
 
-            Box(parent, "DeckCollision", new Vector3(0f, deck - 0.09f, -1.125f * k), new Vector3(3.02f * k, 0.18f, 2.55f * k));
-            foreach (float x in new[] { -1.25f * k, 1.25f * k })
+            Box(parent, "DeckCollision", new Vector3(0f, deck - 0.09f, -1.125f * k), new Vector3(3.02f * kx, 0.18f, 2.55f * k));
+            foreach (float x in new[] { -1.25f * kx, 1.25f * kx })
                 foreach (float z in new[] { -2.2f * k, -0.15f * k })
                     Box(parent, "StiltCollision", new Vector3(x, (deck - 0.18f) * 0.5f, z), new Vector3(0.22f, deck - 0.18f, 0.22f));
             Walls(parent, x0, x1, z0, z1, deck, eaves, dx0, dx1, dTop, frontIsPlusZ: true);
-            Ramp(parent, "StairCollision", new Vector3(0f, 0.04f, 2.35f * k), new Vector3(0f, deck, 0.15f * k), 1.05f * k);
+            Ramp(parent, "StairCollision", new Vector3(0f, 0.04f, 2.35f * k), new Vector3(0f, deck, 0.15f * k), 1.05f * kx);
             door = new DoorSpec { Hinge = new Vector3(dx0, deck, z1), Width = dx1 - dx0, Height = dTop - deck, LeafDirection = 1f, WallFacing = 1f };
             return true;
         }

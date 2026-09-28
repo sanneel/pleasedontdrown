@@ -542,8 +542,6 @@ namespace PleaseDontDrown.Editor
             float k = ShackScale;
             float east = 1.30f * k, floor = 0.575f * k, windowZ = -0.30f * k;
             Material wood = GetMaterial("Wood", new Color(0.55f, 0.36f, 0.22f));
-            Material cream = GetMaterial("SignBoard", new Color(0.95f, 0.93f, 0.85f));
-            Material red = GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f));
             Material seat = GetMaterial("StoolSeat", new Color(0.8f, 0.3f, 0.25f));
 
             // The counter: a plank over the window's own shelf (window opening y 2.13..3.21, shelf at 1.89).
@@ -556,14 +554,14 @@ namespace PleaseDontDrown.Editor
             pay.localPosition = new Vector3(east + 0.3f, 2.4f, windowZ);
             SetRef(lostAndFound, "_payPoint", pay);
 
-            // Sign standing on the roof over the window, the rates under the counter (TextMesh reads from its -z: turned to face east).
-            GameObject board = Primitive(PrimitiveType.Cube, "LostAndFoundSign", shack, new Vector3(east + 0.05f, 4.62f, windowZ), new Vector3(0.06f, 0.55f, 2.3f), cream, keepCollider: false);
-            foreach (float side in new[] { -0.8f, 0.8f })
-                Primitive(PrimitiveType.Cube, "SignPost", shack, new Vector3(east - 0.02f, 4.3f, windowZ + side), new Vector3(0.06f, 0.5f, 0.06f), wood, keepCollider: false);
-            WorldText(shack, "LostAndFoundText", new Vector3(east + 0.085f, 4.62f, windowZ), "LOST & FOUND", 80, 0.04f, red.color)
-                .transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
-            WorldText(shack, "LostAndFoundRates", new Vector3(east + 0.08f, 1.22f, windowZ), "We pay for:  wallets $30   phones $40\nwatches $35   sunglasses $20",
-                56, 0.017f, new Color(0.95f, 0.93f, 0.85f)).transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            // Painted sign standing on the roof over the window, the price chalkboard under the counter. Both face east;
+            // the pictures are painted by ArtSource/Tools/make_signs.py (engine text looked cheap, Meshy can't write).
+            GameObject board = Primitive(PrimitiveType.Cube, "LostAndFoundSign", shack, new Vector3(east + 0.02f, 4.72f, windowZ), new Vector3(0.08f, 0.78f, 2.5f), wood, keepCollider: false);
+            foreach (float side in new[] { -0.85f, 0.85f })
+                Primitive(PrimitiveType.Cube, "SignPost", shack, new Vector3(east - 0.05f, 4.3f, windowZ + side), new Vector3(0.07f, 0.7f, 0.07f), wood, keepCollider: false);
+            SignPicture(shack, "LostAndFoundSignFace", new Vector3(east + 0.068f, 4.72f, windowZ), -90f, new Vector2(2.5f, 0.78f), "lost_and_found_sign");
+            Primitive(PrimitiveType.Cube, "PriceBoard", shack, new Vector3(east + 0.05f, 1.24f, windowZ), new Vector3(0.04f, 0.58f, 0.93f), wood, keepCollider: false);
+            SignPicture(shack, "PriceBoardFace", new Vector3(east + 0.078f, 1.24f, windowZ), -90f, new Vector2(0.93f, 0.58f), "lost_and_found_prices");
             ConfigureInteractable(counter.AddComponent<Interactable>(), new[] { counter.GetComponent<Collider>() },
                 new[] { counter.GetComponent<Renderer>(), board.GetComponent<Renderer>() }, 3.2f);
 
@@ -582,6 +580,33 @@ namespace PleaseDontDrown.Editor
             stool = shack.TransformPoint(stoolLocal);
             stoolYaw = shack.eulerAngles.y + 90f;
             return lostAndFound;
+        }
+
+        /// <summary>
+        /// A painted picture (sign lettering, a chalkboard) on a quad, from Assets/_Game/Art/Signs/{texture}.png.
+        /// The quad shows its face on its local -z, so yaw -90 faces +x (east).
+        /// </summary>
+        private static GameObject SignPicture(Transform parent, string name, Vector3 localPos, float yaw, Vector2 size, string texture)
+        {
+            string path = $"Assets/_Game/Art/Signs/{texture}.png";
+            AssetDatabase.ImportAsset(path);
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer
+                && (importer.anisoLevel != 8 || importer.wrapMode != TextureWrapMode.Clamp || importer.maxTextureSize != 2048))
+            {
+                importer.anisoLevel = 8; // read at a slant from the beach
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.maxTextureSize = 2048;
+                importer.SaveAndReimport();
+            }
+            var picture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (picture == null) throw new FileNotFoundException("Sign picture missing (run ArtSource/Tools/make_signs.py)", path);
+            Material mat = GetMaterial("Sign_" + texture, Color.white, smoothness: 0.15f);
+            mat.SetTexture("_BaseMap", picture);
+            mat.mainTexture = picture;
+            EditorUtility.SetDirty(mat);
+            GameObject quad = Primitive(PrimitiveType.Quad, name, parent, localPos, new Vector3(size.x, size.y, 1f), mat, keepCollider: false);
+            quad.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            return quad;
         }
 
         /// <summary>Sandy's kiosk: counter (hand things in here), back board, striped awning and a sign.</summary>

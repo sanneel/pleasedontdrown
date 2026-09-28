@@ -157,8 +157,9 @@ takes a swimmer from the crowd, so the person you saw swimming is the one who st
 (the thief's victim, the silent woman's friend) and give them back. Swimmers are topped up out of sight. Towels and
 umbrellas are placed by the builder on dry sand away from buildings and palms.
 
-**Story places.** Island 1: the old station shack is Sandy's Lost & Found (door taken off, "LOST & FOUND" on the
-roof). She sits inside on a bar stool on a raised booth floor, looking out of the east window; hand things in at the
+**Story places.** Island 1: the old station shack is Sandy's Lost & Found (door taken off, a painted "LOST & FOUND"
+sign on the roof and a "WE PAY" price chalkboard under the counter: pictures painted by `ArtSource/Tools/make_signs.py`,
+because engine text looked cheap). She sits inside on a bar stool on a raised booth floor, looking out of the east window; hand things in at the
 counter on the window's shelf, or walk in and talk to her (she takes them too, or has a chat). When the story needs
 her she gets up, walks out through the doorway and back. The robber's jet ski is tied to the dock.
 Island 2 (~200 m south, same terrain mesh): the Grand Coral Hotel (reception desk = shop, infirmary bed, first-aid

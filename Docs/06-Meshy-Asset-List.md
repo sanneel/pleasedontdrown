@@ -4,6 +4,10 @@
 > This is the complete checklist. Meshy settings, the style rules and the texture prompt template are in
 > [03-Art-Direction-Meshy.md](03-Art-Direction-Meshy.md) §2 and §4.1; import notes in [04](04-Meshy-Integration.md).
 
+> **On the Free plan, start with [07-Meshy-Island-1.md](07-Meshy-Island-1.md):** island 1 only, and characters made
+> from an A-pose picture (Pose Control is Pro-only). It also adds `tower_wide`, `lf_sign_frame`, `lf_shelf`, `lost_box`
+> and `radio`.
+
 **Already done (keep):** `station_rusty` (the shack, now Sandy's Lost & Found), `tower`, `palm_tall`.
 **Must be redone:** `tourist_dad` and `lifeguard` came out as statues (no A-pose, no skeleton), so they can't move.
 
@@ -15,7 +19,8 @@ the named points (seat, grips, muzzle...), which Claude adds after import.
 2. For each row: Text to 3D (or Image to 3D where it says so), paste the **Prompt** (complete, style included),
    pick the best shape, then the texture step with the **Texture** prompt if there is one (otherwise the template in
    03 §4.1 with the colours from the prompt), PBR on, 2K.
-3. Characters: **A-pose**, then **auto-rig (humanoid)**. Everything else: no pose, no rig.
+3. Characters: **A-pose**, then **auto-rig (humanoid)**. Everything else: no pose, no rig. (No Pose button on the Free
+   plan: make an A-pose picture first and use Image to 3D, see 07.)
 4. Download **GLB** named exactly like the **File** column into `F:\GameDev\PleaseDontDrown\ArtSource\Meshy\`.
 5. Tell Claude which files arrived. Claude decimates, fixes scale and pivots, adds colliders and swaps them in.
 
