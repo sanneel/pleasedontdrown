@@ -106,7 +106,11 @@ namespace PleaseDontDrown.Interaction
                 _secondary.OnSecondary(player);
         }
 
-        /// <summary>Moves the visuals onto the "Outlined" layer, which a URP RenderObjects pass draws with an outline shader.</summary>
+        /// <summary>
+        /// Moves the visuals onto the "Outlined" layer, which a URP RenderObjects pass draws with an outline shader.
+        /// People (skinned characters) never get it: on them it was a yellow glow over the whole model, and the prompt
+        /// already says who you're looking at.
+        /// </summary>
         public void SetOutlined(bool outlined)
         {
             if (outlined == _outlined || _outlineLayer < 0)
@@ -114,7 +118,7 @@ namespace PleaseDontDrown.Interaction
             _outlined = outlined;
             foreach (Renderer r in _outlineRenderers)
             {
-                if (r == null) continue;
+                if (r == null || r is SkinnedMeshRenderer) continue;
                 if (outlined)
                 {
                     _originalLayers[r] = r.gameObject.layer;
