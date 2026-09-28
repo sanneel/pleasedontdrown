@@ -144,9 +144,11 @@ namespace PleaseDontDrown.Avatars
             if (rng.NextDouble() < 0.3) look.Extras |= AvatarExtras.Floaties;
             if (rng.NextDouble() < 0.2) look.Extras |= AvatarExtras.Sunscreen;
             if (look.TopColor == look.BottomColor) look.BottomColor = (byte)((look.BottomColor + 7) % ClothColors.Length);
-            // Most beach-goers are the Meshy models now (the code-built ones stay for variety and as the fallback).
-            if (feminine && rng.NextDouble() < 0.8) look.Body = Bodies.PickVariant(rng, (byte)Pick(rng, Bodies.TouristRed, Bodies.TouristSporty, Bodies.TouristPurple));
-            else if (!feminine && rng.NextDouble() < 0.35) look.Body = Bodies.PickVariant(rng, Bodies.TouristBuddy);
+            // Every tourist is a generated model (a base or one of its look-alikes); the code-built fields above are only
+            // the fallback if the model library is missing.
+            look.Body = feminine
+                ? Bodies.PickVariant(rng, (byte)Pick(rng, Bodies.TouristRed, Bodies.TouristSporty, Bodies.TouristPurple))
+                : Bodies.PickVariant(rng, Bodies.TouristBuddy);
             return look;
         }
 
@@ -171,7 +173,9 @@ namespace PleaseDontDrown.Avatars
 
         private const ulong Marker = 0xA7UL << 56; // tells a real look from 0 / garbage
 
-        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 5 };
+        // Body is last and 8 bits (ids up to 255: the look-alikes start at 32); 49 bits in all, under the marker. Old
+        // packs (5-bit Body) read the same.
+        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 8 };
 
         public ulong Pack()
         {

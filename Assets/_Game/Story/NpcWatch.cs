@@ -176,17 +176,22 @@ namespace PleaseDontDrown.Story
 
         private void Summary()
         {
-            int upright = 0, moving = 0, swimming = 0;
+            int upright = 0, moving = 0, swimming = 0, codeBuilt = 0;
             foreach (StoryNpc npc in StoryNpc.All)
             {
                 if (npc == null) continue;
+                if (Avatars.AvatarBodyLibrary.Get(npc.Look.Body) == null)
+                {
+                    codeBuilt++; // no generated model: a stand-in
+                    if (codeBuilt <= 4) Debug.Log($"[NpcWatch] code-built: {npc.Name} ({npc.Role}) body id {npc.Look.Body}");
+                }
                 if (npc.IsUpright) upright++;
                 if (npc.IsMoving) moving++;
                 if (npc.IsSwimming) swimming++;
             }
             var parts = new List<string>();
             foreach (var kv in _counts) parts.Add($"{kv.Key} {kv.Value}");
-            Debug.Log($"[NpcWatch] t={Time.time:F0}s characters {StoryNpc.All.Count} (upright {upright}, moving {moving}, swimming {swimming}); " +
+            Debug.Log($"[NpcWatch] t={Time.time:F0}s characters {StoryNpc.All.Count} (upright {upright}, moving {moving}, swimming {swimming}, code-built {codeBuilt}); " +
                       $"problem samples: {(parts.Count == 0 ? "none" : string.Join(", ", parts))}");
         }
     }

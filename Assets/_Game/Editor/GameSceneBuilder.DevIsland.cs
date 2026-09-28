@@ -128,17 +128,28 @@ namespace PleaseDontDrown.Editor
             DevSign(root, "ItemsSign", OnGround(new Vector3(-224f, 0f, -63.5f)), 180f, new Vector2(2f, 0.62f), "dev_items", 1.2f);
 
             // ---------------------------------------------------------------- the model gallery
-            (string name, byte body, bool feminine)[] models =
+            // The generated models in a row; west of the item shelves, one row per tourist with its look-alikes (#1..#10).
+            var models = new List<(string name, byte body, bool feminine, Vector3 at)>
             {
-                ("Sandy", AvatarLook.Bodies.Sandy, true), ("Sandy (boss)", AvatarLook.Bodies.SandyBoss, true),
-                ("Tourist: red bikini", AvatarLook.Bodies.TouristRed, true), ("Tourist: sporty", AvatarLook.Bodies.TouristSporty, true),
-                ("Tourist: purple bikini", AvatarLook.Bodies.TouristPurple, true), ("Tourist: sunburnt dad", AvatarLook.Bodies.TouristBuddy, false),
-                ("Lifeguard (code-built)", 0, false),
+                ("Sandy", AvatarLook.Bodies.Sandy, true, new Vector3(-208f, 0f, -80f)),
+                ("Sandy (boss)", AvatarLook.Bodies.SandyBoss, true, new Vector3(-212.5f, 0f, -80f)),
+                ("Tourist: red bikini", AvatarLook.Bodies.TouristRed, true, new Vector3(-217f, 0f, -80f)),
+                ("Tourist: sporty", AvatarLook.Bodies.TouristSporty, true, new Vector3(-221.5f, 0f, -80f)),
+                ("Tourist: purple bikini", AvatarLook.Bodies.TouristPurple, true, new Vector3(-226f, 0f, -80f)),
+                ("Tourist: sunburnt dad", AvatarLook.Bodies.TouristBuddy, false, new Vector3(-230.5f, 0f, -80f)),
             };
-            var gallery = new List<(string name, byte body, bool feminine, StoryNpc npc)>();
-            for (int i = 0; i < models.Length; i++)
+            string[] baseNames = { "Red bikini", "Sporty", "Purple bikini", "Sunburnt dad" };
+            for (int b = 0; b < AvatarLook.Bodies.VariantBases.Length; b++)
             {
-                Vector3 at = OnGround(new Vector3(-208f - i * 4.5f, 0f, -80f));
+                byte baseBody = AvatarLook.Bodies.VariantBases[b];
+                for (int n = 1; n <= AvatarLook.Bodies.VariantsPerBase; n++)
+                    models.Add(($"{baseNames[b]} #{n}", AvatarLook.Bodies.Variant(baseBody, n), AvatarLook.Bodies.IsFeminine(AvatarLook.Bodies.Variant(baseBody, n)),
+                        new Vector3(-241f - (n - 1) * 2.6f, 0f, -62f - b * 4.5f)));
+            }
+            var gallery = new List<(string name, byte body, bool feminine, StoryNpc npc)>();
+            for (int i = 0; i < models.Count; i++)
+            {
+                Vector3 at = OnGround(models[i].at);
                 GameObject pedestal = Primitive(PrimitiveType.Cylinder, "Pedestal", root, at + Vector3.up * 0.15f, new Vector3(1.4f, 0.15f, 1.4f), stone);
                 TagSurface(pedestal, SurfaceKind.Rock);
                 StoryNpc npc = PlaceNpc(npcPrefab, root, "Gallery_" + i, at + Vector3.up * 0.32f, 0f);

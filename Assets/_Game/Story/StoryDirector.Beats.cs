@@ -27,21 +27,26 @@ namespace PleaseDontDrown.Story
         public static AvatarLook ReceptionistLook => new()
         {
             Figure = 1, Build = 1, Height = 1, Skin = 4, Hair = HairStyle.Long, HairColor = 0,
-            Top = TopStyle.TShirt, TopColor = 7, Bottom = BottomStyle.Trousers, BottomColor = 14
+            Top = TopStyle.TShirt, TopColor = 7, Bottom = BottomStyle.Trousers, BottomColor = 14,
+            Body = AvatarLook.Bodies.Variant(AvatarLook.Bodies.TouristSporty, 2) // generated model (own model later)
         };
 
+        // The robber and the pirates are generated models too (look-alikes of the only man model for now); the code-built
+        // fields are the fallback.
         public static AvatarLook RobberLook => new()
         {
             Figure = 0, Build = 0, Height = 2, Skin = 2, Hair = HairStyle.Short, HairColor = 0,
             Top = TopStyle.TShirt, TopColor = 14, Bottom = BottomStyle.Trousers, BottomColor = 7,
-            Hat = HatStyle.Bandana, HatColor = 14, Glasses = GlassesStyle.Sunglasses, Face = FacialHair.Stubble
+            Hat = HatStyle.Bandana, HatColor = 14, Glasses = GlassesStyle.Sunglasses, Face = FacialHair.Stubble,
+            Body = AvatarLook.Bodies.Variant(AvatarLook.Bodies.TouristBuddy, 6)
         };
 
         public static AvatarLook PirateLook(int i) => new()
         {
             Figure = 0, Build = (byte)(i % 2 == 0 ? 2 : 3), Height = (byte)(1 + i % 3), Skin = (byte)(2 + i % 4),
             Hair = HairStyle.Long, HairColor = (byte)(i % 3), Top = i % 2 == 0 ? TopStyle.Tank : TopStyle.None, TopColor = 1,
-            Bottom = BottomStyle.Trousers, BottomColor = 11, Hat = HatStyle.Bandana, HatColor = 0, Face = i % 3 == 2 ? FacialHair.Mustache : FacialHair.Beard
+            Bottom = BottomStyle.Trousers, BottomColor = 11, Hat = HatStyle.Bandana, HatColor = 0, Face = i % 3 == 2 ? FacialHair.Mustache : FacialHair.Beard,
+            Body = AvatarLook.Bodies.Variant(AvatarLook.Bodies.TouristBuddy, 1 + (i * 3) % AvatarLook.Bodies.VariantsPerBase)
         };
 
         private static AvatarLook GuestLook(int seed, int figure) => AvatarLook.RandomTourist(seed, figure);
