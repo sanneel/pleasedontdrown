@@ -183,6 +183,11 @@ namespace PleaseDontDrown.Avatars
         public void BuildMesh(AvatarMeshKit kit, Color skin, Action<int> on, bool lowPoly = false)
         {
             float k = _scale;
+            if (_smoothStyle)
+            {
+                BuildSmooth(kit, skin, on);
+                return;
+            }
             int big = lowPoly ? 7 : 12, small = lowPoly ? 6 : 10, rings = lowPoly ? 4 : 7, fingerSides = lowPoly ? 6 : 7;
             float chunk = lowPoly ? 1.22f : 1f;
             on(-1);
@@ -206,6 +211,38 @@ namespace PleaseDontDrown.Avatars
                     if (s == Segments - 1 && !lowPoly)
                         kit.Ellipsoid(Mirror(new Vector3(r1 / k * 0.55f, -Lengths[f][s] * 0.75f, 0f)) * k,
                             new Vector3(0.0035f, r1 / k * 0.75f, r1 / k * 0.7f) * k, nail, segments: 6, rings: 4); // nail on the back
+                }
+            }
+        }
+
+        private bool _smoothStyle;
+
+        /// <summary>
+        /// The first-person look (How to Fish): one soft rounded palm, round sausage fingers, a short wrist that just
+        /// ends. No knuckle bumps, thumb pads or nails, so the smooth shading stays clean. Build with smooth normals.
+        /// </summary>
+        public void BuildSmoothMesh(AvatarMeshKit kit, Color skin, Action<int> on)
+        {
+            _smoothStyle = true;
+            BuildMesh(kit, skin, on);
+            _smoothStyle = false;
+        }
+
+        private void BuildSmooth(AvatarMeshKit kit, Color skin, Action<int> on)
+        {
+            float k = _scale;
+            const float chunk = 1.25f;
+            on(-1);
+            kit.Ellipsoid(new Vector3(0f, -0.054f, 0f) * k, new Vector3(0.025f, 0.056f, 0.05f) * k, skin, segments: 18, rings: 12);
+            kit.Limb(0.05f * k, 0.028f * k, 0.03f * k, skin, new Vector3(0f, 0.035f, 0f) * k, segments: 14, crossSection: new Vector2(0.85f, 1.15f));
+            for (int f = 0; f < Fingers; f++)
+            {
+                for (int s = 0; s < Segments; s++)
+                {
+                    on(BoneIndex(f, s));
+                    float r0 = Radii[f] * k * (1f - s * 0.08f) * chunk;
+                    // Segments overlap a little so bent joints stay round instead of showing a gap.
+                    kit.Limb(Lengths[f][s] * k, r0, r0 * 0.94f, skin, segments: 12);
                 }
             }
         }

@@ -5,9 +5,12 @@ using UnityEngine.Rendering;
 
 namespace PleaseDontDrown.Player
 {
+    /// <summary>Boxing punches (UFC style). Straight = jab with the left hand, cross with the right.</summary>
+    public enum PunchKind : byte { Straight, Hook, Uppercut, Overhand }
+
     /// <summary>
-    /// The local player's own hands, How to Fish style: just two big, chunky, faceted hands floating in view
-    /// (a stub of wrist, no arms).
+    /// The local player's own hands, How to Fish style: just two big, smooth, softly lit hands floating in view
+    /// (a stub of wrist, no arms). Empty hands box: jab, cross, hook, uppercut, overhand, with a guard between.
     ///
     /// Idle hands rest at the bottom of the view in a frame that follows where you face with a springy lag and a
     /// fixed downward tilt: they sway when you turn and come up into view when you look down. Picking something
@@ -63,6 +66,10 @@ namespace PleaseDontDrown.Player
         private float _gestureStart = -10f;
         private bool _rigidGrip; // holding a gun: hands stay exactly on it (it does its own kick)
         private Vector3 _reach;
+        private PunchKind _punchKind;
+        private bool _punchLeft;
+        private float _punchStart = -10f;
+        private Vector3 _punchFrom;     // camera space: where the punching fist was when the punch started
         private float _lastPump = -10f;
         private Vector3 _pumpPoint;
 
@@ -98,9 +105,9 @@ namespace PleaseDontDrown.Player
             Matrix4x4 rootToWorld = _root.localToWorldMatrix;
             for (int i = 0; i < _bones.Length; i++) bindposes[i] = _bones[i].worldToLocalMatrix * rootToWorld;
             void Use(int index) => kit.SetBone(index, bindposes[index].inverse);
-            _left.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f), lowPoly: true);
-            _right.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f), lowPoly: true);
-            _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh, flat: true);
+            _left.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f));
+            _right.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f));
+            _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh);
 
             if (_renderer == null)
             {
@@ -114,8 +121,25 @@ namespace PleaseDontDrown.Player
             _renderer.sharedMesh = _mesh;
             _renderer.bones = _bones;
             _renderer.rootBone = _root;
-            _renderer.sharedMaterial = AvatarRig.SharedMaterial;
+            _renderer.sharedMaterial = HandMaterial();
             _built = true;
+        }
+
+        private Material _handMaterial;
+
+        /// <summary>Soft and even, like How to Fish: wrapped light, no toon edge, no rim, no shadows falling on them.</summary>
+        private Material HandMaterial()
+        {
+            if (_handMaterial != null) return _handMaterial;
+            Material source = AvatarRig.SharedMaterial;
+            if (source == null) return null;
+            _handMaterial = new Material(source) { name = "FirstPersonHands" };
+            _handMaterial.SetFloat("_ShadowAmount", 0f);
+            _handMaterial.SetFloat("_Softness", 1f);
+            _handMaterial.SetFloat("_Rim", 0f);
+            _handMaterial.SetFloat("_Ambient", 0.8f);
+            _handMaterial.SetColor("_ShadowTint", new Color(0.86f, 0.8f, 0.8f));
+            return _handMaterial;
         }
 
         private void SetupHand(Hand hand, int wrist, float s)
@@ -139,6 +163,144 @@ namespace PleaseDontDrown.Player
             _reach = point;
         }
 
+        /// <summary>How long each punch takes (wind-up, strike, back to guard). The hit lands at 45%.</summary>
+        public static float PunchDuration(PunchKind kind) => kind switch
+        {
+            PunchKind.Straight => 0.32f,
+            PunchKind.Hook => 0.4f,
+            PunchKind.Uppercut => 0.38f,
+            _ => 0.44f
+        };
+
+        private const float GuardHold = 0.9f; // fists stay up this long after the last punch
+
+        /// <summary>Throw a punch with one fist (the other one stays up in guard).</summary>
+        public void PlayPunch(PunchKind kind, bool leftHand)
+        {
+            _punchKind = kind;
+            _punchLeft = leftHand;
+            _punchStart = Time.time;
+            Hand hand = leftHand ? _left : _right;
+            _punchFrom = _camera.transform.InverseTransformPoint(hand.Palm);
+        }
+
+        /// <summary>Boxing (camera space; <paramref name="side"/> -1 left fist, +1 right).</summary>
+        private static Vector3 Guard(float side) => new(side * 0.2f, -0.25f, 0.36f);
+
+        private void PunchPath(PunchKind kind, float side, out Vector3 wind, out Vector3 control, out Vector3 impact)
+        {
+            switch (kind)
+            {
+                case PunchKind.Hook:
+                    // Swings out wide and comes round across the middle, elbow up.
+                    wind = new Vector3(side * 0.42f, -0.15f, 0.26f);
+                    control = new Vector3(side * 0.4f, -0.1f, 0.66f);
+                    impact = new Vector3(-side * 0.04f, -0.09f, 0.62f);
+                    break;
+                case PunchKind.Uppercut:
+                    // Dips low, then drives straight up the middle.
+                    wind = new Vector3(side * 0.14f, -0.48f, 0.3f);
+                    control = new Vector3(side * 0.08f, -0.36f, 0.58f);
+                    impact = new Vector3(side * 0.03f, -0.02f, 0.56f);
+                    break;
+                case PunchKind.Overhand:
+                    // Cocked high behind, loops over the top and down.
+                    wind = new Vector3(side * 0.34f, 0.06f, 0.04f);
+                    control = new Vector3(side * 0.26f, 0.14f, 0.52f);
+                    impact = new Vector3(side * 0.02f, -0.12f, 0.68f);
+                    break;
+                default:
+                    // Straight down the pipe, turning over at the end.
+                    wind = new Vector3(side * 0.16f, -0.21f, 0.22f);
+                    impact = new Vector3(side * 0.03f, -0.09f, 0.74f);
+                    control = (wind + impact) * 0.5f;
+                    break;
+            }
+        }
+
+        /// <summary>Where a fist's knuckles point and where its palm faces, for each punch at impact.</summary>
+        private static void PunchOrientation(PunchKind kind, float side, Transform cam, out Vector3 knuckles, out Vector3 palm)
+        {
+            Vector3 f = cam.forward, u = cam.up, r = cam.right;
+            switch (kind)
+            {
+                case PunchKind.Hook:
+                    knuckles = (f - r * (side * 0.8f)).normalized;
+                    palm = -u;
+                    break;
+                case PunchKind.Uppercut:
+                    knuckles = (u + f * 0.35f).normalized;
+                    palm = -f;
+                    break;
+                case PunchKind.Overhand:
+                    knuckles = (f - u * 0.45f).normalized;
+                    palm = (-u - r * (side * 0.4f)).normalized;
+                    break;
+                default:
+                    knuckles = f;
+                    palm = -u;
+                    break;
+            }
+        }
+
+        private static Vector3 Bezier(Vector3 a, Vector3 b, Vector3 c, float t)
+        {
+            float m = 1f - t;
+            return m * m * a + 2f * m * t * b + t * t * c;
+        }
+
+        /// <summary>A fist throwing (or recovering from) the current punch, or up in guard. False when not boxing.</summary>
+        private bool BoxingPose(Hand hand, Transform cam, out Vector3 palm, out Quaternion rot, out HandPose pose)
+        {
+            palm = default;
+            rot = default;
+            pose = HandPose.Fist;
+            float since = Time.time - _punchStart;
+            float duration = PunchDuration(_punchKind);
+            if (since > duration + GuardHold) return false;
+            float side = hand.Side;
+
+            // Guard: fists up by the chin, knuckles up, palms in, a little bounce.
+            Vector3 guard = Guard(side) + new Vector3(0f, Mathf.Sin(Time.time * 7f + side) * 0.008f, 0f);
+            Vector3 guardKnuckles = (cam.up * 0.8f + cam.forward * 0.6f).normalized;
+            Vector3 guardPalm = (-cam.forward * 0.6f - cam.right * (side * 0.7f)).normalized;
+            bool punching = hand.Right != _punchLeft && since < duration;
+            if (!punching)
+            {
+                palm = cam.TransformPoint(guard);
+                rot = HandBones.Orient(guardKnuckles, guardPalm, side);
+                return true;
+            }
+
+            float u = since / duration;
+            PunchPath(_punchKind, side, out Vector3 wind, out Vector3 control, out Vector3 impact);
+            PunchOrientation(_punchKind, side, cam, out Vector3 knuckles, out Vector3 palmDir);
+            Vector3 local;
+            float turn; // 0 = guard orientation, 1 = impact orientation
+            if (u < 0.22f)
+            {
+                float t = Mathf.SmoothStep(0f, 1f, u / 0.22f);
+                local = Vector3.Lerp(_punchFrom, wind, t);
+                turn = t * 0.3f;
+            }
+            else if (u < 0.45f)
+            {
+                float t = (u - 0.22f) / 0.23f;
+                t = 1f - (1f - t) * (1f - t); // snaps out fast, eases into the target
+                local = Bezier(wind, control, impact, t);
+                turn = 0.3f + 0.7f * t;
+            }
+            else
+            {
+                float t = Mathf.SmoothStep(0f, 1f, (u - 0.45f) / 0.55f);
+                local = Vector3.Lerp(impact, guard, t);
+                turn = 1f - t;
+            }
+            palm = cam.TransformPoint(local);
+            rot = Quaternion.Slerp(HandBones.Orient(guardKnuckles, guardPalm, side), HandBones.Orient(knuckles, palmDir, side), turn);
+            return true;
+        }
+
         /// <summary>We pressed a chest (CPR).</summary>
         public void OnPump(Vector3 chest)
         {
@@ -158,6 +320,7 @@ namespace PleaseDontDrown.Player
         private void OnDestroy()
         {
             if (_mesh != null) Destroy(_mesh);
+            if (_handMaterial != null) Destroy(_handMaterial);
             if (_root != null) Destroy(_root.gameObject);
         }
 
@@ -225,19 +388,11 @@ namespace PleaseDontDrown.Player
             float sincePump = t - _lastPump;
             float sinceGesture = t - _gestureStart;
 
-            if (hand.Right && _gesture == AvatarGesture.Punch && sinceGesture < 0.34f)
+            if (!usesGrip && !(motor != null && (motor.IsSwimming || motor.IsClimbing)) && BoxingPose(hand, cam, out palm, out rot, out pose))
             {
-                // Punch: a fist jabs out to the target (or straight ahead) and back.
+                // Boxing: the path itself is smooth, so only a short blend when the fists first come up.
                 state = State.Punch;
-                float u = sinceGesture / 0.34f;
-                float extend = u < 0.25f ? -0.3f * (u / 0.25f) : Mathf.Sin((u - 0.25f) / 0.75f * Mathf.PI);
-                Vector3 rest = cam.TransformPoint(new Vector3(0.22f, -0.3f, 0.3f));
-                Vector3 target = _reach != Vector3.zero ? _reach : cam.position + cam.forward * 0.85f - cam.up * 0.08f;
-                target = cam.position + Vector3.ClampMagnitude(target - cam.position, MaxReach + 0.2f);
-                palm = Vector3.LerpUnclamped(rest, target, extend);
-                rot = HandBones.Orient(target - rest, -cam.up, side);
-                pose = HandPose.Fist;
-                blend = 0.05f;
+                blend = 0.08f;
             }
             else if (_gesture == AvatarGesture.Breath && sinceGesture < 1.0f && _reach != Vector3.zero)
             {

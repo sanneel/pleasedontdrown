@@ -8,6 +8,8 @@ Shader "PleaseDontDrown/Avatar"
         _ShadowTint ("Shadow tint", Color) = (0.62, 0.66, 0.8, 1)
         _Ambient ("Ambient strength", Float) = 0.55
         _Rim ("Rim light", Float) = 0.28
+        _ShadowAmount ("Receive shadows", Range(0, 1)) = 1
+        _Softness ("Soft light (0 toon .. 1 smooth wrap)", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -20,6 +22,8 @@ Shader "PleaseDontDrown/Avatar"
             half4 _ShadowTint;
             half _Ambient;
             half _Rim;
+            half _ShadowAmount;
+            half _Softness;
         CBUFFER_END
         ENDHLSL
 
@@ -81,7 +85,9 @@ Shader "PleaseDontDrown/Avatar"
                 Light sun = GetMainLight(TransformWorldToShadowCoord(input.positionWS));
                 half ndl = dot(n, sun.direction);
                 // Soft two-tone: a wide, smooth terminator reads as "cartoon" without hard banding.
-                half lit = smoothstep(-0.15, 0.35, ndl) * lerp(1.0, sun.shadowAttenuation, 0.85);
+                half toon = smoothstep(-0.15, 0.35, ndl);
+                half wrap = saturate(ndl * 0.5 + 0.5); // soft half-Lambert: no hard terminator
+                half lit = lerp(toon, wrap, _Softness) * lerp(1.0, sun.shadowAttenuation, 0.85 * _ShadowAmount);
                 half3 light = lerp(_ShadowTint.rgb * 0.55, 1.0, lit) * sun.color;
                 half3 ambient = SampleSH(n) * _Ambient;
                 half3 color = albedo * (light * 0.8 + ambient);
