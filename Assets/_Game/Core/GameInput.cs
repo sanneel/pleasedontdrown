@@ -85,6 +85,7 @@ namespace PleaseDontDrown.Core
             _global = new InputActionMap("Global");
             ToggleConsole = _global.AddAction("ToggleConsole", InputActionType.Button, "<Keyboard>/backquote");
             ToggleConsole.AddBinding("<Keyboard>/f2");
+            ToggleConsole.AddBinding("<Keyboard>/f1"); // laptops where F2 needs Fn
             ToggleMenu = _global.AddAction("ToggleMenu", InputActionType.Button, "<Keyboard>/escape");
             ToggleMenu.AddBinding("<Gamepad>/start");
 

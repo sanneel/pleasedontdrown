@@ -163,10 +163,49 @@ def prices_board():
     return img
 
 
+PURPLE = (108, 78, 190)
+SAND = (243, 228, 190)
+
+
+def board_sign(size, face_color, title, title_size, subtitle=None, seed=21, text_fill=CREAM, outline=NAVY):
+    """A painted board in a wooden frame with one big line (and an optional smaller one under it)."""
+    img = planks(size, seed, WOOD_DARK, WOOD_LIGHT).convert('RGBA')
+    face = Image.new('RGBA', size, face_color + (255,))
+    strokes = ImageChops.multiply(noise(size, seed + 1, 10, 215, 255, stretch=12, blur=4), noise(size, seed + 2, 60, 225, 255, blur=20))
+    face = Image.merge('RGBA', [ImageChops.multiply(ch, strokes) for ch in face.split()[:3]] + [face.split()[3]])
+    inset = max(16, size[1] // 14)
+    img.paste(face, (0, 0), rounded_mask(size, inset, inset * 0.8))
+    ImageDraw.Draw(img).rounded_rectangle([inset * 1.35, inset * 1.35, size[0] - inset * 1.35, size[1] - inset * 1.35],
+                                          inset * 0.6, outline=text_fill, width=max(3, inset // 6))
+    while title_size > 20 and font('Roboto-Black.ttf', title_size).getlength(title) > size[0] * 0.82:
+        title_size -= 4  # shrink long lines to fit the board
+    cy = size[1] / 2 - (title_size * 0.28 if subtitle else 0)
+    outlined_text(img, (size[0] / 2, cy), title, font('Roboto-Black.ttf', title_size), fill=text_fill, outline=outline,
+                  stroke=max(4, title_size // 14), shadow=(title_size // 22, title_size // 18))
+    if subtitle:
+        outlined_text(img, (size[0] / 2, cy + title_size * 0.78), subtitle, font('Roboto-Bold.ttf', int(title_size * 0.34)),
+                      fill=text_fill, outline=outline, stroke=max(2, title_size // 40))
+    return img.convert('RGB')
+
+
+def dev_signs():
+    """The dev island: its name board, the zone boards, the range's distance plates, the teleport pads."""
+    yield 'dev_island', board_sign((2048, 640), PURPLE, 'DEV ISLAND', 250, 'guns  ·  shooting range  ·  rescue tests  ·  models', seed=31)
+    for name, text, colour in (('dev_armory', 'ARMORY', TEAL), ('dev_range', 'SHOOTING RANGE', TEAL),
+                               ('dev_gallery', 'MODEL GALLERY', TEAL), ('dev_rescue', 'RESCUE TESTS', RED),
+                               ('dev_items', 'ITEMS', TEAL), ('dev_to_island', 'TO DEV ISLAND', PURPLE),
+                               ('dev_to_beach', 'BACK TO THE BEACH', PURPLE)):
+        yield name, board_sign((1024, 320), colour, text, 150 if len(text) < 10 else 104, seed=40 + len(name))
+    for metres in (10, 25, 50, 100, 150):
+        yield f'dev_range_{metres}', board_sign((512, 256), SAND, f'{metres} m', 130, seed=60 + metres, text_fill=NAVY, outline=CREAM)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     lost_and_found_sign().save(os.path.join(OUT, 'lost_and_found_sign.png'), optimize=True)
     prices_board().save(os.path.join(OUT, 'lost_and_found_prices.png'), optimize=True)
+    for name, img in dev_signs():
+        img.save(os.path.join(OUT, name + '.png'), optimize=True)
     print('signs written to', OUT)
 
 

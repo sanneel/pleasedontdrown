@@ -6,7 +6,8 @@ using UnityEngine.InputSystem;
 namespace PleaseDontDrown.UI
 {
     /// <summary>
-    /// Drop-down developer console (` or F2). Shows recent game logs and runs <see cref="DevCommands"/>.
+    /// Drop-down developer console (` , F1 or F2). Shows recent game logs and runs <see cref="DevCommands"/>.
+    /// Works on a Georgian keyboard layout too: letters are typed as the Latin letter on the same key.
     /// IMGUI on purpose: zero setup, always works, replaced by nothing (it's a dev tool).
     /// </summary>
     public class DevConsole : MonoBehaviour
@@ -92,6 +93,9 @@ namespace PleaseDontDrown.UI
                     e.Use();
                     return;
                 }
+                // Georgian (or any non-Latin) keyboard layout: type the Latin letter of the same key, so commands work
+                // without switching the layout.
+                if (e.character != '\0' && LatinForKey(e.character) is char latin) e.character = latin;
                 switch (e.keyCode)
                 {
                     case KeyCode.Escape:
@@ -129,9 +133,27 @@ namespace PleaseDontDrown.UI
             }
         }
 
+        // Georgian keyboard (QWERTY-based) letters and the Latin letter on the same key.
+        private const string GeorgianKeys = "ქწჭერღტთყუიოპასშდფგჰჯჟკლზძხცჩვბნმ";
+        private const string LatinKeys = "qwWerRtTyuiopasSdfghjJklzZxcCvbnm";
+
+        private static char? LatinForKey(char c)
+        {
+            int i = GeorgianKeys.IndexOf(c);
+            return i >= 0 ? LatinKeys[i] : null;
+        }
+
+        private static string ToLatin(string text)
+        {
+            var chars = text.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+                if (LatinForKey(chars[i]) is char latin) chars[i] = latin;
+            return new string(chars);
+        }
+
         private void Submit()
         {
-            string command = _input.Trim();
+            string command = ToLatin(_input.Trim()); // anything pasted in Georgian too
             _input = string.Empty;
             if (command.Length == 0) return;
             AddLine($"<color=#8fd3ff>> {command}</color>");

@@ -368,7 +368,8 @@ namespace PleaseDontDrown.Editor
             (string name, Bounds bounds)[] areas =
             {
                 ("Island1", new Bounds(new Vector3(0f, 0f, 8f), new Vector3(130f, 40f, 124f))),
-                ("Island2", new Bounds(new Vector3(20f, 0f, -232f), new Vector3(144f, 40f, 124f)))
+                ("Island2", new Bounds(new Vector3(20f, 0f, -232f), new Vector3(144f, 40f, 124f))),
+                ("DevIsland", new Bounds(new Vector3(-230f, 0f, -60f), new Vector3(110f, 40f, 90f)))
             };
             var baked = new List<Object>();
             foreach ((string name, Bounds bounds) in areas)
@@ -402,7 +403,8 @@ namespace PleaseDontDrown.Editor
             {
                 new(0f, 10f, 5f), new(12f, 8f, 4f), new(-8f, 2f, 2.6f), new(-8f, 6f, 2.6f), new(0f, 15f, 4.5f),
                 new(4.6f, 12.6f, 2f), new(-5f, 12.5f, 1.8f), new(-4f, 9.5f, 2.5f), new(-2.2f, 11.2f, 1.5f), new(15.5f, 5f, 1.2f),
-                new(4.5f, 14f, 1.2f), new(LostItemSpots[0].x, LostItemSpots[0].z, 1.5f), new(RobberSpawn.x, RobberSpawn.z, 2f)
+                new(4.5f, 14f, 1.2f), new(LostItemSpots[0].x, LostItemSpots[0].z, 1.5f), new(RobberSpawn.x, RobberSpawn.z, 2f),
+                new(DevPadOnIsland1.x, DevPadOnIsland1.z, 3f)
             };
             foreach (Vector2 palm in MeshyArt.PalmSpots) list.Add(new Vector3(palm.x, palm.y, 1.8f));
             return list;
@@ -625,12 +627,12 @@ namespace PleaseDontDrown.Editor
             return kiosk;
         }
 
-        private static void BuildDock(Transform env, string name, Vector3 landEnd, float length)
+        private static void BuildDock(Transform env, string name, Vector3 landEnd, float length, float yaw = 0f)
         {
             Material wood = GetMaterial("Wood", new Color(0.55f, 0.36f, 0.22f));
             var dock = new GameObject(name).transform;
             dock.SetParent(env, false);
-            dock.position = new Vector3(landEnd.x, 0f, landEnd.z);
+            dock.SetPositionAndRotation(new Vector3(landEnd.x, 0f, landEnd.z), Quaternion.Euler(0f, yaw, 0f));
             TagSurface(dock.gameObject, SurfaceKind.Wood);
             Primitive(PrimitiveType.Cube, "Deck", dock, new Vector3(0f, 0.175f, 0f), new Vector3(2.4f, 0.25f, length), wood);
             for (float z = -length * 0.5f + 1f; z <= length * 0.5f; z += 4f)
@@ -759,7 +761,7 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>The robber's jet ski: hull, seat, handlebars; driven with W/S/A/D (keys needed).</summary>
-        private static Vehicle BuildJetSki(Transform env, Vector3 position, float yaw)
+        private static Vehicle BuildJetSki(Transform env, Vector3 position, float yaw, string key = "Jet Ski Keys", string displayName = "Jet Ski")
         {
             Material red = GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f));
             Material white = GetMaterial("White", new Color(0.95f, 0.95f, 0.95f));
@@ -793,7 +795,7 @@ namespace PleaseDontDrown.Editor
             Transform gripL = P("GripLeft", new Vector3(-0.3f, 0.86f, 0.5f), Quaternion.LookRotation(Vector3.forward, Vector3.up));
             Transform gripR = P("GripRight", new Vector3(0.3f, 0.86f, 0.5f), Quaternion.LookRotation(Vector3.forward, Vector3.up));
             Transform thrust = P("Thrust", new Vector3(0f, -0.05f, -1.35f), Quaternion.identity);
-            return FinishVehicle(root, "Jet Ski", "Jet Ski Keys", seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.32f,
+            return FinishVehicle(root, displayName, key, seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.32f,
                 thrustForce: 11f, maxSpeed: 17f, turnRate: 1.7f);
         }
 

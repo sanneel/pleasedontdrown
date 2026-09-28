@@ -87,6 +87,9 @@ sitting, CPR pose and the ragdoll work on them unchanged.
    `Resources/AvatarBodies.asset`.
 4. **Use it:** `AvatarLook.Body` = the body's id (`AvatarLook.Bodies`, packed into the synced look, 0 = code-built).
    Sandy: `StoryDirector.SandyLook.Body = Bodies.Sandy`; `Bodies.SandyBoss` is baked and ready for the boss scenes.
+   Tourists (28 Sep): red bikini, sporty, purple bikini (all `--bust 1`) and the sunburnt dad; `AvatarLook.RandomTourist`
+   gives 80% of women one of the three and 35% of men the dad, so most of the beach, the drowning tourists and CPR
+   use them. The jiggle now has real chest shapes to move.
 
 Limits: the face is Meshy's painted one (no talking mouth or blinking yet), fingers don't bend (the hand is one
 piece), and textures are whatever Meshy painted (Sandy has pale streaks down the sides of her trousers).

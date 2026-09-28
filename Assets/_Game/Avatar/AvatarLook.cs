@@ -64,6 +64,10 @@ namespace PleaseDontDrown.Avatars
         {
             public const byte Sandy = 1;
             public const byte SandyBoss = 2;
+            public const byte TouristRed = 3;      // red bikini
+            public const byte TouristSporty = 4;   // turquoise sports bikini
+            public const byte TouristPurple = 5;   // purple bikini, curvy
+            public const byte TouristBuddy = 6;    // sunburnt dad in flowery trunks
         }
 
         public static readonly string[] BuildNames = { "Slim", "Regular", "Broad", "Round" };
@@ -119,6 +123,9 @@ namespace PleaseDontDrown.Avatars
             if (rng.NextDouble() < 0.3) look.Extras |= AvatarExtras.Floaties;
             if (rng.NextDouble() < 0.2) look.Extras |= AvatarExtras.Sunscreen;
             if (look.TopColor == look.BottomColor) look.BottomColor = (byte)((look.BottomColor + 7) % ClothColors.Length);
+            // Most beach-goers are the Meshy models now (the code-built ones stay for variety and as the fallback).
+            if (feminine && rng.NextDouble() < 0.8) look.Body = (byte)Pick(rng, Bodies.TouristRed, Bodies.TouristSporty, Bodies.TouristPurple);
+            else if (!feminine && rng.NextDouble() < 0.35) look.Body = Bodies.TouristBuddy;
             return look;
         }
 
@@ -126,6 +133,7 @@ namespace PleaseDontDrown.Avatars
         {
             AvatarLook look = RandomTourist(rng.Next());
             look.Extras &= ~AvatarExtras.Floaties;
+            look.Body = 0; // players are always the customizable code-built character
             return look;
         }
 

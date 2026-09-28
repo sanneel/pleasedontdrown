@@ -28,6 +28,10 @@ namespace PleaseDontDrown.Editor
         {
             (AvatarLook.Bodies.Sandy, "Sandy", "sandy"),
             (AvatarLook.Bodies.SandyBoss, "Sandy (boss)", "sandy_boss"),
+            (AvatarLook.Bodies.TouristRed, "Tourist (red bikini)", "tourist_bikini_red"),
+            (AvatarLook.Bodies.TouristSporty, "Tourist (sporty)", "tourist_bikini_sporty"),
+            (AvatarLook.Bodies.TouristPurple, "Tourist (purple bikini)", "tourist_bikini_purple"),
+            (AvatarLook.Bodies.TouristBuddy, "Tourist (sunburnt dad)", "tourist_buddy"),
         };
 
         private static readonly int BoneTotal = (int)Bone.Count + 2 * HandBones.BoneCount;
@@ -97,24 +101,10 @@ namespace PleaseDontDrown.Editor
                     return new Vector4(d.x, d.y, d.z, t.w);
                 }).ToArray();
 
-                // Face +Z like the rig: if the toes point to -Z, turn everything half round.
-                float ankleZ = (joint[Bone.FootL].z + joint[Bone.FootR].z) * 0.5f;
-                float ankleY = joint[Bone.FootL].y;
-                float toes = vertices.Where(v => v.y < ankleY * 0.5f).Select(v => v.z - ankleZ).DefaultIfEmpty(0f).Average();
-                if (toes < 0f)
-                {
-                    Quaternion turn = Quaternion.Euler(0f, 180f, 0f);
-                    for (int i = 0; i < vertices.Length; i++) vertices[i] = turn * vertices[i];
-                    for (int i = 0; i < normals.Length; i++) normals[i] = turn * normals[i];
-                    for (int i = 0; i < tangents.Length; i++)
-                    {
-                        Vector3 t = turn * (Vector3)tangents[i];
-                        tangents[i] = new Vector4(t.x, t.y, t.z, tangents[i].w);
-                    }
-                    foreach (Bone b in joint.Keys.ToList()) joint[b] = turn * joint[b];
-                }
+                // prepare_character.py always exports facing glTF +Z, which is the rig's +Z here: no turning needed
+                // (guessing from the feet fails on flip-flops, whose soles stick out behind as far as in front).
                 if (joint[Bone.UpperArmL].x > 0f)
-                    throw new InvalidOperationException($"{glbPath}: left arm on the right (bones mirrored?)");
+                    throw new InvalidOperationException($"{glbPath}: left arm on the right (not exported by prepare_character.py?)");
 
                 var body = ScriptableObject.CreateInstance<AvatarBody>();
                 body.Id = id;
@@ -234,7 +224,7 @@ namespace PleaseDontDrown.Editor
                 }
                 Object.DestroyImmediate(posed);
                 Debug.Log($"[Build] body {displayName}: {vertices.Length} vertices, hips {body.HipHeight:0.00} m, " +
-                          $"shoulders {P(Bone.UpperArmL).y:0.00} m, turned {(toes < 0f ? "yes" : "no")}");
+                          $"shoulders {P(Bone.UpperArmL).y:0.00} m");
                 return body;
             }
             finally

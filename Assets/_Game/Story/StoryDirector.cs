@@ -700,6 +700,16 @@ namespace PleaseDontDrown.Story
             PlayerHub by = null;
             foreach (PlayerHub p in PlayerHub.All)
                 if (p.Owner == caller) by = p;
+            ServerCheat(what, value, by);
+        }
+
+        /// <summary>
+        /// Host: the test commands (robber, shark, tourist, whack, bring, story...). <paramref name="force"/> skips the
+        /// cheats-allowed check (the dev island's buttons).
+        /// </summary>
+        [Server]
+        public void ServerCheat(string what, int value, PlayerHub by, bool force = false)
+        {
             if (what.StartsWith("story:"))
             {
                 string[] args = what.Substring(6).Split(' ');
@@ -727,7 +737,7 @@ namespace PleaseDontDrown.Story
                 }
                 return;
             }
-            if (!DevCommands.CheatsAllowed) return;
+            if (!DevCommands.CheatsAllowed && !force) return;
             // 6 m ahead on the level (looking down must not put things underground).
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")

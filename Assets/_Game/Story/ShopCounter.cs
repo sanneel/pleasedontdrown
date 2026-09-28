@@ -30,6 +30,8 @@ namespace PleaseDontDrown.Story
         [SerializeField] private Transform _spawnPoint;
         [Tooltip("Closed until the story opens it (the receptionist has to talk to you first).")]
         [SerializeField] private bool _startsOpen;
+        [Tooltip("The dev island's armory: everything is free.")]
+        [SerializeField] private bool _free;
 
         private bool _open;           // local window
         private bool _pushedUI;
@@ -55,7 +57,7 @@ namespace PleaseDontDrown.Story
         [Server] public void ServerSetAvailable(bool available) => _available.Value = available;
 
         public bool CanInteract(PlayerHub player) => _available.Value;
-        public string GetPrompt(PlayerHub player) => $"{_title}: buy equipment (${Economy.Money})";
+        public string GetPrompt(PlayerHub player) => _free ? $"{_title}: take guns and parts (free)" : $"{_title}: buy equipment (${Economy.Money})";
         public void OnInteract(PlayerHub player) => SetOpen(true);
 
         private void SetOpen(bool open)
@@ -99,9 +101,9 @@ namespace PleaseDontDrown.Story
                 Item prefab = GameContent.Items != null ? GameContent.Items.Find(p.Item) : null;
                 GUILayout.BeginHorizontal();
                 GUILayout.Label($"<b>{(prefab != null ? prefab.DisplayName : p.Item)}</b>\n<size=13>{p.Blurb}</size>", _style, GUILayout.Width(330f));
-                bool afford = Economy.Money >= p.Price;
+                bool afford = _free || Economy.Money >= p.Price;
                 GUI.enabled = afford;
-                if (GUILayout.Button(afford ? $"Buy  ${p.Price}" : $"${p.Price}", _button, GUILayout.Height(44f)))
+                if (GUILayout.Button(_free ? "Take" : afford ? $"Buy  ${p.Price}" : $"${p.Price}", _button, GUILayout.Height(44f)))
                     BuyServer(i);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
@@ -115,9 +117,9 @@ namespace PleaseDontDrown.Story
                 {
                     GUILayout.BeginHorizontal();
                     GUILayout.Label(part.Name, _style, GUILayout.Width(330f));
-                    bool afford = Economy.Money >= part.Price;
+                    bool afford = _free || Economy.Money >= part.Price;
                     GUI.enabled = afford && !part.Fitted;
-                    string label = part.Fitted ? "Fitted" : afford ? $"Fit  ${part.Price}" : $"${part.Price}";
+                    string label = part.Fitted ? "Fitted" : _free ? "Fit" : afford ? $"Fit  ${part.Price}" : $"${part.Price}";
                     if (GUILayout.Button(label, _button, GUILayout.Height(32f)))
                         BuyPartServer(gun.NetworkObject, (byte)part.Kind, part.Index);
                     GUI.enabled = true;
@@ -164,7 +166,8 @@ namespace PleaseDontDrown.Story
         {
             int price = gun.PriceOf(kind, index);
             if (price < 0 || gun.IsFitted(kind, index)) return false;
-            if (Economy.Instance == null || !Economy.Instance.ServerSpend(price, $"{kind} for the {gun.DisplayName}"))
+            if (_free) price = 0;
+            if (price > 0 && (Economy.Instance == null || !Economy.Instance.ServerSpend(price, $"{kind} for the {gun.DisplayName}")))
             {
                 Tell(buyer.Owner, $"Not enough money: that costs ${price} (you have ${Economy.Money}).");
                 return false;
@@ -178,7 +181,7 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void PartObservers(string gunName, int price, Vector3 at)
         {
-            FloatingText.Spawn(at, $"-${price}", new Color(1f, 0.55f, 0.4f), 1f, 1.6f);
+            if (price > 0) FloatingText.Spawn(at, $"-${price}", new Color(1f, 0.55f, 0.4f), 1f, 1.6f);
             PlayerHud.ShowToast($"Fitted to your <b>{gunName}</b>.", 3f);
         }
 
@@ -193,7 +196,8 @@ namespace PleaseDontDrown.Story
                 Debug.LogError($"[Shop] no item '{product.Item}' in the catalog");
                 return false;
             }
-            if (Economy.Instance == null || !Economy.Instance.ServerSpend(product.Price, $"bought {product.Item}"))
+            int price = _free ? 0 : product.Price;
+            if (price > 0 && (Economy.Instance == null || !Economy.Instance.ServerSpend(price, $"bought {product.Item}")))
             {
                 Tell(buyer.Owner, $"Not enough money: the {prefab.DisplayName} costs ${product.Price} (you have ${Economy.Money}).");
                 return false;
@@ -201,7 +205,7 @@ namespace PleaseDontDrown.Story
             Vector3 at = _spawnPoint != null ? _spawnPoint.position : transform.position + Vector3.up * 1.2f;
             Item bought = Instantiate(prefab, at, Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
             Spawn(bought.gameObject);
-            BoughtObservers(prefab.DisplayName, product.Price, at);
+            BoughtObservers(prefab.DisplayName, price, at);
             Debug.Log($"[Shop] {buyer.DisplayName} bought {prefab.DisplayName} for ${product.Price}");
             ServerPurchased?.Invoke(this, buyer, product.Item);
             return true;
@@ -210,8 +214,8 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void BoughtObservers(string itemName, int price, Vector3 at)
         {
-            FloatingText.Spawn(at + Vector3.up * 0.4f, $"-${price}", new Color(1f, 0.55f, 0.4f), 1f, 1.6f);
-            PlayerHud.ShowToast($"Bought a <b>{itemName}</b>. It's on the counter.", 3f);
+            if (price > 0) FloatingText.Spawn(at + Vector3.up * 0.4f, $"-${price}", new Color(1f, 0.55f, 0.4f), 1f, 1.6f);
+            PlayerHud.ShowToast(price > 0 ? $"Bought a <b>{itemName}</b>. It's on the counter." : $"A <b>{itemName}</b> is on the counter.", 3f);
         }
 
         [TargetRpc]

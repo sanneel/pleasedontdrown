@@ -3,6 +3,7 @@
 Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP · FishNet 4.7.3 · Steam (FishySteamworks).
 
 * Design: [Docs/01-Game-Design.md](Docs/01-Game-Design.md)
+* **Dev island** (every gun and part free, shooting range, rescue test buttons, model gallery; pad on island 1 or `devisland`): [Docs/09-Dev-Island.md](Docs/09-Dev-Island.md)
 * **Guns** (pistol, SMG, shotgun, rifle, sniper; parts, recoil, projectiles): [Docs/08-Weapons.md](Docs/08-Weapons.md)
 * **Story mode** (chapters 1-2: Sandy, the robber, the hotel island, sharks, pirates): [Docs/05-Story-Mode.md](Docs/05-Story-Mode.md)
 * Architecture and milestones: [Docs/02-Technical-Architecture.md](Docs/02-Technical-Architecture.md)

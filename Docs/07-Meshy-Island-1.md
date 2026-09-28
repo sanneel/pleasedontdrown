@@ -31,7 +31,7 @@ Text to 3D, paste the prompt. If Meshy asks for a texture prompt separately, pas
 
 ## 1. People (11)
 
-**Done:** `sandy` and `sandy_boss` (in the game since 2026-09-28).
+**Done:** `sandy`, `sandy_boss`, and four tourists (red bikini, sporty, purple bikini, sunburnt dad), all in the game since 2026-09-28.
 
 **Women: the chest.** The CPR jiggle moves two spring bones inside the chest, so the model needs a real, rounded
 bust shape; Sandy came out flat and would barely move. The women's prompts below ask for it. Check the picture from

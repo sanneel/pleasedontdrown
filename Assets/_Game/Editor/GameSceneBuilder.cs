@@ -661,6 +661,7 @@ namespace PleaseDontDrown.Editor
             PlaceItems(catalog);
             BuildDrillBoard(env);
             BuildStoryWorld(env);
+            BuildDevIsland(env); // guns, range, test buttons, the model gallery (GameSceneBuilder.DevIsland.cs)
             Transform[] spawns = BuildSpawnPoints();
 
             // Rescues: drills now, the emergency director later.
@@ -760,7 +761,8 @@ namespace PleaseDontDrown.Editor
         private static readonly Vector2 IslandCenter = new(0f, 38f);
         private static readonly Vector2 IslandHalfSize = new(80f, 34f);
         private const float IslandCornerRadius = 28f;
-        private const float TerrainMinX = -160f, TerrainMaxX = 160f, TerrainMinZ = -380f, TerrainMaxZ = 150f, TerrainStep = 2f;
+        // Reaches far west for the dev island (and the sea round its 150 m range target).
+        private const float TerrainMinX = -400f, TerrainMaxX = 160f, TerrainMinZ = -380f, TerrainMaxZ = 150f, TerrainStep = 2f;
 
         // The hotel island (chapter 2), ~200 m south across the channel; its beach faces island 1.
         private static readonly Vector2 Island2Center = new(20f, -250f);
@@ -807,7 +809,8 @@ namespace PleaseDontDrown.Editor
         /// Two islands: the station island and the hotel island to the south (flat, no dunes, so the hotel sits level).
         /// </summary>
         private static float BeachHeight(float x, float z) =>
-            Mathf.Max(ProfileHeight(ShoreCoordinate(x, z), x, z, true), ProfileHeight(Island2Shore(x, z), x, z, false));
+            Mathf.Max(Mathf.Max(ProfileHeight(ShoreCoordinate(x, z), x, z, true), ProfileHeight(Island2Shore(x, z), x, z, false)),
+                ProfileHeight(DevIslandShore(x, z), x, z, false));
 
         private static float ProfileHeight(float shore, float x, float z, bool dunesInland)
         {

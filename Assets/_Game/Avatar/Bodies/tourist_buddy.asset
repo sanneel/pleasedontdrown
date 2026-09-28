@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_buddy
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 6
+  DisplayName: Tourist (sunburnt dad)
+  Mesh: {fileID: 4300000, guid: dd4c8d7605d971a4888b73d7792f1a16, type: 2}
+  Material: {fileID: -4234473462164445276, guid: b637e9a7fc2b3bc4fade1e129aa00519, type: 3}
+  RestPositions:
+  - {x: 0, y: 0.8939555, z: 0.01001206}
+  - {x: 0, y: 0.07512665, z: 0.008965924}
+  - {x: 0, y: 0.12020248, z: 0.00021768361}
+  - {x: 0, y: 0.23796523, z: -0.05695791}
+  - {x: 0, y: 0.13991654, z: 0.03988031}
+  - {x: -0.2766172, y: 0.12921524, z: -0.06664251}
+  - {x: 0, y: -0.2393861, z: 0}
+  - {x: 0, y: -0.20981076, z: 0}
+  - {x: 0.27861235, y: 0.12621534, z: -0.061413206}
+  - {x: 0, y: -0.23762728, z: 0}
+  - {x: 0, y: -0.20934878, z: 0}
+  - {x: -0.11715429, y: -0.03955555, z: -0.013811975}
+  - {x: 0, y: -0.40247494, z: 0}
+  - {x: 0, y: -0.38477084, z: 0}
+  - {x: 0.11137258, y: -0.03955555, z: -0.011564881}
+  - {x: 0, y: -0.40258348, z: 0}
+  - {x: 0, y: -0.38474226, z: 0}
+  - {x: -0.037546907, y: 0.13141418, z: 0.15974082}
+  - {x: 0.037546907, y: 0.13141418, z: 0.15974082}
+  - {x: 0, y: 0.06257818, z: 0.15974082}
+  - {x: -0.037546907, y: 0.16896108, z: 0.15974082}
+  - {x: 0.037546907, y: 0.16896108, z: 0.15974082}
+  - {x: -0.07773526, y: 0.019433815, z: 0.08745217}
+  - {x: 0.07773526, y: 0.019433815, z: 0.08745217}
+  Scale: 0.9716908
+  UpperArmLength: 0.2393861
+  ForearmLength: 0.20981076
+  HandLength: 0.08077714
+  ThighLength: 0.40247494
+  ShinLength: 0.38477084
+  AnkleHeight: 0.074166656
+  HipHeight: 0.8939555
+  EyeHeight: 1.5985806

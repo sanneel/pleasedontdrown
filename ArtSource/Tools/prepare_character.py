@@ -276,18 +276,23 @@ for name, z in (('Hips', hips_z), ('Spine', hips_z + 0.10 * k), ('Chest', should
     joints[name] = [0.0, depth_at(0.0, z, 0.06), float(z)]
 joints['HeadTop'] = [0.0, joints['Head'][1], H]
 
-# Bust: the front-most point of each side of the chest (between the shoulders and the waist, inside the torso's
-# outline so arms don't count). The bone sits half a radius behind it, inside the breast.
+# Bust: on each side of the chest (between the shoulders and the waist, inside the torso's outline so arms don't
+# count), the front-most layer of the surface; its middle is the apex (a sports top joined across the middle still
+# gives each side its own). How far it stands out is measured against the front of the ribs just below it.
+# The bone sits half a radius behind the apex, inside the breast.
 bust_radius = {}
 if opts['bust']:
     top_z, bottom_z = shoulder_z - 0.04 * unit, shoulder_z - 0.24 * unit
     torso = [q for q in runs(int((top_z + bottom_z) / 2 / CELL)) if col_x(q[0]) <= 0.0 <= col_x(q[1])]
     half = (col_x(torso[0][1]) - col_x(torso[0][0])) / 2 if torso else 0.15 * unit
     for side, sign in (('L', 1.0), ('R', -1.0)):
-        band = v[(v[:, 2] > bottom_z) & (v[:, 2] < top_z) & (v[:, 0] * sign > 0.02 * unit) & (v[:, 0] * sign < 0.8 * half)]
-        apex = band[np.argmin(band[:, 1])]
-        middle = v[(np.abs(v[:, 0]) < 0.015 * unit) & (np.abs(v[:, 2] - apex[2]) < 0.03 * unit)]
-        stands_out = (float(middle[:, 1].min()) - float(apex[1])) if len(middle) else 0.0
+        band = v[(v[:, 2] > bottom_z) & (v[:, 2] < top_z) & (v[:, 0] * sign > 0.01 * unit) & (v[:, 0] * sign < 0.8 * half)]
+        front = float(band[:, 1].min())
+        layer = band[band[:, 1] < front + 0.012 * unit]
+        apex = np.array([float(np.median(layer[:, 0])), front, float(np.median(layer[:, 2]))])
+        ribs_z = apex[2] - 0.13 * unit
+        below = v[(np.abs(v[:, 2] - ribs_z) < 0.015 * unit) & (np.abs(v[:, 0] - apex[0]) < 0.03 * unit)]
+        stands_out = (float(below[:, 1].min()) - front) if len(below) else 0.0
         r = float(np.clip(abs(apex[0]) * 0.95, 0.045 * unit, 0.1 * unit))
         bust_radius[side] = r
         joints['Bust' + side] = [float(apex[0]), float(apex[1]) + 0.5 * r, float(apex[2])]
@@ -367,11 +372,12 @@ if opts['bust']:
                 continue  # other side, or the back
             d = np.linalg.norm((p - center) / np.array([1.0, 1.0, 1.15]))
             w = 1.0 - d / (1.3 * r)
-            if w <= 0.0 or sum(g.weight for g in vert.groups if g.group in arm_groups) > 0.2:
+            if w <= 0.0:
                 continue
             w = w * w * (3.0 - 2.0 * w) * 0.9  # smooth falloff to the chest
+            # Heat weighting lets the arms pull on the chest of wide figures: take that out here.
             for g in vert.groups:
-                g.weight *= 1.0 - w
+                g.weight *= (1.0 - min(1.0, 2.0 * w)) if g.group in arm_groups else (1.0 - w)
             group.add([vert.index], w, 'REPLACE')
             count += 1
         log(f'bust {side}: {count} vertices')
