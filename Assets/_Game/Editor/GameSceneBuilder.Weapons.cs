@@ -66,7 +66,7 @@ namespace PleaseDontDrown.Editor
                 Suppressor(root, "BarrelSuppressor", new Vector3(0f, 0.022f, 0.118f), 0.017f, 0.12f, metal);
                 Compensator(root, "BarrelCompensator", new Vector3(0f, 0.022f, 0.118f), 0.03f, metal);
                 Laser(root, new Vector3(0f, -0.018f, 0.075f), laserBody, glow);
-                HandGrips(root, new Vector3(0.033f, -0.06f, -0.05f), -12f, left: new Vector3(-0.034f, -0.068f, -0.046f), leftPalmUp: false);
+                HandGrips(root, new Vector3(0.033f, -0.06f, -0.05f), -12f, left: null, leftPalmUp: false); // one-handed
             }, new GunSetup
             {
                 Kind = "Pistol", Sound = GunSound.Pistol, Projectile = ProjectileKind.Bullet, Interval = 0.16f, HipSpread = 1.6f, AimSpread = 0.15f,
@@ -227,7 +227,7 @@ namespace PleaseDontDrown.Editor
                 Item item = go.GetComponent<Item>();
                 SetBool(item, "_pocketable", true);
                 SetBool(item, "_rigidInHand", true);
-                SetEnum(item, "_grip", (int)ItemGrip.TwoHands);
+                SetEnum(item, "_grip", (int)(Find(go, "GripLeft") != null ? ItemGrip.TwoHands : ItemGrip.OneHand));
                 SetRef(item, "_gripRight", Find(go, "GripRight"));
                 SetRef(item, "_gripLeft", Find(go, "GripLeft"));
 
@@ -400,14 +400,16 @@ namespace PleaseDontDrown.Editor
 
         /// <summary>
         /// Where the hands go: the right hand round the grip (fingers along it, palm against its right side), the left
-        /// either under the fore-end (palm up) or cupping the right hand on the other side of the grip.
+        /// either under the fore-end (palm up), cupping the right hand on the other side of the grip, or nowhere (null:
+        /// a one-handed gun, the left hand stays free).
         /// </summary>
-        private static void HandGrips(Transform gun, Vector3 right, float gripTilt, Vector3 left, bool leftPalmUp)
+        private static void HandGrips(Transform gun, Vector3 right, float gripTilt, Vector3? left, bool leftPalmUp)
         {
             Quaternion tilt = Quaternion.Euler(gripTilt, 0f, 0f);
             var r = Node(gun, "GripRight", right);
             r.localRotation = tilt * Quaternion.LookRotation(Vector3.forward, Vector3.right); // palm faces -x, onto the grip
-            var l = Node(gun, "GripLeft", left);
+            if (left == null) return;
+            var l = Node(gun, "GripLeft", left.Value);
             l.localRotation = leftPalmUp
                 ? Quaternion.LookRotation(Vector3.forward, Vector3.down) // palm faces up under the fore-end
                 : tilt * Quaternion.LookRotation(Vector3.forward, Vector3.left);

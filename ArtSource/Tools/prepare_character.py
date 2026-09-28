@@ -8,6 +8,7 @@ blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- <in.glb>
   --bust 1                 women: add BustL/BustR spring bones (the game jiggles them, e.g. during CPR)
   --armband 0.045          shoulders: how far past the armpit line the arm's pull fades in (at 1.8 m tall)
   --helpers 1              ShoulderL/R bones that turn half as far as the upper arm (the game drives them)
+  --armsmooth 40           smoothing passes over the arm/chest split round the shoulders (0 = off)
   --preview <prefix>       also render front/side pictures with the skeleton drawn in
 
 What it does: keeps one figure (drops other figures and floating text), stands it on the origin facing -Y
@@ -30,7 +31,7 @@ from mathutils.kdtree import KDTree
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, DST = argv[0], argv[1]
-opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'preview': ''}
+opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'armsmooth': 40, 'preview': ''}
 i = 2
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -439,20 +440,63 @@ if opts['helpers']:
         b.tail = b.head + Vector((0.0, 0.0, 0.05 * unit))
         b.parent = arm_data.edit_bones['Chest']
     bpy.ops.object.mode_set(mode='OBJECT')
+    # The arm's share of each shoulder vertex (upper arm against chest, spine, neck) is smoothed over the surface
+    # first: the armpit line and the heat weights still switched from chest to arm within a few vertices in places,
+    # which raised arms showed as a small step in the armpit. Inside the line (and the torso below the armpit) the
+    # share stays 0, so the smoothing only widens the fade outward, onto the shoulder and the arm.
+    edges = np.empty(len(body.data.edges) * 2, dtype=np.int64)
+    body.data.edges.foreach_get('vertices', edges)
+    ea, eb = edges[0::2], edges[1::2]
+    co_all = np.empty(len(body.data.vertices) * 3)
+    body.data.vertices.foreach_get('co', co_all)
+    co_all = co_all.reshape(-1, 3)
+    degree = np.bincount(np.concatenate([ea, eb]), minlength=len(co_all)).astype(np.float64)
+    shares = {}
+    for side, sign in (('L', 1.0), ('R', -1.0)):
+        upper = body.vertex_groups['UpperArm' + side].index
+        share = np.zeros(len(co_all))
+        for vert in body.data.vertices:
+            a = sum(g.weight for g in vert.groups if g.group == upper)
+            c = sum(g.weight for g in vert.groups if g.group not in arm_groups)
+            share[vert.index] = a / (a + c) if a + c > 1e-6 else 0.0
+        bottom_x, top_x = crease[sign]
+        u = np.clip((co_all[:, 2] - armpit_z) / max(1e-3, top_z - armpit_z), 0.0, 1.0)
+        inside = (co_all[:, 0] * sign < bottom_x + (top_x - bottom_x) * u) & (share <= 1e-4)
+        near = np.linalg.norm(co_all - np.array(joints['UpperArm' + side]), axis=1) < 0.16 * unit
+        free = near & ~inside & (co_all[:, 0] * sign > 0.0)
+        for _ in range(opts['armsmooth']):
+            total_nb = np.zeros(len(co_all))
+            np.add.at(total_nb, ea, share[eb])
+            np.add.at(total_nb, eb, share[ea])
+            mean = np.divide(total_nb, degree, out=share.copy(), where=degree > 0)
+            share = np.where(free, 0.5 * share + 0.5 * mean, share)
+        shares[side] = share
     shared = 0
     for side in 'LR':
         upper = body.vertex_groups['UpperArm' + side].index
         helper = body.vertex_groups.new(name='Shoulder' + side)
+        arm_groups = arm_groups | {helper.index}  # not "chest" for the other side's split
+        share = shares[side]
         for vert in body.data.vertices:
-            arm = next((g for g in vert.groups if g.group == upper), None)
-            if arm is None or arm.weight <= 0.0:
+            t = float(share[vert.index])
+            if t <= 1e-4:
                 continue
+            arm = next((g for g in vert.groups if g.group == upper), None)
             others = [g for g in vert.groups if g.group not in arm_groups]
+            a = arm.weight if arm is not None else 0.0
             c = sum(g.weight for g in others)
-            if c <= 1e-4:
+            if c <= 1e-4 and t >= 0.9999:
                 continue  # all arm
-            total = arm.weight + c
-            t = arm.weight / total
+            total = a + c
+            if total <= 1e-6:
+                continue
+            if arm is None:
+                body.vertex_groups['UpperArm' + side].add([vert.index], 0.0, 'REPLACE')
+                arm = next(g for g in vert.groups if g.group == upper)
+            if c <= 1e-4:  # smoothing gave an all-arm vertex back some chest
+                body.vertex_groups['Chest'].add([vert.index], 1e-3, 'REPLACE')
+                others = [g for g in vert.groups if g.group not in arm_groups]
+                c = sum(g.weight for g in others)
             arm.weight = total * max(0.0, 2.0 * t - 1.0)
             helper.add([vert.index], total * (1.0 - abs(2.0 * t - 1.0)), 'REPLACE')
             for g in others:

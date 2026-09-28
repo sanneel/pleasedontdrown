@@ -612,6 +612,16 @@ namespace PleaseDontDrown.Avatars
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kneeUp ? 85f : 4f, 0f, 0f), w);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(kneeUp ? -40f : -45f, 0f, 0f), w);
                 }
+                // Hands under the back of the head, elbows out to the sides. By IK: the fixed forearm bend above
+                // folded the hands forward, onto the face, on bodies with other arm lengths (the Meshy ones).
+                Transform head = B(Bone.Head);
+                float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+                // Elbows out and a little up off the ground: flat on it, the arms swung so far back that the armpits
+                // stretched thin.
+                Vector3 nape = head.position + head.up * (0.1f * s) - head.forward * (0.08f * s);
+                Vector3 across = B(Bone.Chest).right;
+                IK.Solve(upperL, foreL, la, lb, nape - across * (0.04f * s), -across + head.up * 0.4f + head.forward * 0.35f, w, false);
+                IK.Solve(upperR, foreR, la, lb, nape + across * (0.04f * s), across + head.up * 0.4f + head.forward * 0.35f, w, false);
             }
 
             if (_lieFront > 0.01f)
