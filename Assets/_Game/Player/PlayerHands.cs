@@ -139,6 +139,7 @@ namespace PleaseDontDrown.Player
             StopEating();
             CancelCharge();
             _localSlot = slot;
+            BeachAudio.PlayLocal(BeachAudio.Equip, 0.45f);
             _hub.RequestActiveSlot(slot);
             OnActiveSlotChanged();
             return true;
@@ -194,6 +195,7 @@ namespace PleaseDontDrown.Player
                 else Drop();
             }
             item.RequestPickUp(_hub, ActiveSlot);
+            BeachAudio.PlayLocal(BeachAudio.Pickup, 0.65f);
             Invalidate();
             ResetHoldState();
         }
@@ -240,6 +242,7 @@ namespace PleaseDontDrown.Player
                 LastThrowCharge = charge;
             }
             item.Release(_hub, velocity, spin);
+            BeachAudio.PlayLocal(charge >= 0f ? BeachAudio.Throw : BeachAudio.Drop, 0.6f);
             Invalidate();
             ResetHoldState();
             if (charge >= 0f) _hub.Gesture(AvatarGesture.Throw);

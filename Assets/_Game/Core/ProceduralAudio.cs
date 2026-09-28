@@ -273,11 +273,11 @@ namespace PleaseDontDrown.Core
             // length, crack brightness, crack decay, punch start/end Hz, tail decay, tail gain
             (float len, float bright, float crackDecay, float f0, float f1, float tailDecay, float tail) = kind switch
             {
-                Combat.GunSound.Smg => (0.32f, 0.9f, 55f, 170f, 70f, 16f, 0.55f),
-                Combat.GunSound.Shotgun => (0.85f, 0.7f, 30f, 95f, 38f, 5.5f, 0.9f),
-                Combat.GunSound.Rifle => (0.6f, 0.97f, 45f, 130f, 50f, 8f, 0.75f),
-                Combat.GunSound.Sniper => (1.2f, 1f, 35f, 90f, 32f, 3.2f, 0.9f),
-                _ => (0.45f, 0.93f, 50f, 150f, 60f, 11f, 0.65f)
+                Combat.GunSound.Smg => (0.85f, 0.9f, 55f, 170f, 70f, 8f, 0.55f),
+                Combat.GunSound.Shotgun => (1.8f, 0.7f, 30f, 95f, 38f, 4f, 0.9f),
+                Combat.GunSound.Rifle => (1.5f, 0.97f, 45f, 130f, 50f, 5f, 0.75f),
+                Combat.GunSound.Sniper => (2.4f, 1f, 35f, 90f, 32f, 2.8f, 0.9f),
+                _ => (1.1f, 0.93f, 50f, 150f, 60f, 6f, 0.65f)
             };
             var rng = new System.Random(700 + i);
             float low = 0f, band = 0f;
@@ -289,7 +289,7 @@ namespace PleaseDontDrown.Core
                 float crack = n * Mathf.Exp(-crackDecay * t);
                 float punch = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(f0, f1, Mathf.Clamp01(t / 0.12f)) * t) * Mathf.Exp(-22f * t);
                 float ring = band * 2.2f * Mathf.Exp(-tailDecay * t) * tail;
-                return (crack * 0.8f + punch * 0.9f + ring) * Mathf.Clamp01(t / 0.0015f);
+                return (crack * 0.8f + punch * 0.9f + ring) * Mathf.Clamp01(t / 0.0015f) * 0.38f;
             });
         }
 
@@ -307,7 +307,7 @@ namespace PleaseDontDrown.Core
                     low += (n - low) * 0.12f;
                     float puff = low * 3f * Mathf.Exp(-24f * t);
                     float clack = t > 0.035f ? Mathf.Sin(2f * Mathf.PI * 1900f * t) * Mathf.Exp(-90f * (t - 0.035f)) * 0.35f : 0f;
-                    return (puff + clack) * Mathf.Clamp01(t / 0.003f);
+                    return (puff + clack) * Mathf.Clamp01(t / 0.003f) * 0.55f;
                 });
             }
         }
@@ -332,7 +332,7 @@ namespace PleaseDontDrown.Core
         {
             float body = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(900f, 500f, t / 0.14f) * t) * Mathf.Exp(-40f * t);
             float hit = (Mathf.PerlinNoise(t * 11000f, 0.8f) * 2f - 1f) * Mathf.Exp(-120f * t);
-            return body * 0.7f + hit * 0.8f;
+            return body * 0.46f + hit * 0.52f;
         });
 
         /// <summary>Slide, pump or bolt: back and forward.</summary>
@@ -340,7 +340,7 @@ namespace PleaseDontDrown.Core
         {
             float Clack(float at, float f) => t < at ? 0f : Mathf.Sin(2f * Mathf.PI * f * (t - at)) * Mathf.Exp(-70f * (t - at)) +
                                               (Mathf.PerlinNoise((t - at) * 9000f, at) * 2f - 1f) * Mathf.Exp(-110f * (t - at)) * 0.6f;
-            return Clack(0f, 1400f) * 0.7f + Clack(0.13f, 1100f) * 0.8f;
+            return Clack(0f, 1400f) * 0.48f + Clack(0.13f, 1100f) * 0.54f;
         });
 
         /// <summary>A bullet thudding into something.</summary>

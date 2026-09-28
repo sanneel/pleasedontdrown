@@ -31,6 +31,7 @@ namespace PleaseDontDrown.Core
         /// <summary>Always active, even while UI is open.</summary>
         public static InputAction ToggleConsole { get; private set; }
         public static InputAction ToggleMenu { get; private set; }
+        public static InputAction ToggleOverlay { get; private set; }
 
         public static bool GameplayActive => _uiBlockers == 0;
 
@@ -88,6 +89,7 @@ namespace PleaseDontDrown.Core
             ToggleConsole.AddBinding("<Keyboard>/f1"); // laptops where F2 needs Fn
             ToggleMenu = _global.AddAction("ToggleMenu", InputActionType.Button, "<Keyboard>/escape");
             ToggleMenu.AddBinding("<Gamepad>/start");
+            ToggleOverlay = _global.AddAction("ToggleOverlay", InputActionType.Button, "<Keyboard>/tab");
 
             _global.Enable();
             _gameplay.Enable();

@@ -15,8 +15,12 @@ namespace PleaseDontDrown.Core
         public static bool IsReady { get; private set; }
         public static CSteamID LocalId => IsReady ? SteamUser.GetSteamID() : CSteamID.Nil;
         public static string LocalName => IsReady ? SteamFriends.GetPersonaName() : Environment.UserName;
+        public static bool OverlayAvailable => IsReady && SteamUtils.IsOverlayEnabled();
+        public static bool IsOverlayOpen => _instance != null && _instance._overlayActive;
 
         private static SteamBootstrap _instance;
+        private Callback<GameOverlayActivated_t> _overlayCallback;
+        private bool _overlayActive;
 
         private void Awake()
         {
@@ -53,9 +57,28 @@ namespace PleaseDontDrown.Core
                 Debug.LogError($"[Steam] steam_api64.dll not found: {e.Message}");
             }
 
+            if (IsReady) _overlayCallback = Callback<GameOverlayActivated_t>.Create(OnOverlayChanged);
+
             Debug.Log(IsReady
                 ? $"[Steam] Ready as {LocalName} ({LocalId})"
                 : "[Steam] Not available (is the Steam client running?). Offline play still works.");
+        }
+
+        public static bool OpenFriendsOverlay()
+        {
+            if (!OverlayAvailable) return false;
+            SteamFriends.ActivateGameOverlay("friends");
+            return true;
+        }
+
+        private void OnOverlayChanged(GameOverlayActivated_t data)
+        {
+            bool open = data.m_bActive != 0;
+            if (open == _overlayActive) return;
+            _overlayActive = open;
+            if (open) GameInput.PushUI();
+            else GameInput.PopUI();
+            Debug.Log(open ? "[Steam] Overlay opened" : "[Steam] Overlay closed");
         }
 
         private void Update()
@@ -69,6 +92,9 @@ namespace PleaseDontDrown.Core
             if (_instance != this)
                 return;
             _instance = null;
+            if (_overlayActive) { _overlayActive = false; GameInput.PopUI(); }
+            _overlayCallback?.Dispose();
+            _overlayCallback = null;
             if (IsReady)
             {
                 IsReady = false;

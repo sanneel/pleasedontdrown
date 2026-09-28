@@ -40,7 +40,7 @@ namespace PleaseDontDrown.World.Water
                 startSize = Mathf.Lerp(0.12f, 0.28f, strength)
             };
             _instance._system.Emit(emit, Mathf.RoundToInt(Mathf.Lerp(10f, 70f, strength)));
-            AudioSource.PlayClipAtPoint(ProceduralAudio.Splash, position, Mathf.Lerp(0.25f, 1f, strength));
+            AudioSource.PlayClipAtPoint(BeachAudio.WaterImpact(strength), position, Mathf.Lerp(0.25f, 1f, strength));
         }
 
         private ParticleSystem BuildSystem()

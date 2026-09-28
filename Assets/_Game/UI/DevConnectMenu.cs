@@ -5,126 +5,293 @@ using UnityEngine.InputSystem;
 
 namespace PleaseDontDrown.UI
 {
-    /// <summary>
-    /// Temporary IMGUI main/pause menu. Always shown when not in a session; Esc toggles it in-game.
-    /// Replaced by the real menus later.
-    /// </summary>
+    /// <summary>Start screen, pause menu, and quick in-game guide.</summary>
     public class DevConnectMenu : MonoBehaviour
     {
         [SerializeField] private ConnectionService _connection;
 
         private bool _pauseOpen;
+        private bool _guideOpen;
         private string _lanAddress = "localhost";
+        private Vector2 _scroll;
+        private int _windowWidth = 1280;
+        private int _windowHeight = 720;
         private GUIStyle _title;
+        private GUIStyle _subtitle;
+        private GUIStyle _body;
+        private GUIStyle _small;
+        private GUIStyle _button;
+        private string _hoveredButton;
+        private string _hoveredThisFrame;
 
-        private void OnEnable() => GameInput.ToggleMenu.performed += OnToggleMenu;
+        private static readonly Color Coral = new(0.98f, 0.47f, 0.34f);
+        private static readonly Color Teal = new(0.27f, 0.79f, 0.77f);
+        private static readonly Color Dark = new(0.035f, 0.13f, 0.19f, 0.94f);
+
+        private void OnEnable()
+        {
+            GameInput.ToggleMenu.performed += OnToggleMenu;
+            GameInput.ToggleOverlay.performed += OnToggleOverlay;
+        }
 
         private void OnDisable()
         {
             GameInput.ToggleMenu.performed -= OnToggleMenu;
+            GameInput.ToggleOverlay.performed -= OnToggleOverlay;
             SetPause(false);
         }
 
         private void OnToggleMenu(InputAction.CallbackContext _)
         {
-            if (DevConsole.IsOpen || AvatarCustomizer.IsOpen || !_connection.IsActive) return; // Esc closes those first
-            if (!_pauseOpen && !GameInput.GameplayActive) return; // a shop or travel list is open: Esc closes that
+            if (DevConsole.IsOpen || AvatarCustomizer.IsOpen || SteamBootstrap.IsOverlayOpen || !_connection.IsActive) return;
+            if (!_pauseOpen && !GameInput.GameplayActive) return;
             SetPause(!_pauseOpen);
+        }
+
+        private void OnToggleOverlay(InputAction.CallbackContext _)
+        {
+            if (!_connection.IsActive || _pauseOpen || !GameInput.GameplayActive) return;
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed))
+                return; // Shift+Tab belongs to the Steam overlay.
+            _guideOpen = !_guideOpen;
         }
 
         private void SetPause(bool open)
         {
             if (open == _pauseOpen) return;
             _pauseOpen = open;
-            if (open) GameInput.PushUI();
+            if (open)
+            {
+                _guideOpen = false;
+                GameInput.PushUI();
+            }
             else GameInput.PopUI();
         }
 
         private void Update()
         {
-            // Session ended while paused (host left, kicked...): drop the pause blocker.
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && (keyboard.f11Key.wasPressedThisFrame ||
+                ((keyboard.leftAltKey.isPressed || keyboard.rightAltKey.isPressed) && keyboard.enterKey.wasPressedThisFrame)))
+                ToggleFullscreen();
+
             if (_pauseOpen && !_connection.IsActive)
                 SetPause(false);
+            if (!_connection.IsActive)
+                _guideOpen = false;
+        }
+
+        private void ToggleFullscreen()
+        {
+            if (Screen.fullScreen)
+                Screen.SetResolution(_windowWidth, _windowHeight, FullScreenMode.Windowed);
+            else
+            {
+                _windowWidth = Screen.width;
+                _windowHeight = Screen.height;
+                Resolution desktop = Screen.currentResolution;
+                Screen.SetResolution(desktop.width, desktop.height, FullScreenMode.FullScreenWindow);
+            }
         }
 
         private void OnGUI()
         {
             bool active = _connection.IsActive;
-            if ((active && !_pauseOpen) || AvatarCustomizer.IsOpen)
+            if (AvatarCustomizer.IsOpen || (active && !_pauseOpen && !_guideOpen))
                 return;
 
-            _title ??= new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold };
+            BuildStyles();
+            if (Event.current.type == EventType.Repaint) _hoveredThisFrame = null;
+            Matrix4x4 previous = GUI.matrix;
+            float scale = Mathf.Max(0.65f, Mathf.Min(Screen.width / 1280f, Screen.height / 720f));
+            GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+            float width = Screen.width / scale;
+            float height = Screen.height / scale;
 
-            GUILayout.BeginArea(new Rect(20, 20, 360, active ? 640 : 480), GUI.skin.box);
-            GUILayout.Label("PLEASE DON'T DROWN", _title);
-            GUILayout.Label(active ? "Paused" : $"Prototype build {NetVersion.Current}");
-            GUILayout.Space(6);
-            GUILayout.Label(SteamBootstrap.IsReady ? $"Steam: {SteamBootstrap.LocalName}" : "Steam: not running (offline only)");
-
-            if (!active)
+            if (_guideOpen && !_pauseOpen)
             {
-                GUI.enabled = SteamBootstrap.IsReady;
-                if (GUILayout.Button("Host (Steam, friends only)", GUILayout.Height(32))) _connection.HostSteam();
-                GUI.enabled = true;
-                GUILayout.Label("Join: accept a Steam invite, or right-click a friend > Join Game.");
-                GUILayout.Space(8);
-                if (GUILayout.Button("Play solo (local host)", GUILayout.Height(28))) _connection.HostOffline();
-                GUILayout.BeginHorizontal();
-                _lanAddress = GUILayout.TextField(_lanAddress, GUILayout.Width(180));
-                if (GUILayout.Button("Join local/LAN")) _connection.JoinOffline(_lanAddress);
-                GUILayout.EndHorizontal();
+                DrawGuide(width);
+                _hoveredButton = null;
+                GUI.matrix = previous;
+                return;
             }
-            else
+
+            DrawRect(new Rect(0f, 0f, width, height), new Color(0.01f, 0.08f, 0.13f, 0.74f));
+            float panelWidth = Mathf.Min(480f, width - 30f);
+            float panelHeight = active ? Mathf.Min(650f, height - 30f) : Mathf.Min(535f, height - 30f);
+            Rect panel = new((width - panelWidth) * 0.5f, (height - panelHeight) * 0.5f, panelWidth, panelHeight);
+            DrawRect(panel, Dark);
+            DrawRect(new Rect(panel.x, panel.y, panel.width, 6f), Coral);
+
+            GUILayout.BeginArea(new Rect(panel.x + 30f, panel.y + 24f, panel.width - 60f, panel.height - 44f));
+            GUILayout.Label("PLEASE DON'T DROWN", _title);
+            GUILayout.Label(active ? "PAUSED" : "ISLAND 1  /  LIFEGUARD START", _subtitle);
+            GUILayout.Space(16f);
+            _scroll = GUILayout.BeginScrollView(_scroll, false, false);
+
+            if (!active) DrawStartMenu();
+            else DrawPauseMenu();
+
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+            if (Event.current.type == EventType.Repaint) _hoveredButton = _hoveredThisFrame;
+            GUI.matrix = previous;
+        }
+
+        private void DrawStartMenu()
+        {
+            GUILayout.Label("Rescue tourists. Return lost items. Find out what is happening on the beach.", _body);
+            GUILayout.Space(16f);
+            if (Button("PLAY SOLO", Coral, 48f)) _connection.HostOffline();
+
+            GUI.enabled = SteamBootstrap.IsReady;
+            if (Button("HOST FOR FRIENDS", Teal, 42f)) _connection.HostSteam();
+            GUI.enabled = true;
+            GUILayout.Label(SteamBootstrap.IsReady
+                ? "Steam: " + SteamBootstrap.LocalName + "  |  Friends can join through Steam."
+                : "Steam is unavailable. Solo and LAN still work.", _small);
+            GUI.enabled = SteamBootstrap.OverlayAvailable;
+            if (Button("OPEN STEAM FRIENDS", Teal, 36f)) SteamBootstrap.OpenFriendsOverlay();
+            GUI.enabled = true;
+            if (SteamBootstrap.IsReady && !SteamBootstrap.OverlayAvailable)
+                GUILayout.Label("Steam overlay unavailable here. Launch the game through Steam to use Shift+Tab.", _small);
+            GUILayout.Space(10f);
+
+            GUILayout.Label("JOIN LOCAL / LAN GAME", _subtitle);
+            GUILayout.BeginHorizontal();
+            _lanAddress = GUILayout.TextField(_lanAddress, GUILayout.Height(34f));
+            if (Button("JOIN", Teal, 34f, 94f)) _connection.JoinOffline(_lanAddress);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(12f);
+
+            if (Button("CUSTOMIZE LIFEGUARD", Color.white, 36f)) AvatarCustomizer.Open();
+            if (Button(Screen.fullScreen ? "WINDOWED  /  F11" : "FULLSCREEN  /  F11", Color.white, 36f))
+                ToggleFullscreen();
+
+            if (!string.IsNullOrEmpty(_connection.LastError))
+                GUILayout.Label(_connection.LastError, _small);
+            GUILayout.Space(5f);
+            GUILayout.Label("Move: WASD   Rescue / use: E   Pause: Esc   Guide: Tab", _small);
+        }
+
+        private void DrawPauseMenu()
+        {
+            var nm = _connection.NetworkManager;
+            string role = nm.IsServerStarted ? "Host" : "Client";
+            int players = nm.IsServerStarted ? nm.ServerManager.Clients.Count : nm.ClientManager.Clients.Count;
+            GUILayout.Label(role + "  /  " + _connection.Mode + "  /  " + players + " players", _body);
+            GUILayout.Space(12f);
+            if (Button("RESUME", Coral, 48f)) SetPause(false);
+            if (Button(Screen.fullScreen ? "WINDOWED  /  F11" : "FULLSCREEN  /  F11", Color.white, 36f))
+                ToggleFullscreen();
+            if (_connection.Mode == ConnectionMode.Steam && Button("INVITE FRIENDS", Teal, 36f))
+                _connection.InviteFriends();
+            GUI.enabled = SteamBootstrap.OverlayAvailable;
+            if (Button("OPEN STEAM FRIENDS", Teal, 36f)) SteamBootstrap.OpenFriendsOverlay();
+            GUI.enabled = true;
+
+            if (Dev.DevIsland.Instance != null)
             {
-                var nm = _connection.NetworkManager;
-                string role = nm.IsServerStarted ? "Host" : "Client";
-                int players = nm.IsServerStarted ? nm.ServerManager.Clients.Count : nm.ClientManager.Clients.Count;
-                GUILayout.Label($"{role} · {_connection.Mode} · players: {players}");
-                if (!nm.IsServerStarted)
-                    GUILayout.Label($"Ping: {nm.TimeManager.RoundTripTime} ms");
-                if (SteamLobbyService.InLobby)
-                    GUILayout.Label($"Lobby: {SteamLobbyService.CurrentLobby.m_SteamID}");
-                GUILayout.Space(6);
-                if (GUILayout.Button("Resume", GUILayout.Height(30))) SetPause(false);
-                if (_connection.Mode == ConnectionMode.Steam && GUILayout.Button("Invite friends", GUILayout.Height(28)))
-                    _connection.InviteFriends();
-                if (GUILayout.Button(nm.IsServerStarted ? "End session" : "Leave", GUILayout.Height(28)))
+                GUILayout.Space(12f);
+                GUILayout.Label("TRAVEL", _subtitle);
+                for (int i = 0; i < Dev.DevIsland.DestinationNames.Length; i++)
                 {
+                    if (!Button(Dev.DevIsland.DestinationNames[i], Color.white, 30f)) continue;
                     SetPause(false);
-                    _connection.Leave();
+                    Dev.DevIsland.Travel((Dev.Destination)i);
                 }
             }
-
-            if (active && Dev.DevIsland.Instance != null)
+            if (nm.IsServerStarted && Story.StoryDirector.Instance != null)
             {
-                GUILayout.Space(8);
-                GUILayout.Label("Travel");
-                for (int i = 0; i < Dev.DevIsland.DestinationNames.Length; i++)
-                    if (GUILayout.Button(Dev.DevIsland.DestinationNames[i], GUILayout.Height(26)))
-                    {
-                        SetPause(false);
-                        Dev.DevIsland.Travel((Dev.Destination)i);
-                    }
-            }
-            if (active && _connection.NetworkManager.IsServerStarted && Story.StoryDirector.Instance != null)
-            {
-                GUILayout.Space(6);
-                if (GUILayout.Button("Restart the story from chapter 1", GUILayout.Height(26)))
+                GUILayout.Space(10f);
+                if (Button("RESTART STORY FROM CHAPTER 1", Color.white, 32f))
                 {
                     SetPause(false);
                     DevCommands.Execute("story reset");
                 }
             }
 
-            GUILayout.Space(6);
-            if (GUILayout.Button("Customize your lifeguard", GUILayout.Height(28))) AvatarCustomizer.Open();
-            GUILayout.Space(8);
-            GUILayout.Label("<color=#aaaaaa>WASD move · Shift sprint · Ctrl crouch · Space jump · E use · ` / F1 / F2 console</color>",
-                new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true });
+            GUILayout.Space(12f);
+            if (Button("CUSTOMIZE LIFEGUARD", Color.white, 34f)) AvatarCustomizer.Open();
+            if (Button(nm.IsServerStarted ? "END SESSION" : "LEAVE SESSION", Color.white, 34f))
+            {
+                SetPause(false);
+                _connection.Leave();
+            }
+            GUILayout.Space(8f);
+            GUILayout.Label("WASD move  |  E use  |  R reload  |  F inspect  |  Tab guide", _small);
+        }
 
-            if (!string.IsNullOrEmpty(_connection.LastError))
-                GUILayout.Label($"<color=#ff8080>{_connection.LastError}</color>", new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true });
+        private void DrawGuide(float width)
+        {
+            Rect panel = new(width - 380f, 18f, 360f, 255f);
+            DrawRect(panel, Dark);
+            DrawRect(new Rect(panel.x, panel.y, panel.width, 5f), Teal);
+            GUILayout.BeginArea(new Rect(panel.x + 20f, panel.y + 18f, panel.width - 40f, panel.height - 28f));
+            GUILayout.Label("BEACH GUIDE", _subtitle);
+            GUILayout.Space(8f);
+            GUILayout.Label("WASD  Move       Shift  Sprint", _body);
+            GUILayout.Label("E  Rescue / interact       Space  Jump", _body);
+            GUILayout.Label("Mouse  Aim / fire       R  Reload", _body);
+            GUILayout.Label("F  Inspect gun       1-4  Inventory", _body);
+            GUILayout.Space(8f);
+            GUILayout.Label("Tab  Close guide       Esc  Pause", _small);
+            GUILayout.Label("F11  Fullscreen       Shift+Tab  Steam", _small);
             GUILayout.EndArea();
+        }
+
+        private void BuildStyles()
+        {
+            if (_title != null) return;
+            _title = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 30, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
+                wordWrap = true
+            };
+            _title.normal.textColor = Color.white;
+            _subtitle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
+                wordWrap = true
+            };
+            _subtitle.normal.textColor = Teal;
+            _body = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true };
+            _body.normal.textColor = Color.white;
+            _small = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true };
+            _small.normal.textColor = new Color(0.76f, 0.88f, 0.9f);
+            _button = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 16, fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter, margin = new RectOffset(0, 0, 3, 3)
+            };
+        }
+
+        private bool Button(string label, Color color, float height, float width = 0f)
+        {
+            Color before = GUI.backgroundColor;
+            GUI.backgroundColor = color;
+            bool pressed = width > 0f
+                ? GUILayout.Button(label, _button, GUILayout.Width(width), GUILayout.Height(height))
+                : GUILayout.Button(label, _button, GUILayout.Height(height));
+            GUI.backgroundColor = before;
+            if (Event.current.type == EventType.Repaint && GUI.enabled &&
+                GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            {
+                _hoveredThisFrame = label;
+                if (_hoveredButton != label)
+                    BeachAudio.PlayLocal(BeachAudio.MenuHover, 0.45f);
+            }
+            if (pressed) BeachAudio.PlayLocal(BeachAudio.MenuSelect, 0.7f);
+            return pressed;
+        }
+
+        private static void DrawRect(Rect rect, Color color)
+        {
+            Color before = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = before;
         }
     }
 }

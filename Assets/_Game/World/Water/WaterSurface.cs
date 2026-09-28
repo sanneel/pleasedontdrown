@@ -122,6 +122,7 @@ namespace PleaseDontDrown.World.Water
         private void Awake()
         {
             _instance = this;
+            gameObject.AddComponent<BeachSoundscape>();
             Precompute();
             if (_material != null)
                 BuildSurface();

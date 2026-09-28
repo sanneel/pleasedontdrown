@@ -21,6 +21,8 @@ namespace PleaseDontDrown.Player
         private Vector3 _lastPosition;
         private float _distance;
         private bool _subscribed;
+        private float _nextSwimStroke;
+        private bool _submerged;
 
         private void Start() => _lastPosition = transform.position;
 
@@ -28,6 +30,7 @@ namespace PleaseDontDrown.Player
         {
             if (_hub.IsOwner)
             {
+                UpdateLocalSwimming();
                 if (!_subscribed && _hub.Look != null)
                 {
                     _hub.Look.Step += OnLocalStep;
@@ -51,6 +54,25 @@ namespace PleaseDontDrown.Player
             }
         }
 
+        private void UpdateLocalSwimming()
+        {
+            if (_audio == null || _hub.Motor == null) return;
+            bool underwater = WaterSurface.Exists && _hub.Head != null &&
+                              WaterSurface.DepthOf(_hub.Head.position) > 0.14f;
+            if (underwater != _submerged)
+            {
+                _submerged = underwater;
+                _audio.PlayOneShot(underwater ? BeachAudio.Dive : BeachAudio.Emerge, 0.35f);
+            }
+            if (!_hub.Motor.IsSwimming) return;
+            Vector3 v = _hub.Motor.Velocity;
+            float speed = new Vector2(v.x, v.z).magnitude;
+            if (speed < 0.6f || Time.time < _nextSwimStroke) return;
+            _nextSwimStroke = Time.time + Mathf.Lerp(1f, 0.62f, Mathf.Clamp01(speed / 5f));
+            _audio.pitch = Random.Range(0.91f, 1.08f);
+            _audio.PlayOneShot(BeachAudio.SwimStroke, Mathf.Min(0.8f, _volume * 0.95f));
+        }
+
         private void OnDestroy()
         {
             if (_subscribed && _hub != null && _hub.Look != null)
@@ -67,7 +89,7 @@ namespace PleaseDontDrown.Player
         {
             if (_audio == null) return;
             bool wading = WaterSurface.Exists && WaterSurface.DepthOf(transform.position) > 0.12f;
-            AudioClip clip = wading ? ProceduralAudio.WaterStep : ProceduralAudio.Step(SurfaceType.Of(ground));
+            AudioClip clip = wading ? ProceduralAudio.WaterStep : BeachAudio.Footstep(SurfaceType.Of(ground));
             _audio.pitch = Random.Range(0.9f, 1.1f);
             _audio.PlayOneShot(clip, _volume * (_hub.Motor != null && _hub.Motor.IsSprinting ? 1.2f : 1f));
         }

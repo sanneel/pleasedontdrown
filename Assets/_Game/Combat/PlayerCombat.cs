@@ -210,7 +210,7 @@ namespace PleaseDontDrown.Combat
 
         private void PlaySwish()
         {
-            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Breath, 0.35f);
+            if (_audio != null) _audio.PlayOneShot(BeachAudio.PunchSwoosh, 0.5f);
         }
 
         // ------------------------------------------------------------------ getting hit
