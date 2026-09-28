@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_purple_v03
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 66
+  DisplayName: Tourist (purple bikini) #3
+  Mesh: {fileID: 4300000, guid: 2693e57cef4acd747aa04e0311b5d46c, type: 2}
+  Material: {fileID: 2100000, guid: 488845472b88cb44bbce3b6373889ea0, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.89649993, z: -0.008672506}
+  - {x: -2.0969232e-16, y: 0.07290697, z: 0.0064056497}
+  - {x: 5.982852e-15, y: 0.11665124, z: 0.080125846}
+  - {x: -5.107026e-15, y: 0.19019163, z: -0.009498857}
+  - {x: -2.8865799e-15, y: 0.094249964, z: -0.1001007}
+  - {x: -0.16298029, y: 0.12244165, z: 0.0073082075}
+  - {x: 0, y: -0.24293356, z: 0}
+  - {x: 0, y: -0.19738854, z: 0}
+  - {x: 0.16015771, y: 0.12544155, z: 0.007988825}
+  - {x: 0, y: -0.24535015, z: 0}
+  - {x: 0, y: -0.19931374, z: 0}
+  - {x: -0.098840065, y: -0.03733337, z: -0.008191129}
+  - {x: 0, y: -0.4076259, z: 0}
+  - {x: 0, y: -0.39405638, z: 0}
+  - {x: 0.09382725, y: -0.03733331, z: -0.008431148}
+  - {x: 0, y: -0.40756574, z: 0}
+  - {x: 0, y: -0.39397237, z: 0}
+  - {x: -0.040910754, y: 0.14318764, z: 0.1891866}
+  - {x: 0.040910754, y: 0.14318764, z: 0.1891866}
+  - {x: 0, y: 0.06818459, z: 0.1891866}
+  - {x: -0.040910754, y: 0.1840984, z: 0.1891866}
+  - {x: 0.040910754, y: 0.1840984, z: 0.1891866}
+  - {x: -0.051961016, y: 0.07323909, z: 0.123041}
+  - {x: 0.049204823, y: 0.07296097, z: 0.124444105}
+  Scale: 0.9744564
+  UpperArmLength: 0.24293356
+  ForearmLength: 0.19738854
+  HandLength: 0.07599459
+  ThighLength: 0.4076259
+  ShinLength: 0.39405638
+  AnkleHeight: 0.07000029
+  HipHeight: 0.89649993
+  EyeHeight: 1.5136874

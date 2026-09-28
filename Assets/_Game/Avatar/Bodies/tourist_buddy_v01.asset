@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_buddy_v01
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 80
+  DisplayName: Tourist (sunburnt dad) #1
+  Mesh: {fileID: 4300000, guid: c2a312ce1cbb3e2459b55efe09522deb, type: 2}
+  Material: {fileID: 2100000, guid: 6dc3ec80b3af6f14da1dd9d3c56ae681, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.89395547, z: 0.01001206}
+  - {x: 5.0399466e-17, y: 0.07512677, z: 0.008965926}
+  - {x: 6.0622836e-17, y: 0.12020254, z: 0.00021770597}
+  - {x: -1.110223e-16, y: 0.23796523, z: -0.05695785}
+  - {x: -1.7763568e-15, y: 0.13991654, z: 0.039880343}
+  - {x: -0.27661717, y: 0.129215, z: -0.06664249}
+  - {x: 0, y: -0.23938613, z: 0}
+  - {x: 0, y: -0.2098109, z: 0}
+  - {x: 0.27861232, y: 0.12621546, z: -0.0614132}
+  - {x: 0, y: -0.23762712, z: 0}
+  - {x: 0, y: -0.20934868, z: 0}
+  - {x: -0.11715427, y: -0.03955543, z: -0.013811964}
+  - {x: 0, y: -0.40247488, z: 0}
+  - {x: 0, y: -0.38477084, z: 0}
+  - {x: 0.11137255, y: -0.03955549, z: -0.011564869}
+  - {x: 0, y: -0.40258342, z: 0}
+  - {x: 0, y: -0.38474187, z: 0}
+  - {x: -0.037724618, y: 0.13203616, z: 0.16004439}
+  - {x: 0.037724618, y: 0.13203616, z: 0.16004439}
+  - {x: 0, y: 0.06287437, z: 0.16004439}
+  - {x: -0.037724618, y: 0.16976078, z: 0.16004439}
+  - {x: 0.037724618, y: 0.16976078, z: 0.16004439}
+  - {x: -0.07773525, y: 0.019433813, z: 0.087452166}
+  - {x: 0.07773525, y: 0.019433813, z: 0.087452166}
+  Scale: 0.9716907
+  UpperArmLength: 0.23938613
+  ForearmLength: 0.2098109
+  HandLength: 0.08077719
+  ThighLength: 0.40247488
+  ShinLength: 0.38477084
+  AnkleHeight: 0.074166775
+  HipHeight: 0.89395547
+  EyeHeight: 1.5992028

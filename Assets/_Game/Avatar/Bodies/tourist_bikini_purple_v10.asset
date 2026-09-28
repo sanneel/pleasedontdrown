@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_purple_v10
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 73
+  DisplayName: Tourist (purple bikini) #10
+  Mesh: {fileID: 4300000, guid: eb0070d67e35e6c4b9b33522fa69397d, type: 2}
+  Material: {fileID: 2100000, guid: 8e940c44c1f9a4849a66dcd7c22932c9, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.89649993, z: -0.008672506}
+  - {x: -1.5855769e-16, y: 0.07290697, z: 0.00640565}
+  - {x: -1.9381367e-14, y: 0.11665112, z: 0.08012588}
+  - {x: -5.551115e-15, y: 0.1901921, z: -0.009498835}
+  - {x: -4.6629367e-15, y: 0.094249725, z: -0.100100785}
+  - {x: -0.16298035, y: 0.122442126, z: 0.0073082}
+  - {x: 0, y: -0.24293354, z: 0}
+  - {x: 0, y: -0.19738851, z: 0}
+  - {x: 0.16015776, y: 0.12544203, z: 0.007988803}
+  - {x: 0, y: -0.24535023, z: 0}
+  - {x: 0, y: -0.1993137, z: 0}
+  - {x: -0.09884008, y: -0.03733337, z: -0.008191127}
+  - {x: 0, y: -0.40762582, z: 0}
+  - {x: 0, y: -0.39405635, z: 0}
+  - {x: 0.09382726, y: -0.03733331, z: -0.00843114}
+  - {x: 0, y: -0.4075657, z: 0}
+  - {x: 0, y: -0.39397222, z: 0}
+  - {x: -0.0411536, y: 0.14403759, z: 0.18708849}
+  - {x: 0.0411536, y: 0.14403759, z: 0.18708849}
+  - {x: 0, y: 0.06858933, z: 0.18708849}
+  - {x: -0.0411536, y: 0.18519118, z: 0.18708849}
+  - {x: 0.0411536, y: 0.18519118, z: 0.18708849}
+  - {x: -0.05196103, y: 0.073239565, z: 0.12304096}
+  - {x: 0.049204834, y: 0.07296121, z: 0.12444407}
+  Scale: 0.9744564
+  UpperArmLength: 0.24293354
+  ForearmLength: 0.19738851
+  HandLength: 0.07599457
+  ThighLength: 0.40762582
+  ShinLength: 0.39405635
+  AnkleHeight: 0.07000041
+  HipHeight: 0.89649993
+  EyeHeight: 1.5145375

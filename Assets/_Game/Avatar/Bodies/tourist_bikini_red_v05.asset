@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_red_v05
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 36
+  DisplayName: Tourist (red bikini) #5
+  Mesh: {fileID: 4300000, guid: b0192c55d9954124d85719bef070e3c3, type: 2}
+  Material: {fileID: 2100000, guid: 0ac4e0e28510f704ba4c71589264481e, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.9114999, z: -0.0015804878}
+  - {x: 3.538095e-17, y: 0.07883716, z: 0.011495276}
+  - {x: 2.185065e-15, y: 0.12613994, z: 0.07355835}
+  - {x: 6.4392935e-15, y: 0.19709277, z: -0.10821422}
+  - {x: 4.440892e-16, y: 0.09106958, z: 0.006936092}
+  - {x: -0.14289795, y: 0.13402295, z: -0.07905026}
+  - {x: 0, y: -0.23627615, z: 0}
+  - {x: 0, y: -0.20046338, z: 0}
+  - {x: 0.14229918, y: 0.13402295, z: -0.070142}
+  - {x: 0, y: -0.23569866, z: 0}
+  - {x: 0, y: -0.20031203, z: 0}
+  - {x: -0.08834533, y: -0.03733331, z: -0.002782219}
+  - {x: 0, y: -0.41410688, z: 0}
+  - {x: 0, y: -0.39623547, z: 0}
+  - {x: 0.082814746, y: -0.03733337, z: -0.0037640668}
+  - {x: 0, y: -0.41407797, z: 0}
+  - {x: 0, y: -0.3961694, z: 0}
+  - {x: -0.02925227, y: 0.10238295, z: 0.17390813}
+  - {x: 0.02925227, y: 0.10238295, z: 0.17390813}
+  - {x: 0, y: 0.048753787, z: 0.17390813}
+  - {x: -0.02925227, y: 0.13163522, z: 0.17390813}
+  - {x: 0.02925227, y: 0.13163522, z: 0.17390813}
+  - {x: -0.056289356, y: 0.069334745, z: 0.10080158}
+  - {x: 0.05642254, y: 0.06849885, z: 0.10123747}
+  Scale: 0.99076074
+  UpperArmLength: 0.23627615
+  ForearmLength: 0.20046338
+  HandLength: 0.077178404
+  ThighLength: 0.41410688
+  ShinLength: 0.39623547
+  AnkleHeight: 0.07000047
+  HipHeight: 0.9114999
+  EyeHeight: 1.5070223

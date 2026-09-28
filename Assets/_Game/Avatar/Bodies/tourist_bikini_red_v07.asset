@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_red_v07
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 38
+  DisplayName: Tourist (red bikini) #7
+  Mesh: {fileID: 4300000, guid: 604d6e72fc013904cbb16b2bafc7a1c4, type: 2}
+  Material: {fileID: 2100000, guid: b8f8a4ed67bd7ed48b225e3f6bddf119, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.9114999, z: -0.0015804879}
+  - {x: 1.7690654e-17, y: 0.07883716, z: 0.011495249}
+  - {x: -3.2373375e-15, y: 0.12613982, z: 0.0735584}
+  - {x: 2.9976022e-15, y: 0.19709289, z: -0.108214274}
+  - {x: -2.8865799e-15, y: 0.09106982, z: 0.006936103}
+  - {x: -0.14289795, y: 0.13402295, z: -0.07905027}
+  - {x: 0, y: -0.236276, z: 0}
+  - {x: 0, y: -0.20046349, z: 0}
+  - {x: 0.14229919, y: 0.13402295, z: -0.07014204}
+  - {x: 0, y: -0.23569864, z: 0}
+  - {x: 0, y: -0.20031187, z: 0}
+  - {x: -0.08834533, y: -0.03733343, z: -0.0027822666}
+  - {x: 0, y: -0.41410714, z: 0}
+  - {x: 0, y: -0.3962355, z: 0}
+  - {x: 0.08281475, y: -0.03733349, z: -0.0037641004}
+  - {x: 0, y: -0.41407797, z: 0}
+  - {x: 0, y: -0.39616933, z: 0}
+  - {x: -0.028296432, y: 0.09903751, z: 0.16758482}
+  - {x: 0.028296432, y: 0.09903751, z: 0.16758482}
+  - {x: 0, y: 0.047160722, z: 0.16758482}
+  - {x: -0.028296432, y: 0.12733394, z: 0.16758482}
+  - {x: 0.028296432, y: 0.12733394, z: 0.16758482}
+  - {x: -0.056289356, y: 0.069334745, z: 0.10080154}
+  - {x: 0.05642254, y: 0.06849909, z: 0.10123743}
+  Scale: 0.99076074
+  UpperArmLength: 0.236276
+  ForearmLength: 0.20046349
+  HandLength: 0.07717844
+  ThighLength: 0.41410714
+  ShinLength: 0.3962355
+  AnkleHeight: 0.07000005
+  HipHeight: 0.9114999
+  EyeHeight: 1.5036771

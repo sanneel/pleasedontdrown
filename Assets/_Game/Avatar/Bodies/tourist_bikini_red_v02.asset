@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_red_v02
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 33
+  DisplayName: Tourist (red bikini) #2
+  Mesh: {fileID: 4300000, guid: 3f3cfff53e18b574f84d0e0058dc7aea, type: 2}
+  Material: {fileID: 2100000, guid: f0c7538bf8270bc439accb4bf4b9c397, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.91150004, z: -0.001580488}
+  - {x: -1.7690449e-17, y: 0.0788371, z: 0.01149527}
+  - {x: -9.3331854e-17, y: 0.12613976, z: 0.073558405}
+  - {x: 7.771561e-16, y: 0.19709301, z: -0.1082142}
+  - {x: -1.3322676e-15, y: 0.09106982, z: 0.006936107}
+  - {x: -0.14289805, y: 0.13402307, z: -0.07905023}
+  - {x: 0, y: -0.23627615, z: 0}
+  - {x: 0, y: -0.20046376, z: 0}
+  - {x: 0.14229928, y: 0.13402307, z: -0.07014198}
+  - {x: 0, y: -0.23569891, z: 0}
+  - {x: 0, y: -0.20031212, z: 0}
+  - {x: -0.08834535, y: -0.03733343, z: -0.0027822368}
+  - {x: 0, y: -0.41410714, z: 0}
+  - {x: 0, y: -0.39623567, z: 0}
+  - {x: 0.082814775, y: -0.03733349, z: -0.00376407}
+  - {x: 0, y: -0.41407806, z: 0}
+  - {x: 0, y: -0.39616942, z: 0}
+  - {x: -0.024398217, y: 0.08539376, z: 0.16632582}
+  - {x: 0.024398217, y: 0.08539376, z: 0.16632582}
+  - {x: 0, y: 0.040663697, z: 0.16632582}
+  - {x: -0.024398217, y: 0.10979197, z: 0.16632582}
+  - {x: 0.024398217, y: 0.10979197, z: 0.16632582}
+  - {x: -0.056289397, y: 0.069334865, z: 0.10080163}
+  - {x: 0.056422584, y: 0.06849921, z: 0.101237506}
+  Scale: 0.99076086
+  UpperArmLength: 0.23627615
+  ForearmLength: 0.20046376
+  HandLength: 0.077178545
+  ThighLength: 0.41410714
+  ShinLength: 0.39623567
+  AnkleHeight: 0.06999999
+  HipHeight: 0.91150004
+  EyeHeight: 1.4900335

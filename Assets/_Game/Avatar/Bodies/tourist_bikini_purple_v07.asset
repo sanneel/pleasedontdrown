@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_purple_v07
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 70
+  DisplayName: Tourist (purple bikini) #7
+  Mesh: {fileID: 4300000, guid: 658f991fb978df249a46b831fb5a3e9d, type: 2}
+  Material: {fileID: 2100000, guid: 9ddaaade65f9a784ea15f82a042fd6e6, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.8965, z: -0.008672506}
+  - {x: 9.130909e-18, y: 0.07290697, z: 0.0064056423}
+  - {x: 1.1093099e-14, y: 0.11665106, z: 0.08012583}
+  - {x: -2.8865799e-15, y: 0.1901921, z: -0.0094988495}
+  - {x: -3.7747583e-15, y: 0.094249964, z: -0.10010086}
+  - {x: -0.16298035, y: 0.122442126, z: 0.0073082075}
+  - {x: 0, y: -0.2429336, z: 0}
+  - {x: 0, y: -0.19738859, z: 0}
+  - {x: 0.16015776, y: 0.12544215, z: 0.007988811}
+  - {x: 0, y: -0.24535044, z: 0}
+  - {x: 0, y: -0.19931374, z: 0}
+  - {x: -0.09884008, y: -0.03733343, z: -0.008191135}
+  - {x: 0, y: -0.40762588, z: 0}
+  - {x: 0, y: -0.39405647, z: 0}
+  - {x: 0.09382726, y: -0.03733337, z: -0.008431155}
+  - {x: 0, y: -0.4075658, z: 0}
+  - {x: 0, y: -0.39397243, z: 0}
+  - {x: -0.03398844, y: 0.11895953, z: 0.17760716}
+  - {x: 0.03398844, y: 0.11895953, z: 0.17760716}
+  - {x: 0, y: 0.056647398, z: 0.17760716}
+  - {x: -0.03398844, y: 0.15294796, z: 0.17760716}
+  - {x: 0.03398844, y: 0.15294796, z: 0.17760716}
+  - {x: -0.05196103, y: 0.073239565, z: 0.12304102}
+  - {x: 0.04920483, y: 0.07296133, z: 0.12444408}
+  Scale: 0.9744565
+  UpperArmLength: 0.2429336
+  ForearmLength: 0.19738859
+  HandLength: 0.0759946
+  ThighLength: 0.40762588
+  ShinLength: 0.39405647
+  AnkleHeight: 0.07000023
+  HipHeight: 0.8965
+  EyeHeight: 1.4894596

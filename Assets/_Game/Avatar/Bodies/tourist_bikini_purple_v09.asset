@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_purple_v09
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 72
+  DisplayName: Tourist (purple bikini) #9
+  Mesh: {fileID: 4300000, guid: be3785fb5e819984db22f64aada68197, type: 2}
+  Material: {fileID: 2100000, guid: 3cd2d436d3199a04ab618d5e0fd2aa7a, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.89650005, z: -0.008672506}
+  - {x: 8.057867e-17, y: 0.07290697, z: 0.0064056576}
+  - {x: 1.0133474e-14, y: 0.11665112, z: 0.08012577}
+  - {x: -1.7763568e-15, y: 0.19019198, z: -0.0094988495}
+  - {x: -1.7763568e-15, y: 0.094249964, z: -0.10010083}
+  - {x: -0.16298036, y: 0.122442126, z: 0.0073082075}
+  - {x: 0, y: -0.24293375, z: 0}
+  - {x: 0, y: -0.1973884, z: 0}
+  - {x: 0.16015776, y: 0.12544191, z: 0.007988796}
+  - {x: 0, y: -0.2453501, z: 0}
+  - {x: 0, y: -0.19931376, z: 0}
+  - {x: -0.09884008, y: -0.03733337, z: -0.008191122}
+  - {x: 0, y: -0.407626, z: 0}
+  - {x: 0, y: -0.3940564, z: 0}
+  - {x: 0.09382727, y: -0.03733331, z: -0.008431142}
+  - {x: 0, y: -0.40756592, z: 0}
+  - {x: 0, y: -0.39397225, z: 0}
+  - {x: -0.030520104, y: 0.10682037, z: 0.19348012}
+  - {x: 0.030520104, y: 0.10682037, z: 0.19348012}
+  - {x: 0, y: 0.050866842, z: 0.19348012}
+  - {x: -0.030520104, y: 0.13734047, z: 0.19348012}
+  - {x: 0.030520104, y: 0.13734047, z: 0.19348012}
+  - {x: -0.051961035, y: 0.073239565, z: 0.123040974}
+  - {x: 0.049204834, y: 0.07296133, z: 0.12444407}
+  Scale: 0.97445655
+  UpperArmLength: 0.24293375
+  ForearmLength: 0.1973884
+  HandLength: 0.07599453
+  ThighLength: 0.407626
+  ShinLength: 0.3940564
+  AnkleHeight: 0.07000029
+  HipHeight: 0.89650005
+  EyeHeight: 1.4773204

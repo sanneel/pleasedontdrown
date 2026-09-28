@@ -124,7 +124,7 @@ namespace PleaseDontDrown.Editor
                 "random" => AvatarLook.Random(new System.Random(seed)),
                 "sandy" => Story.StoryDirector.SandyLook,
                 "sandyboss" => SandyBoss(),
-                "body" => new AvatarLook { Body = (byte)seed, Figure = (byte)(seed is >= 1 and <= 5 ? 1 : 0) },
+                "body" => new AvatarLook { Body = (byte)seed, Figure = (byte)(AvatarLook.Bodies.IsFeminine((byte)seed) ? 1 : 0) },
                 "sandycode" => CodeBuilt(Story.StoryDirector.SandyLook),
                 "receptionist" => Story.StoryDirector.ReceptionistLook,
                 "robber" => Story.StoryDirector.RobberLook,

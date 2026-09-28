@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_buddy_v10
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 89
+  DisplayName: Tourist (sunburnt dad) #10
+  Mesh: {fileID: 4300000, guid: b11d71fa0e5d5ca4b93617b18a6221ba, type: 2}
+  Material: {fileID: 2100000, guid: e8aa712af9c038c4bbf7bffb69af7c5e, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.8939555, z: 0.01001206}
+  - {x: -6.5736755e-16, y: 0.07512677, z: 0.00896595}
+  - {x: -1.7529972e-16, y: 0.1202026, z: 0.00021770783}
+  - {x: 3.8857806e-16, y: 0.23796535, z: -0.056957886}
+  - {x: -8.881784e-16, y: 0.13991666, z: 0.03988032}
+  - {x: -0.27661717, y: 0.12921524, z: -0.06664252}
+  - {x: 0, y: -0.23938608, z: 0}
+  - {x: 0, y: -0.209811, z: 0}
+  - {x: 0.27861232, y: 0.12621558, z: -0.061413236}
+  - {x: 0, y: -0.23762713, z: 0}
+  - {x: 0, y: -0.20934875, z: 0}
+  - {x: -0.11715428, y: -0.03955549, z: -0.013811957}
+  - {x: 0, y: -0.40247497, z: 0}
+  - {x: 0, y: -0.3847708, z: 0}
+  - {x: 0.11137256, y: -0.03955555, z: -0.011564862}
+  - {x: 0, y: -0.40258354, z: 0}
+  - {x: 0, y: -0.38474193, z: 0}
+  - {x: -0.041777473, y: 0.14622115, z: 0.17527623}
+  - {x: 0.041777473, y: 0.14622115, z: 0.17527623}
+  - {x: 0, y: 0.069629125, z: 0.17527623}
+  - {x: -0.041777473, y: 0.18799862, z: 0.17527623}
+  - {x: 0.041777473, y: 0.18799862, z: 0.17527623}
+  - {x: -0.07773526, y: 0.019433815, z: 0.08745217}
+  - {x: 0.07773526, y: 0.019433815, z: 0.08745217}
+  Scale: 0.9716908
+  UpperArmLength: 0.23938608
+  ForearmLength: 0.209811
+  HandLength: 0.080777235
+  ThighLength: 0.40247497
+  ShinLength: 0.3847708
+  AnkleHeight: 0.074166715
+  HipHeight: 0.8939555
+  EyeHeight: 1.6133881

@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_purple_v04
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 67
+  DisplayName: Tourist (purple bikini) #4
+  Mesh: {fileID: 4300000, guid: ca6432a34cffead42af8122bec7e978d, type: 2}
+  Material: {fileID: 2100000, guid: 6ee06e9ae240afb4ca276a0f195e31d1, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.8965, z: -0.008672506}
+  - {x: 6.5748116e-16, y: 0.07290697, z: 0.00640565}
+  - {x: -9.095176e-15, y: 0.11665106, z: 0.0801259}
+  - {x: -4.440892e-16, y: 0.19019186, z: -0.009498835}
+  - {x: 1.110223e-14, y: 0.094249964, z: -0.10010095}
+  - {x: -0.16298035, y: 0.12244189, z: 0.007308215}
+  - {x: 0, y: -0.24293366, z: 0}
+  - {x: 0, y: -0.19738863, z: 0}
+  - {x: 0.16015776, y: 0.12544191, z: 0.007988825}
+  - {x: 0, y: -0.24535021, z: 0}
+  - {x: 0, y: -0.19931369, z: 0}
+  - {x: -0.09884008, y: -0.03733343, z: -0.008191129}
+  - {x: 0, y: -0.4076259, z: 0}
+  - {x: 0, y: -0.3940565, z: 0}
+  - {x: 0.09382726, y: -0.03733337, z: -0.008431148}
+  - {x: 0, y: -0.40756586, z: 0}
+  - {x: 0, y: -0.39397237, z: 0}
+  - {x: -0.037814353, y: 0.13235024, z: 0.18665521}
+  - {x: 0.037814353, y: 0.13235024, z: 0.18665521}
+  - {x: 0, y: 0.063023925, z: 0.18665521}
+  - {x: -0.037814353, y: 0.17016459, z: 0.18665521}
+  - {x: 0.037814353, y: 0.17016459, z: 0.18665521}
+  - {x: -0.05196103, y: 0.07323933, z: 0.123041034}
+  - {x: 0.049204834, y: 0.07296121, z: 0.12444413}
+  Scale: 0.9744565
+  UpperArmLength: 0.24293366
+  ForearmLength: 0.19738863
+  HandLength: 0.075994626
+  ThighLength: 0.4076259
+  ShinLength: 0.3940565
+  AnkleHeight: 0.07000017
+  HipHeight: 0.8965
+  EyeHeight: 1.50285

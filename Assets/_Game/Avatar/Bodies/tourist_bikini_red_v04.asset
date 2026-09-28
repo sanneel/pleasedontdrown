@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_red_v04
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 35
+  DisplayName: Tourist (red bikini) #4
+  Mesh: {fileID: 4300000, guid: 5ef06a4a6e023824185cc6f52673ec24, type: 2}
+  Material: {fileID: 2100000, guid: 2fde6ef84dcde404080afa92e3005e2a, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.9115, z: -0.0015804879}
+  - {x: -5.293956e-23, y: 0.07883716, z: 0.011495294}
+  - {x: -3.7747583e-15, y: 0.12613976, z: 0.07355838}
+  - {x: 4.440892e-15, y: 0.19709289, z: -0.1082142}
+  - {x: -2.6645353e-15, y: 0.0910697, z: 0.006936107}
+  - {x: -0.14289801, y: 0.13402307, z: -0.07905023}
+  - {x: 0, y: -0.2362761, z: 0}
+  - {x: 0, y: -0.2004636, z: 0}
+  - {x: 0.14229923, y: 0.13402307, z: -0.070142}
+  - {x: 0, y: -0.23569867, z: 0}
+  - {x: 0, y: -0.20031202, z: 0}
+  - {x: -0.08834535, y: -0.03733337, z: -0.002782214}
+  - {x: 0, y: -0.4141071, z: 0}
+  - {x: 0, y: -0.3962356, z: 0}
+  - {x: 0.08281477, y: -0.03733343, z: -0.0037640473}
+  - {x: 0, y: -0.41407797, z: 0}
+  - {x: 0, y: -0.39616933, z: 0}
+  - {x: -0.0418737, y: 0.14655796, z: 0.18496083}
+  - {x: 0.0418737, y: 0.14655796, z: 0.18496083}
+  - {x: 0, y: 0.06978951, z: 0.18496083}
+  - {x: -0.0418737, y: 0.18843165, z: 0.18496083}
+  - {x: 0.0418737, y: 0.18843165, z: 0.18496083}
+  - {x: -0.056289375, y: 0.069334865, z: 0.1008016}
+  - {x: 0.056422554, y: 0.06849909, z: 0.101237476}
+  Scale: 0.9907608
+  UpperArmLength: 0.2362761
+  ForearmLength: 0.2004636
+  HandLength: 0.07717848
+  ThighLength: 0.4141071
+  ShinLength: 0.3962356
+  AnkleHeight: 0.07000011
+  HipHeight: 0.9115
+  EyeHeight: 1.5511974

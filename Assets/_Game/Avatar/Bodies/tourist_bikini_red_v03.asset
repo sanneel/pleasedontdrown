@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_red_v03
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 34
+  DisplayName: Tourist (red bikini) #3
+  Mesh: {fileID: 4300000, guid: 6d9a1c49b4e0a264abe58e5a3393144d, type: 2}
+  Material: {fileID: 2100000, guid: 5482c9582cee34b4b8ecfff15d21ec09, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.9114999, z: -0.0015804878}
+  - {x: -5.293956e-23, y: 0.078837216, z: 0.011495301}
+  - {x: 1.1102236e-16, y: 0.12613976, z: 0.07355839}
+  - {x: 7.660539e-15, y: 0.19709277, z: -0.108214185}
+  - {x: -2.220446e-15, y: 0.09106982, z: 0.0069361366}
+  - {x: -0.14289795, y: 0.13402307, z: -0.07905021}
+  - {x: 0, y: -0.23627615, z: 0}
+  - {x: 0, y: -0.20046331, z: 0}
+  - {x: 0.14229918, y: 0.13402307, z: -0.07014196}
+  - {x: 0, y: -0.23569869, z: 0}
+  - {x: 0, y: -0.20031191, z: 0}
+  - {x: -0.08834533, y: -0.03733331, z: -0.0027822047}
+  - {x: 0, y: -0.414107, z: 0}
+  - {x: 0, y: -0.3962354, z: 0}
+  - {x: 0.082814746, y: -0.03733337, z: -0.0037640524}
+  - {x: 0, y: -0.41407785, z: 0}
+  - {x: 0, y: -0.39616933, z: 0}
+  - {x: -0.032683253, y: 0.11439139, z: 0.1800671}
+  - {x: 0.032683253, y: 0.11439139, z: 0.1800671}
+  - {x: 0, y: 0.05447209, z: 0.1800671}
+  - {x: -0.032683253, y: 0.14707464, z: 0.1800671}
+  - {x: 0.032683253, y: 0.14707464, z: 0.1800671}
+  - {x: -0.05628936, y: 0.069334865, z: 0.10080153}
+  - {x: 0.05642254, y: 0.06849897, z: 0.101237446}
+  Scale: 0.99076074
+  UpperArmLength: 0.23627615
+  ForearmLength: 0.20046331
+  HandLength: 0.077178374
+  ThighLength: 0.414107
+  ShinLength: 0.3962354
+  AnkleHeight: 0.07000041
+  HipHeight: 0.9114999
+  EyeHeight: 1.5190308

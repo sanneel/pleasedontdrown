@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_sporty_v07
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 54
+  DisplayName: Tourist (sporty) #7
+  Mesh: {fileID: 4300000, guid: 4f765201f266e1343882b9bc34e5a155, type: 2}
+  Material: {fileID: 2100000, guid: 593158182309f494a9b4ab06d4085b5d, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.91349995, z: -0.0064734593}
+  - {x: -1.1108752e-16, y: 0.08488363, z: 0.0075412975}
+  - {x: -2.1093585e-15, y: 0.13581413, z: 0.07176552}
+  - {x: 2.8865799e-15, y: 0.21130228, z: -0.0691443}
+  - {x: 2.4424907e-15, y: 0.09566665, z: -0.020490084}
+  - {x: -0.13338475, y: 0.14430225, z: -0.013893016}
+  - {x: 0, y: -0.26076895, z: 0}
+  - {x: 0, y: -0.21891473, z: 0}
+  - {x: 0.13481973, y: 0.14430225, z: -0.011244498}
+  - {x: 0, y: -0.26078793, z: 0}
+  - {x: 0, y: -0.21799763, z: 0}
+  - {x: -0.09270007, y: -0.038222253, z: -0.00828497}
+  - {x: 0, y: -0.4156597, z: 0}
+  - {x: 0, y: -0.39888516, z: 0}
+  - {x: 0.087929554, y: -0.038222373, z: -0.008699352}
+  - {x: 0, y: -0.41571662, z: 0}
+  - {x: 0, y: -0.39931956, z: 0}
+  - {x: -0.041375067, y: 0.14481273, z: 0.1759607}
+  - {x: 0.041375067, y: 0.14481273, z: 0.1759607}
+  - {x: 0, y: 0.068958454, z: 0.1759607}
+  - {x: -0.041375067, y: 0.1861878, z: 0.1759607}
+  - {x: 0.041375067, y: 0.1861878, z: 0.1759607}
+  - {x: -0.049705327, y: 0.08016133, z: 0.10533416}
+  - {x: 0.060299065, y: 0.08062601, z: 0.10035476}
+  Scale: 0.9929347
+  UpperArmLength: 0.26076895
+  ForearmLength: 0.21891473
+  HandLength: 0.08428217
+  ThighLength: 0.4156597
+  ShinLength: 0.39888516
+  AnkleHeight: 0.0716666
+  HipHeight: 0.91349995
+  EyeHeight: 1.5859793

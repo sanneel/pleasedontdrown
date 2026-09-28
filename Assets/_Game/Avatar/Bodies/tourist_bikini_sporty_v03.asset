@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_sporty_v03
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 50
+  DisplayName: Tourist (sporty) #3
+  Mesh: {fileID: 4300000, guid: 3ab0cabd71fec1f4b8ed4b46b30d7950, type: 2}
+  Material: {fileID: 2100000, guid: 2714cff76a99fc040b5afa063b13b298, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.9135001, z: -0.00647346}
+  - {x: -2.8713824e-16, y: 0.08488363, z: 0.0075412835}
+  - {x: -3.2655754e-15, y: 0.13581425, z: 0.07176557}
+  - {x: -1.5543122e-15, y: 0.21130228, z: -0.06914426}
+  - {x: 1.5543122e-15, y: 0.09566665, z: -0.020490136}
+  - {x: -0.13338484, y: 0.14430237, z: -0.013893023}
+  - {x: 0, y: -0.2607692, z: 0}
+  - {x: 0, y: -0.21891487, z: 0}
+  - {x: 0.13481982, y: 0.14430237, z: -0.011244506}
+  - {x: 0, y: -0.260788, z: 0}
+  - {x: 0, y: -0.21799777, z: 0}
+  - {x: -0.0927001, y: -0.038222253, z: -0.008284986}
+  - {x: 0, y: -0.41565967, z: 0}
+  - {x: 0, y: -0.39888525, z: 0}
+  - {x: 0.087929584, y: -0.038222373, z: -0.008699369}
+  - {x: 0, y: -0.41571662, z: 0}
+  - {x: 0, y: -0.3993196, z: 0}
+  - {x: -0.025319237, y: 0.08861733, z: 0.16624369}
+  - {x: 0.025319237, y: 0.08861733, z: 0.16624369}
+  - {x: 0, y: 0.04219873, z: 0.16624369}
+  - {x: -0.025319237, y: 0.11393657, z: 0.16624369}
+  - {x: 0.025319237, y: 0.11393657, z: 0.16624369}
+  - {x: -0.049705364, y: 0.08016157, z: 0.10533423}
+  - {x: 0.060299106, y: 0.08062601, z: 0.10035478}
+  Scale: 0.9929348
+  UpperArmLength: 0.2607692
+  ForearmLength: 0.21891487
+  HandLength: 0.08428222
+  ThighLength: 0.41565967
+  ShinLength: 0.39888525
+  AnkleHeight: 0.07166666
+  HipHeight: 0.9135001
+  EyeHeight: 1.5297842

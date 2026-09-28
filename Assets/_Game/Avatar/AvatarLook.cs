@@ -68,6 +68,27 @@ namespace PleaseDontDrown.Avatars
             public const byte TouristSporty = 4;   // turquoise sports bikini
             public const byte TouristPurple = 5;   // purple bikini, curvy
             public const byte TouristBuddy = 6;    // sunburnt dad in flowery trunks
+
+            /// <summary>
+            /// Look-alikes of the tourists (ArtSource/Tools/make_variants.py): other skin, hair, eyes, outfit colour, face
+            /// and build. Id = VariantFirst + 16 * base index + (n - 1), n = 1..VariantsPerBase (files *_v01.glb ...).
+            /// </summary>
+            public const byte VariantFirst = 32;
+            public const int VariantsPerBase = 10;
+            public static readonly byte[] VariantBases = { TouristRed, TouristSporty, TouristPurple, TouristBuddy };
+
+            public static byte Variant(byte baseBody, int n)
+            {
+                int index = System.Array.IndexOf(VariantBases, baseBody);
+                return index < 0 || n <= 0 ? baseBody : (byte)(VariantFirst + 16 * index + (n - 1));
+            }
+
+            /// <summary>The base tourist or one of its look-alikes (a missing body falls back to the code-built one).</summary>
+            /// <summary>Women's bodies (the look's Figure should say feminine: bust jiggle, CPR lines).</summary>
+            public static bool IsFeminine(byte body) =>
+                body is >= Sandy and <= TouristPurple || body >= VariantFirst && body < VariantFirst + 48;
+
+            public static byte PickVariant(System.Random rng, byte baseBody) => Variant(baseBody, rng.Next(VariantsPerBase + 1));
         }
 
         public static readonly string[] BuildNames = { "Slim", "Regular", "Broad", "Round" };
@@ -124,8 +145,8 @@ namespace PleaseDontDrown.Avatars
             if (rng.NextDouble() < 0.2) look.Extras |= AvatarExtras.Sunscreen;
             if (look.TopColor == look.BottomColor) look.BottomColor = (byte)((look.BottomColor + 7) % ClothColors.Length);
             // Most beach-goers are the Meshy models now (the code-built ones stay for variety and as the fallback).
-            if (feminine && rng.NextDouble() < 0.8) look.Body = (byte)Pick(rng, Bodies.TouristRed, Bodies.TouristSporty, Bodies.TouristPurple);
-            else if (!feminine && rng.NextDouble() < 0.35) look.Body = Bodies.TouristBuddy;
+            if (feminine && rng.NextDouble() < 0.8) look.Body = Bodies.PickVariant(rng, (byte)Pick(rng, Bodies.TouristRed, Bodies.TouristSporty, Bodies.TouristPurple));
+            else if (!feminine && rng.NextDouble() < 0.35) look.Body = Bodies.PickVariant(rng, Bodies.TouristBuddy);
             return look;
         }
 

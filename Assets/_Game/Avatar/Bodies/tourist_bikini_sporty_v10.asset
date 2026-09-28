@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_bikini_sporty_v10
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 57
+  DisplayName: Tourist (sporty) #10
+  Mesh: {fileID: 4300000, guid: a9838d51d9457ce46b460091e0f880b5, type: 2}
+  Material: {fileID: 2100000, guid: f56db49b283ebed41859c139e622bcfe, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.9135001, z: -0.00647346}
+  - {x: 1.5001208e-16, y: 0.08488363, z: 0.0075412835}
+  - {x: -1.0381905e-15, y: 0.13581425, z: 0.07176551}
+  - {x: 1.3322676e-15, y: 0.21130228, z: -0.06914431}
+  - {x: 4.440892e-16, y: 0.09566641, z: -0.020490136}
+  - {x: -0.13338481, y: 0.14430225, z: -0.013893008}
+  - {x: 0, y: -0.26076895, z: 0}
+  - {x: 0, y: -0.21891485, z: 0}
+  - {x: 0.1348198, y: 0.14430225, z: -0.011244476}
+  - {x: 0, y: -0.260788, z: 0}
+  - {x: 0, y: -0.21799774, z: 0}
+  - {x: -0.0927001, y: -0.038222253, z: -0.008284979}
+  - {x: 0, y: -0.41565955, z: 0}
+  - {x: 0, y: -0.3988852, z: 0}
+  - {x: 0.08792958, y: -0.038222373, z: -0.008699369}
+  - {x: 0, y: -0.41571662, z: 0}
+  - {x: 0, y: -0.39931956, z: 0}
+  - {x: -0.03924116, y: 0.13734406, z: 0.18191475}
+  - {x: 0.03924116, y: 0.13734406, z: 0.18191475}
+  - {x: 0, y: 0.065401934, z: 0.18191475}
+  - {x: -0.03924116, y: 0.17658523, z: 0.18191475}
+  - {x: 0.03924116, y: 0.17658523, z: 0.18191475}
+  - {x: -0.049705353, y: 0.08016133, z: 0.10533426}
+  - {x: 0.060299095, y: 0.08062601, z: 0.10035477}
+  Scale: 0.9929348
+  UpperArmLength: 0.26076895
+  ForearmLength: 0.21891485
+  HandLength: 0.08428222
+  ThighLength: 0.41565955
+  ShinLength: 0.3988852
+  AnkleHeight: 0.07166684
+  HipHeight: 0.9135001
+  EyeHeight: 1.5785108

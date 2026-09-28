@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: tourist_buddy_v08
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 87
+  DisplayName: Tourist (sunburnt dad) #8
+  Mesh: {fileID: 4300000, guid: ca9b9e223dbbbc44c9026d1b85a41711, type: 2}
+  Material: {fileID: 2100000, guid: be978d3eca2e7a4449b7fa07809472a9, type: 2}
+  RestPositions:
+  - {x: 0, y: 0.8939555, z: 0.01001206}
+  - {x: 6.77822e-16, y: 0.07512671, z: 0.008965926}
+  - {x: 1.5484525e-16, y: 0.12020242, z: 0.0002177041}
+  - {x: -2.6090241e-15, y: 0.23796535, z: -0.05695789}
+  - {x: -1.3322676e-15, y: 0.13991642, z: 0.039880287}
+  - {x: -0.27661717, y: 0.12921512, z: -0.066642545}
+  - {x: 0, y: -0.23938616, z: 0}
+  - {x: 0, y: -0.20981087, z: 0}
+  - {x: 0.27861232, y: 0.12621558, z: -0.061413266}
+  - {x: 0, y: -0.23762727, z: 0}
+  - {x: 0, y: -0.20934877, z: 0}
+  - {x: -0.11715428, y: -0.03955549, z: -0.013811965}
+  - {x: 0, y: -0.40247494, z: 0}
+  - {x: 0, y: -0.38477078, z: 0}
+  - {x: 0.11137256, y: -0.03955555, z: -0.011564869}
+  - {x: 0, y: -0.40258342, z: 0}
+  - {x: 0, y: -0.38474193, z: 0}
+  - {x: -0.038344603, y: 0.1342061, z: 0.16246024}
+  - {x: 0.038344603, y: 0.1342061, z: 0.16246024}
+  - {x: 0, y: 0.063907675, z: 0.16246024}
+  - {x: -0.038344603, y: 0.17255071, z: 0.16246024}
+  - {x: 0.038344603, y: 0.17255071, z: 0.16246024}
+  - {x: -0.07773526, y: 0.019433815, z: 0.08745217}
+  - {x: 0.07773526, y: 0.019433815, z: 0.08745217}
+  Scale: 0.9716908
+  UpperArmLength: 0.23938616
+  ForearmLength: 0.20981087
+  HandLength: 0.08077718
+  ThighLength: 0.40247494
+  ShinLength: 0.38477078
+  AnkleHeight: 0.074166775
+  HipHeight: 0.8939555
+  EyeHeight: 1.6013725

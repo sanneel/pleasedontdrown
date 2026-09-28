@@ -41,7 +41,14 @@ namespace PleaseDontDrown.Editor
         {
             Directory.CreateDirectory(OutputDir);
             var baked = new List<AvatarBody>();
-            foreach (var (id, name, file) in Bodies)
+            var all = new List<(byte id, string name, string file)>(Bodies);
+            foreach (byte baseId in AvatarLook.Bodies.VariantBases)
+            {
+                var (_, baseName, baseFile) = Bodies.First(b => b.id == baseId);
+                for (int n = 1; n <= 16; n++)
+                    all.Add((AvatarLook.Bodies.Variant(baseId, n), $"{baseName} #{n}", $"{baseFile}_v{n:00}"));
+            }
+            foreach (var (id, name, file) in all)
             {
                 string glb = $"{SourceDir}/{file}.glb";
                 if (!File.Exists(glb)) continue;
