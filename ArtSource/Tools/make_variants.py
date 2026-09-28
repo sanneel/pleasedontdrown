@@ -308,8 +308,13 @@ def reshape(p):
     out = co.copy()
     # Build: every vertex pushed out from (or pulled towards) the bones it follows.
     radial = np.zeros_like(co)
-    for name, idx in gi.items():
-        w = vw[:, idx]
+    weights = {name: vw[:, idx] for name, idx in gi.items()}
+    for sd in 'LR':  # shoulder helpers (prepare_character.py) share the skin between the arm and the chest
+        helper = weights.pop('Shoulder' + sd, None)
+        if helper is not None:
+            weights['UpperArm' + sd] = weights['UpperArm' + sd] + 0.5 * helper
+            weights['Chest'] = weights['Chest'] + 0.5 * helper
+    for name, w in weights.items():
         if not w.any() or name not in joint:
             continue
         f = p['limbs'] if name.startswith(('UpperArm', 'Forearm', 'Thigh', 'Shin')) else \

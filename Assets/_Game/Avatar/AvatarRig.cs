@@ -11,6 +11,7 @@ namespace PleaseDontDrown.Avatars
     /// The root is at the feet, facing +Z; in the rest pose arms and legs hang straight down, and every limb bone
     /// points down its local -Y. Animation sets bone rotations (see <see cref="AvatarAnimator"/>).
     /// </summary>
+    [DefaultExecutionOrder(190)] // after everything that poses the arms (AvatarAnimator 50, FirstPersonArms 100)
     public class AvatarRig : MonoBehaviour
     {
         public enum Bone
@@ -20,6 +21,7 @@ namespace PleaseDontDrown.Avatars
             ThighL, ShinL, FootL, ThighR, ShinR, FootR,
             EyeL, EyeR, Mouth, BrowL, BrowR,
             BustL, BustR,   // feminine figures: chest shapes on spring bones (see AvatarJiggle)
+            ShoulderL, ShoulderR,   // generated bodies: turn half as far as the upper arm (round armpits, see LateUpdate)
             Count
         }
 
@@ -40,6 +42,8 @@ namespace PleaseDontDrown.Avatars
         private SkinnedMeshRenderer _renderer;
         private Mesh _mesh;
         private bool _built;
+        // Generated bodies: undoes each upper arm's bind turn (the model's A-pose arm), to measure the arm's turn from it.
+        private Quaternion _armUnbindL = Quaternion.identity, _armUnbindR = Quaternion.identity;
 
         public AvatarLook Look { get; private set; } = AvatarLook.Lifeguard;
         /// <summary>The generated body in use, or null for the code-built one.</summary>
@@ -84,6 +88,18 @@ namespace PleaseDontDrown.Avatars
         private void OnDestroy()
         {
             if (_mesh != null) Destroy(_mesh);
+        }
+
+        /// <summary>
+        /// Shoulder helpers follow half the upper arm's turn away from the model's own pose. The skin between the
+        /// chest and the arm is weighted to them (prepare_character.py), so it never blends two bones more than half
+        /// a raised arm apart: straight blending across 160 degrees pinched the armpits into a hard fold.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!_built || GeneratedBody == null) return;
+            this[Bone.ShoulderL].localRotation = Quaternion.Slerp(Quaternion.identity, this[Bone.UpperArmL].localRotation * _armUnbindL, 0.5f);
+            this[Bone.ShoulderR].localRotation = Quaternion.Slerp(Quaternion.identity, this[Bone.UpperArmR].localRotation * _armUnbindR, 0.5f);
         }
 
         /// <summary>Resets every bone to its rest pose.</summary>
@@ -195,7 +211,7 @@ namespace PleaseDontDrown.Avatars
                     _bones[i] = new GameObject(bone.ToString()).transform;
                 }
                 _bones[i].SetParent(parent.HasValue ? _bones[(int)parent.Value] : transform, false);
-                _restPosition[i] = generated != null ? generated.RestPositions[i] : localPosition * s;
+                _restPosition[i] = generated != null && i < generated.RestPositions.Length ? generated.RestPositions[i] : localPosition * s;
                 _restRotation[i] = Quaternion.identity;
             }
 
@@ -220,6 +236,9 @@ namespace PleaseDontDrown.Avatars
             Vector3 bust = AvatarParts.BustOffset(look);
             Make(Bone.BustL, Bone.Chest, new Vector3(-bust.x, bust.y, bust.z));
             Make(Bone.BustR, Bone.Chest, bust);
+            // Shoulder helpers on the shoulder joints: only generated bodies have skin on them.
+            Make(Bone.ShoulderL, Bone.Chest, new Vector3(-b.Shoulder, 0.17f, 0f));
+            Make(Bone.ShoulderR, Bone.Chest, new Vector3(b.Shoulder, 0.17f, 0f));
 
             // Fingers: keep the same transforms across rebuilds.
             var leftFingers = new Transform[HandBones.BoneCount];
@@ -251,6 +270,9 @@ namespace PleaseDontDrown.Avatars
             _renderer.quality = SkinQuality.Bone4; // smooth weights, unlike the rigid code-built parts
             _renderer.sharedMaterial = body.Material;
             _renderer.skinnedMotionVectors = false;
+            Matrix4x4[] bindposes = body.Mesh.bindposes; // root space, so an arm's rotation is its bind turn undone
+            _armUnbindL = bindposes[(int)Bone.UpperArmL].rotation;
+            _armUnbindR = bindposes[(int)Bone.UpperArmR].rotation;
         }
 
         private void BuildMesh(AvatarLook look)

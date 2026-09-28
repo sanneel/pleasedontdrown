@@ -177,6 +177,9 @@ namespace PleaseDontDrown.Editor
                     Set(thigh, P(thigh) - P(Bone.Hips), P(thigh), Along(thigh, shin));
                     Set(shin, new Vector3(0f, -Dist(thigh, shin), 0f), P(shin), Along(shin, foot));
                     Set(foot, new Vector3(0f, -Dist(shin, foot), 0f), P(foot), Quaternion.identity); // soles stay flat
+                    // Shoulder helper (prepare_character.py): on the shoulder joint, bound unturned; AvatarRig turns it
+                    // half as far as the upper arm has turned from its bind. Older GLBs have no skin on it.
+                    Set(left ? Bone.ShoulderL : Bone.ShoulderR, P(upper) - P(Bone.Chest), P(upper), Quaternion.identity);
                 }
 
                 // Face and bust bones carry no mesh here, but gaze, expressions and jiggle still read them.

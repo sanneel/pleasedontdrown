@@ -7,6 +7,7 @@ blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- <in.glb>
   --texture 2048           largest texture size
   --bust 1                 women: add BustL/BustR spring bones (the game jiggles them, e.g. during CPR)
   --armband 0.045          shoulders: how far past the armpit line the arm's pull fades in (at 1.8 m tall)
+  --helpers 1              ShoulderL/R bones that turn half as far as the upper arm (the game drives them)
   --preview <prefix>       also render front/side pictures with the skeleton drawn in
 
 What it does: keeps one figure (drops other figures and floating text), stands it on the origin facing -Y
@@ -29,7 +30,7 @@ from mathutils.kdtree import KDTree
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, DST = argv[0], argv[1]
-opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'preview': ''}
+opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'preview': ''}
 i = 2
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -425,6 +426,40 @@ for vert in body.data.vertices if opts['armclamp'] else []:
     eased += 1
 log(f'{eased} upper-body vertices kept off the arms inside the armpit line')
 
+# Shoulder helpers: a bone at each shoulder joint that the game turns half as far as the upper arm. Skin shared
+# between the chest and the arm moves onto it, so it never blends two bones more than half the arm's turn apart:
+# linear blending across a raised arm (160 degrees and more) pinches the armpit into a hard fold, across half
+# of it the armpit and the shoulder stay round. A vertex that was half arm, half chest is now all helper.
+if opts['helpers']:
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.object.mode_set(mode='EDIT')
+    for side in 'LR':
+        b = arm_data.edit_bones.new('Shoulder' + side)
+        b.head = Vector(joints['UpperArm' + side])
+        b.tail = b.head + Vector((0.0, 0.0, 0.05 * unit))
+        b.parent = arm_data.edit_bones['Chest']
+    bpy.ops.object.mode_set(mode='OBJECT')
+    shared = 0
+    for side in 'LR':
+        upper = body.vertex_groups['UpperArm' + side].index
+        helper = body.vertex_groups.new(name='Shoulder' + side)
+        for vert in body.data.vertices:
+            arm = next((g for g in vert.groups if g.group == upper), None)
+            if arm is None or arm.weight <= 0.0:
+                continue
+            others = [g for g in vert.groups if g.group not in arm_groups]
+            c = sum(g.weight for g in others)
+            if c <= 1e-4:
+                continue  # all arm
+            total = arm.weight + c
+            t = arm.weight / total
+            arm.weight = total * max(0.0, 2.0 * t - 1.0)
+            helper.add([vert.index], total * (1.0 - abs(2.0 * t - 1.0)), 'REPLACE')
+            for g in others:
+                g.weight *= total * max(0.0, 1.0 - 2.0 * t) / c
+            shared += 1
+    log(f'{shared} vertices shared between the arms and the chest go on the shoulder helpers')
+
 if opts['bust']:
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.mode_set(mode='EDIT')
@@ -434,7 +469,7 @@ if opts['bust']:
         b.tail = Vector(joints['BustTip' + side])
         b.parent = arm_data.edit_bones['Chest']
     bpy.ops.object.mode_set(mode='OBJECT')
-    arm_groups = {g.index for g in body.vertex_groups if g.name.startswith(('UpperArm', 'Forearm', 'Hand'))}
+    arm_groups = {g.index for g in body.vertex_groups if g.name.startswith(('UpperArm', 'Forearm', 'Hand', 'Shoulder'))}
     for side, sign in (('L', 1.0), ('R', -1.0)):
         group = body.vertex_groups.new(name='Bust' + side)
         center, r = np.array(joints['Bust' + side]), bust_radius[side]
