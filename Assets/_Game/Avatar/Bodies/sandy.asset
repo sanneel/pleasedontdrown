@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: sandy
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 1
+  DisplayName: Sandy
+  Mesh: {fileID: 4300000, guid: 92db136b18b7047408fce0888d0e0399, type: 2}
+  Material: {fileID: -4234473462164445276, guid: 9ee7d7a3c3967d948aea13f2ed07464d, type: 3}
+  RestPositions:
+  - {x: 0, y: 0.8738667, z: 0.032435182}
+  - {x: 0, y: 0.060147285, z: -0.0014322922}
+  - {x: 0, y: 0.09623563, z: 0.010006566}
+  - {x: 0, y: 0.1872505, z: -0.029066145}
+  - {x: 0, y: 0.11399996, z: 0.018557964}
+  - {x: -0.17442763, y: 0.10525036, z: -0.046347786}
+  - {x: 0, y: -0.22935796, z: 0}
+  - {x: 0, y: -0.20132393, z: 0}
+  - {x: 0.16605975, y: 0.099250555, z: -0.060412396}
+  - {x: 0, y: -0.22203696, z: 0}
+  - {x: 0, y: -0.19558555, z: 0}
+  - {x: -0.08597406, y: -0.038666666, z: -0.0025246497}
+  - {x: 0, y: -0.39215705, z: 0}
+  - {x: 0, y: -0.376199, z: 0}
+  - {x: 0.069615155, y: -0.038666666, z: 0.005974222}
+  - {x: 0, y: -0.39314646, z: 0}
+  - {x: 0, y: -0.37713137, z: 0}
+  - {x: -0.049045157, y: 0.17165804, z: 0.14846668}
+  - {x: 0.049045157, y: 0.17165804, z: 0.14846668}
+  - {x: 0, y: 0.08174193, z: 0.14846668}
+  - {x: -0.049045157, y: 0.2207032, z: 0.14846668}
+  - {x: 0.049045157, y: 0.2207032, z: 0.14846668}
+  - {x: -0.075988404, y: 0.018997101, z: 0.08548696}
+  - {x: 0.075988404, y: 0.018997101, z: 0.08548696}
+  Scale: 0.9498551
+  UpperArmLength: 0.22935796
+  ForearmLength: 0.20132393
+  HandLength: 0.07750971
+  ThighLength: 0.39215705
+  ShinLength: 0.376199
+  AnkleHeight: 0.07250005
+  HipHeight: 0.8738667
+  EyeHeight: 1.5031581

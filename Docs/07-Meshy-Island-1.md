@@ -29,68 +29,85 @@ Text to 3D, paste the prompt. If Meshy asks for a texture prompt separately, pas
 
 ---
 
-## 1. People (10)
+## 1. People (11)
 
-### 1.1 `sandy`: Sandy, runs the Lost & Found
+**Done:** `sandy` and `sandy_boss` (in the game since 2026-09-28).
+
+**Women: the chest.** The CPR jiggle moves two spring bones inside the chest, so the model needs a real, rounded
+bust shape; Sandy came out flat and would barely move. The women's prompts below ask for it. Check the picture from
+the front *and* imagine it from the side: if the image AI draws the top flat, make it again. If an image AI refuses
+a prompt, take out "full" / "big" and keep "curvy figure". One woman per picture, nothing in front of the chest.
+
+### 1.1 `tourist_bikini_red`: Tourist woman
 Picture prompt:
 ```
-Friendly woman about 50 years old, slim, blonde hair tied in a bun, no glasses, faded coral short-sleeve collared shirt with a few big cream flower shapes, dark teal apron with one square pocket, beige cropped trousers, flat brown sandals, a small ring of keys hanging at the waist, kind face. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
+Adult woman about 25 years old, beach tourist. Slim hourglass figure: a full, rounded bust clearly shaped in the bikini top (not flat), narrow waist, curvy hips. Long wavy brown hair, bright red triangle bikini top and red bikini bottoms, white sunglasses pushed up on her head, yellow flip-flops, light tanned skin, cheerful smile. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the chest and hips, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
 ```
-Best: open your image AI, upload `ArtSource/Concepts/Sandy/sandy-game-style-v1.png` and write: *"Redraw the left character (GUIDE) exactly as she is, but standing in an A-pose, front view, full body, plain white background."* Or use the prompt below. She sits on a stool most of the time: when Meshy asks for rig markers, put the knees and hips carefully.
+The figure: a clearly shaped, rounded chest in the top (not flat), so the CPR jiggle has something to move. Claude adds the two chest spring bones (`--bust 1`), nothing to do in Meshy.
 
-### 1.2 `tourist_bikini_red`: Tourist woman
-Picture prompt:
-```
-Young adult woman beach tourist, slim, long wavy brown hair, bright red two-piece bikini, white sunglasses pushed up on her head, flip-flops, cheerful face. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
-```
-Chest bones for the CPR jiggle: Claude adds them after, nothing to do in Meshy.
-
-### 1.3 `tourist_swimmer`: Tourist man (most swimmers)
+### 1.2 `tourist_swimmer`: Tourist man (most swimmers)
 Picture prompt:
 ```
 Skinny young adult man, shirtless, pale skin with sunburnt pink shoulders and nose, green swim trunks with white side stripes, messy red hair, swim goggles pushed up on the forehead, goofy grin. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
 ```
 Retexture later for 2-3 more swimmers (other trunks and hair).
 
-### 1.4 `robber`: The beach thief
+### 1.3 `robber`: The beach thief
 Picture prompt:
 ```
 Skinny sneaky man, stubble, black bandana on his head, dark sunglasses, black and white horizontally striped long-sleeve shirt, navy cargo trousers, grey sneakers, sly grin. No bag, nothing in his hands. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
 ```
 His backpack is a separate model (below). He runs, gets knocked down, kneels and begs.
 
-### 1.5 `tourist_bikini_curvy`: Tourist woman
+### 1.4 `tourist_bikini_curvy`: Tourist woman
 Picture prompt:
 ```
-Curvy adult woman beach tourist, short curly black hair, yellow two-piece bikini with a green palm-leaf print, wide straw sun hat, flip-flops, friendly face. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
+Adult woman about 30 years old, curvy plus-size beach tourist: a big, full, rounded bust clearly shaped in the bikini top, soft round belly, wide hips. Dark brown skin, short curly black hair, yellow bikini with a green palm-leaf print, wide straw sun hat, pink flip-flops, friendly laugh. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the chest and hips, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
 ```
+The figure: a clearly shaped, rounded chest in the top (not flat), so the CPR jiggle has something to move. Claude adds the two chest spring bones (`--bust 1`), nothing to do in Meshy.
 
-### 1.6 `tourist_bikini_sporty`: Tourist woman
+### 1.5 `tourist_bikini_sporty`: Tourist woman
 Picture prompt:
 ```
-Athletic adult woman beach tourist, blonde high ponytail, turquoise sporty two-piece bikini, white sweatband on the wrist, barefoot, confident face. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
+Athletic adult woman about 28 years old, beach volleyball player: toned body, a medium, rounded bust clearly shaped in a sporty bikini top, narrow waist. Sun-tanned skin, blonde high ponytail, turquoise sporty bikini (racerback top and bottoms), white sweatband on one wrist, barefoot, confident grin. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the chest and hips, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
 ```
+The figure: a clearly shaped, rounded chest in the top (not flat), so the CPR jiggle has something to move. Claude adds the two chest spring bones (`--bust 1`), nothing to do in Meshy.
 
-### 1.7 `tourist_dad`: Tourist man
+### 1.6 `tourist_bikini_redhead`: Tourist woman **NEW**
+Picture prompt:
+```
+Adult woman about 23 years old, slim beach tourist: a medium, rounded bust clearly shaped in the bikini top, slim waist. Pale freckled skin with pink sunburnt shoulders, long straight red hair, emerald green bikini with small white polka dots, green flip-flops, shy smile. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the chest and hips, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
+```
+The figure: a clearly shaped, rounded chest in the top (not flat), so the CPR jiggle has something to move. Claude adds the two chest spring bones (`--bust 1`), nothing to do in Meshy.
+
+### 1.7 `tourist_selfie`: Tourist woman (was P2)
+Picture prompt:
+```
+Adult woman about 24 years old, curvy beach tourist: a full, rounded bust clearly shaped in the bikini top, narrow waist, wide hips. Neon-pink bikini top and bottoms with white board shorts over them, heart-shaped sunglasses, big high ponytail, tanned skin, excited face. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the chest and hips, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
+```
+The figure: a clearly shaped, rounded chest in the top (not flat), so the CPR jiggle has something to move. Claude adds the two chest spring bones (`--bust 1`), nothing to do in Meshy.
+
+### 1.8 `tourist_mom`: Tourist woman
+Picture prompt:
+```
+Middle-aged woman about 45 years old, beach tourist: soft curvy figure with a full, heavy, rounded bust clearly shaped in the swimsuit. Tanned skin, brown hair, huge straw sun hat, big round sunglasses, turquoise one-piece swimsuit, orange inflatable arm floaties on both upper arms, cheerful face. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the chest and hips, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
+```
+The figure: a clearly shaped, rounded chest in the top (not flat), so the CPR jiggle has something to move. Claude adds the two chest spring bones (`--bust 1`), nothing to do in Meshy.
+
+### 1.9 `tourist_dad`: Tourist man
 Picture prompt:
 ```
 Chubby middle-aged male beach tourist, sunburnt pink skin, loud red Hawaiian shirt with white hibiscus flowers worn open, baggy blue swim shorts, flip-flops, bucket hat, bushy mustache, goofy friendly face. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
 ```
 Replaces the old statue `tourist_dad.glb`.
 
-### 1.8 `tourist_mom`: Tourist woman
-Picture prompt:
-```
-Middle-aged female beach tourist, tanned skin, huge straw sun hat, big round sunglasses, turquoise one-piece swimsuit, orange inflatable arm floaties on both upper arms, cheerful face. No sarong. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
-```
-
-### 1.9 `tourist_grandpa`: Tourist man
+### 1.10 `tourist_grandpa`: Tourist man
 Picture prompt:
 ```
 Skinny elderly male tourist, bald head with fluffy white side hair, huge white mustache, round glasses, white tank top, purple striped retro swim trunks, black knee-high socks with sandals, knobbly knees. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
 ```
 
-### 1.10 `tourist_gym`: Tourist man
+### 1.11 `tourist_gym`: Tourist man
 Picture prompt:
 ```
 Very muscular tanned bodybuilder tourist, small orange swim trunks, yellow sweatband on the forehead, spiky blond hair, gold chain, overconfident grin. Full-body character design, front view, standing straight in an A-pose: both arms straight and angled 45 degrees down and out to the sides, clearly apart from the body, open hands with fingers together, legs slightly apart, feet flat. Empty hands, nothing held, nothing on the back. Stylized cartoon 3D game character, chunky proportions, big simple round eyes, bright tropical colors, soft hand-painted look. Plain white background, even flat lighting, no shadow, no text.
@@ -285,14 +302,16 @@ Sporty jet ski with a glossy black and lime green hull, one long padded seat for
 The robber's jet ski: you ride it to island 2 at the end of chapter 1.
 
 ## Order (most visible first)
-sandy → tourist_bikini_red → tourist_swimmer → lf_sign_frame → tower_wide → umbrella → beach_towel → robber → lifering → lf_shelf → wallet → phone → sunglasses → watch → robber_backpack → jetski → the rest.
+tourist_bikini_red → tourist_swimmer → tourist_bikini_curvy → lf_sign_frame → tower_wide → umbrella → beach_towel → robber → lifering → lf_shelf → wallet → phone → sunglasses → watch → robber_backpack → jetski → the rest.
 
 ## Already done, keep
-`station_rusty` (the Lost & Found hut itself), `palm_tall`. The old `tower` stays until `tower_wide` arrives.
+`station_rusty` (the Lost & Found hut itself), `palm_tall`, `sandy`, `sandy_boss`. The old `tower` stays until
+`tower_wide` arrives.
 
 ## What Claude does with each file
 * Shrinks it to the game's budget, fixes size, pivot and facing, makes colliders (never the mesh itself), re-bakes the
   navmesh around buildings.
 * People: maps the rig onto the game skeleton so walking, swimming, drowning, CPR, sitting and the ragdoll keep
-  working; adds the chest bones on women; can lay the game's talking eyes and mouth over the face.
+  working; adds the chest spring bones on women; can lay the game's talking eyes and mouth over the face.
+  (`ArtSource/Tools/prepare_character.py`, then the scene build bakes it: see 04.)
 * Signs: paints the words in the engine (`ArtSource/Tools/make_signs.py`) and puts them on the blank panels.

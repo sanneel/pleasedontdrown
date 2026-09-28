@@ -64,3 +64,30 @@ watchtower stilts, deck, cabin and stair ramp. The cabin is a solid prop; its de
 Run `PleaseDontDrown.Editor.MeshyArtReview.CaptureBatch` in Unity batch mode to render
 close-ups into `Screenshots/Meshy/` (ignored by Git). It opens the saved scene and places
 review characters temporarily, without saving those changes.
+
+## Rigged characters (28 September 2026): Sandy
+
+Characters now go through one pipeline and end up on the game's own procedural skeleton, so every pose, gesture,
+sitting, CPR pose and the ragdoll work on them unchanged.
+
+1. **Meshy (Free plan):** an A-pose picture (image AI) → Image to 3D. No rig needed from Meshy.
+   The raw download is kept in `ArtSource/Meshy/raw/` (Sandy: `sandy_guide_and_boss.glb`, two figures in one file).
+2. **Blender** (`ArtSource/Tools/prepare_character.py`, runs headless in ~10 s):
+   ```
+   blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- ArtSource/Meshy/raw/<raw>.glb Assets/_Game/Art/Characters/<file>.glb --pick left|right|only --height 1.74 [--bust 1] [--preview <prefix>]
+   ```
+   Keeps one figure (drops other figures and floating text), stands it on the origin, finds the joints from the
+   front silhouette (armpits, arm axes, leg split, neck), builds bones named like `AvatarRig.Bone`, skins with
+   automatic weights (4 per vertex), decimates to 14k triangles and exports a skinned GLB. `--bust 1` (women) adds
+   `BustL`/`BustR` spring bones weighted to the chest; it warns when the chest is flat (the jiggle would hardly show).
+   `--preview` renders the joints over the model: check them before baking.
+3. **Unity** (`Editor/MeshyCharacters.cs`, run by the scene build): moves the rig's bones to the model's joints,
+   re-points the skin weights at the rig's bone order and binds the A-pose limbs so the rig's rest pose (arms and legs
+   straight down) turns them down. Output: `Assets/_Game/Avatar/Bodies/<file>.asset` (+ mesh) and the library
+   `Resources/AvatarBodies.asset`.
+4. **Use it:** `AvatarLook.Body` = the body's id (`AvatarLook.Bodies`, packed into the synced look, 0 = code-built).
+   Sandy: `StoryDirector.SandyLook.Body = Bodies.Sandy`; `Bodies.SandyBoss` is baked and ready for the boss scenes.
+
+Limits: the face is Meshy's painted one (no talking mouth or blinking yet), fingers don't bend (the hand is one
+piece), and textures are whatever Meshy painted (Sandy has pale streaks down the sides of her trousers).
+Review shots: `ReviewCapture` looks `sandy`, `sandyboss`, `sandycode` (the old code-built Sandy), pose `sitchair`.

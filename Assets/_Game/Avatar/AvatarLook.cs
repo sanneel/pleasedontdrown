@@ -35,6 +35,7 @@ namespace PleaseDontDrown.Avatars
         public FacialHair Face;
         public AvatarExtras Extras;
         public byte Figure;       // 0 masculine, 1 feminine (hips, waist, bust with jiggle bones)
+        public byte Body;         // 0 code-built from the fields above, else a generated AvatarBody (see AvatarBodies)
 
         public static readonly Color[] SkinTones =
         {
@@ -57,6 +58,13 @@ namespace PleaseDontDrown.Avatars
             new(0.84f, 0.74f, 0.52f) /* khaki */, new(0.55f, 0.56f, 0.6f) /* grey */, new(0.14f, 0.14f, 0.16f) /* black */,
             new(0.7f, 0.9f, 1f) /* sky */
         };
+
+        /// <summary>Ids of the generated bodies (Editor/MeshyCharacters.cs bakes them).</summary>
+        public static class Bodies
+        {
+            public const byte Sandy = 1;
+            public const byte SandyBoss = 2;
+        }
 
         public static readonly string[] BuildNames = { "Slim", "Regular", "Broad", "Round" };
         public static readonly string[] FigureNames = { "Masculine", "Feminine" };
@@ -134,11 +142,11 @@ namespace PleaseDontDrown.Avatars
 
         private const ulong Marker = 0xA7UL << 56; // tells a real look from 0 / garbage
 
-        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1 };
+        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 5 };
 
         public ulong Pack()
         {
-            int[] values = { Build, Height, Skin, (int)Hair, HairColor, (int)Top, TopColor, (int)Bottom, BottomColor, (int)Hat, HatColor, (int)Glasses, (int)Face, (int)Extras, Figure };
+            int[] values = { Build, Height, Skin, (int)Hair, HairColor, (int)Top, TopColor, (int)Bottom, BottomColor, (int)Hat, HatColor, (int)Glasses, (int)Face, (int)Extras, Figure, Body };
             ulong packed = 0;
             int shift = 0;
             for (int i = 0; i < Widths.Length; i++)
@@ -164,7 +172,7 @@ namespace PleaseDontDrown.Avatars
                 Build = (byte)v[0], Height = (byte)v[1], Skin = (byte)v[2], Hair = (HairStyle)v[3], HairColor = (byte)v[4],
                 Top = (TopStyle)Mathf.Min(v[5], (int)TopStyle.Bikini), TopColor = (byte)v[6], Bottom = (BottomStyle)v[7],
                 BottomColor = (byte)v[8], Hat = (HatStyle)v[9], HatColor = (byte)v[10], Glasses = (GlassesStyle)v[11],
-                Face = (FacialHair)v[12], Extras = (AvatarExtras)v[13], Figure = (byte)v[14]
+                Face = (FacialHair)v[12], Extras = (AvatarExtras)v[13], Figure = (byte)v[14], Body = (byte)v[15]
             };
         }
 

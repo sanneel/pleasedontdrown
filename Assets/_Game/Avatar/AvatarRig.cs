@@ -6,6 +6,8 @@ namespace PleaseDontDrown.Avatars
     /// <summary>
     /// A cartoon character built in code from an <see cref="AvatarLook"/>: a humanoid skeleton of plain transforms
     /// and one vertex-coloured skinned mesh (every part rigidly on its bone, rounded ends hide the joints).
+    /// A look with a <see cref="AvatarLook.Body"/> uses a generated <see cref="AvatarBody"/> instead: the same
+    /// skeleton, moved to that character's joints, with its textured mesh skinned to it.
     /// The root is at the feet, facing +Z; in the rest pose arms and legs hang straight down, and every limb bone
     /// points down its local -Y. Animation sets bone rotations (see <see cref="AvatarAnimator"/>).
     /// </summary>
@@ -40,6 +42,8 @@ namespace PleaseDontDrown.Avatars
         private bool _built;
 
         public AvatarLook Look { get; private set; } = AvatarLook.Lifeguard;
+        /// <summary>The generated body in use, or null for the code-built one.</summary>
+        public AvatarBody GeneratedBody { get; private set; }
         public float Scale { get; private set; } = 1f;
         public float UpperArmLength { get; private set; }
         public float ForearmLength { get; private set; }
@@ -120,9 +124,11 @@ namespace PleaseDontDrown.Avatars
         public void Build(AvatarLook look)
         {
             Look = look;
-            Scale = 0.93f + look.Height * 0.05f;
+            GeneratedBody = AvatarBodyLibrary.Get(look.Body);
+            Scale = GeneratedBody != null ? GeneratedBody.Scale : 0.93f + look.Height * 0.05f;
             CreateBones(look);
-            BuildMesh(look);
+            if (GeneratedBody != null) UseBody(GeneratedBody);
+            else BuildMesh(look);
             _built = true;
             ResetPose();
             Rebuilt?.Invoke();
@@ -168,6 +174,18 @@ namespace PleaseDontDrown.Avatars
             AnkleHeight = 0.08f * s;
             HipHeight = 0.92f * s;
             EyeHeight = 1.68f * s;
+            AvatarBody generated = GeneratedBody;
+            if (generated != null)
+            {
+                UpperArmLength = generated.UpperArmLength;
+                ForearmLength = generated.ForearmLength;
+                HandLength = generated.HandLength;
+                ThighLength = generated.ThighLength;
+                ShinLength = generated.ShinLength;
+                AnkleHeight = generated.AnkleHeight;
+                HipHeight = generated.HipHeight;
+                EyeHeight = generated.EyeHeight;
+            }
 
             void Make(Bone bone, Bone? parent, Vector3 localPosition)
             {
@@ -177,7 +195,7 @@ namespace PleaseDontDrown.Avatars
                     _bones[i] = new GameObject(bone.ToString()).transform;
                 }
                 _bones[i].SetParent(parent.HasValue ? _bones[(int)parent.Value] : transform, false);
-                _restPosition[i] = localPosition * s;
+                _restPosition[i] = generated != null ? generated.RestPositions[i] : localPosition * s;
                 _restRotation[i] = Quaternion.identity;
             }
 
@@ -213,6 +231,26 @@ namespace PleaseDontDrown.Avatars
             System.Array.Copy(LeftHand.Bones, 0, _bones, FingerStart, HandBones.BoneCount);
             System.Array.Copy(RightHand.Bones, 0, _bones, FingerStart + HandBones.BoneCount, HandBones.BoneCount);
             ResetPose();
+        }
+
+        /// <summary>A generated body: its mesh is already skinned to these bones (bone order and bind poses baked).</summary>
+        private void UseBody(AvatarBody body)
+        {
+            LeftHand.ResetPose();
+            RightHand.ResetPose();
+            if (_renderer == null)
+            {
+                _renderer = gameObject.GetComponent<SkinnedMeshRenderer>();
+                if (_renderer == null) _renderer = gameObject.AddComponent<SkinnedMeshRenderer>();
+            }
+            _renderer.sharedMesh = body.Mesh;
+            _renderer.bones = _bones;
+            _renderer.rootBone = _bones[(int)Bone.Hips];
+            _renderer.localBounds = new Bounds(Vector3.zero, Vector3.one * 3.2f);
+            _renderer.updateWhenOffscreen = false;
+            _renderer.quality = SkinQuality.Bone4; // smooth weights, unlike the rigid code-built parts
+            _renderer.sharedMaterial = body.Material;
+            _renderer.skinnedMotionVectors = false;
         }
 
         private void BuildMesh(AvatarLook look)
@@ -251,7 +289,7 @@ namespace PleaseDontDrown.Avatars
             _renderer.rootBone = _bones[(int)Bone.Hips];
             _renderer.localBounds = new Bounds(Vector3.zero, Vector3.one * 3.2f); // generous: swimming and diving poses
             _renderer.updateWhenOffscreen = false;
-            _renderer.quality = SkinQuality.Bone1;
+            _renderer.quality = SkinQuality.Bone1; // every part rigidly on one bone
             _renderer.sharedMaterial = _material != null ? _material : SharedMaterial;
             _renderer.skinnedMotionVectors = false;
         }

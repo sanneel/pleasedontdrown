@@ -118,7 +118,7 @@ can be dropped in without code changes. Characters must be **rigged humanoids** 
 
 | Asset | Notes / attach points |
 |---|---|
-| **Sandy** (guide) | Concept done (`ArtSource/Concepts/Sandy`). Needs rig + expressions (friendly / scared / later "boss"). |
+| **Sandy** (guide) | **In the game** (Meshy model, rigged, `AvatarLook.Bodies.Sandy`); boss look baked too (`Bodies.SandyBoss`). Still needs a talking face. |
 | **Receptionist** | Hotel uniform, name tag. |
 | **Robber** | Striped shirt, beanie, backpack (bag bone/transform `Bag` that bursts open). |
 | **Pirates** ×2-3 variants | Bandana, eyepatch, cutlass. |

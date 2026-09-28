@@ -82,6 +82,19 @@ namespace PleaseDontDrown.Editor
         /// <c>avatar &lt;lifeguard|tourist:seed|random:seed&gt; x y z yaw [pose]</c> places a posed character for the next shots.
         /// Poses: idle walk run crouch jump swim tread dive hold carry charge throw eat cpr wave interact.
         /// </summary>
+        private static AvatarLook SandyBoss()
+        {
+            AvatarLook look = Story.StoryDirector.SandyLook;
+            look.Body = AvatarLook.Bodies.SandyBoss;
+            return look;
+        }
+
+        private static AvatarLook CodeBuilt(AvatarLook look)
+        {
+            look.Body = 0;
+            return look;
+        }
+
         private static void SpawnAvatar(string[] p)
         {
             float F(int k) => float.Parse(p[k], CultureInfo.InvariantCulture);
@@ -94,6 +107,8 @@ namespace PleaseDontDrown.Editor
                 "man" => AvatarLook.RandomTourist(seed, 0),
                 "random" => AvatarLook.Random(new System.Random(seed)),
                 "sandy" => Story.StoryDirector.SandyLook,
+                "sandyboss" => SandyBoss(),
+                "sandycode" => CodeBuilt(Story.StoryDirector.SandyLook),
                 "receptionist" => Story.StoryDirector.ReceptionistLook,
                 "robber" => Story.StoryDirector.RobberLook,
                 "pirate" => Story.StoryDirector.PirateLook(seed),
@@ -139,6 +154,8 @@ namespace PleaseDontDrown.Editor
                 case "scared": m.Pose = AvatarPose.Scared; m.Mood = AvatarMood.Scared; break;
                 case "handsup": m.Pose = AvatarPose.HandsUp; break;
                 case "seated": m.Seated = true; break;
+                case "sitchair": m.Pose = AvatarPose.SitChair; break;
+                case "lie": m.Pose = AvatarPose.Lie; break;
                 case "happy": m.Mood = AvatarMood.Happy; m.Talking = true; break;
             }
             animator.Motion = m;

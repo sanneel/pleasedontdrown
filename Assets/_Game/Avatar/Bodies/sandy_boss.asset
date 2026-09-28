@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5221c2570be5eaf49a413493d9d10e27, type: 3}
+  m_Name: sandy_boss
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarBody
+  Id: 2
+  DisplayName: Sandy (boss)
+  Mesh: {fileID: 4300000, guid: f0f33215171106f4d8823c50d103af90, type: 2}
+  Material: {fileID: -4234473462164445276, guid: f8bc2a8cc5b6c55498c3022a57f31e93, type: 3}
+  RestPositions:
+  - {x: 0, y: 0.8738666, z: 0.043756995}
+  - {x: 0, y: 0.06956589, z: 0.011347443}
+  - {x: 0, y: 0.111305416, z: 0.013131712}
+  - {x: 0, y: 0.19551206, z: -0.0285807}
+  - {x: 0, y: 0.10625017, z: -0.07544181}
+  - {x: -0.17075832, y: 0.11676204, z: -0.058587156}
+  - {x: 0, y: -0.23115703, z: 0}
+  - {x: 0, y: -0.20384525, z: 0}
+  - {x: 0.17513692, y: 0.11976206, z: -0.031218618}
+  - {x: 0, y: -0.23544824, z: 0}
+  - {x: 0, y: -0.20720579, z: 0}
+  - {x: -0.07405277, y: -0.038666666, z: 0.0042186975}
+  - {x: 0, y: -0.39377946, z: 0}
+  - {x: 0, y: -0.37890193, z: 0}
+  - {x: 0.097391926, y: -0.038666606, z: 0.0049498975}
+  - {x: 0, y: -0.3916292, z: 0}
+  - {x: 0, y: -0.3773483, z: 0}
+  - {x: -0.045978926, y: 0.16092624, z: 0.24324109}
+  - {x: 0.045978926, y: 0.16092624, z: 0.24324109}
+  - {x: 0, y: 0.076631546, z: 0.24324109}
+  - {x: -0.045978926, y: 0.20690516, z: 0.24324109}
+  - {x: 0.045978926, y: 0.20690516, z: 0.24324109}
+  - {x: -0.0759884, y: 0.0189971, z: 0.085486956}
+  - {x: 0.0759884, y: 0.0189971, z: 0.085486956}
+  Scale: 0.949855
+  UpperArmLength: 0.23115703
+  ForearmLength: 0.20384525
+  HandLength: 0.078480415
+  ThighLength: 0.39377946
+  ShinLength: 0.37890193
+  AnkleHeight: 0.07250011
+  HipHeight: 0.8738666
+  EyeHeight: 1.5174264

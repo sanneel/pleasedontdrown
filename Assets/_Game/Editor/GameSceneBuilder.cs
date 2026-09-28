@@ -98,6 +98,7 @@ namespace PleaseDontDrown.Editor
         {
             ConfigureProject();
             WriteBuildStamp();
+            MeshyCharacters.BakeAll(); // generated character bodies (Sandy...) for AvatarRig
             int outlineLayer = EnsureLayer(OutlineLayerName);
             SetupOutlineRendering(outlineLayer);
             BuildPlayerPrefab();

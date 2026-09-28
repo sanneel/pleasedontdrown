@@ -21,7 +21,9 @@ Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP �
   transforms), stroke when you swim, press flat during CPR, point at what you use and follow a throw out.
 * **Meshy GLBs**: shack, watchtower and palms (decimated). The shack (x1.45) and tower (x1.2, and x1.5 wider) are
   scaled so you can walk in: their painted doors are cut out and replaced with real doors. Sign lettering is painted
-  into textures by `ArtSource/Tools/make_signs.py` (Roboto, Apache 2.0). The Meshy characters were static poses
+  into textures by `ArtSource/Tools/make_signs.py` (Roboto, Apache 2.0).
+* **Characters**: Sandy is a rigged Meshy model on the game's own skeleton (`ArtSource/Tools/prepare_character.py`
+  + `Editor/MeshyCharacters.cs`, see 04 "Rigged characters"). The older Meshy characters were static poses
   (no skeleton), so they are no longer used; see [Meshy integration](Docs/04-Meshy-Integration.md).
 
 ## Open the project

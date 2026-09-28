@@ -20,7 +20,8 @@ namespace PleaseDontDrown.Story
         public static AvatarLook SandyLook => new()
         {
             Figure = 1, Build = 0, Height = 2, Skin = 0, Hair = HairStyle.Ponytail, HairColor = 3,
-            Top = TopStyle.Hawaiian, TopColor = 3, Bottom = BottomStyle.Trousers, BottomColor = 12
+            Top = TopStyle.Hawaiian, TopColor = 3, Bottom = BottomStyle.Trousers, BottomColor = 12,
+            Body = AvatarLook.Bodies.Sandy // the Meshy model; the fields above are the code-built stand-in
         };
 
         public static AvatarLook ReceptionistLook => new()
