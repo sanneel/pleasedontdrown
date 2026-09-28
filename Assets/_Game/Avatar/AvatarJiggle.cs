@@ -15,6 +15,10 @@ namespace PleaseDontDrown.Avatars
         public float Inertia = 1f;       // how much the parent's acceleration shoves it
         public float Squash = 0.12f;     // squash and stretch with the bounce (0 for skinned Meshy bodies: it creases them)
 
+        /// <summary>For a moment after a hard kick (CPR), the flesh may swing this many times further and rings longer.</summary>
+        public float BoostFactor = 1f;
+        public float BoostUntil = float.NegativeInfinity;
+
         private Vector3 _restLocal;
         private Vector3 _offset;         // parent space
         private Vector3 _velocity;       // parent space
@@ -62,13 +66,16 @@ namespace PleaseDontDrown.Avatars
             // Semi-implicit integration in small steps (stiff springs at low frame rates).
             int steps = Mathf.Clamp(Mathf.CeilToInt(dt / 0.008f), 1, 8);
             float h = dt / steps;
+            // Boosted (just kicked): a wider swing, softer and less damped so it wobbles on for a while.
+            float boost = Time.time < BoostUntil ? Mathf.Lerp(1f, BoostFactor, Mathf.Clamp01((BoostUntil - Time.time) / 0.6f)) : 1f;
+            float stiffness = Stiffness / Mathf.Sqrt(boost), damping = Damping / boost;
             for (int i = 0; i < steps; i++)
             {
-                Vector3 a = force - _offset * Stiffness - _velocity * Damping;
+                Vector3 a = force - _offset * stiffness - _velocity * damping;
                 _velocity += a * h;
                 _offset += _velocity * h;
             }
-            float max = MaxOffset * scale;
+            float max = MaxOffset * scale * boost;
             if (_offset.sqrMagnitude > max * max)
             {
                 _offset = _offset.normalized * max;
@@ -150,6 +157,24 @@ namespace PleaseDontDrown.Avatars
         public void Bounce(Vector3 velocity)
         {
             foreach (JiggleBone b in _bones) b.Impulse(velocity * _strength);
+        }
+
+        /// <summary>
+        /// A hard, loose kick (CPR on the chest): each side gets its own push plus a random sideways shove, and for a
+        /// moment swings <paramref name="looseness"/> times further and rings longer, so they visibly move around.
+        /// </summary>
+        public void Shake(Vector3 velocity, Vector3 sideways, float looseness, float seconds)
+        {
+            for (int i = 0; i < _bones.Length; i++)
+            {
+                JiggleBone b = _bones[i];
+                float side = i == 0 ? -1f : 1f;
+                Vector3 kick = velocity * UnityEngine.Random.Range(0.85f, 1.15f) +
+                               sideways * (side * UnityEngine.Random.Range(0.4f, 1f) + UnityEngine.Random.Range(-0.5f, 0.5f));
+                b.Impulse(kick * _strength);
+                b.BoostFactor = looseness;
+                b.BoostUntil = Time.time + seconds;
+            }
         }
 
         private void LateUpdate()

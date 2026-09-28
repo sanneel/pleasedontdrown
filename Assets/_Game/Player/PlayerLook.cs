@@ -113,6 +113,29 @@ namespace PleaseDontDrown.Player
             ApplyHead();
         }
 
+        private Vector3 _leanPoint;
+        private float _leanStart = -10f, _leanLength;
+
+        /// <summary>
+        /// Lean the view right in to a point and back (mouth-to-mouth: the camera goes down to their lips, holds, and
+        /// comes back up). The look direction itself doesn't change.
+        /// </summary>
+        public void LeanIn(Vector3 worldPoint, float seconds)
+        {
+            _leanPoint = worldPoint;
+            _leanStart = Time.time;
+            _leanLength = Mathf.Max(0.3f, seconds);
+        }
+
+        /// <summary>0..1..0 over the lean: quick in, hold, back out.</summary>
+        private float LeanWeight()
+        {
+            float t = (Time.time - _leanStart) / _leanLength;
+            if (t < 0f || t > 1f) return 0f;
+            float inOut = t < 0.3f ? t / 0.3f : t > 0.75f ? (1f - t) / 0.25f : 1f;
+            return Mathf.SmoothStep(0f, 1f, inOut);
+        }
+
         /// <summary>Gun recoil: the view climbs (x right, y up, degrees) quickly and stays there.</summary>
         public void AddRecoil(Vector2 kick) => _recoilTarget += kick;
 
@@ -187,6 +210,19 @@ namespace PleaseDontDrown.Player
 
             _camera.transform.localPosition = new Vector3(bobX, bobY - _dip, 0f);
             _camera.transform.localRotation = Quaternion.Euler(_dip * 12f, 0f, _roll);
+
+            // Leaning in (mouth-to-mouth): the eye comes down over their face (they lie on their back, face up) to just
+            // above the lips, looking down at them, head tipped a little, then back up.
+            float lean = LeanWeight();
+            if (lean > 0f)
+            {
+                Vector3 eye = _camera.transform.position;
+                Vector3 toward = Vector3.ProjectOnPlane(_leanPoint - eye, Vector3.up);
+                toward = toward.sqrMagnitude > 1e-4f ? toward.normalized : Vector3.ProjectOnPlane(_camera.transform.forward, Vector3.up).normalized;
+                Vector3 close = _leanPoint + Vector3.up * 0.19f - toward * 0.05f;
+                Quaternion face = Quaternion.LookRotation(_leanPoint - close, toward) * Quaternion.Euler(0f, 0f, 15f);
+                _camera.transform.SetPositionAndRotation(Vector3.Lerp(eye, close, lean), Quaternion.Slerp(_camera.transform.rotation, face, lean));
+            }
         }
 
         private void OnLanded(float impactSpeed) => _dip = Mathf.Min(0.3f, impactSpeed * _landDipPerSpeed);

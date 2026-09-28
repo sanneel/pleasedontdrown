@@ -118,6 +118,7 @@ namespace PleaseDontDrown.Rescue
         private readonly SyncVar<CprStep> _cprStep = new SyncVar<CprStep>(CprStep.Compress);
         private readonly SyncVar<byte> _cprCount = new SyncVar<byte>();
         private readonly SyncVar<bool> _ashore = new SyncVar<bool>();
+        private readonly SyncVar<bool> _rescued = new SyncVar<bool>();
         private readonly SyncVar<bool> _silent = new SyncVar<bool>();
         private readonly SyncVar<bool> _flatline = new SyncVar<bool>();
         private readonly SyncVar<bool> _legLost = new SyncVar<bool>();
@@ -157,6 +158,7 @@ namespace PleaseDontDrown.Rescue
         public float Cpr01 => _cpr.Value;
         public CprStep NextCprStep => _cprStep.Value;
         public bool IsAshore => _ashore.Value;
+        public bool HasBeenRescued => _rescued.Value;
         public float ConditionSecondsLeft => _condition.Value * _conditionTotal.Value;
         public bool IsSilent => _silent.Value;
         public bool IsFlatlined => _flatline.Value;
@@ -521,6 +523,7 @@ namespace PleaseDontDrown.Rescue
             if (_state.Value == next) return;
             Debug.Log($"[Victim] {Name}: {_state.Value} -> {next} (air {_air.Value:P0}, panic {_panic.Value:F0})");
             _state.Value = next;
+            if (next == VictimState.Saved) _rescued.Value = true;
             _stateSince = Time.time;
             if (announce.HasValue)
                 Announce(announce.Value, text ?? string.Empty, credit);
@@ -794,6 +797,7 @@ namespace PleaseDontDrown.Rescue
             $"{(IsAshore ? "ashore" : $"depth {Shore.WaterDepthAt(transform.position):F1} m")}  sim: {_item.Sync.AuthorityLabel}" +
             (_item.IsHeld ? $"  held by {_item.Holder.DisplayName}" : "") + (_body.HeldFloat != null ? "  on a float" : "") +
             (_body.DebugState.Length > 0 ? "  " + _body.DebugState : "") +
-            $"  at {transform.position:F1}";
+            $"  at {transform.position:F1}" +
+            $"  {(transform.forward.y > 0.8f ? "on the back" : transform.forward.y < -0.8f ? "face down" : "on the side/upright")} yaw {transform.eulerAngles.y:F0}";
     }
 }

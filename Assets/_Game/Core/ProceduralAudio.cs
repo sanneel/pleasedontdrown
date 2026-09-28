@@ -242,6 +242,43 @@ namespace PleaseDontDrown.Core
             };
         }
 
+        private static AudioClip _kiss;
+
+        /// <summary>Mouth-to-mouth: a long muffled "MMMMPPPH" through pressed lips (a hum with a puff of air), then a smack.</summary>
+        public static AudioClip Kiss => _kiss != null ? _kiss : _kiss = Build("Kiss", 1.0f, KissWave());
+
+        private static System.Func<float, float> KissWave()
+        {
+            var rng = new System.Random(733);
+            float air = 0f, hum = 0f, phase = 0f;
+            float rate = SampleRate;
+            return t =>
+            {
+                float s = 0f;
+                if (t < 0.82f)
+                {
+                    // The hum: a low voice (rising a little, wobbling) through closed lips, so only the low harmonics.
+                    float f0 = 150f + 25f * (t / 0.82f) + 6f * Mathf.Sin(t * 19f);
+                    phase += 2f * Mathf.PI * f0 / rate;
+                    float voice = Mathf.Sin(phase) + 0.45f * Mathf.Sin(2f * phase) + 0.2f * Mathf.Sin(3f * phase);
+                    hum += (voice - hum) * 0.18f; // muffled
+                    air += ((float)(rng.NextDouble() * 2.0 - 1.0) - air) * 0.08f;
+                    float env = Mathf.Clamp01(t / 0.07f) * Mathf.Clamp01((0.82f - t) / 0.06f);
+                    float pressure = 0.8f + 0.35f * (t / 0.82f); // pushing harder toward the end
+                    s = (hum * 0.55f + air * 0.9f) * env * pressure;
+                }
+                float u = t - 0.84f;
+                if (u > 0f)
+                {
+                    // The smack: a sharp lip pop and a wet click.
+                    float pop = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-u * 90f);
+                    float click = Mathf.Sin(2f * Mathf.PI * 1900f * u) * Mathf.Exp(-u * 140f);
+                    s += pop * 0.7f + click * 0.5f;
+                }
+                return s;
+            };
+        }
+
         /// <summary>Defibrillator: a rising whine, then a buzzing crack.</summary>
         public static AudioClip Zap => _zap != null ? _zap : _zap = Build("Zap", 0.7f, t =>
         {

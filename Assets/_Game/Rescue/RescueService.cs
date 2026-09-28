@@ -176,7 +176,7 @@ namespace PleaseDontDrown.Rescue
                 if (VictimBrain.All.Count == 0) DevCommands.Print("  no tourists");
                 foreach (VictimBrain v in VictimBrain.All) DevCommands.Print("  " + v.Describe());
             }, owner: this);
-            DevCommands.Register("victim", "[distance] [state]", "Spawn a tourist in the water in front of you (default 10 m, distressed).", VictimCommand, cheat: true, owner: this);
+            DevCommands.Register("victim", "[distance] [state] [f|m]", "Spawn a tourist in front of you (default 10 m, distressed, either figure).", VictimCommand, cheat: true, owner: this);
             DevCommands.Register("vset", "<state|air|panic|condition> <value>", "Change the nearest tourist (state: fine distressed panicking drowning unconscious saved lost).",
                 VsetCommand, cheat: true, owner: this);
             DevCommands.Register("cpr", "[pumps]", "Do CPR on the nearest tourist (automated tests).", args =>
@@ -213,17 +213,20 @@ namespace PleaseDontDrown.Rescue
             float ground = Shore.GroundHeightAt(spot + Vector3.up * 20f);
             if (!float.IsNaN(ground)) spot.y = Mathf.Max(spot.y, ground + 0.5f); // on land: lying on the sand, not under it
             float yaw = Quaternion.LookRotation(-flat).eulerAngles.y; // facing you
-            SpawnVictimServer(spot, yaw, state);
+            int figure = args.Length > 2 ? args[2].StartsWith("f") ? 1 : args[2].StartsWith("m") ? 0 : -1 : -1;
+            SpawnVictimServer(spot, yaw, state, figure);
             DevCommands.Print($"spawning a {state} tourist {distance:F0} m ahead (water depth {Shore.WaterDepthAt(spot):F1} m)");
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void SpawnVictimServer(Vector3 position, float yaw, VictimState state)
+        private void SpawnVictimServer(Vector3 position, float yaw, VictimState state, int figure)
         {
             if (!DevCommands.CheatsAllowed) return;
             float panic = state switch { VictimState.Panicking => 60f, VictimState.Drowning => 90f, VictimState.Distressed => 25f, _ => 0f };
             float air = state switch { VictimState.Drowning => 0.3f, VictimState.Unconscious => 0f, _ => 1f };
-            VictimBrain v = SpawnVictim(position, yaw, state, panic, air);
+            TouristProfile profile = TouristProfile.Default;
+            profile.Figure = figure;
+            VictimBrain v = SpawnVictim(position, yaw, state, panic, air, profile);
             if (v != null) Debug.Log($"[Rescue] cheat-spawned {v.Name} ({state}) at {position:F1}");
         }
 

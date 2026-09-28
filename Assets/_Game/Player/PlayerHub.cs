@@ -228,6 +228,8 @@ namespace PleaseDontDrown.Player
             AvatarGesture gesture = step == Rescue.CprStep.Breath ? AvatarGesture.Breath : AvatarGesture.Punch;
             _avatar.OnCprGesture(gesture, point);
             if (_arms != null) _arms.Play(gesture, point);
+            // Mouth-to-mouth in first person: our view goes right down to their lips and back.
+            if (IsOwner && step == Rescue.CprStep.Breath && Look != null) Look.LeanIn(point, 1.1f);
         }
 
         [ServerRpc]

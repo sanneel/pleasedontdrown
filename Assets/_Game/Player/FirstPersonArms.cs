@@ -394,14 +394,15 @@ namespace PleaseDontDrown.Player
                 state = State.Punch;
                 blend = 0.08f;
             }
-            else if (_gesture == AvatarGesture.Breath && sinceGesture < 1.0f && _reach != Vector3.zero)
+            else if (_gesture == AvatarGesture.Breath && sinceGesture < 1.1f && _reach != Vector3.zero)
             {
-                // Rescue breath: left hand on the forehead, right hand lifting the chin, face right down there.
+                // Mouth-to-mouth: the view leans right in to the lips (PlayerLook.LeanIn), so the hands hold the face
+                // from the sides, on the cheeks, and stay out of the way.
                 state = State.Breath;
                 Vector3 across = Vector3.ProjectOnPlane(cam.right, Vector3.up).normalized;
-                palm = hand.Right ? _reach - Vector3.up * 0.05f + across * 0.06f : _reach + Vector3.up * 0.06f - across * 0.1f;
-                rot = HandBones.Orient(hand.Right ? cam.forward : -across, Vector3.down, side);
-                pose = hand.Right ? HandPose.Cup : HandPose.Flat;
+                palm = _reach + across * (hand.Right ? 0.2f : -0.2f) - Vector3.up * 0.03f; // beside the head, out of view
+                rot = HandBones.Orient(Vector3.down, -across * (hand.Right ? 1f : -1f), side);
+                pose = HandPose.Cup;
                 blend = 0.12f;
             }
             else if (sincePump < 1.2f)

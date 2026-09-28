@@ -219,7 +219,13 @@ namespace PleaseDontDrown.Player
             Vector3 playerVelocity = _hub.Motor.Velocity;
             Vector3 velocity;
             Vector3 spin;
-            if (charge < 0f)
+            if (charge < 0f && item.TryGetComponent(out Rescue.VictimBody victim) && victim.LayDown(_hub))
+            {
+                // A person, put down on land: laid on their back on the sand in front of us, ready for CPR.
+                velocity = Vector3.zero;
+                spin = Vector3.zero;
+            }
+            else if (charge < 0f)
             {
                 velocity = playerVelocity + AimTransform.forward * 0.8f;
                 spin = Vector3.zero;

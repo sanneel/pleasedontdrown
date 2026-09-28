@@ -82,6 +82,7 @@ namespace PleaseDontDrown.Rescue
         private float _nextFloatScan;
         private float _nextWadeScan;
         private bool _wading;
+        private bool _walkingAway;
         private Vector3 _wadeDirection = Vector3.forward;
         private float _groundY;
         private int _voice;
@@ -89,6 +90,10 @@ namespace PleaseDontDrown.Rescue
         private float _punchAt = float.NegativeInfinity;
         private float _punchSide = 1f;
         private float _zapAt = float.NegativeInfinity;
+        private float _layDownUntil = float.NegativeInfinity;
+        private float _nextLyingScan;
+        private Collider[] _allColliders = Array.Empty<Collider>();
+        private readonly System.Collections.Generic.HashSet<Collider> _passThrough = new(); // players' bodies we let walk over us
 
         /// <summary>Where the mouth and nose are: underwater here = no air.</summary>
         public Vector3 HeadPosition => transform.TransformPoint(_headLocal);
@@ -123,6 +128,10 @@ namespace PleaseDontDrown.Rescue
                 limb.Body.name = $"{name}_{limb.Kind}";
             }
             _lastRootPosition = _rb.position;
+            var colliders = new System.Collections.Generic.List<Collider>(GetComponentsInChildren<Collider>(true));
+            foreach (Limb limb in _limbs) colliders.AddRange(limb.Body.GetComponentsInChildren<Collider>(true));
+            colliders.RemoveAll(c => c.isTrigger);
+            _allColliders = colliders.ToArray();
         }
 
         private void OnEnable()
@@ -162,16 +171,18 @@ namespace PleaseDontDrown.Rescue
         {
             _squishAt = Time.time;
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Thump, 0.9f);
-            if (_jiggle != null) _jiggle.Bounce(-transform.up * 0.55f); // pushed into the chest, then bouncing back
+            // Pushed into the chest (lying on the back, the chest faces the body's forward), then bouncing back and
+            // swinging about loosely for a moment.
+            if (_jiggle != null) _jiggle.Shake(-transform.forward * 1.5f, transform.right * 0.9f + transform.up * 0.4f, 2.4f, 1.3f);
         }
 
-        /// <summary>A rescue breath: the chest rises (local visual, every machine).</summary>
+        /// <summary>A rescue breath, mouth to mouth: a kiss, and the chest rises (local visual, every machine).</summary>
         public void RescueBreath()
         {
             _breathAt = Time.time;
-            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Breath, 0.8f);
-            if (_jiggle != null) _jiggle.Bounce(transform.up * 0.35f);
-            FloatingText.Spawn(HeadPosition + Vector3.up * 0.35f, "fwoooo", new Color(0.75f, 0.9f, 1f), 0.6f, 1.1f);
+            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Kiss, 0.9f);
+            if (_jiggle != null) _jiggle.Shake(transform.forward * 0.7f, transform.right * 0.3f, 1.6f, 1.2f);
+            FloatingText.Spawn(HeadPosition + Vector3.up * 0.35f, "MMMPPPH", new Color(1f, 0.6f, 0.75f), 0.7f, 1.1f);
         }
 
         /// <summary>Punched awake (men's CPR): the head snaps aside with a POW.</summary>
@@ -189,9 +200,45 @@ namespace PleaseDontDrown.Rescue
             _zapAt = Time.time;
             _squishAt = Time.time;
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Zap, 1f);
-            if (_jiggle != null) _jiggle.Bounce(transform.up * 0.8f);
+            if (_jiggle != null) _jiggle.Shake(transform.forward * 1.2f, transform.right * 0.8f, 2f, 1f);
             FloatingText.Spawn(ChestPoint + Vector3.up * 0.4f, "BZZZT!", new Color(0.6f, 0.9f, 1f), 1.3f, 1.2f);
             if (!_rb.isKinematic) _rb.AddForce(Vector3.up * 2.5f, ForceMode.VelocityChange);
+        }
+
+        /// <summary>
+        /// Put down with a plain drop (G) on land: laid on the back on the sand in front of the lifeguard, across
+        /// their view (head to their right), ready for CPR. Called by the holder's hands just before letting go.
+        /// Returns false in the water (dropped there, they just float).
+        /// </summary>
+        public bool LayDown(PlayerHub holder)
+        {
+            if (holder == null) return false;
+            Vector3 feet = holder.transform.position;
+            Vector3 ahead = Vector3.ProjectOnPlane(holder.Head != null ? holder.Head.forward : holder.transform.forward, Vector3.up);
+            ahead = ahead.sqrMagnitude > 1e-4f ? ahead.normalized : Vector3.forward;
+            Vector3 spot = feet + ahead * 0.95f;
+            if (Shore.WaterDepthAt(spot + Vector3.up * 0.3f) > 0.3f) return false;
+            float ground = Shore.GroundHeightAt(spot + Vector3.up * 1.5f);
+            spot.y = (float.IsNaN(ground) ? feet.y : ground) + 0.17f;
+            Quaternion onBack = Quaternion.LookRotation(Vector3.up, Vector3.Cross(Vector3.up, ahead)); // chest up, head to the right
+
+            Quaternion turn = onBack * Quaternion.Inverse(_rb.rotation);
+            foreach (Limb limb in _limbs)
+            {
+                // Limbs come along, turned with the torso, so the joints don't yank.
+                Vector3 local = limb.Body.position - _rb.position;
+                limb.Body.position = spot + turn * local;
+                limb.Body.rotation = turn * limb.Body.rotation;
+                limb.Body.transform.SetPositionAndRotation(limb.Body.position, limb.Body.rotation);
+                if (!limb.Body.isKinematic) limb.Body.linearVelocity = limb.Body.angularVelocity = Vector3.zero;
+            }
+            _rb.position = spot;
+            _rb.rotation = onBack;
+            transform.SetPositionAndRotation(spot, onBack);
+            if (!_rb.isKinematic) _rb.linearVelocity = _rb.angularVelocity = Vector3.zero;
+            _lastRootPosition = spot;
+            _layDownUntil = Time.time + 1.5f;
+            return true;
         }
 
         /// <summary>Host (simulator): move the body somewhere (a hospital bed), limbs follow.</summary>
@@ -239,6 +286,7 @@ namespace PleaseDontDrown.Rescue
             bool headUnder = WaterSurface.Exists && WaterSurface.DepthOf(HeadPosition) > 0.02f;
             UpdateFace(state);
             UpdateSquish();
+            UpdatePassThrough();
 
             if (Time.time >= _nextFloatScan)
             {
@@ -303,7 +351,7 @@ namespace PleaseDontDrown.Rescue
             if (!state.IsConscious()) { armBend = 8f; legBend = 6f; }
             else if (_item.IsHeld) { armBend = 25f; legBend = 30f; }
             else if (state.IsStruggling()) { armBend = 30f + 15f * Mathf.Sin(Time.time * 5f); legBend = 35f + 20f * Mathf.Sin(Time.time * 4f); }
-            else if (_wading) { armBend = 20f; legBend = 15f; }
+            else if (_wading || _walkingAway) { armBend = 18f; legBend = 22f; }
             else { armBend = 15f; legBend = 4f; }
 
             foreach (Limb limb in _limbs)
@@ -370,24 +418,107 @@ namespace PleaseDontDrown.Rescue
             PoseLimbs(state);
 
             bool struggling = state.IsStruggling() && !_item.IsHeld;
-            _sync.KeepAwake = struggling;
+            bool recovered = _brain.HasBeenRescued && !_brain.HasLostLeg && (state is VictimState.Fine or VictimState.Saved);
+            _sync.KeepAwake = struggling || (recovered && (_wading || _walkingAway || transform.up.y < 0.92f));
             if (_buoyancy != null)
                 _buoyancy.Density = state.IsConscious() ? _consciousDensity : _unconsciousDensity;
 
             if (_rb.isKinematic || _item.IsHeld)
                 return; // someone else simulates the torso, or a lifeguard's hands steer it
 
-            if (struggling && WaterSurface.Exists)
+            _mode = "-";
+            if (Time.time < _layDownUntil)
+            {
+                _mode = "laydown";
+                KeepOnBack(); // just put down: settle on the back
+            }
+            else if (struggling && WaterSurface.Exists)
+            {
+                _mode = "swim";
                 Swim(state);
+            }
             else if (state is VictimState.Fine or VictimState.Saved)
             {
-                if (_wading) WadeAshore();
+                _mode = "fine";
+                if (recovered) StandAndWalk(_wading || _walkingAway);
+                else if (_wading) WadeAshore();
                 else SitUp();
             }
             else if (!state.IsConscious() && !_brain.IsAshore && WaterSurface.Exists && WaterSurface.DepthOf(transform.position) > 0.2f)
+            {
+                _mode = "topple";
                 Topple(); // (not in the shallows: CPR needs them on their back)
-            else if ((!state.IsConscious() || state == VictimState.Injured) && transform.up.y > 0.35f && _rb.linearVelocity.sqrMagnitude < 4f)
-                FallOnBack(); // passed out (or holding a bitten leg) on the sand: flat on the back, ready for CPR
+            }
+            else if ((!state.IsConscious() || state == VictimState.Injured) && _rb.linearVelocity.sqrMagnitude < 4f)
+            {
+                // Passed out (or holding a bitten leg) on the sand: flat on the back and staying put, ready for CPR.
+                // (Sitting, on the side or face down: all rolled onto the back the same way.)
+                _mode = "onback";
+                KeepOnBack();
+            }
+        }
+
+        /// <summary>
+        /// Lying on land: roll onto the back if face down or on the side, and don't spin or slide about (a nudge
+        /// from someone kneeling by them used to turn them round mid-CPR).
+        /// </summary>
+        private void KeepOnBack()
+        {
+            Vector3 chest = transform.forward;
+            Vector3 axis = Vector3.Cross(chest, Vector3.up);
+            float error = Vector3.Angle(chest, Vector3.up) * Mathf.Deg2Rad;
+            if (axis.sqrMagnitude < 1e-4f) axis = chest.y < 0f ? transform.up : Vector3.zero; // face down: roll over along the spine
+            // Strong: the floppy limbs (an arm or a leg underneath) wedge the body, so a gentle push leaves them on the side.
+            Vector3 torque = axis.normalized * Mathf.Min(error, 1.6f) * 70f;
+            Vector3 w = _rb.angularVelocity;
+            _rb.AddTorque(torque - w * 12f - Vector3.Project(w, Vector3.up) * 10f, ForceMode.Acceleration); // extra brake on turning round
+            if (error > 0.35f)
+            {
+                // Lift a touch while rolling over, so the torso isn't pinned by its own limbs.
+                float ground = Shore.GroundHeightAt(_rb.position + Vector3.up * 0.5f);
+                if (float.IsNaN(ground)) ground = _rb.position.y - 0.17f;
+                float lift = Mathf.Clamp((ground + 0.3f - _rb.position.y) * 30f - _rb.linearVelocity.y * 6f, 0f, 14f);
+                _rb.AddForce(Vector3.up * lift, ForceMode.Acceleration);
+            }
+            if (error < 0.5f)
+            {
+                Vector3 v = _rb.linearVelocity;
+                _rb.AddForce(-new Vector3(v.x, 0f, v.z) * 6f, ForceMode.Acceleration);
+            }
+        }
+
+        /// <summary>
+        /// Someone lying on the sand (out cold, being given CPR): the lifeguards' feet walk over them instead of
+        /// kicking them about. Checked every machine, from the synced state.
+        /// </summary>
+        private void UpdatePassThrough()
+        {
+            if (Time.time < _nextLyingScan) return;
+            _nextLyingScan = Time.time + 0.25f;
+            VictimState state = _brain.State;
+            bool lying = !_item.IsHeld && _brain.IsAshore && transform.forward.y > 0.4f &&
+                         (!state.IsConscious() || state == VictimState.Injured || Time.time < _layDownUntil);
+            foreach (PlayerHub player in PlayerHub.All)
+            {
+                if (player == null) continue;
+                // Every solid part of the lifeguard (body capsule, feet, head...), not just the main capsule.
+                foreach (Collider body in player.GetComponentsInChildren<Collider>())
+                {
+                    if (body == null || body.isTrigger) continue;
+                    if (lying)
+                    {
+                        // Re-applied every scan (a holder's own collision handling may have switched it back on).
+                        foreach (Collider c in _allColliders)
+                            if (c != null) Physics.IgnoreCollision(c, body, true);
+                        _passThrough.Add(body);
+                    }
+                    else if (_passThrough.Remove(body) && _item.Holder != player)
+                    {
+                        foreach (Collider c in _allColliders)
+                            if (c != null) Physics.IgnoreCollision(c, body, false);
+                    }
+                }
+            }
         }
 
         /// <summary>Unconscious in the water: slowly tip over face-down instead of sinking like a statue.</summary>
@@ -395,13 +526,6 @@ namespace PleaseDontDrown.Rescue
         {
             Vector3 tilt = Vector3.Cross(transform.forward, Vector3.down);
             _rb.AddTorque(tilt * 6f - _rb.angularVelocity * 1f, ForceMode.Acceleration);
-        }
-
-        /// <summary>Out cold but still sitting up on land: tip over backwards.</summary>
-        private void FallOnBack()
-        {
-            Vector3 axis = Vector3.Cross(transform.up, -transform.forward); // turns "up" toward "back"
-            _rb.AddTorque(axis * 9f - _rb.angularVelocity * 1.5f, ForceMode.Acceleration);
         }
 
         /// <summary>The torso jumped (snap, unstuck pop, teleport): bring the limbs along instead of stretching the joints.</summary>
@@ -496,45 +620,61 @@ namespace PleaseDontDrown.Rescue
             if (!(state is VictimState.Fine or VictimState.Saved) || _item.IsHeld || !WaterSurface.Exists)
             {
                 _wading = false;
+                _walkingAway = false;
                 return;
             }
+
             Vector3 p = transform.position;
             float depth = Shore.WaterDepthAt(p);
+            bool recovered = _brain.HasBeenRescued && !_brain.HasLostLeg;
             _wading = depth > 0.12f && depth < Shore.DeepDepth + 0.4f;
-            if (!_wading || _rb.isKinematic) return;
+            _walkingAway = recovered && depth <= 0.12f && depth > -0.85f;
+            if (!_wading && !recovered) return;
 
-            // Where the simulator walks: up the seabed slope (ground heights, not water depth: waves would swamp the slope).
-            _groundY = WaterSurface.HeightAt(p) - depth;
-            float dx = Shore.GroundHeightAt(p + Vector3.right * 1.5f) - Shore.GroundHeightAt(p + Vector3.left * 1.5f);
-            float dz = Shore.GroundHeightAt(p + Vector3.forward * 1.5f) - Shore.GroundHeightAt(p + Vector3.back * 1.5f);
+            float ground = Shore.GroundHeightAt(p + Vector3.up * 2f);
+            if (!float.IsNaN(ground)) _groundY = ground;
+            else if (_wading) _groundY = WaterSurface.HeightAt(p) - depth;
+
+            // Head inland, up the beach slope. Keep the last direction where the beach levels out.
+            float dx = Shore.GroundHeightAt(p + Vector3.right * 1.5f + Vector3.up * 2f) -
+                       Shore.GroundHeightAt(p + Vector3.left * 1.5f + Vector3.up * 2f);
+            float dz = Shore.GroundHeightAt(p + Vector3.forward * 1.5f + Vector3.up * 2f) -
+                       Shore.GroundHeightAt(p + Vector3.back * 1.5f + Vector3.up * 2f);
             var uphill = new Vector3(dx, 0f, dz);
-            if (!float.IsNaN(uphill.x) && !float.IsNaN(uphill.z) && uphill.sqrMagnitude > 1e-5f) _wadeDirection = uphill.normalized;
+            if (!float.IsNaN(uphill.x) && !float.IsNaN(uphill.z) && uphill.sqrMagnitude > 1e-5f)
+                _wadeDirection = uphill.normalized;
         }
 
-        private void WadeAshore()
+        private void WadeAshore() => StandAndWalk(true);
+
+        /// <summary>Lift a rescued person off the sand, right the torso, then let them walk inland.</summary>
+        private void StandAndWalk(bool moving)
         {
             Vector3 p = _rb.position;
             Vector3 v = _rb.linearVelocity;
-            // Stand: hold the torso at standing height over the seabed (the legs are too floppy to carry it).
-            float lift = Mathf.Clamp((_groundY + 1.2f - p.y) * 60f - v.y * 16f + 10f, -30f, 50f); // feet just clear of the sand
+            float lift = Mathf.Clamp((_groundY + 1.2f - p.y) * 65f - v.y * 17f + 10f, -30f, 55f);
             _rb.AddForce(Vector3.up * lift, ForceMode.Acceleration);
+
             Vector3 tilt = Vector3.Cross(transform.up, Vector3.up);
+            if (tilt.sqrMagnitude < 0.001f && transform.up.y < 0f)
+                tilt = transform.right; // an upside-down body needs a direction to start rolling
             float turn = Vector3.SignedAngle(transform.forward, _wadeDirection, Vector3.up) * Mathf.Deg2Rad;
-            _rb.AddTorque(tilt * 60f + Vector3.up * (turn * 8f) - _rb.angularVelocity * 12f, ForceMode.Acceleration);
-            Vector3 walk = (_wadeDirection * 1.2f - new Vector3(v.x, 0f, v.z)) * 6f;
-            _rb.AddForce(walk, ForceMode.Acceleration);
+            _rb.AddTorque(tilt * 78f + Vector3.up * (turn * 8f) - _rb.angularVelocity * 14f, ForceMode.Acceleration);
+
+            Vector3 target = moving ? _wadeDirection * (_wading ? 1.1f : 1.35f) : Vector3.zero;
+            Vector3 horizontal = new(v.x, 0f, v.z);
+            _rb.AddForce((target - horizontal) * 8f, ForceMode.Acceleration);
         }
 
-        /// <summary>Saved or fine on land: sit up (the legs are posed forward).</summary>
+        /// <summary>Unrescued beachgoers can stay seated on the sand.</summary>
         private void SitUp()
         {
-            if (_rb.linearVelocity.sqrMagnitude > 9f) return; // flying through the air: let physics have it
+            if (_rb.linearVelocity.sqrMagnitude > 9f) return;
             bool inWater = WaterSurface.Exists && WaterSurface.DepthOf(transform.position) > 0.3f;
             if (inWater) return;
             Vector3 tilt = Vector3.Cross(transform.up, Vector3.up);
             _rb.AddTorque(tilt * 28f - _rb.angularVelocity * 8f, ForceMode.Acceleration);
         }
-
         // ------------------------------------------------------------------ limbs
 
         private void BuildLimbs()
@@ -650,7 +790,14 @@ namespace PleaseDontDrown.Rescue
                 float ph = limb.Phase;
                 if (!state.IsConscious())
                 {
-                    SetDrive(limb, 0f, 3f); // limp
+                    if (_brain.IsAshore && !held)
+                    {
+                        // Out cold on the sand: a soft pull to lying flat (legs straight, arms a little out), so the
+                        // limbs don't fold up under the body and wedge it onto its side.
+                        SetDrive(limb, 70f, 7f);
+                        SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 22f, 0f) : LegPose(limb, 2f, 5f));
+                    }
+                    else SetDrive(limb, 0f, 3f); // limp
                     continue;
                 }
 
@@ -711,33 +858,49 @@ namespace PleaseDontDrown.Rescue
                         else
                             SetTarget(limb.Joint, LegPose(limb, 20f + 15f * Mathf.Sin(t * 3f + ph), 10f));
                         break;
-                    case VictimState.Saved when _wading:
-                    case VictimState.Fine when _wading:
-                        // Walking out of the water (arms up while celebrating).
-                        SetDrive(limb, limb.IsArm ? 300f : 520f, 24f);
-                        float stride = Mathf.Sin(t * 6f + (limb.Side > 0f ? 0f : Mathf.PI));
+                    case VictimState.Saved when _wading || _walkingAway:
+                    case VictimState.Fine when _wading || _walkingAway:
+                        // Alternating steps and arm swings while leaving the water.
+                        SetDrive(limb, limb.IsArm ? 360f : 650f, 28f);
+                        float stride = Mathf.Sin(t * (_wading ? 5f : 7f) + (limb.Side > 0f ? 0f : Mathf.PI));
                         if (limb.IsArm)
-                            SetTarget(limb.Joint, state == VictimState.Saved ? ArmPose(limb, 160f + 12f * Mathf.Sin(t * 8f + ph), 10f) : ArmPose(limb, 10f, -25f * stride));
+                            SetTarget(limb.Joint, state == VictimState.Saved && limb.Kind == LimbKind.ArmR
+                                ? ArmPose(limb, 125f + 15f * Mathf.Sin(t * 7f), 10f)
+                                : ArmPose(limb, 14f, -30f * stride));
                         else
-                            SetTarget(limb.Joint, LegPose(limb, 25f * stride, 4f));
+                            SetTarget(limb.Joint, LegPose(limb, 30f * stride, 5f));
+                        break;
+                    case VictimState.Saved when _brain.HasBeenRescued && !_brain.HasLostLeg:
+                        // A short standing wave after reaching dry sand.
+                        SetDrive(limb, limb.IsArm ? 340f : 600f, 28f);
+                        SetTarget(limb.Joint, limb.IsArm
+                            ? limb.Kind == LimbKind.ArmR ? ArmPose(limb, 120f + 12f * Mathf.Sin(t * 6f), 8f) : ArmPose(limb, 12f, 0f)
+                            : LegPose(limb, 3f, 5f));
+                        break;
+                    case VictimState.Fine when _brain.HasBeenRescued && !_brain.HasLostLeg:
+                        // Upright idle until they head back to their sunbed.
+                        SetDrive(limb, limb.IsArm ? 320f : 600f, 28f);
+                        SetTarget(limb.Joint, limb.IsArm
+                            ? ArmPose(limb, 12f, 3f * Mathf.Sin(t * 1.7f + ph))
+                            : LegPose(limb, 2f, 5f));
                         break;
                     case VictimState.Saved:
-                        // Arms up, legs out: sitting on the sand, celebrating.
                         SetDrive(limb, limb.IsArm ? 360f : 440f, 28f);
                         SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 160f + 12f * Mathf.Sin(t * 8f + ph), 10f) : LegPose(limb, 85f, 12f));
                         break;
                     default:
-                        // Fine: sitting, leaning back on the hands.
                         SetDrive(limb, limb.IsArm ? 280f : 440f, 28f);
                         SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 22f, -35f) : LegPose(limb, 85f, 12f));
-                        break;
-                }
+                        break;                }
             }
         }
 
         // ------------------------------------------------------------------ debugging
 
-        public string DebugState => _wading ? $"wading toward {_wadeDirection:F2} (ground {_groundY:F2})" : "";
+        public string DebugState => (_wading || _walkingAway ? $"walking toward {_wadeDirection:F2} (ground {_groundY:F2})  " : "") +
+                                    $"mode {_mode}{(_rb.isKinematic ? " kinematic" : "")}{(_rb.IsSleeping() ? " asleep" : "")} chest {transform.forward:F2}";
+
+        private string _mode = "-"; // which physics branch ran last (tests)
 
         /// <summary>Where each limb points in torso space (checks that poses and joint limits agree).</summary>
         public string DescribeLimbs()

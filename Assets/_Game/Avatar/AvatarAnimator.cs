@@ -716,16 +716,16 @@ namespace PleaseDontDrown.Avatars
             }
             else if (GestureActive(AvatarGesture.Breath, 1.1f))
             {
-                // Rescue breath: lean right down to the face, one hand on the forehead, one lifting the chin.
+                // Rescue breath, mouth to mouth: bend right down until our lips are on theirs (head tilted, eyes
+                // closed), one hand on the forehead, one lifting the chin; the knees stay where they are.
                 float t = GestureT(1.1f);
-                float w = Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI);
-                B(Bone.Hips).localRotation *= Quaternion.Euler(28f * w, 0f, 0f);
-                B(Bone.Neck).localRotation *= Quaternion.Euler(25f * w, 0f, 0f);
-                if (_gesturePoint != Vector3.zero)
+                float w = Mathf.SmoothStep(0f, 1f, t < 0.28f ? t / 0.28f : t > 0.78f ? (1f - t) / 0.22f : 1f);
+                if (_gesturePoint == Vector3.zero)
                 {
-                    IK.Solve(upperL, foreL, la, lb, _gesturePoint + up * 0.1f - fwd * 0.05f, -fwd - right, w, false);
-                    IK.Solve(upperR, foreR, la, lb, _gesturePoint - up * 0.06f + fwd * 0.05f, -fwd + right, w, false);
+                    B(Bone.Hips).localRotation *= Quaternion.Euler(28f * w, 0f, 0f);
+                    B(Bone.Neck).localRotation *= Quaternion.Euler(25f * w, 0f, 0f);
                 }
+                else Kiss(_gesturePoint, w, upperL, foreL, upperR, foreR, la, lb);
             }
             else if (GestureActive(AvatarGesture.Zap, 0.6f))
             {
@@ -742,6 +742,42 @@ namespace PleaseDontDrown.Avatars
                 upperR.localRotation *= Quaternion.Euler(-14f * kick, 0f, 0f);
                 foreR.localRotation *= Quaternion.Euler(-10f * kick, 0f, 0f);
             }
+        }
+
+        /// <summary>Our lips, just in front of the head.</summary>
+        private Vector3 MouthPoint => B(Bone.Head).TransformPoint(new Vector3(0f, 0.035f, 0.12f) * _rig.Scale);
+
+        /// <summary>
+        /// Lips on lips: the upper body pivots at the hips toward the other mouth, the face turns down to meet it
+        /// (tipped sideways, the way people kiss), then the hips slide the last bit so the mouths touch. The legs are
+        /// posed again afterwards, so the knees stay planted on the sand.
+        /// </summary>
+        private void Kiss(Vector3 lips, float w, Transform upperL, Transform foreL, Transform upperR, Transform foreR, float la, float lb)
+        {
+            if (w <= 0.001f) return;
+            Transform hips = B(Bone.Hips), head = B(Bone.Head);
+            Vector3 fwd = transform.forward, right = transform.right;
+            Vector3 target = lips + Vector3.up * 0.015f;
+
+            // 1. Swing the upper body round the hips so the mouth heads for theirs.
+            Vector3 pivot = hips.position;
+            Quaternion swing = Quaternion.FromToRotation(MouthPoint - pivot, target - pivot);
+            hips.rotation = Quaternion.Slerp(Quaternion.identity, swing, w) * hips.rotation;
+            // 2. Face down onto theirs, tilted sideways a little.
+            Vector3 along = Vector3.ProjectOnPlane(target - pivot, Vector3.up);
+            if (along.sqrMagnitude < 1e-4f) along = fwd;
+            Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along.normalized * 0.25f, along.normalized) * Quaternion.Euler(0f, 0f, 24f);
+            B(Bone.Neck).rotation = Quaternion.Slerp(B(Bone.Neck).rotation, faceDown, w * 0.5f);
+            head.rotation = Quaternion.Slerp(head.rotation, faceDown, w);
+            // 3. Close the last gap by moving the whole upper body (not far: we're kneeling right next to them).
+            Vector3 gap = Vector3.ClampMagnitude(target - MouthPoint, 0.6f * _rig.Scale);
+            hips.position += gap * w;
+            PoseLegs(); // knees back down where they were
+
+            // Hands: one on the forehead, one under the chin.
+            Vector3 over = Vector3.ProjectOnPlane(along, Vector3.up).normalized;
+            IK.Solve(upperL, foreL, la, lb, lips + over * 0.12f + Vector3.up * 0.06f - right * 0.04f, -fwd - right, w, false);
+            IK.Solve(upperR, foreR, la, lb, lips - over * 0.07f + Vector3.up * 0.01f + right * 0.03f, -fwd + right, w, false);
         }
 
         // ------------------------------------------------------------------ head & face
@@ -780,7 +816,7 @@ namespace PleaseDontDrown.Avatars
             if (Motion.Talking) mouth = 0.12f + 0.5f * Mathf.Abs(Mathf.Sin(t * 13f) * Mathf.Sin(t * 5.3f + 1f));
             if (_down > 0.5f) { eyes = 0.08f; mouth = 0.45f; }
             else if (_lie > 0.5f && !Motion.Talking) { eyes = 0.12f; mouth = 0.05f; brows = 0.2f; } // soaking up the sun
-            if (GestureActive(AvatarGesture.Breath, 1.1f)) mouth = 0.6f;
+            if (GestureActive(AvatarGesture.Breath, 1.1f)) { mouth = 0.08f; eyes = 0.08f; brows = 0.3f; } // a kiss: lips pressed, eyes shut
             _rig.SetExpression(eyes, mouth, brows);
         }
     }
