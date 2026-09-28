@@ -6,6 +6,7 @@ Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP �
 * **Story mode** (chapters 1-2: Sandy, the robber, the hotel island, sharks, pirates): [Docs/05-Story-Mode.md](Docs/05-Story-Mode.md)
 * Architecture and milestones: [Docs/02-Technical-Architecture.md](Docs/02-Technical-Architecture.md)
 * Art direction + Meshy prompts: [Docs/03-Art-Direction-Meshy.md](Docs/03-Art-Direction-Meshy.md) (exports go in `ArtSource/Meshy/`)
+* **Everything to generate in Meshy** (checklist, prompts, order): [Docs/06-Meshy-Asset-List.md](Docs/06-Meshy-Asset-List.md)
 
 ## Art
 

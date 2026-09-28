@@ -1,5 +1,8 @@
 # PLEASE DON'T DROWN — Art direction and Meshy prompts
 
+> **What to generate now:** the full checklist with ready-to-paste prompts is in
+> [06-Meshy-Asset-List.md](06-Meshy-Asset-List.md). This file keeps the style rules, settings and the original prompts.
+
 Goal: replace the grey-box primitives with one consistent look. Meshy makes the **models** (characters, buildings,
 props, vehicles). Things Meshy is bad at, Claude builds in the engine instead: terrain, water, sky, lighting and
 post-processing, the modular dock planks, the beach ball (a textured sphere), UI and signs with text.
