@@ -412,7 +412,8 @@ namespace PleaseDontDrown.Editor
 
         private static List<Vector3> Island2Avoid() => new()
         {
-            new(-2f, -214f, 3f), new(-2f, -219f, 3f), new(20f, -237f, 3f), new(PirateLanding.x, PirateLanding.z, 3f), new(Island2Spawn.x, Island2Spawn.z, 2.5f)
+            new(-2f, -214f, 3f), new(-2f, -219f, 3f), new(20f, -237f, 3f), new(PirateLanding.x, PirateLanding.z, 3f), new(Island2Spawn.x, Island2Spawn.z, 2.5f),
+            new(PadOnIsland2.x, PadOnIsland2.z, 3f)
         };
 
         /// <summary>

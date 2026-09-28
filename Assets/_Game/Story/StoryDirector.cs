@@ -598,6 +598,14 @@ namespace PleaseDontDrown.Story
             if (!anyFar) return;
             TeleportObservers(_island2Spawn.position);
             if (_jetSki != null && _jetSkiIsland2Dock != null) _jetSki.ServerPlace(_jetSkiIsland2Dock.position, _jetSkiIsland2Dock.eulerAngles.y);
+            // Resuming a save: the keys (handed over in chapter 1) come along too, so the jet ski still goes.
+            bool haveKeys = false; // keys in someone's hands or lying on this island (not the dev island's spare set)
+            foreach (Item item in Item.All)
+                if (item.DisplayName == "Jet Ski Keys" && (item.IsHeld || (item.transform.position - _island2Spawn.position).sqrMagnitude < 80f * 80f))
+                    haveKeys = true;
+            if (!haveKeys) SpawnItem("Jet Ski Keys", _island2Spawn.position + Vector3.up * 1.2f, Vector3.zero);
+            if (RescueService.Instance != null)
+                RescueService.Instance.ServerAnnounce($"Story continues on the hotel island ({_beat.Value}). Purple travel pads or Esc > Travel go to the other islands; Esc > Restart the story starts over.");
         }
 
         // ------------------------------------------------------------------ console
@@ -725,6 +733,9 @@ namespace PleaseDontDrown.Story
                         break;
                     case "reset":
                         if (Economy.Instance != null) Economy.Instance.ServerSet(0);
+                        // Everyone back to the station beach for chapter 1.
+                        if (Dev.DevIsland.Instance != null && Dev.DevIsland.Instance.Home != null)
+                            TeleportObservers(Dev.DevIsland.Instance.Home.position);
                         StartAt(0);
                         break;
                     case "off":

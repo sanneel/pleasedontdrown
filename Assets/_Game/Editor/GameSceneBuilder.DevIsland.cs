@@ -23,6 +23,7 @@ namespace PleaseDontDrown.Editor
         private const float DevIslandCornerRadius = 20f;
         private static readonly Vector3 DevPadOnIsland1 = new(-16f, 0f, 17f);
         private static readonly Vector3 DevArrival = new(-199.5f, 0.3f, -60f);
+        private static readonly Vector3 PadOnIsland2 = new(8f, 0f, -229f);
         private const float DevFiringLineX = -207f;
 
         /// <summary>The dev island's shore coordinate (4 at the edge, growing inland), a flat sandy block.</summary>
@@ -55,8 +56,11 @@ namespace PleaseDontDrown.Editor
             // ---------------------------------------------------------------- getting there and back
             Transform arrival = Point(root, "DevArrival", DevArrival, -90f); // looking west, into the island
             Transform home = Point(root, "DevHome", OnGround(DevPadOnIsland1 + new Vector3(2.2f, 0f, 0f)) + Vector3.up * 0.3f, 90f);
-            TeleportPadAt(root, "PadToDevIsland", OnGround(DevPadOnIsland1), 90f, true, "Teleport to the dev island", "dev_to_island", padGlow);
-            TeleportPadAt(root, "PadToBeach", OnGround(new Vector3(-200.5f, 0f, -66.5f)), -90f, false, "Teleport back to the beach", "dev_to_beach", padGlow);
+            Transform hotel = Point(root, "HotelArrival", OnGround(PadOnIsland2 + new Vector3(2.2f, 0f, 0f)) + Vector3.up * 0.3f, 180f);
+            // A travel pad on every island (E: a list of the other islands).
+            TeleportPadAt(root, "TravelPad_Island1", OnGround(DevPadOnIsland1), 90f, Destination.StationBeach, padGlow);
+            TeleportPadAt(root, "TravelPad_Island2", OnGround(PadOnIsland2), 0f, Destination.HotelIsland, padGlow);
+            TeleportPadAt(root, "TravelPad_Dev", OnGround(new Vector3(-200.5f, 0f, -66.5f)), -90f, Destination.DevIsland, padGlow);
             DevSign(root, "DevIslandSign", OnGround(new Vector3(-195f, 0f, -51f)), 90f, new Vector2(5f, 1.56f), "dev_island", 1.4f);
 
             // ---------------------------------------------------------------- armory and the range
@@ -181,6 +185,7 @@ namespace PleaseDontDrown.Editor
             var so = new SerializedObject(dev);
             Require(so, "_arrival").objectReferenceValue = arrival;
             Require(so, "_home").objectReferenceValue = home;
+            Require(so, "_hotel").objectReferenceValue = hotel;
             Require(so, "_seaSpot").objectReferenceValue = seaSpot;
             Require(so, "_beachSpot").objectReferenceValue = beachSpot;
             SerializedProperty shelfList = Require(so, "_shelves");
@@ -223,7 +228,7 @@ namespace PleaseDontDrown.Editor
             SignPicture(sign, "Face", new Vector3(0f, cy, 0.046f), 180f, size, texture);
         }
 
-        private static void TeleportPadAt(Transform parent, string name, Vector3 ground, float facing, bool toDevIsland, string label, string signTexture, Material glow)
+        private static void TeleportPadAt(Transform parent, string name, Vector3 ground, float facing, Destination here, Material glow)
         {
             Material ring = GetMaterial("PadRing", new Color(0.25f, 0.2f, 0.35f));
             var pad = new GameObject(name).transform;
@@ -233,12 +238,11 @@ namespace PleaseDontDrown.Editor
             Primitive(PrimitiveType.Cylinder, "Glow", pad, new Vector3(0f, 0.11f, 0f), new Vector3(1.4f, 0.02f, 1.4f), glow, keepCollider: false);
             var teleport = pad.gameObject.AddComponent<TeleportPad>();
             var so = new SerializedObject(teleport);
-            Require(so, "_label").stringValue = label;
-            Require(so, "_toDevIsland").boolValue = toDevIsland;
+            Require(so, "_here").enumValueIndex = (int)here;
             so.ApplyModifiedPropertiesWithoutUndo();
             ConfigureInteractable(pad.gameObject.AddComponent<Interactable>(), new[] { disc.GetComponent<Collider>() },
                 pad.GetComponentsInChildren<Renderer>(), 3.5f);
-            DevSign(pad, "Sign", new Vector3(0f, 0f, -1.3f), 0f, new Vector2(1.6f, 0.5f), signTexture, 1.3f);
+            DevSign(pad, "Sign", new Vector3(0f, 0f, -1.3f), 0f, new Vector2(1.6f, 0.5f), "dev_travel", 1.3f);
         }
 
         /// <summary>A range target: a plywood torso and head with a bullseye on a post, hinged at the foot to fall over.</summary>

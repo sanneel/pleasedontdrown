@@ -28,6 +28,7 @@ namespace PleaseDontDrown.UI
         private void OnToggleMenu(InputAction.CallbackContext _)
         {
             if (DevConsole.IsOpen || AvatarCustomizer.IsOpen || !_connection.IsActive) return; // Esc closes those first
+            if (!_pauseOpen && !GameInput.GameplayActive) return; // a shop or travel list is open: Esc closes that
             SetPause(!_pauseOpen);
         }
 
@@ -54,7 +55,7 @@ namespace PleaseDontDrown.UI
 
             _title ??= new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold };
 
-            GUILayout.BeginArea(new Rect(20, 20, 360, 480), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(20, 20, 360, active ? 640 : 480), GUI.skin.box);
             GUILayout.Label("PLEASE DON'T DROWN", _title);
             GUILayout.Label(active ? "Paused" : $"Prototype build {NetVersion.Current}");
             GUILayout.Space(6);
@@ -94,10 +95,31 @@ namespace PleaseDontDrown.UI
                 }
             }
 
+            if (active && Dev.DevIsland.Instance != null)
+            {
+                GUILayout.Space(8);
+                GUILayout.Label("Travel");
+                for (int i = 0; i < Dev.DevIsland.DestinationNames.Length; i++)
+                    if (GUILayout.Button(Dev.DevIsland.DestinationNames[i], GUILayout.Height(26)))
+                    {
+                        SetPause(false);
+                        Dev.DevIsland.Travel((Dev.Destination)i);
+                    }
+            }
+            if (active && _connection.NetworkManager.IsServerStarted && Story.StoryDirector.Instance != null)
+            {
+                GUILayout.Space(6);
+                if (GUILayout.Button("Restart the story from chapter 1", GUILayout.Height(26)))
+                {
+                    SetPause(false);
+                    DevCommands.Execute("story reset");
+                }
+            }
+
             GUILayout.Space(6);
             if (GUILayout.Button("Customize your lifeguard", GUILayout.Height(28))) AvatarCustomizer.Open();
             GUILayout.Space(8);
-            GUILayout.Label("<color=#aaaaaa>WASD move · Shift sprint · Ctrl crouch · Space jump · E use · ` console</color>",
+            GUILayout.Label("<color=#aaaaaa>WASD move · Shift sprint · Ctrl crouch · Space jump · E use · ` / F1 / F2 console</color>",
                 new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true });
 
             if (!string.IsNullOrEmpty(_connection.LastError))

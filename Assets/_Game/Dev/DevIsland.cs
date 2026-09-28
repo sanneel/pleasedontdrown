@@ -15,6 +15,9 @@ using UnityEngine;
 
 namespace PleaseDontDrown.Dev
 {
+    /// <summary>Where the travel pads and the pause menu can take you.</summary>
+    public enum Destination : byte { StationBeach, HotelIsland, DevIsland }
+
     public enum DevAction : byte
     {
         DrowningWoman, DrowningMan, SilentWoman, CprWoman, CprMan, Flatline, Robber, Shark, Money, ClearTourists
@@ -47,12 +50,40 @@ namespace PleaseDontDrown.Dev
         [SerializeField] private Model[] _gallery = Array.Empty<Model>();
         [SerializeField] private Transform _arrival;
         [SerializeField] private Transform _home;
+        [SerializeField] private Transform _hotel;
         [SerializeField] private Transform _seaSpot;
         [SerializeField] private Transform _beachSpot;
 
         public static DevIsland Instance { get; private set; }
         public Transform Arrival => _arrival;
         public Transform Home => _home;
+
+        public static readonly string[] DestinationNames = { "Station beach (island 1)", "Hotel island (island 2)", "Dev island" };
+
+        /// <summary>The local player goes to <paramref name="where"/> (players move themselves: nothing to send).</summary>
+        public static void Travel(Destination where)
+        {
+            PlayerHub me = PlayerHub.Local;
+            if (Instance == null || me == null) return;
+            if (me.Motor.Seat != null)
+            {
+                PlayerHud.ShowToast("Get off the vehicle first.", 3f);
+                return;
+            }
+            Transform spot = where switch
+            {
+                Destination.HotelIsland => Instance._hotel,
+                Destination.DevIsland => Instance._arrival,
+                _ => Instance._home
+            };
+            Teleport(me, spot);
+            PlayerHud.ShowToast(where switch
+            {
+                Destination.DevIsland => "Dev island: guns (table and armory), the range, rescue test buttons, the models. Console: ` or F1 / F2.",
+                Destination.HotelIsland => "The hotel island. Purple pads (or Esc > Travel) take you back.",
+                _ => "The station beach."
+            }, 5f);
+        }
 
         private void Awake() => Instance = this;
 
@@ -71,8 +102,9 @@ namespace PleaseDontDrown.Dev
         public override void OnStartClient()
         {
             base.OnStartClient();
-            DevCommands.Register("devisland", "", "Go to the dev island (guns, range, test buttons, models).", _ => Teleport(PlayerHub.Local, _arrival), owner: this);
-            DevCommands.Register("home", "", "Back to the station beach.", _ => Teleport(PlayerHub.Local, _home), owner: this);
+            DevCommands.Register("devisland", "", "Go to the dev island (guns, range, test buttons, models).", _ => Travel(Destination.DevIsland), owner: this);
+            DevCommands.Register("home", "", "Go to the station beach (island 1).", _ => Travel(Destination.StationBeach), owner: this);
+            DevCommands.Register("hotel", "", "Go to the hotel island (island 2).", _ => Travel(Destination.HotelIsland), owner: this);
             DevCommands.Register("devtest", "<action>", $"Press a dev island test button: {string.Join(", ", Enum.GetNames(typeof(DevAction)))}.", args =>
             {
                 if (args.Length == 0 || !Enum.TryParse(args[0], true, out DevAction action)) throw new ArgumentException("which button?");
@@ -85,18 +117,16 @@ namespace PleaseDontDrown.Dev
             base.OnStopClient();
             DevCommands.Unregister("devisland", this);
             DevCommands.Unregister("home", this);
+            DevCommands.Unregister("hotel", this);
             DevCommands.Unregister("devtest", this);
         }
 
-        /// <summary>Moves a player (on their own machine: players move themselves) and turns them the way the spot faces.</summary>
-        public static void Teleport(PlayerHub player, Transform spot)
+        /// <summary>Moves a player (on their own machine) and turns them the way the spot faces.</summary>
+        private static void Teleport(PlayerHub player, Transform spot)
         {
             if (player == null || spot == null) return;
-            player.Motor.Teleport(spot.position);
+            player.Motor.Teleport(spot.position + new Vector3(UnityEngine.Random.Range(-0.8f, 0.8f), 0f, UnityEngine.Random.Range(-0.8f, 0.8f)));
             player.Look.LookAt(spot.position + spot.forward * 10f + Vector3.up * 1.5f);
-            PlayerHud.ShowToast(spot == Instance?._arrival
-                ? "Dev island: guns (table and armory), the range, rescue test buttons, the models. Console: ` or F1 / F2."
-                : "Back on the beach.", 5f);
         }
 
         private IEnumerator SetUpGallery()

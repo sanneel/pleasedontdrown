@@ -3,10 +3,14 @@
 > 2026-09-28. A sandbox ~110 m west of island 1 (centre -230, -60) to try every feature without playing the story.
 > Code: `Assets/_Game/Dev/` (DevIsland, TargetDummy, DevButton, TeleportPad); built by `Editor/GameSceneBuilder.DevIsland.cs`.
 
-## Getting there
-* The purple **teleport pad** on island 1, west of the spawn (sign "TO DEV ISLAND"), E to use. The pad next to the
-  arrival spot on the dev island goes back.
-* Console: `devisland` and `home`. The console opens with **`**, **F1** or **F2**; it works on a Georgian keyboard
+## Getting there (and between all islands)
+* A purple **travel pad** on every island (sign "TRAVEL"): island 1 west of the spawn, the hotel island in front of the
+  hotel, the dev island by the arrival spot. E opens a list: Station beach / Hotel island / Dev island.
+* **Esc > Travel** does the same from anywhere; **Esc > Restart the story from chapter 1** (host) starts over and brings
+  everyone back to the station beach.
+* Console: `devisland`, `home`, `hotel`.
+* Resuming a chapter 2 save puts everyone on the hotel island (as before) and now also brings the jet ski keys and says
+  how to get elsewhere. The console opens with **`**, **F1** or **F2**; it works on a Georgian keyboard
   layout too (letters are typed as the Latin letter on the same key).
 * Or ride over: the dev dock has a jet ski that needs no key.
 

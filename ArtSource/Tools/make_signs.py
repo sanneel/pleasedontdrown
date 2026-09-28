@@ -194,7 +194,7 @@ def dev_signs():
     for name, text, colour in (('dev_armory', 'ARMORY', TEAL), ('dev_range', 'SHOOTING RANGE', TEAL),
                                ('dev_gallery', 'MODEL GALLERY', TEAL), ('dev_rescue', 'RESCUE TESTS', RED),
                                ('dev_items', 'ITEMS', TEAL), ('dev_to_island', 'TO DEV ISLAND', PURPLE),
-                               ('dev_to_beach', 'BACK TO THE BEACH', PURPLE)):
+                               ('dev_to_beach', 'BACK TO THE BEACH', PURPLE), ('dev_travel', 'TRAVEL', PURPLE)):
         yield name, board_sign((1024, 320), colour, text, 150 if len(text) < 10 else 104, seed=40 + len(name))
     for metres in (10, 25, 50, 100, 150):
         yield f'dev_range_{metres}', board_sign((512, 256), SAND, f'{metres} m', 130, seed=60 + metres, text_fill=NAVY, outline=CREAM)
