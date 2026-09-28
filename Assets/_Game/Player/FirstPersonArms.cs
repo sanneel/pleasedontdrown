@@ -58,6 +58,7 @@ namespace PleaseDontDrown.Player
         private float _stride;
         private float _stroke;
         private float _run;
+        private float _air;   // 0..1 airborne: hands fly up into view
         private AvatarGesture _gesture;
         private float _gestureStart = -10f;
         private Vector3 _reach;
@@ -175,6 +176,8 @@ namespace PleaseDontDrown.Player
             bool grounded = motor == null || motor.IsGrounded;
             _stride += (grounded ? speed : 0f) * dt / 1.5f;
             _run = Mathf.MoveTowards(_run, motor != null && motor.IsSprinting && grounded && speed > 5f ? 1f : 0f, dt * 4f);
+            bool airborne = motor != null && !motor.IsGrounded && !motor.IsSwimming && !motor.IsClimbing && !motor.Noclip;
+            _air = Mathf.MoveTowards(_air, airborne ? 1f : 0f, dt * (airborne ? 5f : 7f));
 
             // What we hold (or just threw).
             HandGrip gripL = default, gripR = default;
@@ -306,9 +309,13 @@ namespace PleaseDontDrown.Player
                 Vector3 origin = _hub.Head.position;
                 float swing = Mathf.Sin(_stride * Mathf.PI + (hand.Right ? 0f : Mathf.PI));
                 float walk = Mathf.Clamp01(speed / 4.5f) * (motor == null || motor.IsGrounded ? 1f : 0f);
-                var offset = new Vector3(side * 0.23f, -0.265f, 0.45f);
+                // Low enough to stay out of view when looking straight ahead: look down (or jump) to see them.
+                var offset = new Vector3(side * 0.24f, -0.44f, 0.36f);
                 offset += new Vector3(0f, -Mathf.Abs(Mathf.Sin(_stride * Mathf.PI)) * 0.018f * walk, swing * 0.03f * walk * (1f - _run));
                 offset += new Vector3(-side * 0.04f, Mathf.Max(0f, swing) * 0.05f, swing * 0.13f) * _run;
+                // Jumping / falling: hands flail up to the sides of the view.
+                float flap = Mathf.Sin(Time.time * 9f + (hand.Right ? 0f : 1.3f)) * 0.03f;
+                offset = Vector3.Lerp(offset, new Vector3(side * 0.34f, -0.16f + flap, 0.42f), Mathf.SmoothStep(0f, 1f, _air));
                 palm = origin + frame * offset;
                 Vector3 fingers = frame * new Vector3(-side * 0.12f, -0.5f, 1f);
                 Vector3 palmDir = frame * Vector3.Lerp(new Vector3(-side * 0.9f, -0.35f, 0f), new Vector3(-side, 0f, 0f), _run);
