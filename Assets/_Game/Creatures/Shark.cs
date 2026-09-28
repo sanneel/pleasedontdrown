@@ -20,7 +20,7 @@ namespace PleaseDontDrown.Creatures
         [SerializeField] private float _cruiseSpeed = 3f;
         [SerializeField] private float _chargeSpeed = 9f;
         [SerializeField] private float _depth = 0.55f;
-        [SerializeField] private int _health = 3;
+        [SerializeField] private int _health = 100;
 
         private enum Mode { Circle, Charge, Leave }
 

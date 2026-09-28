@@ -48,6 +48,8 @@ namespace PleaseDontDrown.Items
         [SerializeField] private Transform _gripRight;
         [SerializeField] private Transform _gripLeft;
         [SerializeField] private Avatars.HandPose _gripPose = new(0.9f, 0.7f, 0f);
+        [Tooltip("Held rigidly in view by our own hands too (guns: no lag, exact aim and recoil); colliders off while held.")]
+        [SerializeField] private bool _rigidInHand;
 
         private readonly SyncVar<PlayerHub> _holder = new SyncVar<PlayerHub>();
         private readonly SyncVar<byte> _slot = new SyncVar<byte>();
@@ -78,6 +80,7 @@ namespace PleaseDontDrown.Items
         public Transform GripRight => _gripRight;
         public Transform GripLeft => _gripLeft;
         public Avatars.HandPose GripPose => _gripPose;
+        public bool RigidInHand => _rigidInHand;
 
         /// <summary>Inventory slot of the holder this item is in (our prediction first).</summary>
         public int Slot => _predictedHolder != null && _predictedSlot >= 0 ? _predictedSlot : _slot.Value;
@@ -347,7 +350,7 @@ namespace PleaseDontDrown.Items
             // Our own hands steer a live body (it collides with the world, but not with us);
             // everyone else sees it glued to the holder with its colliders off (dangling limbs keep theirs).
             // Pocketed items are hidden and ride along with the holder.
-            bool heldLocally = held && !stowed && holder == PlayerHub.Local;
+            bool heldLocally = held && !stowed && holder == PlayerHub.Local && !_rigidInHand;
             foreach (Collider c in _bodyColliders)
                 if (c != null) c.enabled = !held || heldLocally;
             if (heldLocally && holder.BodyCollider != null)

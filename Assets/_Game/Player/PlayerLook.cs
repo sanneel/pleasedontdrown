@@ -35,6 +35,9 @@ namespace PleaseDontDrown.Player
         private float _bobWeight;
         private float _dip;
         private float _dipVelocity;
+        private Vector2 _recoilTarget, _recoilCurrent;   // x = yaw right, y = pitch up (degrees)
+        private float _zoomFov, _zoomWeight;
+        private int _zoomFrame = -10;
 
         public Camera Camera => _camera;
         public float Sensitivity { get; private set; }
@@ -110,6 +113,19 @@ namespace PleaseDontDrown.Player
             ApplyHead();
         }
 
+        /// <summary>Gun recoil: the view climbs (x right, y up, degrees) quickly and stays there.</summary>
+        public void AddRecoil(Vector2 kick) => _recoilTarget += kick;
+
+        /// <summary>Aiming down the sights: blend the view towards <paramref name="fov"/>. Call every frame while it applies.</summary>
+        public void SetZoom(float fov, float weight)
+        {
+            _zoomFov = fov;
+            _zoomWeight = Mathf.Clamp01(weight);
+            _zoomFrame = Time.frameCount;
+        }
+
+        private float ZoomWeight => Time.frameCount - _zoomFrame <= 1 ? _zoomWeight : 0f;
+
         /// <summary>Players' bodies never rotate; facing lives on the head.</summary>
         public static void ResetBodyRotation(Transform body)
         {
@@ -126,6 +142,15 @@ namespace PleaseDontDrown.Player
             Vector2 mouse = GameInput.LookMouse.ReadValue<Vector2>() * Sensitivity;
             Vector2 stick = GameInput.LookStick.ReadValue<Vector2>() * (_stickDegreesPerSecond * Time.deltaTime);
             Vector2 look = mouse + stick;
+            // Zoomed in: turn slower, so the same hand movement covers the same part of the picture.
+            float zoom = ZoomWeight;
+            if (zoom > 0f) look *= Mathf.Lerp(1f, _zoomFov / Mathf.Max(1f, BaseFov), zoom);
+
+            // Recoil eases in over a few frames.
+            Vector2 before = _recoilCurrent;
+            _recoilCurrent = Vector2.Lerp(_recoilCurrent, _recoilTarget, 1f - Mathf.Exp(-25f * Time.deltaTime));
+            look += _recoilCurrent - before;
+            if ((_recoilTarget - _recoilCurrent).sqrMagnitude < 1e-6f) _recoilTarget = _recoilCurrent = Vector2.zero;
 
             _yaw = Mathf.Repeat(_yaw + look.x, 360f);
             _pitch = Mathf.Clamp(_pitch - look.y, -88f, 88f);
@@ -138,9 +163,10 @@ namespace PleaseDontDrown.Player
                 return;
             float dt = Time.deltaTime;
 
-            float targetBoost = _motor.IsSprinting && _motor.HorizontalSpeed > 1f ? _sprintFovBoost : 0f;
+            float zoom = ZoomWeight;
+            float targetBoost = _motor.IsSprinting && _motor.HorizontalSpeed > 1f && zoom < 0.1f ? _sprintFovBoost : 0f;
             _fovBoost = Mathf.Lerp(_fovBoost, targetBoost, 1f - Mathf.Exp(-8f * dt));
-            _camera.fieldOfView = BaseFov + _fovBoost;
+            _camera.fieldOfView = Mathf.Lerp(BaseFov + _fovBoost, _zoomFov, zoom);
 
             // Lean a touch into strafes.
             _roll = Mathf.Lerp(_roll, -_motor.StrafeInput * _strafeRoll, 1f - Mathf.Exp(-6f * dt));

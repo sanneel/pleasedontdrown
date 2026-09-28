@@ -640,6 +640,16 @@ namespace PleaseDontDrown.Story
                 me.Look.LookAt(p + Vector3.up * 0.4f);
                 DevCommands.Print($"at {target.name} {p:F1}");
             }, cheat: true, owner: this);
+            DevCommands.Register("aimat", "<name part>", "Look at a character's chest (gun tests).", args =>
+            {
+                if (args.Length == 0) throw new ArgumentException("who?");
+                Transform target = FindByName(args[0]);
+                PlayerHub me = PlayerHub.Local;
+                if (target == null || me == null) throw new InvalidOperationException($"nothing called '{args[0]}'");
+                Vector3 chest = target.TryGetComponent(out StoryNpc npc) ? npc.HeadPosition - Vector3.up * 0.35f : target.position + Vector3.up;
+                me.Look.LookAt(chest);
+                DevCommands.Print($"aiming at {target.name} {(chest - me.Head.position).magnitude:F1} m away");
+            }, cheat: true, owner: this);
             DevCommands.Register("tourist", "<f|m> [silent] [flatline]", "Spawn a story tourist in trouble near you.", args =>
             {
                 int figure = args.Length > 0 && args[0].StartsWith("f") ? 1 : args.Length > 0 && args[0].StartsWith("m") ? 0 : -1;
@@ -652,7 +662,7 @@ namespace PleaseDontDrown.Story
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "story", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto" })
+            foreach (string c in new[] { "story", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat" })
                 DevCommands.Unregister(c, this);
         }
 
@@ -722,7 +732,7 @@ namespace PleaseDontDrown.Story
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")
             {
-                StoryNpc robber = SpawnNpc("Robber", NpcRole.Robber, RobberLook, at, 0f, 3);
+                StoryNpc robber = SpawnNpc("Robber", NpcRole.Robber, RobberLook, at, 0f, 3 * Combat.Damage.Punch);
                 robber.ServerFlee(true, new Rect(at.x - 30f, at.z - 30f, 60f, 60f));
             }
             else if (what == "shark")
@@ -759,7 +769,7 @@ namespace PleaseDontDrown.Story
                     if (n.MaxHealth > 0 && n.Health > 0 && (best == null || (n.transform.position - at).sqrMagnitude < (best.transform.position - at).sqrMagnitude))
                         best = n;
                 for (int i = 0; best != null && i < Mathf.Max(1, value); i++)
-                    ((Combat.IDamageable)best).ServerTakeHit(1, Combat.DamageKind.Punch, by, best.HeadPosition, by != null ? by.Head.forward : Vector3.forward);
+                    ((Combat.IDamageable)best).ServerTakeHit(Combat.Damage.Punch, Combat.DamageKind.Punch, by, best.HeadPosition, by != null ? by.Head.forward : Vector3.forward);
             }
             else if (what.StartsWith("tourist:"))
             {

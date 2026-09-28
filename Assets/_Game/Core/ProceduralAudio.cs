@@ -17,7 +17,9 @@ namespace PleaseDontDrown.Core
         {
             _bell = _click = _splash = _waterStep = _cough = _thump = null;
             _crunch = _rustle = _bonk = _creak = _shut = null;
-            _breath = _zap = _punch = _gunshot = _cash = _engine = null;
+            _breath = _zap = _punch = _cash = _engine = null;
+            _shots = null;
+            _suppressed = _dryFire = _aimIn = _aimOut = _magOut = _magIn = _rack = _impact = null;
             _steps = null;
             _cries = null;
         }
@@ -224,7 +226,7 @@ namespace PleaseDontDrown.Core
             return (thud * 0.8f + click * 0.4f) * Mathf.Clamp01(t / 0.002f);
         });
 
-        private static AudioClip _breath, _zap, _punch, _gunshot, _cash, _engine;
+        private static AudioClip _breath, _zap, _punch, _cash, _engine;
 
         /// <summary>A long exhale (rescue breath).</summary>
         public static AudioClip Breath => _breath != null ? _breath : _breath = Build("Breath", 0.8f, BreathWave());
@@ -257,8 +259,119 @@ namespace PleaseDontDrown.Core
             return (thud * 0.9f + slap * 0.7f) * Mathf.Clamp01(t / 0.002f);
         });
 
-        /// <summary>Pistol shot.</summary>
-        public static AudioClip Gunshot => _gunshot != null ? _gunshot : _gunshot = Noise("Gunshot", 0.45f, 777, 0.95f, 0.08f, 11f, 1f);
+        // ------------------------------------------------------------------ guns
+
+        private static AudioClip[] _shots;
+        private static AudioClip _suppressed, _dryFire, _aimIn, _aimOut, _magOut, _magIn, _rack, _impact;
+
+        /// <summary>A gunshot per kind of gun: a sharp crack, a low punch and a tail that rings out.</summary>
+        public static AudioClip Shot(Combat.GunSound kind)
+        {
+            _shots ??= new AudioClip[5];
+            int i = (int)kind;
+            if (_shots[i] != null) return _shots[i];
+            // length, crack brightness, crack decay, punch start/end Hz, tail decay, tail gain
+            (float len, float bright, float crackDecay, float f0, float f1, float tailDecay, float tail) = kind switch
+            {
+                Combat.GunSound.Smg => (0.32f, 0.9f, 55f, 170f, 70f, 16f, 0.55f),
+                Combat.GunSound.Shotgun => (0.85f, 0.7f, 30f, 95f, 38f, 5.5f, 0.9f),
+                Combat.GunSound.Rifle => (0.6f, 0.97f, 45f, 130f, 50f, 8f, 0.75f),
+                Combat.GunSound.Sniper => (1.2f, 1f, 35f, 90f, 32f, 3.2f, 0.9f),
+                _ => (0.45f, 0.93f, 50f, 150f, 60f, 11f, 0.65f)
+            };
+            var rng = new System.Random(700 + i);
+            float low = 0f, band = 0f;
+            return _shots[i] = Build($"Shot{kind}", len, t =>
+            {
+                float n = (float)(rng.NextDouble() * 2.0 - 1.0);
+                low += (n - low) * Mathf.Lerp(bright, 0.05f, Mathf.Clamp01(t / len));
+                band += (low - band) * 0.25f;
+                float crack = n * Mathf.Exp(-crackDecay * t);
+                float punch = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(f0, f1, Mathf.Clamp01(t / 0.12f)) * t) * Mathf.Exp(-22f * t);
+                float ring = band * 2.2f * Mathf.Exp(-tailDecay * t) * tail;
+                return (crack * 0.8f + punch * 0.9f + ring) * Mathf.Clamp01(t / 0.0015f);
+            });
+        }
+
+        /// <summary>Through a suppressor: a dull "thwp" and the action clacking.</summary>
+        public static AudioClip GunshotSuppressed
+        {
+            get
+            {
+                if (_suppressed != null) return _suppressed;
+                var rng = new System.Random(733);
+                float low = 0f;
+                return _suppressed = Build("ShotSuppressed", 0.3f, t =>
+                {
+                    float n = (float)(rng.NextDouble() * 2.0 - 1.0);
+                    low += (n - low) * 0.12f;
+                    float puff = low * 3f * Mathf.Exp(-24f * t);
+                    float clack = t > 0.035f ? Mathf.Sin(2f * Mathf.PI * 1900f * t) * Mathf.Exp(-90f * (t - 0.035f)) * 0.35f : 0f;
+                    return (puff + clack) * Mathf.Clamp01(t / 0.003f);
+                });
+            }
+        }
+
+        /// <summary>Empty: the hammer falls on nothing.</summary>
+        public static AudioClip DryFire => _dryFire != null ? _dryFire : _dryFire = Build("DryFire", 0.08f, t =>
+            (Mathf.Sin(2f * Mathf.PI * 2600f * t) * 0.6f + Mathf.Sin(2f * Mathf.PI * 4100f * t) * 0.3f) * Mathf.Exp(-70f * t));
+
+        public static AudioClip AimIn => _aimIn != null ? _aimIn : _aimIn = Cloth("AimIn", 0.13f, 810, 1.2f);
+        public static AudioClip AimOut => _aimOut != null ? _aimOut : _aimOut = Cloth("AimOut", 0.11f, 820, 0.9f);
+
+        /// <summary>Magazine out: a latch click and a metal slide.</summary>
+        public static AudioClip MagOut => _magOut != null ? _magOut : _magOut = Build("MagOut", 0.22f, t =>
+        {
+            float click = Mathf.Sin(2f * Mathf.PI * 3100f * t) * Mathf.Exp(-80f * t);
+            float scrape = (Mathf.PerlinNoise(t * 7000f, 0.3f) * 2f - 1f) * Mathf.Exp(-14f * t) * (t > 0.02f ? 0.5f : 0f);
+            return click * 0.6f + scrape;
+        });
+
+        /// <summary>Magazine in: a solid clack.</summary>
+        public static AudioClip MagIn => _magIn != null ? _magIn : _magIn = Build("MagIn", 0.14f, t =>
+        {
+            float body = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(900f, 500f, t / 0.14f) * t) * Mathf.Exp(-40f * t);
+            float hit = (Mathf.PerlinNoise(t * 11000f, 0.8f) * 2f - 1f) * Mathf.Exp(-120f * t);
+            return body * 0.7f + hit * 0.8f;
+        });
+
+        /// <summary>Slide, pump or bolt: back and forward.</summary>
+        public static AudioClip Rack => _rack != null ? _rack : _rack = Build("Rack", 0.28f, t =>
+        {
+            float Clack(float at, float f) => t < at ? 0f : Mathf.Sin(2f * Mathf.PI * f * (t - at)) * Mathf.Exp(-70f * (t - at)) +
+                                              (Mathf.PerlinNoise((t - at) * 9000f, at) * 2f - 1f) * Mathf.Exp(-110f * (t - at)) * 0.6f;
+            return Clack(0f, 1400f) * 0.7f + Clack(0.13f, 1100f) * 0.8f;
+        });
+
+        /// <summary>A bullet thudding into something.</summary>
+        public static AudioClip BulletImpact
+        {
+            get
+            {
+                if (_impact != null) return _impact;
+                var rng = new System.Random(747);
+                float low = 0f;
+                return _impact = Build("BulletImpact", 0.12f, t =>
+                {
+                    float n = (float)(rng.NextDouble() * 2.0 - 1.0);
+                    low += (n - low) * 0.3f;
+                    return (low * 2f + n * 0.3f * Mathf.Exp(-120f * t)) * Mathf.Exp(-35f * t);
+                });
+            }
+        }
+
+        private static AudioClip Cloth(string name, float seconds, int seed, float pitch)
+        {
+            var rng = new System.Random(seed);
+            float low = 0f;
+            return Build(name, seconds, t =>
+            {
+                float n = (float)(rng.NextDouble() * 2.0 - 1.0);
+                low += (n - low) * 0.18f * pitch;
+                float env = Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / seconds));
+                return low * 1.6f * env;
+            });
+        }
 
         /// <summary>Cash register "ka-ching".</summary>
         public static AudioClip Cash => _cash != null ? _cash : _cash = Build("Cash", 0.6f, t =>

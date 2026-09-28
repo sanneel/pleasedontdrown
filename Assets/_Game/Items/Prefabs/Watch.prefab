@@ -326,6 +326,7 @@ MonoBehaviour:
     Ring: 0.9
     Pinky: 0.9
     Spread: 0
+  _rigidInHand: 0
 --- !u!114 &348659192442496857
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -40,6 +40,7 @@ namespace PleaseDontDrown.UI
             if (local == null || !GameInput.GameplayActive)
                 return;
 
+            if (Combat.Weapon.LocalScoped) return; // the scope fills the screen
             EnsureStyles();
             float cx = Screen.width * 0.5f;
             float cy = Screen.height * 0.5f;
@@ -48,7 +49,8 @@ namespace PleaseDontDrown.UI
             bool hovering = !string.IsNullOrEmpty(local.Interactor.CurrentPrompt) || !string.IsNullOrEmpty(secondary);
             float size = hovering ? 8f : 4f;
             GUI.color = hovering ? new Color(1f, 0.86f, 0.25f) : new Color(1f, 1f, 1f, 0.8f);
-            GUI.DrawTexture(new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size), _dot);
+            bool aimingGun = Combat.Weapon.Local != null && Combat.Weapon.Local.Aim > 0.5f; // the sights are the crosshair
+            if (!aimingGun) GUI.DrawTexture(new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size), _dot);
             GUI.color = Color.white;
 
             if (hovering)
@@ -74,6 +76,9 @@ namespace PleaseDontDrown.UI
                 string eat = food ? $"    hold <b>[{GameInput.KeyLabel(GameInput.Secondary)}]</b> to eat" : "";
                 var tool = hands.HeldItem.GetComponent<Combat.IHeldTool>();
                 string use = tool != null ? $"<b>[{throwKey}]</b> {tool.UseLabel}    hold <b>[{dropKey}]</b> to throw" : $"<b>[{throwKey}]</b> or hold <b>[{dropKey}]</b> to throw";
+                if (tool is Combat.Weapon)
+                    use = $"<b>[{throwKey}]</b> shoot    <b>[{GameInput.KeyLabel(GameInput.Secondary)}]</b> aim    <b>[{GameInput.KeyLabel(GameInput.Reload)}]</b> reload    " +
+                          $"<b>[{GameInput.KeyLabel(GameInput.Inspect)}]</b> inspect    hold <b>[{dropKey}]</b> to throw";
                 DrawShadowed(new Rect(cx - 500f, Screen.height - 112f, 1000f, 30f),
                     $"Holding <b>{hands.HeldItem.DisplayName}</b>    {use}    tap <b>[{dropKey}]</b> to drop{eat}", _prompt);
 

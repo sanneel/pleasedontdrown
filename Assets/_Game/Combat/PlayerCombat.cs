@@ -118,7 +118,7 @@ namespace PleaseDontDrown.Combat
             if ((target.transform.position - transform.position).sqrMagnitude > 4f * 4f) return;
             _lastServerPunch = Time.time;
             IDamageable damageable = target.GetComponent<IDamageable>();
-            damageable?.ServerTakeHit(1, DamageKind.Punch, _hub, point, dir);
+            damageable?.ServerTakeHit(Damage.Punch, DamageKind.Punch, _hub, point, dir);
             PunchFxObservers(point);
         }
 

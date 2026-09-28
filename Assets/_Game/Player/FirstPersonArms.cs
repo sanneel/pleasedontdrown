@@ -61,6 +61,7 @@ namespace PleaseDontDrown.Player
         private float _air;   // 0..1 airborne: hands fly up into view
         private AvatarGesture _gesture;
         private float _gestureStart = -10f;
+        private bool _rigidGrip; // holding a gun: hands stay exactly on it (it does its own kick)
         private Vector3 _reach;
         private float _lastPump = -10f;
         private Vector3 _pumpPoint;
@@ -165,6 +166,8 @@ namespace PleaseDontDrown.Player
         private void LateUpdate()
         {
             if (!_built || _hub == null) return;
+            // Looking through a scope: no arms in the picture.
+            if (_renderer != null) _renderer.forceRenderingOff = Combat.Weapon.LocalScoped;
             float dt = Mathf.Min(Time.deltaTime, 0.1f);
             Transform cam = _camera.transform;
             PlayerMotor motor = _hub.Motor;
@@ -184,6 +187,7 @@ namespace PleaseDontDrown.Player
             PlayerHands.GripKind kind = PlayerHands.GripKind.None;
             int itemId = 0;
             Item held = hands != null ? hands.HeldItem : null;
+            _rigidGrip = held != null && held.RigidInHand;
             if (held != null)
             {
                 kind = hands.GetGrip(out gripL, out gripR);
@@ -262,8 +266,8 @@ namespace PleaseDontDrown.Player
                 rot = grip.Rotation(side);
                 pose = grip.Pose;
                 blend = followThrown ? 0.05f : 0.16f;
-                // Tools kick: a pistol jumps up and back, the defibrillator's paddles push forward.
-                if (_gesture == AvatarGesture.Shoot && sinceGesture < 0.16f)
+                // Tools kick: the defibrillator's paddles push forward (guns kick by themselves).
+                if (_gesture == AvatarGesture.Shoot && sinceGesture < 0.16f && !_rigidGrip)
                     palm += (cam.up * 0.05f - cam.forward * 0.06f) * (1f - sinceGesture / 0.16f);
                 else if (_gesture == AvatarGesture.Zap && sinceGesture < 0.5f)
                     palm += (cam.forward * 0.18f - cam.up * 0.08f) * Mathf.Sin(sinceGesture / 0.5f * Mathf.PI);
@@ -390,7 +394,9 @@ namespace PleaseDontDrown.Player
             Vector3 palm = eye + Vector3.ClampMagnitude(hand.Palm - eye, MaxReach + 0.3f);
             // Resting, swimming, holding things: never into a wall (reaching, pressing and punching do touch it).
             var state = (State)(hand.Key & 15);
-            if (state is not (State.Reach or State.Cpr or State.Punch or State.Breath)) palm = KeepOutOfWalls(eye, palm);
+            // A gun pulls itself back from walls; its hands stay on it.
+            bool onGun = state == State.Item && _rigidGrip;
+            if (state is not (State.Reach or State.Cpr or State.Punch or State.Breath) && !onGun) palm = KeepOutOfWalls(eye, palm);
             hand.Wrist.SetPositionAndRotation(palm - hand.Rot * hand.Bones.PalmContact, hand.Rot);
             hand.Bones.Pose(hand.Pose);
         }

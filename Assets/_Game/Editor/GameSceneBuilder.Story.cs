@@ -120,29 +120,8 @@ namespace PleaseDontDrown.Editor
                 SetEnum(go.GetComponent<Item>(), "_grip", (int)ItemGrip.OneHand);
             });
 
-            yield return BuildItem("Pistol", "Pistol", 1f, new Vector3(0.2f, -0.2f, 0.5f), Vector3.zero, 1f, wood, root =>
-            {
-                Primitive(PrimitiveType.Cube, "Slide", root, new Vector3(0f, 0.02f, 0.02f), new Vector3(0.04f, 0.04f, 0.2f), gunMetal);
-                Primitive(PrimitiveType.Cube, "Grip", root, new Vector3(0f, -0.05f, -0.05f), new Vector3(0.035f, 0.11f, 0.05f), gunMetal).transform.localRotation = Quaternion.Euler(-12f, 0f, 0f);
-                Primitive(PrimitiveType.Cube, "Guard", root, new Vector3(0f, -0.015f, 0f), new Vector3(0.012f, 0.03f, 0.05f), gunMetal, keepCollider: false);
-            }, density: 1.5f, configure: go =>
-            {
-                Item item = go.GetComponent<Item>();
-                SetBool(item, "_pocketable", true);
-                SetEnum(item, "_grip", (int)ItemGrip.OneHand);
-                var muzzle = new GameObject("Muzzle").transform;
-                muzzle.SetParent(go.transform, false);
-                muzzle.localPosition = new Vector3(0f, 0.02f, 0.13f);
-                // Right hand wrapped round the grip: fingers forward, palm against its right side.
-                var grip = new GameObject("GripRight").transform;
-                grip.SetParent(go.transform, false);
-                grip.localPosition = new Vector3(0.035f, -0.055f, -0.05f);
-                grip.localRotation = Quaternion.LookRotation(Vector3.forward, Vector3.right);
-                SetRef(item, "_gripRight", grip);
-                var gun = go.AddComponent<Gun>();
-                SetRef(gun, "_muzzle", muzzle);
-                SetRef(gun, "_audio", SpatialAudio(go, 4f, 120f));
-            });
+            // Guns: pistol, SMG, shotgun, rifle, sniper (GameSceneBuilder.Weapons.cs).
+            foreach (Object gun in BuildWeapons(wood)) yield return gun;
 
             yield return BuildItem("Defibrillator", "Defibrillator", 2.5f, new Vector3(0.05f, -0.4f, 0.62f), Vector3.zero, 0.8f, wood, root =>
             {
@@ -717,11 +696,22 @@ namespace PleaseDontDrown.Editor
             var shopSo = new SerializedObject(reception);
             Require(shopSo, "_title").stringValue = "Grand Coral reception";
             SerializedProperty products = Require(shopSo, "_products");
-            products.arraySize = 1;
-            SerializedProperty pistol = products.GetArrayElementAtIndex(0);
-            pistol.FindPropertyRelative("Item").stringValue = "Pistol";
-            pistol.FindPropertyRelative("Price").intValue = 250;
-            pistol.FindPropertyRelative("Blurb").stringValue = "For when guests get attacked. Left mouse to shoot.";
+            (string item, int price, string blurb)[] stock =
+            {
+                ("Pistol", 250, "For when guests get attacked. Left mouse shoots, right mouse aims, R reloads."),
+                ("SMG", 600, "Sprays. Hold the trigger. 30 rounds."),
+                ("Shotgun", 700, "Eight pellets a shot. Knocks you back too."),
+                ("Rifle", 900, "Full auto, accurate when you aim. Takes a 4x scope."),
+                ("Sniper", 1200, "One shot, one pirate. 8x scope included."),
+            };
+            products.arraySize = stock.Length;
+            for (int i = 0; i < stock.Length; i++)
+            {
+                SerializedProperty product = products.GetArrayElementAtIndex(i);
+                product.FindPropertyRelative("Item").stringValue = stock[i].item;
+                product.FindPropertyRelative("Price").intValue = stock[i].price;
+                product.FindPropertyRelative("Blurb").stringValue = stock[i].blurb;
+            }
             shopSo.ApplyModifiedPropertiesWithoutUndo();
             ConfigureInteractable(deskGo.AddComponent<Interactable>(), new[] { deskGo.GetComponent<Collider>() }, new[] { deskGo.GetComponent<Renderer>() }, 3f);
             desk = deskGo.transform;

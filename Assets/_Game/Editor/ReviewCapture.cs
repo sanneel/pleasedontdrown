@@ -52,6 +52,22 @@ namespace PleaseDontDrown.Editor
                     SpawnAvatar(p);
                     continue;
                 }
+                if (p[0] == "item")
+                {
+                    // item <prefab> x y z yaw [child to switch on...]: e.g. a gun with its scope and suppressor showing.
+                    var prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Items/Prefabs/{p[1]}.prefab");
+                    if (prefab == null) { Debug.LogError($"[Review] no item {p[1]}"); continue; }
+                    GameObject item = Object.Instantiate(prefab, new Vector3(F(2), F(3), F(4)), Quaternion.Euler(0f, F(5), 0f));
+                    if (item.TryGetComponent(out Rigidbody body)) body.isKinematic = true;
+                    for (int k = 6; k < p.Length; k++)
+                    {
+                        bool on = !p[k].StartsWith("-");
+                        string part = p[k].TrimStart('-');
+                        foreach (Transform t in item.GetComponentsInChildren<Transform>(true))
+                            if (t.name == part) t.gameObject.SetActive(on);
+                    }
+                    continue;
+                }
                 RenderSettings.fog = p[1] != "top" && p[1] != "ortho"; // haze would hide a map view
                 if (p[1] == "ortho")
                 {

@@ -82,6 +82,7 @@ namespace PleaseDontDrown.Player
         public bool IsEating { get; private set; }
         public float EatProgress01 => _eatProgress;
         public bool IsCharging => _chargeSource != ChargeSource.None && Charge01 > 0f;
+
         public float Charge01 { get; private set; }
         /// <summary>The item we last threw, when, and how hard (first-person hands follow it out briefly).</summary>
         public Item LastThrown { get; private set; }
@@ -371,7 +372,14 @@ namespace PleaseDontDrown.Player
             UpdateEating(held);
             if (IsEating || HeldItem == null) return;
 
-            // Tools (pistol, defibrillator): Primary uses them; hold Drop to throw them instead.
+            // Guns handle their own trigger, sights and reload (Combat/Weapon); here only hold Drop to throw them.
+            if (held.TryGetComponent(out Combat.Weapon _))
+            {
+                if (_chargeSource == ChargeSource.None && GameInput.Drop.WasPressedThisFrame()) BeginCharge(ChargeSource.Drop);
+                if (_chargeSource == ChargeSource.None) return;
+            }
+
+            // Tools (defibrillator): Primary uses them; hold Drop to throw them instead.
             if (_chargeSource == ChargeSource.None && GameInput.Primary.WasPressedThisFrame() && held.TryGetComponent(out Combat.IHeldTool tool))
             {
                 if (held.IsConfirmedHolder(_hub)) tool.Use(_hub);
@@ -486,9 +494,20 @@ namespace PleaseDontDrown.Player
                 if (pocketed != null && pocketed.Sync.Body.isKinematic) pocketed.PlaceInHand(hip, pocketed.transform.rotation);
             }
 
-            // Remote holders: glue the held item to their (synced) head.
             Item item = HeldItem;
-            if (IsLocal || item == null) return;
+            if (item == null) return;
+            if (IsLocal)
+            {
+                // Guns sit rigidly in view (their own pose adds aim, sway and recoil).
+                if (item.RigidInHand && item.Sync.Body.isKinematic)
+                {
+                    GetHoldTarget(item, out Vector3 at, out Quaternion turned);
+                    item.PlaceInHand(at, turned);
+                }
+                return;
+            }
+
+            // Remote holders: glue the held item to their (synced) head.
             GetHoldTarget(item, out Vector3 target, out Quaternion rotation);
             float k = 1f - Mathf.Exp(-30f * Time.deltaTime);
             Vector3 current = item.transform.position;

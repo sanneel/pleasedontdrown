@@ -99,6 +99,7 @@ namespace PleaseDontDrown.Editor
             ConfigureProject();
             WriteBuildStamp();
             MeshyCharacters.BakeAll(); // generated character bodies (Sandy...) for AvatarRig
+            BuildProjectileMaterials(); // tracers and bullet holes (Resources)
             int outlineLayer = EnsureLayer(OutlineLayerName);
             SetupOutlineRendering(outlineLayer);
             BuildPlayerPrefab();
@@ -680,6 +681,7 @@ namespace PleaseDontDrown.Editor
             ui.AddComponent<ItemDebugView>();
             ui.AddComponent<RescueHud>();
             ui.AddComponent<Story.StoryHud>();
+            ui.AddComponent<WeaponHud>(); // ammo, crosshair spread, scope, hit markers
             ui.AddComponent<AvatarCustomizer>();
             BuildNetworkManager(playerPrefab, spawns);
             BakeNavMeshes(); // last: everything that blocks walking is in the scene now

@@ -233,7 +233,7 @@ namespace PleaseDontDrown.Story
                 spawn = victim.transform.position + away * 2.5f + Vector3.Cross(Vector3.up, away) * 1.5f;
             }
             else victim = SpawnNpc("Gloria", NpcRole.Guest, GuestLook(7171, 1), spawn + new Vector3(-3f, 0f, 2f), 90f);
-            StoryNpc robber = SpawnNpc("Robber", NpcRole.Robber, RobberLook, spawn, 90f, 3);
+            StoryNpc robber = SpawnNpc("Robber", NpcRole.Robber, RobberLook, spawn, 90f, 3 * Combat.Damage.Punch);
             victim.ServerSetPose(AvatarPose.Scared);
             victim.ServerSetMood(AvatarMood.Scared);
             victim.ServerShout("THIEF!! He's got my bag!", true);
@@ -437,7 +437,7 @@ namespace PleaseDontDrown.Story
             _island = _island1;
             Vector3 spawn = _island1.RobberSpawn != null ? _island1.RobberSpawn.position + new Vector3(55f, 0f, 5f) : new Vector3(25f, 0f, 25f);
             spawn.y = Shore.GroundHeightAt(spawn + Vector3.up * 5f) is var g && !float.IsNaN(g) ? g : 0f;
-            StoryNpc robber = SpawnNpc("Robber", NpcRole.Robber, RobberLook, spawn, -90f, 5);
+            StoryNpc robber = SpawnNpc("Robber", NpcRole.Robber, RobberLook, spawn, -90f, 5 * Combat.Damage.Punch);
             robber.ServerFlee(true, _island1.LandArea);
             robber.ServerShout("Vitamins! Cheap vitamins!", false);
             yield return new WaitForSeconds(1f);
@@ -642,7 +642,7 @@ namespace PleaseDontDrown.Story
             string[] names = { "Pirate Pete", "One-Eyed Olga", "Big Sal", "Salty Bill" };
             for (int i = 0; i < 4; i++)
             {
-                StoryNpc pirate = SpawnNpc(names[i], NpcRole.Pirate, PirateLook(i), _pirateBoatStart.position, 0f, 3);
+                StoryNpc pirate = SpawnNpc(names[i], NpcRole.Pirate, PirateLook(i), _pirateBoatStart.position, 0f, 100);
                 pirate.ServerRide(_pirateBoat, new Vector3(i % 2 == 0 ? -0.7f : 0.7f, 0.86f, 1.8f - i / 2 * 1.4f)); // on the fore deck
                 pirates.Add(pirate);
             }

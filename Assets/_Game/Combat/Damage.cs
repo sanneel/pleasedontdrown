@@ -24,6 +24,12 @@ namespace PleaseDontDrown.Combat
         void Use(PlayerHub holder);
     }
 
+    /// <summary>Health is on a 100 scale: a punch takes a quarter, guns do their own (see Weapon).</summary>
+    public static class Damage
+    {
+        public const int Punch = 25;
+    }
+
     public static class DamageUtil
     {
         /// <summary>The damageable a collider belongs to (colliders on children count).</summary>

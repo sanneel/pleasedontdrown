@@ -20,6 +20,9 @@ namespace PleaseDontDrown.Core
         public static InputAction Secondary { get; private set; }
         public static InputAction Drop { get; private set; }
         public static InputAction Emote { get; private set; }
+        /// <summary>Guns: reload / look the gun over.</summary>
+        public static InputAction Reload { get; private set; }
+        public static InputAction Inspect { get; private set; }
         /// <summary>Inventory slots 1-4.</summary>
         public static InputAction[] Slots { get; private set; }
         /// <summary>Mouse wheel (y) cycles slots.</summary>
@@ -69,6 +72,10 @@ namespace PleaseDontDrown.Core
             Drop.AddBinding("<Gamepad>/buttonNorth");
             Emote = _gameplay.AddAction("Emote", InputActionType.Button, "<Keyboard>/v");
             Emote.AddBinding("<Gamepad>/dpad/up");
+            Reload = _gameplay.AddAction("Reload", InputActionType.Button, "<Keyboard>/r");
+            Reload.AddBinding("<Gamepad>/rightShoulder");
+            Inspect = _gameplay.AddAction("Inspect", InputActionType.Button, "<Keyboard>/f");
+            Inspect.AddBinding("<Gamepad>/dpad/down");
             Slots = new InputAction[4];
             for (int i = 0; i < Slots.Length; i++)
                 Slots[i] = _gameplay.AddAction($"Slot{i + 1}", InputActionType.Button, $"<Keyboard>/{i + 1}");
