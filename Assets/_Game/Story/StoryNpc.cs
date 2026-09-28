@@ -20,6 +20,9 @@ namespace PleaseDontDrown.Story
 {
     public enum NpcRole : byte { Guide, Receptionist, Robber, Pirate, Bystander, Guest }
 
+    /// <summary>What a beach tourist is up to (host bookkeeping, used by BeachCrowd and NpcWatch).</summary>
+    public enum NpcActivity : byte { None, Sunbathe, Stroll, Wade, Swim, Chat, GoSwim, Return }
+
     /// <summary>
     /// A story character: Sandy, the receptionist, the robber, pirates, a guest shouting for help.
     ///
@@ -56,6 +59,7 @@ namespace PleaseDontDrown.Story
         private Vector3 _velocity;
         private float _talkUntil;
         private float _lookYaw;
+        private bool _swimPose;
         private GameObject _bag;
         private float _nextTalkRequest;
         private CapsuleCollider _bodyCollider;
@@ -76,8 +80,15 @@ namespace PleaseDontDrown.Story
         private int _pathIndex;
         private NavMeshPath _navPath;
         private float _stuckTime;
+        private float _progressBest;       // closest it has come to the current waypoint...
+        private float _progressSince;      // ...and when that last improved
         private int _replans;
+        private bool _allowWater;
+        private float _teleportedAt = -10f;
+        private string _gaveUp;
+        private float _nextUnstick;
         private readonly RaycastHit[] _sweepHits = new RaycastHit[12];
+        private readonly Collider[] _overlapHits = new Collider[12];
 
         public static IReadOnlyList<StoryNpc> All => _all;
         /// <summary>Host: a player pressed Interact on this character.</summary>
@@ -97,14 +108,36 @@ namespace PleaseDontDrown.Story
         public Vector3 HeadPosition => _pose.Value switch
         {
             AvatarPose.Down or AvatarPose.Lie or AvatarPose.LieFront => transform.position + Vector3.up * 0.3f,
-            AvatarPose.Sit => transform.position + Vector3.up * 1f,
+            AvatarPose.Sit => transform.position + Vector3.up * 1f - transform.forward * SitBack,
             AvatarPose.SitChair => transform.position + Vector3.up * 1.35f,
             AvatarPose.Kneel => transform.position + Vector3.up * 1.3f,
             _ => transform.position + Vector3.up * 1.75f
         };
         /// <summary>Treading water (in water deeper than it can stand in).</summary>
-        public bool IsSwimming => WaterSurface.Exists && WaterSurface.HeightAt(transform.position) - transform.position.y > 1.1f;
+        public bool IsSwimming => WaterSurface.Exists && WaterSurface.HeightAt(transform.position) - transform.position.y > SwimAbove;
+
+        /// <summary>
+        /// Swimming once the surface is this far above the feet. Walkers keep their feet on the bottom until the water is
+        /// <see cref="SwimDepth"/> deep, so the swim pose starts just before they lift off (not while still walking).
+        /// </summary>
+        private const float SwimAbove = 1.3f;
         public bool IsMoving => _moveTarget.HasValue;
+        public Vector3 MoveTarget => _moveTarget ?? transform.position;
+        public bool IsUpright => Upright(_pose.Value);
+        public Vehicle Ride => _ride;
+        /// <summary>Host: what a beach tourist is doing (set by BeachCrowd).</summary>
+        public NpcActivity Activity { get; set; }
+        /// <summary>Host: a route ended; true = arrived, false = gave up (blocked for good).</summary>
+        public event Action<StoryNpc, bool> ServerRouteEnded;
+        public bool ServerTeleportedSince(float time) => _teleportedAt >= time;
+
+        /// <summary>Host (tests): the last route it gave up on, once.</summary>
+        public bool TakeGaveUp(out string why)
+        {
+            why = _gaveUp;
+            _gaveUp = null;
+            return why != null;
+        }
         /// <summary>Host debugging: where along its route it is.</summary>
         public string PathInfo => _moveTarget.HasValue ? $"waypoint {_pathIndex + 1}/{_path.Count}" : "";
 
@@ -122,6 +155,7 @@ namespace PleaseDontDrown.Story
         {
             _all.Clear();
             _groundColliders.Clear();
+            _characterBodies.Clear();
             ServerTalked = null;
             ServerDefeated = null;
         }
@@ -160,11 +194,12 @@ namespace PleaseDontDrown.Story
                 case AvatarPose.Kneel:
                 case AvatarPose.SitChair:
                     float h = pose == AvatarPose.Sit ? 0.95f : 1.35f;
+                    float back = pose == AvatarPose.Sit ? -SitBack : 0f; // sitting on a towel: behind the feet (see SitBack)
                     _bodyCollider.direction = 1;
-                    _bodyCollider.center = new Vector3(0f, h * 0.5f, 0f);
+                    _bodyCollider.center = new Vector3(0f, h * 0.5f, back);
                     _bodyCollider.height = h;
                     _bodyCollider.radius = 0.3f;
-                    if (_headCollider != null) _headCollider.center = new Vector3(0f, h - 0.1f, 0f);
+                    if (_headCollider != null) _headCollider.center = new Vector3(0f, h - 0.1f, back);
                     break;
                 default:
                     _bodyCollider.direction = 1;
@@ -234,11 +269,14 @@ namespace PleaseDontDrown.Story
         public void ServerMoveTo(Vector3 target, bool run = false) => ServerMoveTo(target, run ? _runSpeed : _walkSpeed);
 
         /// <summary>Host: move at a given speed (m/s), e.g. a slow swim. Walks around obstacles on the navmesh.</summary>
+        /// <param name="water">May walk into (and swim through) deep water: beach tourists going for a swim. Story
+        /// characters leave it off, so a robber never runs into the sea.</param>
         [Server]
-        public void ServerMoveTo(Vector3 target, float speed)
+        public void ServerMoveTo(Vector3 target, float speed, bool water = false)
         {
             _moveTarget = target;
             _moveSpeed = Mathf.Max(0.1f, speed);
+            _allowWater = water;
             _replans = 0;
             PlanPath();
         }
@@ -252,9 +290,19 @@ namespace PleaseDontDrown.Story
             _path.Clear();
             _pathIndex = 0;
             _stuckTime = 0f;
+            _progressBest = float.MaxValue;
+            _progressSince = Time.time;
             if (!_moveTarget.HasValue) return;
             _navPath ??= new NavMeshPath();
             Vector3 target = _moveTarget.Value;
+            // Swimming from water to water: straight there if nothing's in the way (the navmesh lies on the seabed and
+            // would lead under the dock).
+            if (Shore.WaterDepthAt(transform.position + Vector3.up * 0.1f) > 1.1f && Shore.WaterDepthAt(target + Vector3.up * 0.1f) > 1.1f &&
+                SwimLineClear(transform.position, target))
+            {
+                _path.Add(target);
+                return;
+            }
             if (NavMesh.SamplePosition(transform.position, out NavMeshHit from, 10f, NavMesh.AllAreas) &&
                 NavMesh.SamplePosition(target, out NavMeshHit to, 10f, NavMesh.AllAreas) &&
                 NavMesh.CalculatePath(from.position, to.position, NavMesh.AllAreas, _navPath) &&
@@ -268,6 +316,29 @@ namespace PleaseDontDrown.Story
             if (_path.Count == 0) _path.Add(target);
         }
 
+        private static readonly RaycastHit[] _lineHits = new RaycastHit[16];
+
+        /// <summary>Can a swimmer go straight from a to b, head above water (no dock, post, rock or buoy in between)?</summary>
+        public static bool SwimLineClear(Vector3 a, Vector3 b)
+        {
+            if (!WaterSurface.Exists) return true;
+            Vector3 from = new Vector3(a.x, WaterSurface.HeightAt(a) - 0.35f, a.z), to = new Vector3(b.x, WaterSurface.HeightAt(b) - 0.35f, b.z);
+            Vector3 d = to - from;
+            float length = d.magnitude;
+            if (length < 0.05f) return true;
+            int n = Physics.SphereCastNonAlloc(from, 0.4f, d / length, _lineHits, length, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                Collider c = _lineHits[i].collider;
+                if (c.attachedRigidbody == null && !IsGround(c) && !(c is TerrainCollider)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Open water above this spot (not under a dock or a pier).</summary>
+        public static bool OpenSky(Vector3 p) =>
+            !WaterSurface.Exists || !Physics.Raycast(new Vector3(p.x, WaterSurface.HeightAt(p) - 0.6f, p.z), Vector3.up, 6f, ~0, QueryTriggerInteraction.Ignore);
+
         /// <summary>The nearest walkable spot (outside walls and trunks), same height handling as walking.</summary>
         public static Vector3 OnNavMesh(Vector3 position, float radius = 3f)
         {
@@ -275,7 +346,12 @@ namespace PleaseDontDrown.Story
             return new Vector3(hit.position.x, position.y, hit.position.z);
         }
 
-        [Server] public void ServerStop() => _moveTarget = null;
+        [Server]
+        public void ServerStop()
+        {
+            _moveTarget = null;
+            _path.Clear();
+        }
 
         /// <summary>Host: turn toward a point (null: face whoever is near).</summary>
         [Server] public void ServerFace(Vector3? point) => _facePoint = point;
@@ -286,6 +362,7 @@ namespace PleaseDontDrown.Story
             _moveTarget = null;
             _path.Clear();
             _ride = null;
+            _teleportedAt = Time.time;
             if (!keepExact) position = Grounded(OnNavMesh(position, 2f)); // never inside a wall or a trunk
             transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
         }
@@ -319,6 +396,21 @@ namespace PleaseDontDrown.Story
             FloatingText.Spawn(HeadPosition + Vector3.up * 0.4f, text, new Color(1f, 0.95f, 0.75f), 0.9f, 1.6f);
             if (cry && _audio != null) _audio.PlayOneShot(ProceduralAudio.Cry(_rig != null && _rig.Look.Feminine ? 3 : 1), 1f);
             OnSpeak(0.8f);
+        }
+
+        /// <summary>Host: say something (a speech line over the head; the mouth moves while it's up).</summary>
+        [Server]
+        public void ServerSay(string text, float seconds = 0f)
+        {
+            if (seconds <= 0f) seconds = Mathf.Clamp(1.2f + text.Length * 0.055f, 1.8f, 4.5f);
+            SayObservers(text, seconds);
+        }
+
+        [ObserversRpc]
+        private void SayObservers(string text, float seconds)
+        {
+            FloatingText.Spawn(HeadPosition + Vector3.up * 0.4f, text, SpeechColor, 0.75f, seconds);
+            OnSpeak(seconds * 0.8f);
         }
 
         // ------------------------------------------------------------------ talking
@@ -399,13 +491,18 @@ namespace PleaseDontDrown.Story
             // Idle: turn the head (and eventually the body) toward the nearest player.
             float yaw = transform.eulerAngles.y;
             var flatSpeed = new Vector2(_velocity.x, _velocity.z).magnitude;
-            if (flatSpeed < 0.3f && _pose.Value is AvatarPose.Normal or AvatarPose.Scared && NearestPlayer(6f) is { } near)
+            // (Only someone close and roughly in front: a lifeguard walking past behind two tourists chatting doesn't
+            // spin them round.)
+            if (flatSpeed < 0.3f && _pose.Value is AvatarPose.Normal or AvatarPose.Scared && NearestPlayer(4.5f) is { } near)
             {
                 Vector3 to = near.transform.position - transform.position;
-                if (to.sqrMagnitude > 0.01f) yaw = Quaternion.LookRotation(new Vector3(to.x, 0f, to.z)).eulerAngles.y;
+                to.y = 0f;
+                if (to.sqrMagnitude > 0.01f && Vector3.Angle(transform.forward, to) < 110f) yaw = Quaternion.LookRotation(to).eulerAngles.y;
             }
             _lookYaw = Mathf.LerpAngle(_lookYaw, yaw, 1f - Mathf.Exp(-6f * Time.deltaTime));
-            bool swimming = WaterSurface.Exists && WaterSurface.HeightAt(transform.position) - transform.position.y > 1.1f;
+            float submerged = WaterSurface.Exists ? WaterSurface.HeightAt(transform.position) - transform.position.y : 0f;
+            _swimPose = _swimPose ? submerged > SwimAbove - 0.12f : submerged > SwimAbove; // no flicker on a wave
+            bool swimming = _swimPose;
             _animator.Motion = new AvatarMotion
             {
                 Velocity = _pose.Value == AvatarPose.Normal || _pose.Value == AvatarPose.Scared ? _velocity : Vector3.zero,
@@ -477,6 +574,8 @@ namespace PleaseDontDrown.Story
                 return;
             }
 
+            Unstick();
+            p = transform.position;
             if (_moveTarget.HasValue && _pose.Value is AvatarPose.Normal or AvatarPose.Scared)
                 FollowPath(p, dt);
             if (!_moveTarget.HasValue && _facePoint.HasValue)
@@ -489,11 +588,11 @@ namespace PleaseDontDrown.Story
         /// <summary>Don't stand inside each other (a gang of pirates spreads out around their target).</summary>
         private void Separate(float dt)
         {
-            if (!IsUpright(_pose.Value)) return;
+            if (!Upright(_pose.Value)) return;
             Vector3 p = transform.position, push = Vector3.zero;
             foreach (StoryNpc other in _all)
             {
-                if (other == this || other._ride != null || !IsUpright(other._pose.Value)) continue;
+                if (other == this || other._ride != null || !Upright(other._pose.Value)) continue;
                 Vector3 d = p - other.transform.position;
                 d.y = 0f;
                 float distance = d.magnitude;
@@ -504,6 +603,18 @@ namespace PleaseDontDrown.Story
             if (push.sqrMagnitude > 1e-6f) transform.position = Grounded(MoveChecked(p, Vector3.ClampMagnitude(push, 1f) * Mathf.Min(1f, dt * 6f)));
         }
 
+        private void EndRoute(bool arrived, string why = null)
+        {
+            _moveTarget = null;
+            _path.Clear();
+            if (!arrived)
+            {
+                _gaveUp = why;
+                Debug.Log($"[Npc] {Name} gave up walking: {why}");
+            }
+            ServerRouteEnded?.Invoke(this, arrived);
+        }
+
         private void FollowPath(Vector3 p, float dt)
         {
             if (_path.Count == 0) PlanPath();
@@ -511,41 +622,136 @@ namespace PleaseDontDrown.Story
             Vector3 to = waypoint - p;
             to.y = 0f;
             float distance = to.magnitude;
-            if (distance < 0.2f)
+            bool last = _pathIndex >= _path.Count - 1;
+            // Corners are passed a little early (no stop-and-turn at each one); the destination is reached exactly.
+            if (distance < (last ? 0.15f : Mathf.Clamp(_moveSpeed * 0.25f, 0.2f, 0.6f)))
             {
-                if (++_pathIndex >= _path.Count)
-                {
-                    _moveTarget = null; // arrived (or as close as the navmesh gets)
-                    _path.Clear();
-                }
+                if (++_pathIndex >= _path.Count) EndRoute(true); // arrived (or as close as the navmesh gets)
+                _progressBest = float.MaxValue;
+                _progressSince = Time.time;
                 return;
             }
 
-            Vector3 step = to / distance * Mathf.Min(distance, _moveSpeed * dt);
+            // Ease into the destination instead of stopping dead.
+            float speed = last ? Mathf.Min(_moveSpeed, 0.6f + distance * 1.5f) : _moveSpeed;
+            Vector3 dir = Avoid(p, to / distance);
+            Vector3 step = dir * Mathf.Min(distance, speed * dt);
             Vector3 moved = MoveChecked(p, step);
             Vector3 next = Grounded(moved);
-            // Story characters don't wander into deep water (the robber would drown on us).
-            if (Shore.WaterDepthAt(next + Vector3.up * 0.1f) < 0.5f || Shore.WaterDepthAt(p) >= 0.5f)
+            // Story characters don't wander into deep water (the robber would drown on us); beach tourists may.
+            if (_allowWater || Shore.WaterDepthAt(next + Vector3.up * 0.1f) < 0.5f || Shore.WaterDepthAt(p) >= 0.5f)
                 transform.position = next;
             else
             {
-                _moveTarget = null;
-                _path.Clear();
+                EndRoute(false, "the way goes into deep water");
+                return;
             }
-            Face(step, dt, 10f);
+            // Turn toward where we're heading (toward the next corner when close to this one, so turns are rounded).
+            Vector3 heading = step;
+            if (!last && distance < 1f)
+            {
+                Vector3 after = _path[_pathIndex + 1] - p;
+                after.y = 0f;
+                if (after.sqrMagnitude > 1e-4f) heading = Vector3.Lerp(after.normalized, step.normalized, distance);
+            }
+            Face(heading, dt, 8f);
 
-            // Pinned against something the path didn't know about (a player, a parked jet ski): plan again, then give up.
+            // Pinned against something the path didn't know about (a player, a tourist, a parked jet ski): plan again,
+            // then step aside, and only then give up (whoever sent it picks something else to do).
             bool progressed = (new Vector2(moved.x - p.x, moved.z - p.z)).sqrMagnitude > step.sqrMagnitude * 0.09f;
             _stuckTime = progressed ? 0f : _stuckTime + dt;
-            if (_stuckTime > 0.8f && _moveTarget.HasValue)
+            // Also stuck: moving but not getting any closer (pushed back and forth, circling a corner).
+            if (distance < _progressBest - 0.25f)
             {
-                if (++_replans > 3)
-                {
-                    _moveTarget = null;
-                    _path.Clear();
-                }
-                else PlanPath();
+                _progressBest = distance;
+                _progressSince = Time.time;
             }
+            if (Time.time - _progressSince > 2.5f + 1.5f / Mathf.Max(0.3f, _moveSpeed))
+            {
+                _stuckTime = 1f;
+                _progressBest = distance;
+                _progressSince = Time.time;
+            }
+            if (_stuckTime > 0.7f && _moveTarget.HasValue)
+            {
+                // Blocked right next to the destination (someone standing on it): that's close enough.
+                Vector3 left = _moveTarget.Value - p;
+                left.y = 0f;
+                if (left.magnitude < 1.5f)
+                {
+                    EndRoute(true);
+                    return;
+                }
+                _replans++;
+                if (_replans > 6) EndRoute(false, $"blocked at {p:F1} on the way to {_moveTarget.Value:F1}");
+                else if (_replans % 2 == 1) PlanPath();
+                else SideStep(p, step);
+                _stuckTime = 0f;
+            }
+        }
+
+        /// <summary>
+        /// Walking into someone: veer off to the side they're not on (two people meeting head-on both keep right), more
+        /// the closer and more squarely in front they are.
+        /// </summary>
+        private Vector3 Avoid(Vector3 p, Vector3 dir)
+        {
+            Vector3 right = Vector3.Cross(Vector3.up, dir);
+            Vector3 avoid = Vector3.zero;
+            foreach (StoryNpc other in _all)
+            {
+                if (other == this || other._ride != null || !Upright(other._pose.Value)) continue;
+                Vector3 d = other.transform.position - p;
+                d.y = 0f;
+                float distance = d.magnitude;
+                if (distance > 1.8f || distance < 0.01f) continue;
+                float ahead = Vector3.Dot(d / distance, dir);
+                if (ahead < 0.2f) continue;
+                float side = Vector3.Dot(d, right);
+                float away = Mathf.Abs(side) < 0.05f ? 1f : -Mathf.Sign(side); // dead ahead: keep right
+                avoid += right * (away * ahead * (1.8f - distance) / 1.8f);
+            }
+            if (avoid.sqrMagnitude < 1e-6f) return dir;
+            Vector3 steered = dir + avoid * 1.6f;
+            steered.y = 0f;
+            return steered.sqrMagnitude > 1e-6f ? steered.normalized : dir;
+        }
+
+        /// <summary>Blocked: put a detour point to one side (whichever is free) at the front of the route.</summary>
+        private void SideStep(Vector3 p, Vector3 step)
+        {
+            Vector3 forward = step.sqrMagnitude > 1e-8f ? step.normalized : transform.forward;
+            Vector3 side = Vector3.Cross(Vector3.up, forward);
+            foreach (float sign in Random.value < 0.5f ? new[] { 1f, -1f } : new[] { -1f, 1f })
+                for (float d = 0.8f; d <= 2.4f; d += 0.8f)
+                {
+                    Vector3 dir = (side * sign + forward * 0.3f).normalized;
+                    if (ObstacleAhead(p, dir, d, out _)) continue;
+                    Vector3 detour = p + dir * d;
+                    if (NavMesh.SamplePosition(detour, out NavMeshHit hit, 0.6f, NavMesh.AllAreas)) detour = new Vector3(hit.position.x, detour.y, hit.position.z);
+                    _path.Insert(Mathf.Min(_pathIndex, _path.Count), detour);
+                    return;
+                }
+            PlanPath();
+        }
+
+        /// <summary>Standing inside something solid (spawned there, knocked into it): step out of it.</summary>
+        private void Unstick()
+        {
+            if (_bodyCollider == null || Time.time < _nextUnstick || !Upright(_pose.Value)) return;
+            _nextUnstick = Time.time + 0.2f;
+            Vector3 p = transform.position;
+            int n = Physics.OverlapCapsuleNonAlloc(p + Vector3.up * 0.55f, p + Vector3.up * 1.5f, 0.24f, _overlapHits, ~0, QueryTriggerInteraction.Ignore);
+            Vector3 push = Vector3.zero;
+            for (int i = 0; i < n; i++)
+            {
+                Collider c = _overlapHits[i];
+                if (c == _bodyCollider || c == _headCollider || c.attachedRigidbody != null || IsGround(c) || c is TerrainCollider) continue;
+                if (c.bounds.max.y <= p.y + StepHeight) continue; // a step being climbed (dock deck), not a wall
+                if (Physics.ComputePenetration(_bodyCollider, p, transform.rotation, c, c.transform.position, c.transform.rotation, out Vector3 dir, out float depth))
+                    push += new Vector3(dir.x, 0f, dir.z) * depth;
+            }
+            if (push.sqrMagnitude > 1e-6f) transform.position = Grounded(p + Vector3.ClampMagnitude(push * 1.05f, 0.5f));
         }
 
         /// <summary>
@@ -585,13 +791,25 @@ namespace PleaseDontDrown.Story
                 Collider c = h.collider;
                 Rigidbody body = c.attachedRigidbody;
                 if (IsGround(c) || (body != null && (body == _rigidbody || (_ride != null && body == _ride.Body)))) continue; // ourselves, our boat
+                if (body == null && c.bounds.max.y <= p.y + StepHeight) continue; // a step up (dock deck, kerb): Grounded climbs it
+                if (body != null && IsCharacter(body)) continue;                   // other characters: steered round (Avoid)
                 bestDistance = h.distance;
                 best = h;
             }
             return bestDistance < float.MaxValue;
         }
 
+        /// <summary>Static edges up to this high are stepped onto (a dock deck from low sand is ~0.5 m).</summary>
+        private const float StepHeight = 0.6f;
+
         private static readonly Dictionary<Collider, bool> _groundColliders = new();
+        private static readonly Dictionary<Rigidbody, bool> _characterBodies = new();
+
+        private static bool IsCharacter(Rigidbody body)
+        {
+            if (!_characterBodies.TryGetValue(body, out bool yes)) _characterBodies[body] = yes = body.GetComponent<StoryNpc>() != null;
+            return yes;
+        }
 
         /// <summary>The island terrain (dunes, seabed slopes) is walked on, never a wall.</summary>
         private static bool IsGround(Collider c)
@@ -601,7 +819,50 @@ namespace PleaseDontDrown.Story
             return ground;
         }
 
-        private static bool IsUpright(AvatarPose pose) => pose is AvatarPose.Normal or AvatarPose.Scared or AvatarPose.HandsUp;
+        private static bool Upright(AvatarPose pose) => pose is AvatarPose.Normal or AvatarPose.Scared or AvatarPose.HandsUp;
+
+        /// <summary>
+        /// Sitting on a towel, the hips are this far behind the feet (the character's root): lying on the back, on the
+        /// belly and sitting up all share one root, so turning over or getting up never makes the body jump.
+        /// </summary>
+        public const float SitBack = AvatarAnimator.SitBack;
+
+        /// <summary>Host (tests): joints where they can't be (stretched limbs, head under the hips while standing, feet off the ground).</summary>
+        public bool BodyProblem(out string what)
+        {
+            what = null;
+            if (_rig == null || !_rig.IsBuilt) return false;
+            Transform hips = _rig[AvatarRig.Bone.Hips], head = _rig[AvatarRig.Bone.Head];
+            if (float.IsNaN(hips.position.x) || float.IsNaN(head.position.x)) what = "NaN joint positions";
+            else if (Upright(_pose.Value) && !_swimPose && head.position.y < hips.position.y + 0.25f * _rig.Scale)
+                what = $"head {hips.position.y - head.position.y:F2} m below the hips while upright";
+            else
+            {
+                float arm = (_rig.UpperArmLength + _rig.ForearmLength + _rig.HandLength) * 1.2f + 0.02f;
+                float leg = (_rig.ThighLength + _rig.ShinLength) * 1.2f + 0.02f;
+                (AvatarRig.Bone a, AvatarRig.Bone b, float max, string limb)[] limbs =
+                {
+                    (AvatarRig.Bone.UpperArmL, AvatarRig.Bone.HandL, arm, "left arm"), (AvatarRig.Bone.UpperArmR, AvatarRig.Bone.HandR, arm, "right arm"),
+                    (AvatarRig.Bone.ThighL, AvatarRig.Bone.FootL, leg, "left leg"), (AvatarRig.Bone.ThighR, AvatarRig.Bone.FootR, leg, "right leg")
+                };
+                foreach (var (a, b, max, limb) in limbs)
+                {
+                    float d = Vector3.Distance(_rig[a].position, _rig[b].position);
+                    if (d > max)
+                    {
+                        what = $"{limb} stretched to {d:F2} m (max {max:F2})";
+                        break;
+                    }
+                }
+                if (what == null && Upright(_pose.Value) && !_swimPose && _ride == null)
+                {
+                    float lowest = Mathf.Min(_rig[AvatarRig.Bone.FootL].position.y, _rig[AvatarRig.Bone.FootR].position.y) - transform.position.y;
+                    if (lowest > 0.35f) what = $"both feet {lowest:F2} m off the ground";
+                    else if (lowest < -0.2f) what = $"a foot {-lowest:F2} m into the ground";
+                }
+            }
+            return what != null;
+        }
 
         private void Face(Vector3 direction, float dt, float rate)
         {

@@ -51,6 +51,13 @@ namespace PleaseDontDrown.Avatars
 
         public AvatarMotion Motion;
 
+        /// <summary>
+        /// Sitting on a towel (<see cref="AvatarPose.Sit"/>), the hips sit this far behind the character's root. Lying
+        /// poses have the feet at the root and the body behind it, so all towel poses share one root: turning over or
+        /// sitting up blends in place instead of jumping.
+        /// </summary>
+        public const float SitBack = 0.8f;
+
         private float _phase;
         private float _swimPhase;
         private float _bodyYaw;
@@ -200,15 +207,17 @@ namespace PleaseDontDrown.Avatars
             // Swimming: lie forward (crawl), stand up to tread water, follow the look direction underwater.
             float swimPitch = Mathf.Lerp(Mathf.Lerp(8f, 72f, _swimMove), Mathf.Clamp(90f + Motion.LookPitch, 10f, 170f) * _swimMove + 12f * (1f - _swimMove), _under);
             float lift = _swim * Mathf.Lerp(0.18f, 0.32f, _swimMove * (1f - _under)) * s;
+            float stroke = Wave(_swimPhase) * _swim * _swimMove * (1f - _under);
+            float swimBob = Mathf.Sin(_swimPhase * Mathf.PI * 4f) * 0.025f * s * _swim * _swimMove;
 
             Transform hips = B(Bone.Hips);
-            hips.localPosition = _rig.RestPosition(Bone.Hips) + new Vector3(0f, stepBob - drop - pumpDip + lift + breathe, 0f);
+            hips.localPosition = _rig.RestPosition(Bone.Hips) + new Vector3(0f, stepBob - drop - pumpDip + lift + breathe + swimBob, 0f);
             float lean = (4f + 9f * _run) * _move * land + _crouch * 18f * land + _cpr * 34f + _air * -6f;
-            hips.localRotation = Quaternion.Euler(lean * 0.35f + swimPitch * _swim, Wave(_phase) * 4f * _move * land, 0f);
+            hips.localRotation = Quaternion.Euler(lean * 0.35f + swimPitch * _swim, Wave(_phase) * 4f * _move * land, stroke * 7f);
 
-            B(Bone.Spine).localRotation = Quaternion.Euler(lean * 0.35f + Mathf.Sin(Now * 1.7f) * 1.2f, -Wave(_phase) * 5f * _move * land, 0f);
+            B(Bone.Spine).localRotation = Quaternion.Euler(lean * 0.35f + Mathf.Sin(Now * 1.7f) * 1.2f, -Wave(_phase) * 5f * _move * land, -stroke * 2.5f);
             // The chest takes a share of looking around (before the arms, which hang off it).
-            B(Bone.Chest).localRotation = Quaternion.Euler(lean * 0.3f + LookPitch * 0.15f, -Wave(_phase) * 5f * _move * land + LookYaw * 0.25f, 0f);
+            B(Bone.Chest).localRotation = Quaternion.Euler(lean * 0.3f + LookPitch * 0.15f, -Wave(_phase) * 5f * _move * land + LookYaw * 0.25f, stroke * 1.5f);
         }
 
         private float LookYaw => Mathf.Clamp(Mathf.DeltaAngle(_bodyYaw, Motion.FacingYaw), -85f, 85f);
@@ -231,10 +240,10 @@ namespace PleaseDontDrown.Avatars
             if (_swim > 0.01f)
             {
                 // FK kicks: fast flutter while swimming, slow bicycling while treading water, frog kick underwater.
-                float flutter = Mathf.Sin((_swimPhase * 4f + offset * 2f) * Mathf.PI * 2f) * 18f;
+                float flutter = Mathf.Sin((_swimPhase * 4f + offset) * Mathf.PI * 2f) * 24f;
                 float bike = Mathf.Sin((_swimPhase + offset) * Mathf.PI * 2f);
                 float thighX = Mathf.Lerp(-35f * Mathf.Max(0f, bike) - 10f, flutter, _swimMove);
-                float kneeBend = Mathf.Lerp(40f + 40f * Mathf.Max(0f, bike), 12f + flutter * 0.3f, _swimMove);
+                float kneeBend = Mathf.Lerp(40f + 40f * Mathf.Max(0f, bike), 12f + Mathf.Max(0f, -flutter) * 0.5f, _swimMove);
                 float frog = Mathf.Max(0f, Mathf.Sin(_swimPhase * Mathf.PI * 2f));
                 thighX = Mathf.Lerp(thighX, -30f * frog, _under);
                 kneeBend = Mathf.Lerp(kneeBend, 90f * frog + 5f, _under);
@@ -654,7 +663,7 @@ namespace PleaseDontDrown.Avatars
             if (_sit > 0.01f)
             {
                 float w = _sit;
-                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.14f * s, 0f), w);
+                hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.14f * s, -SitBack), w);
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(-14f, 0f, 0f), w);
                 B(Bone.Spine).localRotation = Quaternion.Slerp(B(Bone.Spine).localRotation, Quaternion.Euler(4f, 0f, 0f), w);
                 upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(38f, 0f, -16f), w);

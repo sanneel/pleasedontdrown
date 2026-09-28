@@ -377,6 +377,22 @@ namespace PleaseDontDrown.Editor
                 var sources = new List<NavMeshBuildSource>();
                 UnityEngine.AI.NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.PhysicsColliders, 0, new List<NavMeshBuildMarkup>(), sources);
                 sources.RemoveAll(s => s.component is Collider c && (c.attachedRigidbody != null || c.isTrigger));
+                // Under a dock (the seabed between the posts) is off limits: swimmers and waders used to be routed
+                // through there with their heads in the planks. The deck itself stays walkable (it's above the box).
+                foreach (Collider deck in Object.FindObjectsByType<Collider>(FindObjectsSortMode.None))
+                {
+                    if (deck.name != "Deck" || deck.transform.parent == null || !deck.transform.parent.name.Contains("Dock")) continue;
+                    if (!bounds.Intersects(deck.bounds)) continue;
+                    Bounds under = deck.bounds;
+                    float bottom = under.min.y - 0.02f;
+                    sources.Add(new NavMeshBuildSource
+                    {
+                        shape = NavMeshBuildSourceShape.ModifierBox,
+                        area = 1, // Not Walkable
+                        transform = Matrix4x4.TRS(new Vector3(under.center.x, bottom - 4f, under.center.z), Quaternion.identity, Vector3.one),
+                        size = new Vector3(under.size.x + 0.8f, 8f, under.size.z + 0.8f)
+                    });
+                }
                 NavMeshData data = UnityEngine.AI.NavMeshBuilder.BuildNavMeshData(settings, sources, bounds, Vector3.zero, Quaternion.identity);
                 data.name = $"NavMesh_{name}";
                 string path = $"{NavMeshDir}/{name}.asset";

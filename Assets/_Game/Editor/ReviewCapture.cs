@@ -139,6 +139,16 @@ namespace PleaseDontDrown.Editor
             var animator = go.AddComponent<AvatarAnimator>();
             animator.Rig = rig;
             string pose = p.Length > 6 ? p[6] : "idle";
+            // "from>to@seconds": held in one pose, then caught that long into blending to the next (e.g. lie>sit@0.3).
+            string blendTo = null;
+            float blendTime = 0f;
+            if (pose.Contains(">"))
+            {
+                string[] parts = pose.Split('>', '@');
+                pose = parts[0];
+                blendTo = parts[1];
+                blendTime = parts.Length > 2 ? float.Parse(parts[2], CultureInfo.InvariantCulture) : 2f;
+            }
             float yaw = F(5);
             Vector3 forward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
             go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
@@ -172,8 +182,8 @@ namespace PleaseDontDrown.Editor
                 case "handsup": m.Pose = AvatarPose.HandsUp; break;
                 case "seated": m.Seated = true; break;
                 case "sitchair": m.Pose = AvatarPose.SitChair; break;
-                case "lie": m.Pose = AvatarPose.Lie; break;
                 case "happy": m.Mood = AvatarMood.Happy; m.Talking = true; break;
+                default: if (PoseByName(pose) is { } held) m.Pose = held; break;
             }
             animator.Motion = m;
             // Face the camera first, so grips computed from "right" below are the avatar's right.
@@ -182,6 +192,16 @@ namespace PleaseDontDrown.Editor
             {
                 AvatarAnimator.TimeOverride = 100f + i / 30f;
                 animator.Tick(1f / 30f);
+            }
+            if (blendTo != null && PoseByName(blendTo) is { } next)
+            {
+                m.Pose = next;
+                animator.Motion = m;
+                for (int i = 0; i < Mathf.RoundToInt(blendTime * 30f); i++)
+                {
+                    AvatarAnimator.TimeOverride = 103f + i / 30f;
+                    animator.Tick(1f / 30f);
+                }
             }
             AvatarGesture gesture = pose switch { "throw" => AvatarGesture.Throw, "wave" => AvatarGesture.Wave, "interact" => AvatarGesture.Interact, _ => AvatarGesture.None };
             if (gesture != AvatarGesture.None)
@@ -192,6 +212,20 @@ namespace PleaseDontDrown.Editor
             }
             AvatarAnimator.TimeOverride = null;
         }
+
+        private static AvatarPose? PoseByName(string name) => name switch
+        {
+            "idle" or "normal" => AvatarPose.Normal,
+            "lie" => AvatarPose.Lie,
+            "liefront" => AvatarPose.LieFront,
+            "sit" => AvatarPose.Sit,
+            "sitchair" => AvatarPose.SitChair,
+            "kneel" => AvatarPose.Kneel,
+            "down" => AvatarPose.Down,
+            "scared" => AvatarPose.Scared,
+            "handsup" => AvatarPose.HandsUp,
+            _ => null
+        };
 
         private static void Render(Camera camera, string name)
         {
