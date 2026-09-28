@@ -6,6 +6,7 @@ blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- <in.glb>
   --tris 22000             triangle budget after decimation
   --texture 2048           largest texture size
   --bust 1                 women: add BustL/BustR spring bones (the game jiggles them, e.g. during CPR)
+  --armband 0.045          shoulders: how far past the armpit line the arm's pull fades in (at 1.8 m tall)
   --preview <prefix>       also render front/side pictures with the skeleton drawn in
 
 What it does: keeps one figure (drops other figures and floating text), stands it on the origin facing -Y
@@ -28,7 +29,7 @@ from mathutils.kdtree import KDTree
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, DST = argv[0], argv[1]
-opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'preview': ''}
+opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'preview': ''}
 i = 2
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -384,27 +385,37 @@ for vert in body.data.vertices if opts['armclamp'] else []:
     cleared += 1
 log(f'{cleared} torso vertices freed from the arms')
 
-# The upper chest (armpit height up to the shoulders, the front half, inside the torso): the bust and the top live
-# here, so raising the arms over the head (lying, waving, swimming) must not drag it along. The arm weight fades out
-# toward the middle; the shoulder edges keep theirs so the shoulders still bend smoothly.
-below = [q for q in runs(max(0, armpit_row - 4)) if col_x(q[0]) <= 0.0 <= col_x(q[1])]
-chest_half = (col_x(below[0][1]) - col_x(below[0][0])) / 2 if below else 0.15 * unit
-front_y = joints['Chest'][1]
+# Above that (armpit height and up), the arm only owns what is outside a line from the armpit crease up to the top of
+# the shoulder, fading in over a few centimetres. Everything inside the line (the upper chest, the bust and the top
+# on it, the shoulder blades) stays on the chest: arms raised over the head (lying, hands up, swimming) stretch the
+# armpit instead of dragging the bust and the top's corners out with them. Big busts often reach the armpit line, so
+# a softer rule (heat weights fading toward the middle) still left the outer half of the breasts on the arms.
+def smooth(u):
+    u = min(1.0, max(0.0, u))
+    return u * u * (3.0 - 2.0 * u)
+
+
+mid = [q for q in runs(max(0, armpit_row - 1)) if col_x(q[0]) <= 0.0 <= col_x(q[1])]
+band = opts['armband'] * unit  # the fade outward from the line; wider softens the shoulders with the arms down
+inner = opts['armin'] * unit  # start the fade this far inside the line (more lets raised arms flare a top again)
+crease = {}
+for side, sign in (('L', 1.0), ('R', -1.0)):
+    joint_x = abs(joints['UpperArm' + side][0])
+    edge = (col_x(mid[0][1]) if sign > 0 else -col_x(mid[0][0])) if mid else joint_x - 0.03 * unit
+    bottom_x = min(edge, joint_x - 0.015 * unit)
+    crease[sign] = (bottom_x, joint_x - 0.02 * unit)
+    log(f'arm line {side}: {bottom_x:.3f} at the armpit to {joint_x - 0.02 * unit:.3f} at the shoulder (joint {joint_x:.3f})')
+top_z = shoulder_z + 0.05 * unit
 eased = 0
 for vert in body.data.vertices if opts['armclamp'] else []:
     x, y, z = vert.co
-    if not (armpit_z - 0.03 <= z <= shoulder_z + 0.04) or y > front_y or abs(x) > 1.05 * chest_half:
+    if z < armpit_z - 0.03:
         continue
-    def smooth(u):
-        u = min(1.0, max(0.0, u))
-        return u * u * (3.0 - 2.0 * u)
-    lateral = smooth((abs(x) - 0.75 * chest_half) / (0.3 * chest_half))  # 0 mid-chest, 1 at the shoulder edge
-    v_ = (z - (armpit_z - 0.03)) / max(1e-3, shoulder_z + 0.04 - (armpit_z - 0.03))
-    # Blends into the full clamp below (at the armpits) and back to the heat weights above (collarbones): no seams.
-    keep = lateral * smooth(v_ / 0.4)
-    keep += (1.0 - keep) * smooth((v_ - 0.6) / 0.4)
-    arm_w = sum(g.weight for g in vert.groups if g.group in arm_groups)
-    if arm_w <= 0.0:
+    bottom_x, top_x = crease[1.0 if x >= 0 else -1.0]
+    u = min(1.0, max(0.0, (z - armpit_z) / max(1e-3, top_z - armpit_z)))
+    line_x = bottom_x + (top_x - bottom_x) * u
+    keep = smooth((abs(x) - line_x + inner) / band)
+    if keep >= 1.0 or sum(g.weight for g in vert.groups if g.group in arm_groups) <= 0.0:
         continue
     for g in vert.groups:
         if g.group in arm_groups:
@@ -412,7 +423,7 @@ for vert in body.data.vertices if opts['armclamp'] else []:
     if sum(g.weight for g in vert.groups) < 1e-4:
         body.vertex_groups['Chest'].add([vert.index], 1.0, 'REPLACE')
     eased += 1
-log(f'{eased} upper-chest vertices eased off the arms')
+log(f'{eased} upper-body vertices kept off the arms inside the armpit line')
 
 if opts['bust']:
     bpy.context.view_layer.objects.active = rig
