@@ -168,8 +168,10 @@ jet ski, boat, kiosk and hotel are primitives in `GameSceneBuilder.Story.cs`.
 
 **Known limits.**
 * NPCs follow a navmesh baked per island by the builder (`Assets/_Game/Data/Navigation`, `NavMeshLoader`), and every
-  step is also checked against static colliders so they slide along walls (knockbacks and pushes too). Things that
-  move (players, items, vehicles) aren't in the navmesh: an NPC pinned by one re-plans, then gives up.
+  step is also checked (capsule sweep) against walls and against things that move: lifeguards, items, vehicles,
+  tourists and other characters; they slide round them (knockbacks and pushes too). Crates, coolers, vehicles and
+  tourists carry a `NavMeshObstacle` that carves the navmesh while they stand still, so routes go round a parked jet
+  ski or a tourist lying on the sand. An NPC pinned for a while re-plans, then gives up.
 * Players can't be hurt by pirates beyond knockback (the design keeps failure light).
 * One save slot, host only. A client that joins mid-chapter-2 spawns on island 1 (`goto`/`tp` or the next beat moves them).
 * Dialogue auto-advances; no choices yet.

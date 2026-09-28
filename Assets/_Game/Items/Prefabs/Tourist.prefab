@@ -574,6 +574,7 @@ GameObject:
   - component: {fileID: 7793420296876453761}
   - component: {fileID: 945792021091734970}
   - component: {fileID: 6499911066142142861}
+  - component: {fileID: 8793790014098204945}
   - component: {fileID: 6295726673578978674}
   m_Layer: 0
   m_Name: Tourist
@@ -895,6 +896,22 @@ MonoBehaviour:
   _punchGain: 0.2
   _celebrateSeconds: 4
   _leaveAfterSeconds: 45
+--- !u!208 &8793790014098204945
+NavMeshObstacle:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8989603711930392819}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Shape: 1
+  m_Extents: {x: 0.375, y: 1.05, z: 0.325}
+  m_MoveThreshold: 0.3
+  m_Carve: 1
+  m_CarveOnlyStationary: 1
+  m_Center: {x: 0, y: -0.25, z: 0}
+  m_TimeToStationary: 0.8
 --- !u!82 &6295726673578978674
 AudioSource:
   m_ObjectHideFlags: 0

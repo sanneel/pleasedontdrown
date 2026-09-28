@@ -60,6 +60,7 @@ namespace PleaseDontDrown.Story
         private float _nextTalkRequest;
         private CapsuleCollider _bodyCollider;
         private SphereCollider _headCollider;
+        private Rigidbody _rigidbody;
 
         // Host.
         private Vector3? _moveTarget;
@@ -135,6 +136,7 @@ namespace PleaseDontDrown.Story
             _pose.OnChange += (_, next, _) => FitColliders(next);
             _bodyCollider = GetComponent<CapsuleCollider>();
             _headCollider = GetComponent<SphereCollider>();
+            _rigidbody = GetComponent<Rigidbody>();
         }
 
         /// <summary>Lying people are long and low, sitting ones short: the colliders follow (walk past, punch the right spot).</summary>
@@ -541,9 +543,10 @@ namespace PleaseDontDrown.Story
         }
 
         /// <summary>
-        /// Moves by <paramref name="step"/> unless a wall is in the way, sliding along it. Walls = static colliders
-        /// (buildings, counters, trunks, dock posts, rocks); the ground itself, bodies and triggers don't count.
-        /// The capsule starts 0.45 m up, so steps and kerbs are walked over.
+        /// Moves by <paramref name="step"/> unless something is in the way, sliding along it: walls (buildings,
+        /// counters, trunks, dock posts, rocks) and things that move (lifeguards, crates, parked jet skis, tourists,
+        /// other characters). The ground itself and triggers don't count. The capsule starts 0.45 m up, so steps and
+        /// kerbs are walked over (low things lying about are avoided by the navmesh instead: they carve it).
         /// </summary>
         private Vector3 MoveChecked(Vector3 p, Vector3 step)
         {
@@ -552,7 +555,7 @@ namespace PleaseDontDrown.Story
                 float distance = step.magnitude;
                 if (distance < 1e-5f) return p;
                 Vector3 dir = step / distance;
-                if (!WallAhead(p, dir, distance, out RaycastHit hit)) return p + step;
+                if (!ObstacleAhead(p, dir, distance, out RaycastHit hit)) return p + step;
                 float free = Mathf.Max(0f, hit.distance - 0.02f);
                 p += dir * free;
                 Vector3 normal = new Vector3(hit.normal.x, 0f, hit.normal.z);
@@ -562,7 +565,7 @@ namespace PleaseDontDrown.Story
             return p;
         }
 
-        private bool WallAhead(Vector3 p, Vector3 dir, float distance, out RaycastHit best)
+        private bool ObstacleAhead(Vector3 p, Vector3 dir, float distance, out RaycastHit best)
         {
             const float radius = 0.28f;
             Vector3 bottom = p + Vector3.up * (0.45f + radius), top = p + Vector3.up * (1.95f - radius);
@@ -574,7 +577,8 @@ namespace PleaseDontDrown.Story
                 RaycastHit h = _sweepHits[i];
                 if (h.distance <= 0f || h.distance >= bestDistance) continue; // already overlapping: let them walk out of it
                 Collider c = h.collider;
-                if (c.attachedRigidbody != null || IsGround(c)) continue;
+                Rigidbody body = c.attachedRigidbody;
+                if (IsGround(c) || (body != null && (body == _rigidbody || (_ride != null && body == _ride.Body)))) continue; // ourselves, our boat
                 bestDistance = h.distance;
                 best = h;
             }

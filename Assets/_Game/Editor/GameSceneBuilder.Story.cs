@@ -784,7 +784,26 @@ namespace PleaseDontDrown.Editor
             Require(so, "_engineAudio").objectReferenceValue = SpatialAudio(root, 3f, 80f);
             so.ApplyModifiedPropertiesWithoutUndo();
             ConfigureInteractable(root.AddComponent<Interactable>(), new[] { hull }, root.GetComponentsInChildren<Renderer>(), 3.5f);
+            // Parked (in the water or run up on the beach): story characters route around it.
+            var box = (BoxCollider)hull;
+            AddNavCarver(root, box.transform.localPosition, Vector3.Scale(box.size, box.transform.localScale) + new Vector3(0.3f, 0f, 0.3f));
             return vehicle;
+        }
+
+        /// <summary>
+        /// A navmesh obstacle that cuts its footprint out of the navmesh while it stands still, so story characters
+        /// route around it. Tall (down to the seabed) so a floating one carves the swimmers' navmesh too.
+        /// </summary>
+        public static void AddNavCarver(GameObject go, Vector3 center, Vector3 footprint)
+        {
+            var obstacle = go.AddComponent<NavMeshObstacle>();
+            obstacle.shape = NavMeshObstacleShape.Box;
+            obstacle.center = new Vector3(center.x, center.y - 3f, center.z);
+            obstacle.size = new Vector3(footprint.x, 8f, footprint.z);
+            obstacle.carving = true;
+            obstacle.carveOnlyStationary = true;
+            obstacle.carvingTimeToStationary = 0.5f;
+            obstacle.carvingMoveThreshold = 0.3f;
         }
     }
 }

@@ -350,7 +350,7 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Box", root, Vector3.zero, Vector3.one * 0.6f, crateWood);
                 Primitive(PrimitiveType.Cube, "BandTop", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
                 Primitive(PrimitiveType.Cube, "BandBottom", root, new Vector3(0f, -0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
-            }, density: 0.55f, waterDrag: 1.4f);
+            }, density: 0.55f, waterDrag: 1.4f, configure: go => AddNavCarver(go, Vector3.zero, new Vector3(0.75f, 0f, 0.75f)));
 
             Item ball = BuildItem("BeachBall", "Beach Ball", 0.4f, new Vector3(0.1f, -0.34f, 0.72f), Vector3.zero, 1f, bouncy, root =>
             {
@@ -397,7 +397,7 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.55f, 0.36f, 0.36f), blue);
                 Primitive(PrimitiveType.Cube, "Lid", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.57f, 0.07f, 0.38f), white, keepCollider: false);
                 Primitive(PrimitiveType.Cube, "Handle", root, new Vector3(0f, 0.25f, 0f), new Vector3(0.3f, 0.04f, 0.05f), dark, keepCollider: false);
-            }, density: 0.4f, waterDrag: 1.2f);
+            }, density: 0.4f, waterDrag: 1.2f, configure: go => AddNavCarver(go, Vector3.zero, new Vector3(0.7f, 0f, 0.5f)));
 
             Material husk = GetMaterial("Coconut", new Color(0.45f, 0.28f, 0.15f));
             Material huskDark = GetMaterial("CoconutDark", new Color(0.2f, 0.12f, 0.07f));
@@ -579,6 +579,15 @@ namespace PleaseDontDrown.Editor
             var jiggle = avatarGo.AddComponent<AvatarJiggle>();
             SetRef(jiggle, "_rig", rig);
             SetRef(victimBody, "_jiggle", jiggle);
+            // Lying on the sand (collapsed, sitting after a rescue): walkers go round, not over them.
+            var carver = root.AddComponent<UnityEngine.AI.NavMeshObstacle>();
+            carver.shape = UnityEngine.AI.NavMeshObstacleShape.Box; // turns with the body: lies along it on the sand
+            carver.center = new Vector3(0f, -0.25f, 0f);
+            carver.size = new Vector3(0.75f, 2.1f, 0.65f);
+            carver.carving = true;
+            carver.carveOnlyStationary = true;
+            carver.carvingTimeToStationary = 0.8f;
+            carver.carvingMoveThreshold = 0.3f;
             SetRef(victimBody, "_audio", SpatialAudio(root, 3f, 70f));
 
             GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, $"{ItemPrefabDir}/Tourist.prefab");

@@ -226,6 +226,7 @@ namespace PleaseDontDrown.Story
                 _beatIndex = i;
                 Beat beat = _beats[i];
                 _beat.Value = beat.Id;
+                SetChapter(beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
                 Debug.Log($"[Story] beat {beat.Id}: {beat.Title}");
                 ClearWaits();
                 Save();
