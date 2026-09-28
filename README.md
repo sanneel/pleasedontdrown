@@ -62,7 +62,8 @@ Story: `story` (status), `story list`, `story skip`, `story goto 1.9`, `story re
 `shark`, `pirates`, `vehicles`, `drive <s> [steer] [throttle]`, `usetool`, `punch`, `buy <n>`, `dialogue`.
 Cheats work in the editor and dev builds.
 
-**Story mode** starts by itself when you host: Sandy walks over to meet you, then follow the objective in the top left.
+**Story mode** starts by itself when you host: Sandy walks over to meet you from her Lost & Found (the shack by the
+bell: hand things in at its window), then follow the objective in the top left.
 The beaches are full of tourists sunbathing, wading and swimming (press E to chat); the ones who get into trouble are
 swimmers you saw a moment ago. Progress (beat + money) is saved in `%USERPROFILE%/AppData/LocalLow/PleaseDontDrown/PLEASE DON'T DROWN/story.json`;
 `story reset` starts over. Test switches: `-pdd-nostory` (sandbox, no story) and `-pdd-nosave` (don't read or write the save).

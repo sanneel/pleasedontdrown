@@ -201,6 +201,7 @@ namespace PleaseDontDrown.Story
                 _sandy.ServerSetup("Sandy", NpcRole.Guide, SandyLook);
                 _sandyHome = _sandy.transform.position;
                 _sandyHomeYaw = _sandy.transform.eulerAngles.y;
+                _sandy.ServerSetPose(AvatarPose.SitChair); // at her window, on her stool
             }
             if (_receptionist != null)
                 _receptionist.ServerSetup("Marisol", NpcRole.Receptionist, ReceptionistLook);
@@ -212,6 +213,7 @@ namespace PleaseDontDrown.Story
         private void StartAt(int index)
         {
             StopAllCoroutines(); // the beat and anything it started (waving, delayed lines...)
+            _waitingForTalk = false;
             foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
             if (_sandy != null && index > 0) StartCoroutine(SandyGoesHome()); // interrupted mid-walk: back to the kiosk
             CleanupActors();
@@ -306,7 +308,31 @@ namespace PleaseDontDrown.Story
         }
 
         private void OnHandedIn(LostAndFound.HandedIn info) => _handedIn.Add(info);
-        private void OnTalked(StoryNpc npc, PlayerHub by) => _talks.Add((npc, by));
+        private void OnTalked(StoryNpc npc, PlayerHub by)
+        {
+            _talks.Add((npc, by));
+            if (npc == _sandy && !_waitingForTalk && _running) StartCoroutine(SandyChats(by));
+        }
+
+        private static readonly string[] SandyLines =
+        {
+            "Found something? Put it on the counter out front, I'll pay you.",
+            "Tourists! They'd lose their heads if they weren't screwed on.",
+            "Keep an eye on the water, dear. I'll shout if I see anything.",
+            "I've run this Lost & Found for twenty years. Twenty!",
+            "The bell's right outside. When it rings, you run."
+        };
+
+        /// <summary>Talking to Sandy outside a scene: she takes any lost things you carry, or just has a chat.</summary>
+        private IEnumerator SandyChats(PlayerHub by)
+        {
+            if (_lostAndFound != null && _lostAndFound.ServerHandIn(by, _sandy.HeadPosition))
+            {
+                yield return Say(_sandy, "Ooh, lovely. Somebody will be very happy. Here you go.");
+                yield break;
+            }
+            yield return Say(_sandy, SandyLines[Random.Range(0, SandyLines.Length)]);
+        }
         private void OnDefeated(StoryNpc npc, PlayerHub by) => _defeated.Add(npc);
         private void OnPurchased(ShopCounter shop, PlayerHub by, string item) => _purchases.Add(item);
 
@@ -360,11 +386,15 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void TitleObservers(string title, string subtitle) => StoryHud.ShowTitle(title, subtitle);
 
+        private bool _waitingForTalk;
+
         private IEnumerator WaitTalk(StoryNpc npc, string prompt)
         {
             _talks.Clear();
+            _waitingForTalk = true;
             npc.ServerSetTalkable(true, prompt);
             while (!_talks.Exists(t => t.npc == npc)) yield return null;
+            _waitingForTalk = false;
             _talks.Clear();
         }
 

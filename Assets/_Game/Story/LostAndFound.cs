@@ -78,8 +78,16 @@ namespace PleaseDontDrown.Story
         {
             if (player == null || player.Owner != caller) return;
             if ((player.transform.position - transform.position).sqrMagnitude > 6f * 6f) return;
-            Vector3 where = _payPoint != null ? _payPoint.position : transform.position + Vector3.up * 1.4f;
-            foreach (LostItem lost in Carried(player))
+            ServerHandIn(player, _payPoint != null ? _payPoint.position : transform.position + Vector3.up * 1.4f);
+        }
+
+        /// <summary>Host: take every lost thing this player carries and pay for it. False if they had none.</summary>
+        [Server]
+        public bool ServerHandIn(PlayerHub player, Vector3 where)
+        {
+            List<LostItem> carried = Carried(player);
+            if (carried.Count == 0) return false;
+            foreach (LostItem lost in carried)
             {
                 var info = new HandedIn
                 {
@@ -92,6 +100,7 @@ namespace PleaseDontDrown.Story
                 where += Vector3.up * 0.35f;
                 ServerHandedIn?.Invoke(info);
             }
+            return true;
         }
     }
 }

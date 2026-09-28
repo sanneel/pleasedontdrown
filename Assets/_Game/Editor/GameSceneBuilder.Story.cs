@@ -258,10 +258,23 @@ namespace PleaseDontDrown.Editor
             var story = new GameObject("Story").transform;
 
             // ---------------------------------------------------------------- island 1: Sandy's Lost & Found kiosk
-            Vector3 kioskPos = OnGround(KioskPosition);
-            float kioskYaw = Quaternion.LookRotation(new Vector3(0f, 0f, 15f) - new Vector3(kioskPos.x, 0f, kioskPos.z)).eulerAngles.y;
-            Transform kiosk = BuildKiosk(env, kioskPos, kioskYaw, out LostAndFound lostAndFound);
-            StoryNpc sandy = PlaceNpc(npcPrefab, story, "Sandy", OnGround(kiosk.TransformPoint(new Vector3(1.7f, 0f, 0.9f))), kioskYaw);
+            // Sandy's Lost & Found is the old shack (door off): she sits inside at the window, you hand things in at
+            // the window's shelf. Without the Meshy shack there's a stand-alone kiosk instead.
+            Transform shack = env.Find("Station_Shack");
+            LostAndFound lostAndFound;
+            StoryNpc sandy;
+            if (shack != null && shack.Find("FloorCollision") != null)
+            {
+                lostAndFound = BuildShackLostAndFound(shack, out Vector3 stool, out float stoolYaw);
+                sandy = PlaceNpc(npcPrefab, story, "Sandy", stool, stoolYaw);
+            }
+            else
+            {
+                Vector3 kioskPos = OnGround(KioskPosition);
+                float kioskYaw = Quaternion.LookRotation(new Vector3(0f, 0f, 15f) - new Vector3(kioskPos.x, 0f, kioskPos.z)).eulerAngles.y;
+                Transform kiosk = BuildKiosk(env, kioskPos, kioskYaw, out lostAndFound);
+                sandy = PlaceNpc(npcPrefab, story, "Sandy", OnGround(kiosk.TransformPoint(new Vector3(1.7f, 0f, 0.9f))), kioskYaw);
+            }
 
             // The beach crowd: towels and umbrellas, sunbathers on them, people wading and swimming.
             Transform[] towels1 = BuildTowels(env, "Island1", Island1TowelXs, seaTowardPositiveZ: false, startZ: -15f, Island1Avoid(), seed: 11);
@@ -408,7 +421,7 @@ namespace PleaseDontDrown.Editor
         {
             var list = new List<Vector3>
             {
-                new(0f, 10f, 5f), new(12f, 8f, 4f), new(-8f, 2f, 2.6f), new(-8f, 6f, 2.6f), new(8.5f, 17.5f, 3.5f), new(0f, 15f, 4.5f),
+                new(0f, 10f, 5f), new(12f, 8f, 4f), new(-8f, 2f, 2.6f), new(-8f, 6f, 2.6f), new(0f, 15f, 4.5f),
                 new(4.6f, 12.6f, 2f), new(-5f, 12.5f, 1.8f), new(-4f, 9.5f, 2.5f), new(-2.2f, 11.2f, 1.5f), new(15.5f, 5f, 1.2f),
                 new(4.5f, 14f, 1.2f), new(LostItemSpots[0].x, LostItemSpots[0].z, 1.5f), new(RobberSpawn.x, RobberSpawn.z, 2f)
             };
@@ -517,6 +530,58 @@ namespace PleaseDontDrown.Editor
             go.transform.SetParent(parent, true);
             go.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
             return go.GetComponent<StoryNpc>();
+        }
+
+        /// <summary>
+        /// Turns the shack into Sandy's Lost &amp; Found: a counter plank over the shelf under the east window (hand
+        /// things in here), a sign under the eaves, the rates, and a stool inside where Sandy sits looking out.
+        /// Window position measured from a screenshot of the Meshy shack (4 m model units, scaled like the walls).
+        /// </summary>
+        private static LostAndFound BuildShackLostAndFound(Transform shack, out Vector3 stool, out float stoolYaw)
+        {
+            float k = ShackScale;
+            float east = 1.30f * k, floor = 0.575f * k, windowZ = -0.30f * k;
+            Material wood = GetMaterial("Wood", new Color(0.55f, 0.36f, 0.22f));
+            Material cream = GetMaterial("SignBoard", new Color(0.95f, 0.93f, 0.85f));
+            Material red = GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f));
+            Material seat = GetMaterial("StoolSeat", new Color(0.8f, 0.3f, 0.25f));
+
+            // The counter: a plank over the window's own shelf (window opening y 2.13..3.21, shelf at 1.89).
+            GameObject counter = Primitive(PrimitiveType.Cube, "LostAndFoundCounter", shack, new Vector3(east + 0.16f, 1.9f, windowZ), new Vector3(0.42f, 0.08f, 1.8f), wood);
+            TagSurface(counter, SurfaceKind.Wood);
+            counter.AddComponent<NetworkObject>();
+            var lostAndFound = counter.AddComponent<LostAndFound>();
+            var pay = new GameObject("PayPoint").transform;
+            pay.SetParent(shack, false);
+            pay.localPosition = new Vector3(east + 0.3f, 2.4f, windowZ);
+            SetRef(lostAndFound, "_payPoint", pay);
+
+            // Sign standing on the roof over the window, the rates under the counter (TextMesh reads from its -z: turned to face east).
+            GameObject board = Primitive(PrimitiveType.Cube, "LostAndFoundSign", shack, new Vector3(east + 0.05f, 4.62f, windowZ), new Vector3(0.06f, 0.55f, 2.3f), cream, keepCollider: false);
+            foreach (float side in new[] { -0.8f, 0.8f })
+                Primitive(PrimitiveType.Cube, "SignPost", shack, new Vector3(east - 0.02f, 4.3f, windowZ + side), new Vector3(0.06f, 0.5f, 0.06f), wood, keepCollider: false);
+            WorldText(shack, "LostAndFoundText", new Vector3(east + 0.085f, 4.62f, windowZ), "LOST & FOUND", 80, 0.04f, red.color)
+                .transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            WorldText(shack, "LostAndFoundRates", new Vector3(east + 0.08f, 1.22f, windowZ), "We pay for:  wallets $30   phones $40\nwatches $35   sunglasses $20",
+                56, 0.017f, new Color(0.95f, 0.93f, 0.85f)).transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            ConfigureInteractable(counter.AddComponent<Interactable>(), new[] { counter.GetComponent<Collider>() },
+                new[] { counter.GetComponent<Renderer>(), board.GetComponent<Renderer>() }, 3.2f);
+
+            // A raised booth floor under the window (0.4 m: characters step up onto it) so she looks out of it,
+            // and her stool on it, facing the window (no collider: she sits on it, nobody trips on it).
+            const float booth = 0.4f;
+            GameObject boothFloor = Primitive(PrimitiveType.Cube, "BoothFloor", shack, new Vector3(east - 0.62f, floor + booth * 0.5f, windowZ), new Vector3(1.0f, booth, 1.5f), wood);
+            TagSurface(boothFloor, SurfaceKind.Wood);
+            // A bar stool: she sits up high with her feet on its footrest, head and shoulders in the window.
+            const float barStool = 0.28f;
+            var boothTop = new Vector3(east - 0.72f, floor + booth, windowZ);
+            Primitive(PrimitiveType.Cylinder, "StoolSeat", shack, boothTop + Vector3.up * (0.45f + barStool), new Vector3(0.38f, 0.03f, 0.38f), seat, keepCollider: false);
+            Primitive(PrimitiveType.Cylinder, "StoolLeg", shack, boothTop + Vector3.up * (0.45f + barStool) * 0.5f, new Vector3(0.07f, (0.45f + barStool) * 0.5f, 0.07f), wood, keepCollider: false);
+            Primitive(PrimitiveType.Cylinder, "StoolFootrest", shack, boothTop + Vector3.up * (barStool - 0.02f), new Vector3(0.32f, 0.02f, 0.32f), wood, keepCollider: false);
+            Vector3 stoolLocal = boothTop + Vector3.up * barStool; // her feet, on the footrest
+            stool = shack.TransformPoint(stoolLocal);
+            stoolYaw = shack.eulerAngles.y + 90f;
+            return lostAndFound;
         }
 
         /// <summary>Sandy's kiosk: counter (hand things in here), back board, striped awning and a sign.</summary>

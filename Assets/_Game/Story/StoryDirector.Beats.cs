@@ -82,10 +82,12 @@ namespace PleaseDontDrown.Story
             // Sandy spots the new lifeguard and comes over (press E to talk sooner).
             SetObjective("Sandy is coming over to meet you");
             Marker("Sandy", _sandy.NetworkObject);
+            _sandy.ServerSetPose(AvatarPose.Normal); // up off her stool
             Coroutine waving = StartCoroutine(WaveNowAndThen(_sandy));
             _sandy.ServerShout("Yoo-hoo! You there! Lifeguard!", false);
             _sandy.ServerSetTalkable(true, "Talk to Sandy");
             _talks.Clear();
+            _waitingForTalk = true;
             PlayerHub greeted = null;
             float giveUp = Time.time + 25f;
             while (Time.time < giveUp && !_talks.Exists(t => t.npc == _sandy))
@@ -101,6 +103,7 @@ namespace PleaseDontDrown.Story
                 yield return new WaitForSeconds(0.4f);
             }
             StopCoroutine(waving);
+            _waitingForTalk = false;
             _sandy.ServerStop();
             if (greeted != null) _sandy.ServerFace(greeted.transform.position);
             _sandy.ServerSetTalkable(false);
@@ -110,7 +113,7 @@ namespace PleaseDontDrown.Story
             yield return Say(_sandy, "The tourists on this island can't swim to save their lives. Literally. When someone's in trouble, the bell rings and you go and get them.");
             yield return Say(_sandy, "Drag them onto the sand. If they're out cold: push on the chest. The ladies need a bit of air too, mouth-to-mouth. The men... a good smack in the face usually does it.");
             yield return Say(_sandy, "And they lose EVERYTHING. Wallets, phones, sunglasses. You find something, you bring it to me, and I pay you.");
-            yield return Say(_sandy, "I'll be at my kiosk if you need me. And I'll shout if I see anything. Go on then!");
+            yield return Say(_sandy, "I'll be in my hut by the bell, at the window. And I'll shout if I see anything. Go on then!");
             _sandy.ServerSetMood(AvatarMood.Neutral);
             StartCoroutine(SandyGoesHome());
             // Something to find right away.
@@ -122,12 +125,26 @@ namespace PleaseDontDrown.Story
             _nextAmbientLoss = Time.time + 60f;
         }
 
+        /// <summary>Back into her hut and onto her stool at the window.</summary>
         private IEnumerator SandyGoesHome()
         {
             _sandy.ServerFace(null);
-            _sandy.ServerMoveTo(_sandyHome, 2f);
-            while (_sandy.IsMoving) yield return new WaitForSeconds(0.3f);
+            if ((_sandy.transform.position - _sandyHome).sqrMagnitude > 0.3f * 0.3f)
+            {
+                _sandy.ServerSetPose(AvatarPose.Normal);
+                _sandy.ServerMoveTo(_sandyHome, 2f);
+                float giveUp = Time.time + 40f;
+                while (_sandy.IsMoving && Time.time < giveUp) yield return new WaitForSeconds(0.3f);
+            }
+            SandySits();
+        }
+
+        private void SandySits()
+        {
+            _sandy.ServerTeleport(_sandyHome, _sandyHomeYaw, keepExact: true);
             _sandy.ServerFace(_sandyHome + Quaternion.Euler(0f, _sandyHomeYaw, 0f) * Vector3.forward * 5f);
+            _sandy.ServerSetPose(AvatarPose.SitChair);
+            _sandy.ServerSetTalkable(true, "Talk to Sandy"); // chats, and takes lost things too
         }
 
         private IEnumerator WaveNowAndThen(StoryNpc npc)
@@ -194,7 +211,7 @@ namespace PleaseDontDrown.Story
                         if (i.IsHeld && i.TryGetComponent(out LostItem l) && !l.IsStolen)
                         {
                             found = true;
-                            StartCoroutine(Say(_sandy, $"(shouting) Ooh, somebody's {l.Kind.ToLowerInvariant()}? Bring it to my kiosk, I'll pay you!"));
+                            StartCoroutine(Say(_sandy, $"(shouting) Ooh, somebody's {l.Kind.ToLowerInvariant()}? Bring it to my window, I'll pay you!"));
                             break;
                         }
                 yield return new WaitForSeconds(0.3f);
@@ -301,7 +318,7 @@ namespace PleaseDontDrown.Story
             yield return Say(_sandy, "Stolen?! A ROBBER? On MY island?");
             yield return Say(_sandy, "Oh no, no, no. This was such a quiet place. I don't like this at all...");
             yield return Say(_sandy, "Everyone hold on to your bags! ...Please keep your eyes open out there.");
-            _sandy.ServerSetPose(AvatarPose.Normal);
+            SandySits();
             _sandy.ServerSetMood(AvatarMood.Neutral);
         }
 

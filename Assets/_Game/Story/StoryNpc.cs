@@ -70,6 +70,7 @@ namespace PleaseDontDrown.Story
         private Vector3 _rideLocal;
         private float _staggerUntil;
         private Vector3 _knock;
+        private bool _setUp;   // placed by whoever spawned it (until then it stays exactly where the scene put it)
         // Walking a navmesh path (host).
         private readonly List<Vector3> _path = new();
         private int _pathIndex;
@@ -97,6 +98,7 @@ namespace PleaseDontDrown.Story
         {
             AvatarPose.Down or AvatarPose.Lie or AvatarPose.LieFront => transform.position + Vector3.up * 0.3f,
             AvatarPose.Sit => transform.position + Vector3.up * 1f,
+            AvatarPose.SitChair => transform.position + Vector3.up * 1.35f,
             AvatarPose.Kneel => transform.position + Vector3.up * 1.3f,
             _ => transform.position + Vector3.up * 1.75f
         };
@@ -156,7 +158,8 @@ namespace PleaseDontDrown.Story
                     break;
                 case AvatarPose.Sit:
                 case AvatarPose.Kneel:
-                    float h = pose == AvatarPose.Sit ? 0.95f : 1.3f;
+                case AvatarPose.SitChair:
+                    float h = pose == AvatarPose.Sit ? 0.95f : 1.35f;
                     _bodyCollider.direction = 1;
                     _bodyCollider.center = new Vector3(0f, h * 0.5f, 0f);
                     _bodyCollider.height = h;
@@ -202,6 +205,7 @@ namespace PleaseDontDrown.Story
         [Server]
         public void ServerSetup(string displayName, NpcRole role, AvatarLook look, int health = 0)
         {
+            _setUp = true;
             _name.Value = displayName;
             _role.Value = role;
             _look.Value = look.Pack();
@@ -453,6 +457,7 @@ namespace PleaseDontDrown.Story
 
         private void ServerUpdate(float dt)
         {
+            if (!_setUp) return;
             if (_ride != null)
             {
                 // Standing on a moving deck.
@@ -477,7 +482,8 @@ namespace PleaseDontDrown.Story
             if (!_moveTarget.HasValue && _facePoint.HasValue)
                 Face(_facePoint.Value - p, dt, 5f);
             Separate(dt);
-            if (!_moveTarget.HasValue) transform.position = Grounded(transform.position); // spawned in the air or into a dune
+            // Spawned in the air or into a dune: onto the ground. (Not someone placed on a seat: feet on a stool's footrest.)
+            if (!_moveTarget.HasValue && _pose.Value != AvatarPose.SitChair) transform.position = Grounded(transform.position);
         }
 
         /// <summary>Don't stand inside each other (a gang of pirates spreads out around their target).</summary>
@@ -610,7 +616,8 @@ namespace PleaseDontDrown.Story
         {
             // Swimmers look for the seabed just above themselves, so a dock overhead isn't mistaken for the ground.
             bool swimming = WaterSurface.Exists && WaterSurface.HeightAt(p) - p.y > 1f;
-            float ground = Shore.GroundHeightAt(p + Vector3.up * (swimming ? 0.9f : 2.5f));
+            // (Walkers probe from just above their knees: from 3 m up, the ceiling of a hut they stand in looked like the ground.)
+            float ground = Shore.GroundHeightAt(p + Vector3.up * (swimming ? 0.9f : 0.7f));
             if (float.IsNaN(ground)) return p;
             if (WaterSurface.Exists)
             {

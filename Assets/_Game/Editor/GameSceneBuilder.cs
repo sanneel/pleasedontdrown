@@ -926,7 +926,8 @@ namespace PleaseDontDrown.Editor
             bool meshyShack = MeshyArt.Shack(shack, ShackScale, out MeshyArt.DoorSpec shackDoor);
             if (meshyShack)
             {
-                BuildDoor(shack, "ShackDoor", shackDoor, new Color(0.5f, 0.33f, 0.2f), new Color(0.36f, 0.23f, 0.14f), planks: true);
+                // Sandy's Lost & Found now: the door is off its hinges, only the frame round the doorway stays.
+                BuildDoorway(shack, "ShackDoorway", shackDoor, new Color(0.36f, 0.23f, 0.14f));
                 // A shelf along the back wall with a radio and the first-aid kit.
                 float k = ShackScale;
                 Primitive(PrimitiveType.Cube, "Shelf", shack, new Vector3(0.28f * k, 0.575f * k + 0.95f, -1.18f * k + 0.25f), new Vector3(1.4f, 0.06f, 0.42f), wood);
@@ -1065,7 +1066,7 @@ namespace PleaseDontDrown.Editor
             Material darker = GetMaterial(name + "Boards", leafColor * 0.78f);
             Material brass = GetMaterial("Brass", new Color(0.85f, 0.65f, 0.25f), metallic: 0.8f, smoothness: 0.7f);
             float w = spec.Width, h = spec.Height, dir = spec.LeafDirection;
-            const float thick = 0.06f, trim = 0.09f;
+            const float thick = 0.06f;
 
             var root = new GameObject(name);
             root.transform.SetParent(parent, false);
@@ -1089,18 +1090,33 @@ namespace PleaseDontDrown.Editor
                 extras.Add(Primitive(PrimitiveType.Sphere, "Knob", hinge, new Vector3(dir * (w - 0.1f), h * 0.47f, side * (thick * 0.5f + 0.025f)),
                     Vector3.one * 0.06f, brass, keepCollider: false).GetComponent<Renderer>());
 
-            // Frame around the gap (outside the swing, so the door never catches on it).
-            float mid = dir * w * 0.5f;
-            Primitive(PrimitiveType.Cube, "JambHinge", root.transform, new Vector3(-dir * trim * 0.5f, h * 0.5f, 0f), new Vector3(trim, h + trim, 0.26f), trimMat, keepCollider: false);
-            Primitive(PrimitiveType.Cube, "JambLatch", root.transform, new Vector3(dir * (w + trim * 0.5f), h * 0.5f, 0f), new Vector3(trim, h + trim, 0.26f), trimMat, keepCollider: false);
-            Primitive(PrimitiveType.Cube, "Head", root.transform, new Vector3(mid, h + trim * 0.5f, 0f), new Vector3(w + trim * 2f, trim, 0.26f), trimMat, keepCollider: false);
-            Primitive(PrimitiveType.Cube, "Sill", root.transform, new Vector3(mid, 0.01f, 0f), new Vector3(w + trim * 2f, 0.02f, 0.26f), trimMat, keepCollider: false);
+            DoorFrame(root.transform, spec, trimMat);
 
             root.AddComponent<NetworkObject>();
             var door = root.AddComponent<Door>();
             SetRef(door, "_hinge", hinge);
             SetRef(door, "_audio", SpatialAudio(root, 2f, 25f));
             ConfigureInteractable(root.AddComponent<Interactable>(), new[] { leaf.GetComponent<Collider>() }, extras.ToArray(), 2.8f);
+        }
+
+        /// <summary>Frame around a doorway gap (hides the cut edges of the Meshy wall), outside the door's swing.</summary>
+        private static void DoorFrame(Transform root, MeshyArt.DoorSpec spec, Material trimMat)
+        {
+            const float trim = 0.09f;
+            float w = spec.Width, h = spec.Height, dir = spec.LeafDirection, mid = dir * w * 0.5f;
+            Primitive(PrimitiveType.Cube, "JambHinge", root, new Vector3(-dir * trim * 0.5f, h * 0.5f, 0f), new Vector3(trim, h + trim, 0.26f), trimMat, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "JambLatch", root, new Vector3(dir * (w + trim * 0.5f), h * 0.5f, 0f), new Vector3(trim, h + trim, 0.26f), trimMat, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "Head", root, new Vector3(mid, h + trim * 0.5f, 0f), new Vector3(w + trim * 2f, trim, 0.26f), trimMat, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "Sill", root, new Vector3(mid, 0.01f, 0f), new Vector3(w + trim * 2f, 0.02f, 0.26f), trimMat, keepCollider: false);
+        }
+
+        /// <summary>An open doorway: just the frame, no door (walk straight in).</summary>
+        private static void BuildDoorway(Transform parent, string name, MeshyArt.DoorSpec spec, Color frameColor)
+        {
+            var root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            root.transform.localPosition = spec.Hinge;
+            DoorFrame(root.transform, spec, GetMaterial(name + "Frame", frameColor));
         }
 
         /// <summary>Red board by the spawn: starts a rescue drill (a tourist in trouble out in the water).</summary>
