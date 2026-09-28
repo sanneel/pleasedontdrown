@@ -633,12 +633,22 @@ namespace PleaseDontDrown.Story
             yield return new WaitForSeconds(1f);
             if (receptionist != null) StartCoroutine(Say(receptionist, "(over the speaker) Is that... a PIRATE FLAG?!"));
             // The landing is on the beach; the boat stops in the water just off it.
-            Vector3 boatStop = _pirateLanding.position + _pirateLanding.forward * 12f;
+            Vector3 boatStop = _pirateLanding.position + _pirateLanding.forward * 13f;
             _pirateBoat.ServerAutopilot(boatStop, 9f);
-            float giveUp = Time.time + 60f;
-            while ((new Vector2(_pirateBoat.transform.position.x - boatStop.x, _pirateBoat.transform.position.z - boatStop.z)).sqrMagnitude > 5f * 5f
-                   && Time.time < giveUp)
+            // Landed when it's close, or when it has run into the shallows and stopped.
+            float started = Time.time, stoppedSince = -1f;
+            while (Time.time - started < 45f)
+            {
+                var off = new Vector2(_pirateBoat.transform.position.x - boatStop.x, _pirateBoat.transform.position.z - boatStop.z);
+                if (off.sqrMagnitude < 8f * 8f) break;
+                if (Time.time - started > 8f && _pirateBoat.Speed < 0.4f)
+                {
+                    if (stoppedSince < 0f) stoppedSince = Time.time;
+                    else if (Time.time - stoppedSince > 1.5f) break;
+                }
+                else stoppedSince = -1f;
                 yield return null;
+            }
             _pirateBoat.ServerAutopilot(null);
 
             // Everybody off! They charge up the beach toward the hotel.

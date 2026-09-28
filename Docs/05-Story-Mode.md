@@ -167,7 +167,9 @@ looks are `AvatarLook` presets in `StoryDirector.Beats.cs`; the robber's bag is 
 jet ski, boat, kiosk and hotel are primitives in `GameSceneBuilder.Story.cs`.
 
 **Known limits.**
-* NPCs walk in straight lines (no navmesh); the robber picks open routes by raycast, pirates can clip through walls.
+* NPCs follow a navmesh baked per island by the builder (`Assets/_Game/Data/Navigation`, `NavMeshLoader`), and every
+  step is also checked against static colliders so they slide along walls (knockbacks and pushes too). Things that
+  move (players, items, vehicles) aren't in the navmesh: an NPC pinned by one re-plans, then gives up.
 * Players can't be hurt by pirates beyond knockback (the design keeps failure light).
 * One save slot, host only. A client that joins mid-chapter-2 spawns on island 1 (`goto`/`tp` or the next beat moves them).
 * Dialogue auto-advances; no choices yet.

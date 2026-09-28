@@ -672,6 +672,7 @@ namespace PleaseDontDrown.Editor
             ui.AddComponent<Story.StoryHud>();
             ui.AddComponent<AvatarCustomizer>();
             BuildNetworkManager(playerPrefab, spawns);
+            BakeNavMeshes(); // last: everything that blocks walking is in the scene now
 
             AssignSceneIds(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);

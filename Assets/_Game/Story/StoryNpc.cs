@@ -13,6 +13,7 @@ using PleaseDontDrown.UI;
 using PleaseDontDrown.Vehicles;
 using PleaseDontDrown.World.Water;
 using UnityEngine;
+using UnityEngine.AI;
 using Random = UnityEngine.Random;
 
 namespace PleaseDontDrown.Story
@@ -68,6 +69,13 @@ namespace PleaseDontDrown.Story
         private Vector3 _rideLocal;
         private float _staggerUntil;
         private Vector3 _knock;
+        // Walking a navmesh path (host).
+        private readonly List<Vector3> _path = new();
+        private int _pathIndex;
+        private NavMeshPath _navPath;
+        private float _stuckTime;
+        private int _replans;
+        private readonly RaycastHit[] _sweepHits = new RaycastHit[12];
 
         public static IReadOnlyList<StoryNpc> All => _all;
         /// <summary>Host: a player pressed Interact on this character.</summary>
@@ -94,6 +102,8 @@ namespace PleaseDontDrown.Story
         /// <summary>Treading water (in water deeper than it can stand in).</summary>
         public bool IsSwimming => WaterSurface.Exists && WaterSurface.HeightAt(transform.position) - transform.position.y > 1.1f;
         public bool IsMoving => _moveTarget.HasValue;
+        /// <summary>Host debugging: where along its route it is.</summary>
+        public string PathInfo => _moveTarget.HasValue ? $"waypoint {_pathIndex + 1}/{_path.Count}" : "";
 
         public Color SpeechColor => _role.Value switch
         {
@@ -108,6 +118,7 @@ namespace PleaseDontDrown.Story
         private static void ResetStatics()
         {
             _all.Clear();
+            _groundColliders.Clear();
             ServerTalked = null;
             ServerDefeated = null;
         }
@@ -214,18 +225,48 @@ namespace PleaseDontDrown.Story
 
         /// <summary>Host: walk (or run) to a point on land, then stop.</summary>
         [Server]
-        public void ServerMoveTo(Vector3 target, bool run = false)
-        {
-            _moveTarget = target;
-            _moveSpeed = run ? _runSpeed : _walkSpeed;
-        }
+        public void ServerMoveTo(Vector3 target, bool run = false) => ServerMoveTo(target, run ? _runSpeed : _walkSpeed);
 
-        /// <summary>Host: move at a given speed (m/s), e.g. a slow swim.</summary>
+        /// <summary>Host: move at a given speed (m/s), e.g. a slow swim. Walks around obstacles on the navmesh.</summary>
         [Server]
         public void ServerMoveTo(Vector3 target, float speed)
         {
             _moveTarget = target;
             _moveSpeed = Mathf.Max(0.1f, speed);
+            _replans = 0;
+            PlanPath();
+        }
+
+        /// <summary>
+        /// Route to the destination on the baked navmesh (around walls, palms and counters, through doorways).
+        /// Without a navmesh there it goes straight, and the wall check still stops it at walls.
+        /// </summary>
+        private void PlanPath()
+        {
+            _path.Clear();
+            _pathIndex = 0;
+            _stuckTime = 0f;
+            if (!_moveTarget.HasValue) return;
+            _navPath ??= new NavMeshPath();
+            Vector3 target = _moveTarget.Value;
+            if (NavMesh.SamplePosition(transform.position, out NavMeshHit from, 10f, NavMesh.AllAreas) &&
+                NavMesh.SamplePosition(target, out NavMeshHit to, 10f, NavMesh.AllAreas) &&
+                NavMesh.CalculatePath(from.position, to.position, NavMesh.AllAreas, _navPath) &&
+                _navPath.status != NavMeshPathStatus.PathInvalid)
+            {
+                Vector3[] corners = _navPath.corners;
+                for (int i = 1; i < corners.Length; i++) _path.Add(corners[i]);
+                // Arrive exactly where asked (a path to somewhere unreachable ends at its closest point).
+                if (_navPath.status == NavMeshPathStatus.PathComplete && _path.Count > 0) _path[_path.Count - 1] = target;
+            }
+            if (_path.Count == 0) _path.Add(target);
+        }
+
+        /// <summary>The nearest walkable spot (outside walls and trunks), same height handling as walking.</summary>
+        public static Vector3 OnNavMesh(Vector3 position, float radius = 3f)
+        {
+            if (!NavMesh.SamplePosition(position, out NavMeshHit hit, radius, NavMesh.AllAreas)) return position;
+            return new Vector3(hit.position.x, position.y, hit.position.z);
         }
 
         [Server] public void ServerStop() => _moveTarget = null;
@@ -234,10 +275,12 @@ namespace PleaseDontDrown.Story
         [Server] public void ServerFace(Vector3? point) => _facePoint = point;
 
         [Server]
-        public void ServerTeleport(Vector3 position, float yaw)
+        public void ServerTeleport(Vector3 position, float yaw, bool keepExact = false)
         {
             _moveTarget = null;
+            _path.Clear();
             _ride = null;
+            if (!keepExact) position = Grounded(OnNavMesh(position, 2f)); // never inside a wall or a trunk
             transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
         }
 
@@ -421,34 +464,14 @@ namespace PleaseDontDrown.Story
             Vector3 p = transform.position;
             if (Time.time < _staggerUntil)
             {
-                // Knocked back by a hit, sliding to a stop.
-                p += _knock * dt;
+                // Knocked back by a hit, sliding to a stop (against a wall, not into it).
+                transform.position = Grounded(MoveChecked(p, _knock * dt));
                 _knock = Vector3.MoveTowards(_knock, Vector3.zero, dt * 8f);
-                transform.position = Grounded(p);
                 return;
             }
 
             if (_moveTarget.HasValue && _pose.Value is AvatarPose.Normal or AvatarPose.Scared)
-            {
-                Vector3 to = _moveTarget.Value - p;
-                to.y = 0f;
-                float distance = to.magnitude;
-                if (distance < 0.15f)
-                {
-                    _moveTarget = null;
-                }
-                else
-                {
-                    Vector3 step = to / distance * Mathf.Min(distance, _moveSpeed * dt);
-                    Vector3 next = Grounded(p + step);
-                    // Story characters don't wander into deep water (the robber would drown on us).
-                    if (Shore.WaterDepthAt(next + Vector3.up * 0.1f) < 0.5f || Shore.WaterDepthAt(p) >= 0.5f)
-                        transform.position = next;
-                    else
-                        _moveTarget = null;
-                    Face(step, dt, 10f);
-                }
-            }
+                FollowPath(p, dt);
             if (!_moveTarget.HasValue && _facePoint.HasValue)
                 Face(_facePoint.Value - p, dt, 5f);
             Separate(dt);
@@ -470,7 +493,102 @@ namespace PleaseDontDrown.Story
                     push += (distance > 0.01f ? d / distance : Random.insideUnitSphere) * (0.85f - distance);
             }
             push.y = 0f;
-            if (push.sqrMagnitude > 1e-6f) transform.position = Grounded(p + Vector3.ClampMagnitude(push, 1f) * Mathf.Min(1f, dt * 6f));
+            if (push.sqrMagnitude > 1e-6f) transform.position = Grounded(MoveChecked(p, Vector3.ClampMagnitude(push, 1f) * Mathf.Min(1f, dt * 6f)));
+        }
+
+        private void FollowPath(Vector3 p, float dt)
+        {
+            if (_path.Count == 0) PlanPath();
+            Vector3 waypoint = _path[Mathf.Min(_pathIndex, _path.Count - 1)];
+            Vector3 to = waypoint - p;
+            to.y = 0f;
+            float distance = to.magnitude;
+            if (distance < 0.2f)
+            {
+                if (++_pathIndex >= _path.Count)
+                {
+                    _moveTarget = null; // arrived (or as close as the navmesh gets)
+                    _path.Clear();
+                }
+                return;
+            }
+
+            Vector3 step = to / distance * Mathf.Min(distance, _moveSpeed * dt);
+            Vector3 moved = MoveChecked(p, step);
+            Vector3 next = Grounded(moved);
+            // Story characters don't wander into deep water (the robber would drown on us).
+            if (Shore.WaterDepthAt(next + Vector3.up * 0.1f) < 0.5f || Shore.WaterDepthAt(p) >= 0.5f)
+                transform.position = next;
+            else
+            {
+                _moveTarget = null;
+                _path.Clear();
+            }
+            Face(step, dt, 10f);
+
+            // Pinned against something the path didn't know about (a player, a parked jet ski): plan again, then give up.
+            bool progressed = (new Vector2(moved.x - p.x, moved.z - p.z)).sqrMagnitude > step.sqrMagnitude * 0.09f;
+            _stuckTime = progressed ? 0f : _stuckTime + dt;
+            if (_stuckTime > 0.8f && _moveTarget.HasValue)
+            {
+                if (++_replans > 3)
+                {
+                    _moveTarget = null;
+                    _path.Clear();
+                }
+                else PlanPath();
+            }
+        }
+
+        /// <summary>
+        /// Moves by <paramref name="step"/> unless a wall is in the way, sliding along it. Walls = static colliders
+        /// (buildings, counters, trunks, dock posts, rocks); the ground itself, bodies and triggers don't count.
+        /// The capsule starts 0.45 m up, so steps and kerbs are walked over.
+        /// </summary>
+        private Vector3 MoveChecked(Vector3 p, Vector3 step)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                float distance = step.magnitude;
+                if (distance < 1e-5f) return p;
+                Vector3 dir = step / distance;
+                if (!WallAhead(p, dir, distance, out RaycastHit hit)) return p + step;
+                float free = Mathf.Max(0f, hit.distance - 0.02f);
+                p += dir * free;
+                Vector3 normal = new Vector3(hit.normal.x, 0f, hit.normal.z);
+                if (normal.sqrMagnitude < 1e-4f) return p;
+                step = Vector3.ProjectOnPlane(dir * (distance - free), normal.normalized); // slide along the wall
+            }
+            return p;
+        }
+
+        private bool WallAhead(Vector3 p, Vector3 dir, float distance, out RaycastHit best)
+        {
+            const float radius = 0.28f;
+            Vector3 bottom = p + Vector3.up * (0.45f + radius), top = p + Vector3.up * (1.95f - radius);
+            int count = Physics.CapsuleCastNonAlloc(bottom, top, radius, dir, _sweepHits, distance + 0.02f, ~0, QueryTriggerInteraction.Ignore);
+            best = default;
+            float bestDistance = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit h = _sweepHits[i];
+                if (h.distance <= 0f || h.distance >= bestDistance) continue; // already overlapping: let them walk out of it
+                Collider c = h.collider;
+                if (c.attachedRigidbody != null || IsGround(c)) continue;
+                bestDistance = h.distance;
+                best = h;
+            }
+            return bestDistance < float.MaxValue;
+        }
+
+        private static readonly Dictionary<Collider, bool> _groundColliders = new();
+
+        /// <summary>The island terrain (dunes, seabed slopes) is walked on, never a wall.</summary>
+        private static bool IsGround(Collider c)
+        {
+            if (!_groundColliders.TryGetValue(c, out bool ground))
+                _groundColliders[c] = ground = c.GetComponent<World.Water.Seabed>() != null;
+            return ground;
         }
 
         private static bool IsUpright(AvatarPose pose) => pose is AvatarPose.Normal or AvatarPose.Scared or AvatarPose.HandsUp;

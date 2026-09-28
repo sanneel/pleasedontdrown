@@ -239,12 +239,34 @@ namespace PleaseDontDrown.Vehicles
                 if (c != null) Physics.IgnoreCollision(c, player.BodyCollider, ignore);
         }
 
-        /// <summary>Beside the seat, a little up (in the water for a jet ski, on the deck for the boat).</summary>
+        private readonly Collider[] _exitOverlaps = new Collider[16];
+
+        /// <summary>
+        /// Where the driver gets off: beside the seat (in the water for a jet ski, on the deck for the boat), or the
+        /// other side, behind, in front, on top, whichever is free first, so nobody ends up inside the dock or a hull.
+        /// </summary>
         private Vector3 ExitPosition()
         {
             Transform seat = _seat != null ? _seat : transform;
-            Vector3 side = Vector3.ProjectOnPlane(seat.right, Vector3.up).normalized;
-            return seat.position + side * 1.2f + Vector3.up * 0.2f;
+            Vector3 right = Vector3.ProjectOnPlane(seat.right, Vector3.up).normalized;
+            Vector3 forward = Vector3.ProjectOnPlane(seat.forward, Vector3.up).normalized;
+            Vector3 up = Vector3.up * 0.2f;
+            Vector3[] candidates =
+            {
+                seat.position + right * 1.2f + up, seat.position - right * 1.2f + up, seat.position - forward * 2f + up,
+                seat.position + forward * 2.2f + up, seat.position + right * 2f + up, seat.position - right * 2f + up,
+                seat.position + Vector3.up * 1.2f
+            };
+            Collider mine = PlayerHub.Local != null ? PlayerHub.Local.BodyCollider : null;
+            foreach (Vector3 feet in candidates)
+            {
+                int count = Physics.OverlapCapsuleNonAlloc(feet + Vector3.up * 0.4f, feet + Vector3.up * 1.45f, 0.35f, _exitOverlaps, ~0, QueryTriggerInteraction.Ignore);
+                bool blocked = false;
+                for (int i = 0; i < count && !blocked; i++)
+                    blocked = _exitOverlaps[i] != mine;
+                if (!blocked) return feet;
+            }
+            return candidates[candidates.Length - 1];
         }
 
         /// <summary>World handlebar grips (fingers forward over the bar, palms down).</summary>

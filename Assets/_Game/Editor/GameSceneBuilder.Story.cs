@@ -14,6 +14,7 @@ using PleaseDontDrown.World;
 using PleaseDontDrown.World.Water;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.AI;
 using Object = UnityEngine.Object;
 
 namespace PleaseDontDrown.Editor
@@ -347,6 +348,52 @@ namespace PleaseDontDrown.Editor
             profile.FindPropertyRelative("BleedSeconds").floatValue = 60f;
             profile.FindPropertyRelative("Silent").boolValue = false;
             profile.FindPropertyRelative("NeedsCpr").boolValue = needsCpr;
+        }
+
+        // =====================================================================
+        // Navigation
+        // =====================================================================
+
+        private const string NavMeshDir = "Assets/_Game/Data/Navigation";
+
+        /// <summary>
+        /// Bakes a navmesh per island from the scene's static colliders (terrain, buildings, counters, trunks, dock
+        /// posts, rocks; nothing with a rigidbody) and adds a loader, so story characters walk around things.
+        /// </summary>
+        private static void BakeNavMeshes()
+        {
+            Directory.CreateDirectory(NavMeshDir);
+            // Objects were created and moved by script: bring the physics scene up to date, or collecting the
+            // colliders (a physics query) misses the ones built far from where they were created.
+            Physics.SyncTransforms();
+            NavMeshBuildSettings settings = NavMesh.GetSettingsByID(0);
+            settings.agentRadius = 0.3f;
+            settings.agentHeight = 1.8f;
+            settings.agentClimb = 0.45f;
+            settings.agentSlope = 40f;
+            settings.overrideVoxelSize = true;
+            settings.voxelSize = 0.1f;
+            (string name, Bounds bounds)[] areas =
+            {
+                ("Island1", new Bounds(new Vector3(0f, 0f, 8f), new Vector3(130f, 40f, 124f))),
+                ("Island2", new Bounds(new Vector3(20f, 0f, -232f), new Vector3(144f, 40f, 124f)))
+            };
+            var baked = new List<Object>();
+            foreach ((string name, Bounds bounds) in areas)
+            {
+                var sources = new List<NavMeshBuildSource>();
+                UnityEngine.AI.NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.PhysicsColliders, 0, new List<NavMeshBuildMarkup>(), sources);
+                sources.RemoveAll(s => s.component is Collider c && (c.attachedRigidbody != null || c.isTrigger));
+                NavMeshData data = UnityEngine.AI.NavMeshBuilder.BuildNavMeshData(settings, sources, bounds, Vector3.zero, Quaternion.identity);
+                data.name = $"NavMesh_{name}";
+                string path = $"{NavMeshDir}/{name}.asset";
+                AssetDatabase.DeleteAsset(path);
+                AssetDatabase.CreateAsset(data, path);
+                baked.Add(data);
+                Debug.Log($"[Build] navmesh {name}: {sources.Count} sources");
+            }
+            var loader = new GameObject("Navigation").AddComponent<NavMeshLoader>();
+            SetRefs(loader, "_data", baked.ToArray());
         }
 
         // =====================================================================

@@ -388,8 +388,36 @@ namespace PleaseDontDrown.Player
         {
             Vector3 eye = _camera.transform.position;
             Vector3 palm = eye + Vector3.ClampMagnitude(hand.Palm - eye, MaxReach + 0.3f);
+            // Resting, swimming, holding things: never into a wall (reaching, pressing and punching do touch it).
+            var state = (State)(hand.Key & 15);
+            if (state is not (State.Reach or State.Cpr or State.Punch or State.Breath)) palm = KeepOutOfWalls(eye, palm);
             hand.Wrist.SetPositionAndRotation(palm - hand.Rot * hand.Bones.PalmContact, hand.Rot);
             hand.Bones.Pose(hand.Pose);
+        }
+
+        private readonly RaycastHit[] _wallHits = new RaycastHit[8];
+
+        /// <summary>
+        /// Standing against a wall (or a counter, a tree), the hands pull back toward the eye so they end at its
+        /// surface instead of sinking into it. Only static things count: held items and bodies are handled by physics.
+        /// </summary>
+        private Vector3 KeepOutOfWalls(Vector3 eye, Vector3 palm)
+        {
+            Vector3 to = palm - eye;
+            float distance = to.magnitude;
+            if (distance < 0.05f) return palm;
+            Vector3 dir = to / distance;
+            const float fingers = 0.1f; // the fingers stick out past the palm point
+            int count = Physics.SphereCastNonAlloc(eye, 0.05f, dir, _wallHits, distance + fingers, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit h = _wallHits[i];
+                if (h.distance <= 0f || h.collider.attachedRigidbody != null) continue;
+                nearest = Mathf.Min(nearest, h.distance);
+            }
+            if (nearest >= distance + fingers) return palm;
+            return eye + dir * Mathf.Max(0.12f, nearest - fingers);
         }
 
         private Vector3 FrameForward => Quaternion.Euler(0f, _frameYaw, 0f) * Vector3.forward;

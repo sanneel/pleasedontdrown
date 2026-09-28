@@ -369,6 +369,9 @@ namespace PleaseDontDrown.Story
 
         private StoryNpc SpawnNpc(string displayName, NpcRole role, AvatarLook look, Vector3 position, float yaw, int health = 0)
         {
+            position = StoryNpc.OnNavMesh(position); // not inside a palm, a counter or a wall
+            float ground = Shore.GroundHeightAt(position + Vector3.up * 3f);
+            if (!float.IsNaN(ground) && Shore.WaterDepthAt(position + Vector3.up * 3f) < 1f) position.y = ground;
             StoryNpc npc = Instantiate(_npcPrefab, position, Quaternion.Euler(0f, yaw, 0f));
             Spawn(npc.gameObject);
             npc.ServerSetup(displayName, role, look, health);
@@ -582,7 +585,7 @@ namespace PleaseDontDrown.Story
             DevCommands.Register("npcs", "", "List story characters.", _ =>
             {
                 foreach (StoryNpc n in StoryNpc.All)
-                    DevCommands.Print($"  {n.Name,-14} {n.Role,-12} pose {n.Pose,-7} hp {n.Health}/{n.MaxHealth}  at {n.transform.position:F1}{(n.IsMoving ? "  moving" : "")}");
+                    DevCommands.Print($"  {n.Name,-14} {n.Role,-12} pose {n.Pose,-7} hp {n.Health}/{n.MaxHealth}  at {n.transform.position:F1}{(n.IsMoving ? "  moving " + n.PathInfo : "")}");
             }, owner: this);
             DevCommands.Register("goto", "<name part>", "Teleport next to a tourist, character, item or vehicle and look at it (tests).", args =>
             {

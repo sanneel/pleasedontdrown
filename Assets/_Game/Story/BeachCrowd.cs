@@ -233,7 +233,7 @@ namespace PleaseDontDrown.Story
             m.TowelPose = pose;
             Vector3 p = TowelPlace(m.Towel, pose, out float yaw);
             m.Npc.ServerSetPose(pose);
-            m.Npc.ServerTeleport(p, yaw);
+            m.Npc.ServerTeleport(p, yaw, keepExact: true); // towels are laid out clear of obstacles
         }
 
         /// <summary>Keep the water busy: new swimmers appear far from any lifeguard.</summary>
