@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 6206540679585628353}
   - component: {fileID: 9106289244823157302}
   - component: {fileID: 7907833280377942406}
+  - component: {fileID: 5563798120586501583}
   m_Layer: 0
   m_Name: Avatar
   m_TagString: Untagged
@@ -107,6 +108,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarRig
   _material: {fileID: 2100000, guid: 2b9a1ba0df6725b43bddddf596d58f1a, type: 2}
   _buildOnAwake: 0
+--- !u!114 &5563798120586501583
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 772326272712791509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d72168c9069a7f0479db9e71431cc405, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarJiggle
+  _rig: {fileID: 7907833280377942406}
+  _strength: 1
 --- !u!1 &1037742606862666997
 GameObject:
   m_ObjectHideFlags: 0
@@ -829,6 +844,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Rescue.VictimBody
   _visual: {fileID: 4213332064815936240}
   _avatar: {fileID: 7907833280377942406}
+  _jiggle: {fileID: 5563798120586501583}
   _hipY: -0.3
   _audio: {fileID: 6295726673578978674}
   _headLocal: {x: 0, y: 0.52, z: 0}
@@ -870,9 +886,13 @@ MonoBehaviour:
   _drowningBelowAir: 0.35
   _conditionSeconds: 90
   _cprSlowdown: 0.3
-  _cprPumpsNeeded: 15
   _cprDecayPerSecond: 0.04
   _cprReach: 3
+  _compressionsPerSet: 5
+  _breathsPerSet: 2
+  _compressGain: 0.05
+  _breathGain: 0.1
+  _punchGain: 0.2
   _celebrateSeconds: 4
   _leaveAfterSeconds: 45
 --- !u!82 &6295726673578978674

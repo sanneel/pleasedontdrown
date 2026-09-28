@@ -307,6 +307,11 @@ namespace PleaseDontDrown.Player
                 args => GrabCommand(args.Length > 0 ? args[0] : null), owner: this);
             DevCommands.Register("throw", "[charge 0..1]", "Throw the held item.", args => Throw(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 1f), owner: this);
             DevCommands.Register("drop", "", "Drop the held item.", _ => Drop(), owner: this);
+            DevCommands.Register("usetool", "", "Use the held tool (pistol, defibrillator) as if pressing Primary.", _ =>
+            {
+                if (HeldItem != null && HeldItem.TryGetComponent(out Combat.IHeldTool t)) t.Use(_hub);
+                else DevCommands.Print("not holding a tool");
+            }, cheat: true, owner: this);
             DevCommands.Register("eat", "[seconds]", "Hold 'eat' on autopilot (automated tests).", args =>
                 _scriptedEatUntil = Time.time + (args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 2.5f), cheat: true, owner: this);
             DevCommands.Register("slot", "<1-4>", "Select an inventory slot.", args => SelectSlot(Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) - 1), owner: this);
@@ -322,6 +327,7 @@ namespace PleaseDontDrown.Player
             DevCommands.Unregister("grab", this);
             DevCommands.Unregister("throw", this);
             DevCommands.Unregister("drop", this);
+            DevCommands.Unregister("usetool", this);
             DevCommands.Unregister("slot", this);
             DevCommands.Unregister("eat", this);
             DevCommands.Unregister("inventory", this);
@@ -364,6 +370,13 @@ namespace PleaseDontDrown.Player
 
             UpdateEating(held);
             if (IsEating || HeldItem == null) return;
+
+            // Tools (pistol, defibrillator): Primary uses them; hold Drop to throw them instead.
+            if (_chargeSource == ChargeSource.None && GameInput.Primary.WasPressedThisFrame() && held.TryGetComponent(out Combat.IHeldTool tool))
+            {
+                if (held.IsConfirmedHolder(_hub)) tool.Use(_hub);
+                return;
+            }
 
             if (_chargeSource == ChargeSource.None)
             {

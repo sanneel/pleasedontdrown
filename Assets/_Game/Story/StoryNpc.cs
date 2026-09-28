@@ -1,0 +1,473 @@
+using System;
+using System.Collections.Generic;
+using FishNet.Connection;
+using FishNet.Object;
+using FishNet.Object.Synchronizing;
+using PleaseDontDrown.Avatars;
+using PleaseDontDrown.Combat;
+using PleaseDontDrown.Core;
+using PleaseDontDrown.Interaction;
+using PleaseDontDrown.Player;
+using PleaseDontDrown.Rescue;
+using PleaseDontDrown.UI;
+using PleaseDontDrown.Vehicles;
+using PleaseDontDrown.World.Water;
+using UnityEngine;
+using Random = UnityEngine.Random;
+
+namespace PleaseDontDrown.Story
+{
+    public enum NpcRole : byte { Guide, Receptionist, Robber, Pirate, Bystander, Guest }
+
+    /// <summary>
+    /// A story character: Sandy, the receptionist, the robber, pirates, a guest shouting for help.
+    ///
+    /// The host moves it (a <c>NetworkTransform</c> carries position and facing); every machine animates the
+    /// procedural body from that movement, the same way remote players are animated, plus a synced pose (knocked
+    /// down, begging, scared...), mood and "talking". Press Interact to talk when it has something to say.
+    /// Robbers and pirates can be punched and shot (<see cref="IDamageable"/>); their behaviour lives in
+    /// StoryNpc.Brains.cs. The look is an <see cref="AvatarLook"/> today and a generated model later.
+    /// </summary>
+    public partial class StoryNpc : NetworkBehaviour, IInteractionHandler, IDamageable
+    {
+        [SerializeField] private AvatarRig _rig;
+        [SerializeField] private AvatarAnimator _animator;
+        [SerializeField] private AudioSource _audio;
+        [SerializeField] private TextMesh _nameTag;
+        [SerializeField] private float _walkSpeed = 1.5f;
+        [SerializeField] private float _runSpeed = 5.9f;
+
+        private static readonly List<StoryNpc> _all = new();
+
+        private readonly SyncVar<string> _name = new SyncVar<string>();
+        private readonly SyncVar<ulong> _look = new SyncVar<ulong>();
+        private readonly SyncVar<NpcRole> _role = new SyncVar<NpcRole>();
+        private readonly SyncVar<AvatarPose> _pose = new SyncVar<AvatarPose>();
+        private readonly SyncVar<AvatarMood> _mood = new SyncVar<AvatarMood>();
+        private readonly SyncVar<bool> _talkable = new SyncVar<bool>();
+        private readonly SyncVar<string> _talkPrompt = new SyncVar<string>();
+        private readonly SyncVar<int> _health = new SyncVar<int>();
+        private readonly SyncVar<int> _maxHealth = new SyncVar<int>();
+        private readonly SyncVar<bool> _hasBag = new SyncVar<bool>();
+
+        // Every machine.
+        private Vector3 _lastPosition;
+        private Vector3 _velocity;
+        private float _talkUntil;
+        private float _lookYaw;
+        private GameObject _bag;
+        private float _nextTalkRequest;
+
+        // Host.
+        private Vector3? _moveTarget;
+        private float _moveSpeed;
+        private Vector3? _facePoint;
+        private Vehicle _ride;
+        private Vector3 _rideLocal;
+        private float _staggerUntil;
+        private Vector3 _knock;
+
+        public static IReadOnlyList<StoryNpc> All => _all;
+        /// <summary>Host: a player pressed Interact on this character.</summary>
+        public static event Action<StoryNpc, PlayerHub> ServerTalked;
+        /// <summary>Host: health reached zero.</summary>
+        public static event Action<StoryNpc, PlayerHub> ServerDefeated;
+
+        public string Name => string.IsNullOrEmpty(_name.Value) ? "Someone" : _name.Value;
+        public NpcRole Role => _role.Value;
+        public AvatarPose Pose => _pose.Value;
+        public int Health => _health.Value;
+        public int MaxHealth => _maxHealth.Value;
+        public bool IsDefeated => _maxHealth.Value > 0 && _health.Value <= 0;
+        public bool IsTalkable => _talkable.Value;
+        public Vector3 HeadPosition => transform.position + Vector3.up * (_pose.Value == AvatarPose.Down ? 0.3f : 1.75f);
+        public bool IsMoving => _moveTarget.HasValue;
+
+        public Color SpeechColor => _role.Value switch
+        {
+            NpcRole.Guide => new Color(1f, 0.78f, 0.55f),
+            NpcRole.Receptionist => new Color(0.7f, 0.85f, 1f),
+            NpcRole.Robber => new Color(0.85f, 0.85f, 0.85f),
+            NpcRole.Pirate => new Color(1f, 0.5f, 0.4f),
+            _ => new Color(1f, 1f, 0.75f)
+        };
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _all.Clear();
+            ServerTalked = null;
+            ServerDefeated = null;
+        }
+
+        private void Awake()
+        {
+            _look.OnChange += (_, next, _) => ApplyLook(next);
+            _name.OnChange += (_, next, _) =>
+            {
+                if (_nameTag != null) _nameTag.text = next;
+                if (!string.IsNullOrEmpty(next)) gameObject.name = $"Npc_{next}";
+            };
+            _hasBag.OnChange += (_, next, _) => ShowBag(next);
+        }
+
+        public override void OnStartNetwork()
+        {
+            base.OnStartNetwork();
+            _all.Add(this);
+            _lastPosition = transform.position;
+            _lookYaw = transform.eulerAngles.y;
+        }
+
+        public override void OnStopNetwork()
+        {
+            base.OnStopNetwork();
+            _all.Remove(this);
+        }
+
+        public override void OnStartClient()
+        {
+            base.OnStartClient();
+            ApplyLook(_look.Value);
+            if (_nameTag != null) _nameTag.text = Name;
+            ShowBag(_hasBag.Value);
+        }
+
+        // ------------------------------------------------------------------ host API
+
+        /// <summary>Host: who this is and what they look like.</summary>
+        [Server]
+        public void ServerSetup(string displayName, NpcRole role, AvatarLook look, int health = 0)
+        {
+            _name.Value = displayName;
+            _role.Value = role;
+            _look.Value = look.Pack();
+            _maxHealth.Value = health;
+            _health.Value = health;
+            _hasBag.Value = role == NpcRole.Robber;
+            _talkable.Value = role is NpcRole.Guide or NpcRole.Receptionist;
+            _pose.Value = AvatarPose.Normal;
+            _mood.Value = AvatarMood.Neutral;
+            ServerSetupBrain();
+        }
+
+        [Server] public void ServerSetTalkable(bool talkable, string prompt = null)
+        {
+            _talkable.Value = talkable;
+            _talkPrompt.Value = prompt ?? string.Empty;
+        }
+
+        [Server] public void ServerSetPose(AvatarPose pose) => _pose.Value = pose;
+        [Server] public void ServerSetMood(AvatarMood mood) => _mood.Value = mood;
+        [Server] public void ServerSetHealth(int health, int max) { _maxHealth.Value = max; _health.Value = health; }
+        [Server] public void ServerSetBag(bool hasBag) => _hasBag.Value = hasBag;
+
+        /// <summary>Host: walk (or run) to a point on land, then stop.</summary>
+        [Server]
+        public void ServerMoveTo(Vector3 target, bool run = false)
+        {
+            _moveTarget = target;
+            _moveSpeed = run ? _runSpeed : _walkSpeed;
+        }
+
+        [Server] public void ServerStop() => _moveTarget = null;
+
+        /// <summary>Host: turn toward a point (null: face whoever is near).</summary>
+        [Server] public void ServerFace(Vector3? point) => _facePoint = point;
+
+        [Server]
+        public void ServerTeleport(Vector3 position, float yaw)
+        {
+            _moveTarget = null;
+            _ride = null;
+            transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+        }
+
+        /// <summary>Host: stand on a vehicle's deck (pirates arriving), local to the vehicle. Null gets off.</summary>
+        [Server]
+        public void ServerRide(Vehicle vehicle, Vector3 local)
+        {
+            _ride = vehicle;
+            _rideLocal = local;
+            _moveTarget = null;
+        }
+
+        /// <summary>Host: play a gesture on every machine.</summary>
+        [Server]
+        public void ServerGesture(AvatarGesture gesture, Vector3 point = default) => GestureObservers(gesture, point);
+
+        [ObserversRpc]
+        private void GestureObservers(AvatarGesture gesture, Vector3 point)
+        {
+            if (_animator != null) _animator.Play(gesture, point);
+        }
+
+        /// <summary>Host: a shout above the head everyone sees (and hears).</summary>
+        [Server]
+        public void ServerShout(string text, bool cry = false) => ShoutObservers(text, cry);
+
+        [ObserversRpc]
+        private void ShoutObservers(string text, bool cry)
+        {
+            FloatingText.Spawn(HeadPosition + Vector3.up * 0.4f, text, new Color(1f, 0.95f, 0.75f), 0.9f, 1.6f);
+            if (cry && _audio != null) _audio.PlayOneShot(ProceduralAudio.Cry(_rig != null && _rig.Look.Feminine ? 3 : 1), 1f);
+            OnSpeak(0.8f);
+        }
+
+        // ------------------------------------------------------------------ talking
+
+        public bool CanInteract(PlayerHub player) => _talkable.Value && _pose.Value != AvatarPose.Down;
+
+        public string GetPrompt(PlayerHub player) => !string.IsNullOrEmpty(_talkPrompt.Value) ? _talkPrompt.Value : $"Talk to {Name}";
+
+        public void OnInteract(PlayerHub player)
+        {
+            if (Time.time < _nextTalkRequest) return;
+            _nextTalkRequest = Time.time + 0.6f;
+            TalkServer(player);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void TalkServer(PlayerHub player, NetworkConnection caller = null)
+        {
+            if (player == null || player.Owner != caller || !_talkable.Value) return;
+            if ((player.transform.position - transform.position).sqrMagnitude > 5f * 5f) return;
+            Debug.Log($"[Npc] {player.DisplayName} talks to {Name}");
+            ServerTalked?.Invoke(this, player);
+        }
+
+        /// <summary>Every machine: mouth moves for a while (a dialogue line or a shout).</summary>
+        public void OnSpeak(float seconds) => _talkUntil = Mathf.Max(_talkUntil, Time.time + seconds);
+
+        // ------------------------------------------------------------------ damage (host)
+
+        public bool ServerTakeHit(int damage, DamageKind kind, PlayerHub attacker, Vector3 point, Vector3 direction)
+        {
+            if (_maxHealth.Value <= 0 || _health.Value <= 0) return false; // can't be hurt / already down
+            _health.Value = Mathf.Max(0, _health.Value - damage);
+            Vector3 push = new Vector3(direction.x, 0f, direction.z).normalized;
+            _knock = push * (kind == DamageKind.Bullet ? 2f : 3.5f);
+            _staggerUntil = Time.time + (kind == DamageKind.Bullet ? 0.35f : 0.6f);
+            HitObservers(point, _health.Value, kind == DamageKind.Bullet);
+            OnServerHit(attacker);
+            if (_health.Value <= 0)
+            {
+                _moveTarget = null;
+                _pose.Value = AvatarPose.Down;
+                _mood.Value = AvatarMood.Hurt;
+                Debug.Log($"[Npc] {Name} is down ({kind} by {(attacker != null ? attacker.DisplayName : "?")})");
+                ServerDefeated?.Invoke(this, attacker);
+            }
+            return true;
+        }
+
+        [ObserversRpc]
+        private void HitObservers(Vector3 point, int healthLeft, bool bullet)
+        {
+            if (_audio != null) _audio.PlayOneShot(bullet ? ProceduralAudio.Bonk : ProceduralAudio.Punch, 1f);
+            string text = healthLeft <= 0 ? "K.O.!" : bullet ? "OUCH!" : Random.value < 0.5f ? "OW!" : "OOF!";
+            FloatingText.Spawn(HeadPosition + Vector3.up * 0.3f, text, new Color(1f, 0.6f, 0.3f), healthLeft <= 0 ? 1.4f : 0.9f, 1.2f);
+        }
+
+        // ------------------------------------------------------------------ per frame
+
+        private void Update()
+        {
+            float dt = Mathf.Max(Time.deltaTime, 1e-4f);
+            if (IsServerInitialized) ServerUpdate(dt);
+
+            // Everyone: animate from how the body moved.
+            Vector3 position = transform.position;
+            Vector3 raw = (position - _lastPosition) / dt;
+            if (raw.sqrMagnitude > 900f) raw = Vector3.zero;
+            _velocity = Vector3.Lerp(_velocity, raw, 1f - Mathf.Exp(-10f * dt));
+            _lastPosition = position;
+            UpdateAnimation();
+            UpdateNameTag();
+        }
+
+        private void UpdateAnimation()
+        {
+            if (_animator == null || _rig == null || !_rig.IsBuilt) return;
+            // Idle: turn the head (and eventually the body) toward the nearest player.
+            float yaw = transform.eulerAngles.y;
+            var flatSpeed = new Vector2(_velocity.x, _velocity.z).magnitude;
+            if (flatSpeed < 0.3f && _pose.Value is AvatarPose.Normal or AvatarPose.Scared && NearestPlayer(6f) is { } near)
+            {
+                Vector3 to = near.transform.position - transform.position;
+                if (to.sqrMagnitude > 0.01f) yaw = Quaternion.LookRotation(new Vector3(to.x, 0f, to.z)).eulerAngles.y;
+            }
+            _lookYaw = Mathf.LerpAngle(_lookYaw, yaw, 1f - Mathf.Exp(-6f * Time.deltaTime));
+            bool swimming = WaterSurface.Exists && WaterSurface.HeightAt(transform.position) - transform.position.y > 1.1f;
+            _animator.Motion = new AvatarMotion
+            {
+                Velocity = _pose.Value == AvatarPose.Normal || _pose.Value == AvatarPose.Scared ? _velocity : Vector3.zero,
+                FacingYaw = _lookYaw,
+                Grounded = true,
+                Swimming = swimming && _ride == null,
+                Sprinting = flatSpeed > 4.5f,
+                Pose = _pose.Value,
+                Mood = _mood.Value,
+                Talking = Time.time < _talkUntil,
+                Seated = false
+            };
+        }
+
+        private void UpdateNameTag()
+        {
+            if (_nameTag == null) return;
+            PlayerHub local = PlayerHub.Local;
+            Camera cam = Camera.main;
+            bool show = local != null && cam != null && (local.transform.position - transform.position).sqrMagnitude < 9f * 9f && !string.IsNullOrEmpty(_name.Value);
+            if (_nameTag.gameObject.activeSelf != show) _nameTag.gameObject.SetActive(show);
+            if (!show) return;
+            _nameTag.transform.position = HeadPosition + Vector3.up * 0.45f;
+            _nameTag.transform.rotation = cam.transform.rotation;
+            _nameTag.text = _maxHealth.Value > 0 && _health.Value > 0
+                ? $"{Name}  {new string('●', _health.Value)}{new string('○', Mathf.Max(0, _maxHealth.Value - _health.Value))}"
+                : Name;
+        }
+
+        public static PlayerHub NearestPlayer(Vector3 from, float range)
+        {
+            PlayerHub best = null;
+            float bestSq = range * range;
+            foreach (PlayerHub p in PlayerHub.All)
+            {
+                float d = (p.transform.position - from).sqrMagnitude;
+                if (d < bestSq)
+                {
+                    bestSq = d;
+                    best = p;
+                }
+            }
+            return best;
+        }
+
+        private PlayerHub NearestPlayer(float range) => NearestPlayer(transform.position, range);
+
+        // ------------------------------------------------------------------ host movement
+
+        private void ServerUpdate(float dt)
+        {
+            if (_ride != null)
+            {
+                // Standing on a moving deck.
+                transform.position = _ride.transform.TransformPoint(_rideLocal);
+                transform.rotation = Quaternion.Euler(0f, _ride.transform.eulerAngles.y, 0f);
+                return;
+            }
+
+            BrainUpdate(dt);
+
+            Vector3 p = transform.position;
+            if (Time.time < _staggerUntil)
+            {
+                // Knocked back by a hit, sliding to a stop.
+                p += _knock * dt;
+                _knock = Vector3.MoveTowards(_knock, Vector3.zero, dt * 8f);
+                transform.position = Grounded(p);
+                return;
+            }
+
+            if (_moveTarget.HasValue && _pose.Value is AvatarPose.Normal or AvatarPose.Scared)
+            {
+                Vector3 to = _moveTarget.Value - p;
+                to.y = 0f;
+                float distance = to.magnitude;
+                if (distance < 0.15f)
+                {
+                    _moveTarget = null;
+                }
+                else
+                {
+                    Vector3 step = to / distance * Mathf.Min(distance, _moveSpeed * dt);
+                    Vector3 next = Grounded(p + step);
+                    // Story characters don't wander into deep water (the robber would drown on us).
+                    if (Shore.WaterDepthAt(next + Vector3.up * 0.1f) < 0.5f || Shore.WaterDepthAt(p) >= 0.5f)
+                        transform.position = next;
+                    else
+                        _moveTarget = null;
+                    Face(step, dt, 10f);
+                }
+            }
+            if (!_moveTarget.HasValue && _facePoint.HasValue)
+                Face(_facePoint.Value - p, dt, 5f);
+            Separate(dt);
+            if (!_moveTarget.HasValue) transform.position = Grounded(transform.position); // spawned in the air or into a dune
+        }
+
+        /// <summary>Don't stand inside each other (a gang of pirates spreads out around their target).</summary>
+        private void Separate(float dt)
+        {
+            if (_pose.Value == AvatarPose.Down) return;
+            Vector3 p = transform.position, push = Vector3.zero;
+            foreach (StoryNpc other in _all)
+            {
+                if (other == this || other._ride != null || other._pose.Value == AvatarPose.Down) continue;
+                Vector3 d = p - other.transform.position;
+                d.y = 0f;
+                float distance = d.magnitude;
+                if (distance < 0.85f)
+                    push += (distance > 0.01f ? d / distance : Random.insideUnitSphere) * (0.85f - distance);
+            }
+            push.y = 0f;
+            if (push.sqrMagnitude > 1e-6f) transform.position = Grounded(p + Vector3.ClampMagnitude(push, 1f) * Mathf.Min(1f, dt * 6f));
+        }
+
+        private void Face(Vector3 direction, float dt, float rate)
+        {
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 1e-4f) return;
+            Quaternion want = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.Slerp(transform.rotation, want, 1f - Mathf.Exp(-rate * dt));
+        }
+
+        private static Vector3 Grounded(Vector3 p)
+        {
+            float ground = Shore.GroundHeightAt(p + Vector3.up * 2.5f);
+            if (!float.IsNaN(ground)) p.y = ground;
+            return p;
+        }
+
+        // ------------------------------------------------------------------ looks
+
+        private void ApplyLook(ulong packed)
+        {
+            if (_rig == null || packed == 0) return;
+            AvatarLook look = AvatarLook.Unpack(packed);
+            if (_rig.IsBuilt && _rig.Look.Equals(look)) return;
+            _rig.Build(look);
+            ShowBag(_hasBag.Value);
+        }
+
+        /// <summary>The robber's backpack: a lumpy bag on his back (bursts open when he goes down).</summary>
+        private void ShowBag(bool show)
+        {
+            if (!show)
+            {
+                if (_bag != null) _bag.SetActive(false);
+                return;
+            }
+            if (_rig == null || !_rig.IsBuilt) return;
+            if (_bag == null)
+            {
+                var kit = new AvatarMeshKit();
+                kit.SetBone(0, Matrix4x4.identity);
+                Color canvas = new Color(0.36f, 0.27f, 0.18f), strap = new Color(0.16f, 0.12f, 0.08f);
+                kit.Ellipsoid(Vector3.zero, new Vector3(0.17f, 0.22f, 0.11f), canvas, segments: 12, rings: 8);
+                kit.Ellipsoid(new Vector3(0f, 0.15f, -0.02f), new Vector3(0.15f, 0.07f, 0.1f), canvas * 0.85f, segments: 10, rings: 6);
+                kit.Box(new Vector3(0f, -0.02f, -0.11f), new Vector3(0.16f, 0.12f, 0.04f), canvas * 0.9f);
+                foreach (float side in new[] { -1f, 1f })
+                    kit.Box(new Vector3(0.1f * side, 0.05f, 0.1f), new Vector3(0.03f, 0.34f, 0.02f), strap);
+                _bag = new GameObject("Bag");
+                _bag.AddComponent<MeshFilter>().sharedMesh = kit.ToMesh("RobberBag", new[] { Matrix4x4.identity });
+                _bag.AddComponent<MeshRenderer>().sharedMaterial = AvatarRig.SharedMaterial;
+            }
+            _bag.transform.SetParent(_rig[AvatarRig.Bone.Chest], false);
+            _bag.transform.localPosition = new Vector3(0f, 0.05f, -0.22f) * _rig.Scale;
+            _bag.transform.localRotation = Quaternion.identity;
+            _bag.SetActive(true);
+        }
+    }
+}

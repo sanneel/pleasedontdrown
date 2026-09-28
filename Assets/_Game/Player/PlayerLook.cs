@@ -103,6 +103,13 @@ namespace PleaseDontDrown.Player
 
         private void ApplyHead() => _head.localRotation = Quaternion.Euler(_pitch, _yaw, 0f);
 
+        /// <summary>Turn the view (e.g. with the vehicle we're driving).</summary>
+        public void AddYaw(float degrees)
+        {
+            _yaw += degrees;
+            ApplyHead();
+        }
+
         /// <summary>Players' bodies never rotate; facing lives on the head.</summary>
         public static void ResetBodyRotation(Transform body)
         {

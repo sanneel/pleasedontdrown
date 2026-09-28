@@ -162,6 +162,33 @@ namespace PleaseDontDrown.Player
             _climbing = false;
         }
 
+        /// <summary>The vehicle we're sitting on (the vehicle glues us to its seat), or null.</summary>
+        public Vehicles.Vehicle Seat { get; private set; }
+
+        /// <summary>Sit on a vehicle (body goes kinematic, eyes drop to sitting height) or get off at <paramref name="exitPosition"/>.</summary>
+        public void SetSeat(Vehicles.Vehicle vehicle, Vector3 exitPosition)
+        {
+            if (Seat == vehicle) return;
+            Seat = vehicle;
+            _climbing = false;
+            if (vehicle != null)
+            {
+                _rb.linearVelocity = Vector3.zero;
+                _rb.isKinematic = true;
+                _rb.interpolation = RigidbodyInterpolation.None;
+                IsGrounded = true;
+                IsCrouching = false;
+                _height = _standHeight;
+                ApplyHeight();
+                if (_head != null) _head.localPosition = new Vector3(0f, 1.22f, 0f); // sitting eye height
+                return;
+            }
+            _rb.isKinematic = Noclip;
+            _rb.interpolation = RigidbodyInterpolation.Interpolate;
+            ApplyHeight();
+            Teleport(exitPosition);
+        }
+
         /// <summary>Knockback / explosion / boat hit: an instant velocity change plus a moment of reduced control.</summary>
         public void AddImpulse(Vector3 velocityChange)
         {
@@ -187,7 +214,8 @@ namespace PleaseDontDrown.Player
 
             UpdateBreath(Time.deltaTime);
 
-            if (!Noclip && transform.position.y < -25f)
+            if (Seat != null) _moveInput = Vector2.zero; // W/S/A/D drive the vehicle instead
+            if (!Noclip && Seat == null && transform.position.y < -25f)
                 Teleport(_spawnPoint);
         }
 
@@ -196,6 +224,8 @@ namespace PleaseDontDrown.Player
         private void FixedUpdate()
         {
             float dt = Time.fixedDeltaTime;
+            if (Seat != null)
+                return; // the vehicle carries us
             if (Noclip)
             {
                 FlyNoclip(dt);

@@ -3,6 +3,7 @@
 Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP · FishNet 4.7.3 · Steam (FishySteamworks).
 
 * Design: [Docs/01-Game-Design.md](Docs/01-Game-Design.md)
+* **Story mode** (chapters 1-2: Sandy, the robber, the hotel island, sharks, pirates): [Docs/05-Story-Mode.md](Docs/05-Story-Mode.md)
 * Architecture and milestones: [Docs/02-Technical-Architecture.md](Docs/02-Technical-Architecture.md)
 * Art direction + Meshy prompts: [Docs/03-Art-Direction-Meshy.md](Docs/03-Art-Direction-Meshy.md) (exports go in `ArtSource/Meshy/`)
 
@@ -33,8 +34,11 @@ Keep the Steam client running for online features (dev app id **480** / Spacewar
 | Inventory slots (small things go in your pockets) | 1-4 / mouse wheel | D-pad left / right |
 | Eat the food in your hands (coconut) | Hold right mouse | Hold LT |
 | Wave | V | D-pad up |
-| CPR on an unconscious tourist on land (keep tapping) | Right mouse | LT |
+| CPR on an unconscious tourist on land (keep tapping: compressions, then mouth-to-mouth or a punch) | Right mouse | LT |
+| Punch (empty hands) | Left mouse | RT |
+| Use the held tool (pistol: shoot, defibrillator: shock) | Left mouse | RT |
 | Throw held item (hold to charge) | Left mouse, or hold G | RT, or hold Y |
+| Drive a jet ski / boat: throttle, steer · get off | W/S, A/D · E | Left stick · X |
 | Drop held item | Tap G | Tap Y |
 | Swim: dive · rise | Ctrl · Space (underwater) | B · A |
 | Climb out onto dock / rock | Space in the water, facing the ledge | A |
@@ -53,7 +57,14 @@ Useful console commands: `help`, `noclip`, `speed 3`, `tp spawn`, `lookat x y z`
 `waves <scale>` (storm = 3), `water`, `breath`, `knock x y z`, `use`, `use2`, `targetdebug`, `contacts`, `screenshot [delay]` (saved to `Screenshots/`),
 `grab [name]`, `drill`, `victims`, `victim [distance] [state]`, `vset <state|air|panic|condition> <value>` (nearest tourist),
 `cpr [pumps]`, `clearvictims`, `ragdoll`.
+Story: `story` (status), `story list`, `story skip`, `story goto 1.9`, `story reset`, `story off`, `money [n]`, `npcs`,
+`goto <name>`, `bring <item>`, `tourist f|m [silent] [flatline]` (on land: collapsed, needs CPR), `robber`, `whack [n]`,
+`shark`, `pirates`, `vehicles`, `drive <s> [steer] [throttle]`, `usetool`, `punch`, `buy <n>`, `dialogue`.
 Cheats work in the editor and dev builds.
+
+**Story mode** starts by itself when you host: meet Sandy at the Lost & Found kiosk next to the spawn and follow the
+objective in the top left. Progress (beat + money) is saved in `%USERPROFILE%/AppData/LocalLow/PleaseDontDrown/PLEASE DON'T DROWN/story.json`;
+`story reset` starts over. Test switches: `-pdd-nostory` (sandbox, no story) and `-pdd-nosave` (don't read or write the save).
 
 ## Feel (modelled on How to Fish)
 * **Physics-body player**: a rigidbody capsule (75 kg) whose velocity is shaped each physics step: eased walk/sprint,

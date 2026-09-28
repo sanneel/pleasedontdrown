@@ -21,8 +21,10 @@ GameObject:
   - component: {fileID: 1751312579384821158}
   - component: {fileID: 4360125022336723585}
   - component: {fileID: 8335782968337767112}
-  - component: {fileID: 1725149870259231495}
+  - component: {fileID: 8748436732980522936}
   - component: {fileID: 4001305862416589337}
+  - component: {fileID: 1725149870259231495}
+  - component: {fileID: 3312183532521263807}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -385,6 +387,124 @@ MonoBehaviour:
   _animator: {fileID: 243754643095623124}
   _standEyeHeight: 1.65
   _crouchEyeHeight: 1
+--- !u!114 &8748436732980522936
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 665019184260466725}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ab6734839f4ff64ca39302461fc5867, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Combat.PlayerCombat
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 3796914769783393310}
+  _networkObjectCache: {fileID: 0}
+  _hub: {fileID: 6590466689215046085}
+  _audio: {fileID: 4001305862416589337}
+  _reach: 1.9
+  _radius: 0.28
+  _cooldown: 0.42
+  _shove: 5.5
+--- !u!82 &4001305862416589337
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 665019184260466725}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 2
+  MaxDistance: 30
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!114 &1725149870259231495
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -398,10 +518,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Player.PlayerFootsteps
   _hub: {fileID: 6590466689215046085}
-  _audio: {fileID: 4001305862416589337}
+  _audio: {fileID: 3312183532521263807}
   _remoteStride: 1.5
   _volume: 0.55
---- !u!82 &4001305862416589337
+--- !u!82 &3312183532521263807
 AudioSource:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -614,6 +734,7 @@ GameObject:
   - component: {fileID: 6118547956922520031}
   - component: {fileID: 6399849279824882199}
   - component: {fileID: 243754643095623124}
+  - component: {fileID: 8792870174193682817}
   m_Layer: 0
   m_Name: Avatar
   m_TagString: Untagged
@@ -724,6 +845,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarAnimator
   _rig: {fileID: 6399849279824882199}
   _turnSpeed: 10
+--- !u!114 &8792870174193682817
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6460529484615142115}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d72168c9069a7f0479db9e71431cc405, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Avatars.AvatarJiggle
+  _rig: {fileID: 6399849279824882199}
+  _strength: 1
 --- !u!1 &8598090722559763707
 GameObject:
   m_ObjectHideFlags: 0

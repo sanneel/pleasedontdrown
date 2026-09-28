@@ -17,6 +17,7 @@ namespace PleaseDontDrown.Core
         {
             _bell = _click = _splash = _waterStep = _cough = _thump = null;
             _crunch = _rustle = _bonk = _creak = _shut = null;
+            _breath = _zap = _punch = _gunshot = _cash = _engine = null;
             _steps = null;
             _cries = null;
         }
@@ -221,6 +222,60 @@ namespace PleaseDontDrown.Core
             float thud = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(90f, 60f, t / 0.25f) * t) * Mathf.Exp(-18f * t);
             float click = (Mathf.PerlinNoise(t * 7000f, 0.2f) * 2f - 1f) * Mathf.Exp(-80f * t);
             return (thud * 0.8f + click * 0.4f) * Mathf.Clamp01(t / 0.002f);
+        });
+
+        private static AudioClip _breath, _zap, _punch, _gunshot, _cash, _engine;
+
+        /// <summary>A long exhale (rescue breath).</summary>
+        public static AudioClip Breath => _breath != null ? _breath : _breath = Build("Breath", 0.8f, BreathWave());
+
+        private static System.Func<float, float> BreathWave()
+        {
+            var rng = new System.Random(311);
+            float low = 0f;
+            return t =>
+            {
+                low += ((float)(rng.NextDouble() * 2.0 - 1.0) - low) * 0.12f;
+                return low * 1.6f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.8f));
+            };
+        }
+
+        /// <summary>Defibrillator: a rising whine, then a buzzing crack.</summary>
+        public static AudioClip Zap => _zap != null ? _zap : _zap = Build("Zap", 0.7f, t =>
+        {
+            if (t < 0.35f) return Mathf.Sin(2f * Mathf.PI * (600f + 2400f * t) * t) * 0.12f * (t / 0.35f);
+            float u = t - 0.35f;
+            float buzz = Mathf.Sign(Mathf.Sin(2f * Mathf.PI * 120f * u)) * 0.5f + (Mathf.PerlinNoise(u * 3000f, 0.5f) * 2f - 1f) * 0.6f;
+            return buzz * Mathf.Exp(-9f * u) * 0.6f;
+        });
+
+        /// <summary>Cartoon punch: a slap of noise over a low thud.</summary>
+        public static AudioClip Punch => _punch != null ? _punch : _punch = Build("Punch", 0.25f, t =>
+        {
+            float thud = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(140f, 60f, t / 0.25f) * t) * Mathf.Exp(-16f * t);
+            float slap = (Mathf.PerlinNoise(t * 9000f, 0.7f) * 2f - 1f) * Mathf.Exp(-60f * t);
+            return (thud * 0.9f + slap * 0.7f) * Mathf.Clamp01(t / 0.002f);
+        });
+
+        /// <summary>Pistol shot.</summary>
+        public static AudioClip Gunshot => _gunshot != null ? _gunshot : _gunshot = Noise("Gunshot", 0.45f, 777, 0.95f, 0.08f, 11f, 1f);
+
+        /// <summary>Cash register "ka-ching".</summary>
+        public static AudioClip Cash => _cash != null ? _cash : _cash = Build("Cash", 0.6f, t =>
+        {
+            float clunk = t < 0.08f ? (Mathf.PerlinNoise(t * 5000f, 0.1f) * 2f - 1f) * Mathf.Exp(-40f * t) : 0f;
+            float u = Mathf.Max(0f, t - 0.07f);
+            float ding = (Mathf.Sin(2f * Mathf.PI * 1760f * u) + 0.5f * Mathf.Sin(2f * Mathf.PI * 2637f * u)) * Mathf.Exp(-6f * u) * (t > 0.07f ? 0.35f : 0f);
+            return clunk * 0.5f + ding;
+        });
+
+        /// <summary>Small two-stroke engine, loopable (pitch it up with the throttle).</summary>
+        public static AudioClip Engine => _engine != null ? _engine : _engine = Build("Engine", 1f, t =>
+        {
+            float f = 55f;
+            float pulse = Mathf.Pow(Mathf.Abs(Mathf.Sin(Mathf.PI * f * t)), 6f);
+            float rasp = Mathf.Sin(2f * Mathf.PI * f * 4f * t) * 0.3f + Mathf.Sin(2f * Mathf.PI * f * 7f * t) * 0.15f;
+            return (pulse * 0.7f + rasp * pulse) * 0.5f;
         });
 
         /// <summary>Low-passed noise burst: cutoff falls from <paramref name="brightStart"/> to <paramref name="brightEnd"/>.</summary>

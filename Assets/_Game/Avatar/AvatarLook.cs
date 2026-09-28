@@ -4,7 +4,7 @@ using UnityEngine;
 namespace PleaseDontDrown.Avatars
 {
     public enum HairStyle : byte { Bald, Buzz, Short, Spiky, Long, Ponytail, Afro, Mohawk }
-    public enum TopStyle : byte { None, Tank, LifeguardTank, TShirt, Hawaiian, RashGuard, Swimsuit }
+    public enum TopStyle : byte { None, Tank, LifeguardTank, TShirt, Hawaiian, RashGuard, Swimsuit, Bikini }
     public enum BottomStyle : byte { Trunks, Shorts, BoardShorts, Trousers }
     public enum HatStyle : byte { None, Cap, CapBackwards, BucketHat, Visor, StrawHat, Headband, Bandana }
     public enum GlassesStyle : byte { None, Sunglasses, Round, Hearts }
@@ -34,6 +34,7 @@ namespace PleaseDontDrown.Avatars
         public GlassesStyle Glasses;
         public FacialHair Face;
         public AvatarExtras Extras;
+        public byte Figure;       // 0 masculine, 1 feminine (hips, waist, bust with jiggle bones)
 
         public static readonly Color[] SkinTones =
         {
@@ -58,6 +59,8 @@ namespace PleaseDontDrown.Avatars
         };
 
         public static readonly string[] BuildNames = { "Slim", "Regular", "Broad", "Round" };
+        public static readonly string[] FigureNames = { "Masculine", "Feminine" };
+        public bool Feminine => Figure == 1;
         public static readonly string[] HeightNames = { "Short", "Medium", "Tall", "Very tall" };
 
         /// <summary>The station uniform: red shorts, white tank with a red stripe, red cap on backwards, whistle.</summary>
@@ -70,7 +73,10 @@ namespace PleaseDontDrown.Avatars
         };
 
         /// <summary>Same seed, same tourist on every machine: loud shirts, hats, the occasional pair of arm floaties.</summary>
-        public static AvatarLook RandomTourist(int seed)
+        public static AvatarLook RandomTourist(int seed) => RandomTourist(seed, -1);
+
+        /// <param name="figure">0 masculine, 1 feminine, -1 decided by the seed.</param>
+        public static AvatarLook RandomTourist(int seed, int figure)
         {
             var rng = new System.Random(seed);
             var look = new AvatarLook
@@ -89,6 +95,18 @@ namespace PleaseDontDrown.Avatars
                 Glasses = (GlassesStyle)Pick(rng, 0, 0, 0, 1, 1, 2, 3),
                 Face = (FacialHair)Pick(rng, 0, 0, 0, 1, 2, 3)
             };
+            bool feminine = figure >= 0 ? figure == 1 : rng.NextDouble() < 0.5;
+            if (feminine)
+            {
+                // Beach outfits: mostly bikinis, some swimsuits; longer hair, no beards, a bit less wide.
+                look.Figure = 1;
+                look.Top = (TopStyle)Pick(rng, 7, 7, 7, 6);
+                look.Hair = (HairStyle)Pick(rng, 4, 4, 5, 5, 2, 6);
+                look.Face = FacialHair.None;
+                look.Build = (byte)Pick(rng, 0, 0, 1, 1, 3);
+                look.Bottom = BottomStyle.Trunks;
+                if (look.Hat is HatStyle.Cap or HatStyle.CapBackwards or HatStyle.Bandana) look.Hat = HatStyle.StrawHat;
+            }
             if (look.Top == TopStyle.Swimsuit) look.Face = FacialHair.None;
             if (rng.NextDouble() < 0.3) look.Extras |= AvatarExtras.Floaties;
             if (rng.NextDouble() < 0.2) look.Extras |= AvatarExtras.Sunscreen;
@@ -116,11 +134,11 @@ namespace PleaseDontDrown.Avatars
 
         private const ulong Marker = 0xA7UL << 56; // tells a real look from 0 / garbage
 
-        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3 };
+        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1 };
 
         public ulong Pack()
         {
-            int[] values = { Build, Height, Skin, (int)Hair, HairColor, (int)Top, TopColor, (int)Bottom, BottomColor, (int)Hat, HatColor, (int)Glasses, (int)Face, (int)Extras };
+            int[] values = { Build, Height, Skin, (int)Hair, HairColor, (int)Top, TopColor, (int)Bottom, BottomColor, (int)Hat, HatColor, (int)Glasses, (int)Face, (int)Extras, Figure };
             ulong packed = 0;
             int shift = 0;
             for (int i = 0; i < Widths.Length; i++)
@@ -144,9 +162,9 @@ namespace PleaseDontDrown.Avatars
             return new AvatarLook
             {
                 Build = (byte)v[0], Height = (byte)v[1], Skin = (byte)v[2], Hair = (HairStyle)v[3], HairColor = (byte)v[4],
-                Top = (TopStyle)Mathf.Min(v[5], (int)TopStyle.Swimsuit), TopColor = (byte)v[6], Bottom = (BottomStyle)v[7],
+                Top = (TopStyle)Mathf.Min(v[5], (int)TopStyle.Bikini), TopColor = (byte)v[6], Bottom = (BottomStyle)v[7],
                 BottomColor = (byte)v[8], Hat = (HatStyle)v[9], HatColor = (byte)v[10], Glasses = (GlassesStyle)v[11],
-                Face = (FacialHair)v[12], Extras = (AvatarExtras)v[13]
+                Face = (FacialHair)v[12], Extras = (AvatarExtras)v[13], Figure = (byte)v[14]
             };
         }
 

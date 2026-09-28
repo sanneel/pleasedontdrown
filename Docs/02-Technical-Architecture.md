@@ -252,4 +252,8 @@ PleaseDontDrown/                  (git repo root = Unity project)
 After the slice: rescue-line gun + ropes, shark + water cannon/harpoon, currents, more zones, the Octopus.
 
 Progress: M0–M4 done (plus a "feel pass" between M3 and M4: physics-body player, physics-held items).
+**Story mode (chapters 1-2)** was built ahead of M5-M10 on request: StoryDirector, NPCs, dialogue, money, Lost & Found,
+shop, punching, pistol, defibrillator, shark, jet ski and pirate boat (`Vehicle`), the hotel island. See
+[05-Story-Mode.md](05-Story-Mode.md). Several pieces are first versions of milestone systems (money = M6's wallet,
+`Vehicle` = M8's jet ski, the story director's spawning = a scripted M9 director).
 M4 also brought a first taste of M6/M7: placeholder tap-CPR, and tourists grabbing a floating life ring.

@@ -39,6 +39,8 @@ namespace PleaseDontDrown.Rescue
         [SerializeField] private Transform _visual;
         [Tooltip("The cartoon body; its arms and legs follow the physics limbs.")]
         [SerializeField] private AvatarRig _avatar;
+        [Tooltip("Spring bones (feminine figures): kicked by CPR compressions and breaths.")]
+        [SerializeField] private AvatarJiggle _jiggle;
         [Tooltip("Torso-space height of the hips (where the leg joints are).")]
         [SerializeField] private float _hipY = -0.3f;
         [SerializeField] private AudioSource _audio;
@@ -83,11 +85,18 @@ namespace PleaseDontDrown.Rescue
         private Vector3 _wadeDirection = Vector3.forward;
         private float _groundY;
         private int _voice;
+        private float _breathAt = float.NegativeInfinity;
+        private float _punchAt = float.NegativeInfinity;
+        private float _punchSide = 1f;
+        private float _zapAt = float.NegativeInfinity;
 
         /// <summary>Where the mouth and nose are: underwater here = no air.</summary>
         public Vector3 HeadPosition => transform.TransformPoint(_headLocal);
         /// <summary>Middle of the chest, where CPR hands go.</summary>
         public Vector3 ChestPoint => transform.position + transform.forward * 0.17f + transform.up * 0.12f;
+        /// <summary>The mouth (rescue breaths).</summary>
+        public Vector3 MouthPoint => transform.TransformPoint(_headLocal + new Vector3(0f, -0.03f, 0.13f));
+        public bool IsBuilt => _avatar != null && _avatar.IsBuilt;
         /// <summary>The float (life ring...) this person is holding onto, if any. Found on every machine.</summary>
         public Floatable HeldFloat { get; private set; }
 
@@ -136,12 +145,13 @@ namespace PleaseDontDrown.Rescue
 
         // ------------------------------------------------------------------ looks
 
-        /// <summary>Same seed, same tourist on every machine: body, clothes, hat, glasses, floaties, voice.</summary>
-        public void ApplyLooks(int seed)
+        /// <summary>Same look on every machine (the host picks it from the seed): body, clothes, hat, glasses, floaties, voice.</summary>
+        public void ApplyLooks(AvatarLook look, int seed)
         {
-            _voice = Mathf.Abs(seed % 4);
+            // Voices 0-1 are the lower ones, 2-3 the higher ones.
+            _voice = look.Feminine ? 2 + Mathf.Abs(seed % 2) : Mathf.Abs(seed % 2);
             if (_avatar == null) return;
-            _avatar.Build(AvatarLook.RandomTourist(seed));
+            _avatar.Build(look);
             // Hips of the cartoon body on the torso's hip joints.
             _avatar.transform.localPosition = new Vector3(0f, _hipY - _avatar.HipHeight, 0f);
             _avatar.transform.localRotation = Quaternion.identity;
@@ -152,6 +162,45 @@ namespace PleaseDontDrown.Rescue
         {
             _squishAt = Time.time;
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Thump, 0.9f);
+            if (_jiggle != null) _jiggle.Bounce(-transform.up * 0.55f); // pushed into the chest, then bouncing back
+        }
+
+        /// <summary>A rescue breath: the chest rises (local visual, every machine).</summary>
+        public void RescueBreath()
+        {
+            _breathAt = Time.time;
+            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Breath, 0.8f);
+            if (_jiggle != null) _jiggle.Bounce(transform.up * 0.35f);
+            FloatingText.Spawn(HeadPosition + Vector3.up * 0.35f, "fwoooo", new Color(0.75f, 0.9f, 1f), 0.6f, 1.1f);
+        }
+
+        /// <summary>Punched awake (men's CPR): the head snaps aside with a POW.</summary>
+        public void Punched()
+        {
+            _punchAt = Time.time;
+            _punchSide = Random.value < 0.5f ? -1f : 1f;
+            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Bonk, 1f);
+            FloatingText.Spawn(HeadPosition + Vector3.up * 0.3f, "POW!", new Color(1f, 0.85f, 0.25f), 1.1f, 1f);
+        }
+
+        /// <summary>Defibrillator shock: the whole body jumps.</summary>
+        public void Zapped()
+        {
+            _zapAt = Time.time;
+            _squishAt = Time.time;
+            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Zap, 1f);
+            if (_jiggle != null) _jiggle.Bounce(transform.up * 0.8f);
+            FloatingText.Spawn(ChestPoint + Vector3.up * 0.4f, "BZZZT!", new Color(0.6f, 0.9f, 1f), 1.3f, 1.2f);
+            if (!_rb.isKinematic) _rb.AddForce(Vector3.up * 2.5f, ForceMode.VelocityChange);
+        }
+
+        /// <summary>Host (simulator): move the body somewhere (a hospital bed), limbs follow.</summary>
+        public void ServerPlaceAt(Vector3 position, Quaternion rotation)
+        {
+            _rb.position = position;
+            _rb.rotation = rotation;
+            transform.SetPositionAndRotation(position, rotation);
+            if (!_rb.isKinematic) _rb.linearVelocity = _rb.angularVelocity = Vector3.zero;
         }
 
         public void PlayCough()
@@ -202,8 +251,8 @@ namespace PleaseDontDrown.Rescue
                 SenseWading(state);
             }
 
-            if (!state.IsStruggling() || _item.IsHeld)
-                return;
+            if (!state.IsStruggling() || _item.IsHeld || _brain.IsSilent)
+                return; // the silent ones just slip under
 
             // Calling for help (only with the head out of the water).
             if (!headUnder && state != VictimState.Drowning && Time.time >= _nextCryAt && HeldFloat == null)
@@ -230,16 +279,18 @@ namespace PleaseDontDrown.Rescue
         {
             if (_avatar == null) return;
             float eyes = state is VictimState.Unconscious or VictimState.Lost ? 0.1f
-                : state is VictimState.Panicking or VictimState.Drowning ? 1.45f : 1f;
+                : state is VictimState.Panicking or VictimState.Drowning ? 1.45f : state == VictimState.Injured ? 0.5f : 1f;
             float mouth = state switch
             {
                 VictimState.Panicking => 0.75f + 0.25f * Mathf.Sin(Time.time * 11f),
                 VictimState.Drowning => 0.9f,
                 VictimState.Distressed => 0.45f,
                 VictimState.Saved => 0.55f,
+                VictimState.Injured => 0.6f + 0.2f * Mathf.Sin(Time.time * 7f),
                 _ => 0.05f
             };
-            float brows = state.IsStruggling() ? -1f : state == VictimState.Saved ? 0.2f : 0f;
+            float brows = state.IsStruggling() || state == VictimState.Injured ? -1f : state == VictimState.Saved ? 0.2f : 0f;
+            if (_brain.IsSilent && state.IsStruggling()) { eyes = 1.2f; mouth = 0.3f; brows = -0.4f; } // glassy, quiet
             _avatar.SetExpression(eyes, mouth, brows);
         }
 
@@ -278,6 +329,22 @@ namespace PleaseDontDrown.Rescue
             };
             _avatar.LeftHand?.Pose(hands);
             _avatar.RightHand?.Pose(hands);
+
+            // Punched: the head snaps aside and wobbles back.
+            float sincePunch = Time.time - _punchAt;
+            if (sincePunch < 0.6f)
+            {
+                float k = Mathf.Exp(-sincePunch * 7f) * Mathf.Cos(sincePunch * 22f);
+                _avatar[AvatarRig.Bone.Head].localRotation = _avatar.RestRotation(AvatarRig.Bone.Head) * Quaternion.Euler(0f, 55f * k * _punchSide, 20f * k * _punchSide);
+            }
+            else if (state == VictimState.Unconscious)
+                _avatar[AvatarRig.Bone.Head].localRotation = _avatar.RestRotation(AvatarRig.Bone.Head) * Quaternion.Euler(-12f, 0f, 0f); // chin up (airway open)
+            else
+                _avatar[AvatarRig.Bone.Head].localRotation = _avatar.RestRotation(AvatarRig.Bone.Head);
+
+            // Shark bite: the left leg is a short stump.
+            Transform thigh = _avatar[AvatarRig.Bone.ThighL];
+            thigh.localScale = _brain.HasLostLeg ? new Vector3(1f, 0.22f, 1f) : Vector3.one;
         }
 
         private void UpdateSquish()
@@ -285,7 +352,13 @@ namespace PleaseDontDrown.Rescue
             if (_visual == null) return;
             float t = (Time.time - _squishAt) / 0.28f;
             float k = t < 1f ? Mathf.Sin(t * Mathf.PI) * (1f - t) : 0f;
-            _visual.localScale = new Vector3(1f + 0.12f * k, 1f - 0.16f * k, 1f + 0.12f * k);
+            // A rescue breath puffs the chest up for a moment.
+            float b = (Time.time - _breathAt) / 0.9f;
+            float rise = b < 1f ? Mathf.Sin(b * Mathf.PI) * 0.07f : 0f;
+            // Zap: a quick shiver.
+            float z = Time.time - _zapAt;
+            float shiver = z < 0.45f ? Mathf.Sin(z * 90f) * 0.04f * (1f - z / 0.45f) : 0f;
+            _visual.localScale = new Vector3(1f + 0.12f * k + rise * 0.5f + shiver, 1f - 0.16f * k + shiver, 1f + 0.12f * k + rise);
         }
 
         // ------------------------------------------------------------------ physics step (every machine)
@@ -313,8 +386,8 @@ namespace PleaseDontDrown.Rescue
             }
             else if (!state.IsConscious() && !_brain.IsAshore && WaterSurface.Exists && WaterSurface.DepthOf(transform.position) > 0.2f)
                 Topple(); // (not in the shallows: CPR needs them on their back)
-            else if (!state.IsConscious() && transform.up.y > 0.35f && _rb.linearVelocity.sqrMagnitude < 4f)
-                FallOnBack(); // passed out on the sand: flat on the back, ready for CPR
+            else if ((!state.IsConscious() || state == VictimState.Injured) && transform.up.y > 0.35f && _rb.linearVelocity.sqrMagnitude < 4f)
+                FallOnBack(); // passed out (or holding a bitten leg) on the sand: flat on the back, ready for CPR
         }
 
         /// <summary>Unconscious in the water: slowly tip over face-down instead of sinking like a statue.</summary>
@@ -355,6 +428,7 @@ namespace PleaseDontDrown.Rescue
             UpdateDunk(state);
 
             float depth = HeldFloat != null ? _floatDepth - 0.12f : _floatDepth + _dunkDepth * _dunk;
+            if (_brain.IsSilent && HeldFloat == null) depth = _floatDepth + 0.22f + _dunkDepth * _dunk; // mouth at the waterline, head tipped back
             float targetY = surface - depth;
             float lift = Mathf.Clamp((targetY - p.y) * _floatSpring - v.y * _floatDamping, -24f, 24f);
             if (p.y > surface + 0.2f) lift = Mathf.Min(lift, 0f); // don't fly out of the water
@@ -376,7 +450,7 @@ namespace PleaseDontDrown.Rescue
                     _rb.AddForce(Vector3.ClampMagnitude(pull, 12f), ForceMode.Acceleration);
                 }
             }
-            else if (state == VictimState.Panicking)
+            else if (state == VictimState.Panicking && !_brain.IsSilent)
             {
                 // Thrashing about.
                 float t = Time.time;
@@ -585,6 +659,22 @@ namespace PleaseDontDrown.Rescue
                     // Held: arms along the body, legs a little bent, a bit stiff.
                     SetDrive(limb, 90f, 8f);
                     SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 18f, 5f) : LegPose(limb, 15f, 6f));
+                    continue;
+                }
+
+                if (_brain.IsSilent && state.IsStruggling() && !onFloat)
+                {
+                    // Instinctive drowning response: upright, arms out to the sides pressing down on the water,
+                    // no waving, no kicking to speak of. Looks like treading water; it isn't.
+                    SetDrive(limb, limb.IsArm ? 300f : 200f, 20f);
+                    SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 80f + 12f * Mathf.Sin(t * 2.2f + ph), 10f) : LegPose(limb, 6f + 4f * Mathf.Sin(t * 1.5f + ph), 4f));
+                    continue;
+                }
+                if (state == VictimState.Injured)
+                {
+                    // Lying there clutching the leg, the other one twitching.
+                    SetDrive(limb, 200f, 18f);
+                    SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 25f, 55f + 10f * Mathf.Sin(t * 5f + ph)) : LegPose(limb, 15f + 10f * Mathf.Sin(t * 3f + ph), 8f));
                     continue;
                 }
 

@@ -17,6 +17,7 @@ namespace PleaseDontDrown.Avatars
             UpperArmL, ForearmL, HandL, UpperArmR, ForearmR, HandR,
             ThighL, ShinL, FootL, ThighR, ShinR, FootR,
             EyeL, EyeR, Mouth, BrowL, BrowR,
+            BustL, BustR,   // feminine figures: chest shapes on spring bones (see AvatarJiggle)
             Count
         }
 
@@ -132,6 +133,18 @@ namespace PleaseDontDrown.Avatars
             public float Width, Belly, Limb, Shoulder;
         }
 
+        /// <summary>Feminine figures: narrower shoulders and waist, wider hips (the rest of the shape is in AvatarParts).</summary>
+        private static Body BodyFor(AvatarLook look)
+        {
+            Body b = BodyFor(look.Build);
+            if (look.Feminine)
+            {
+                b.Shoulder *= 0.9f;
+                b.Limb *= 0.88f;
+            }
+            return b;
+        }
+
         /// <summary>Arm/leg thickness multiplier for a body build (first-person arms match the body).</summary>
         public static float LimbWidthFor(byte build) => BodyFor(build).Limb;
 
@@ -146,7 +159,7 @@ namespace PleaseDontDrown.Avatars
         private void CreateBones(AvatarLook look)
         {
             float s = Scale;
-            Body b = BodyFor(look.Build);
+            Body b = BodyFor(look);
             UpperArmLength = 0.29f * s;
             ForearmLength = 0.26f * s;
             HandLength = 0.1f * s;
@@ -186,6 +199,9 @@ namespace PleaseDontDrown.Avatars
                 Make(left ? Bone.BrowL : Bone.BrowR, Bone.Head, new Vector3(0.058f * side, 0.215f, 0.142f) * AvatarParts.HeadScale);
             }
             Make(Bone.Mouth, Bone.Head, new Vector3(0f, 0.068f, 0.145f) * AvatarParts.HeadScale);
+            Vector3 bust = AvatarParts.BustOffset(look);
+            Make(Bone.BustL, Bone.Chest, new Vector3(-bust.x, bust.y, bust.z));
+            Make(Bone.BustR, Bone.Chest, bust);
 
             // Fingers: keep the same transforms across rebuilds.
             var leftFingers = new Transform[HandBones.BoneCount];
@@ -214,7 +230,8 @@ namespace PleaseDontDrown.Avatars
                 bindposes[i] = _bones[i].worldToLocalMatrix * rootToWorld;
 
             void On(Bone bone) => kit.SetBone((int)bone, bindposes[(int)bone].inverse);
-            AvatarParts.Build(kit, look, BodyFor(look.Build).Width, BodyFor(look.Build).Belly, BodyFor(look.Build).Limb, BodyFor(look.Build).Shoulder, Scale, On);
+            Body body = BodyFor(look);
+            AvatarParts.Build(kit, look, body.Width, body.Belly, body.Limb, body.Shoulder, Scale, On);
             void HandMesh(HandBones hand, Bone handBone, int first) => hand.BuildMesh(kit, look.SkinColor, f =>
             {
                 int index = f < 0 ? (int)handBone : first + f;

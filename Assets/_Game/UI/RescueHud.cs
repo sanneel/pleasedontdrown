@@ -28,6 +28,8 @@ namespace PleaseDontDrown.UI
                 VictimState state = v.State;
                 if (!state.NeedsHelp() && state != VictimState.Saved) continue;
                 if (v.Item.IsHeld && v.Item.Holder == local) continue; // it's in your arms
+                // Silent drowners give no sign: only a marker once you're close (or they're out cold).
+                if (v.IsSilent && state.IsStruggling() && Vector3.Distance(local.transform.position, v.transform.position) > 12f) continue;
                 DrawMarker(cam, local, v, state);
             }
 
@@ -44,6 +46,7 @@ namespace PleaseDontDrown.UI
 
             const float margin = 50f;
             bool offscreen = behind || screen.x < margin || screen.x > Screen.width - margin || screen.y < margin || screen.y > Screen.height - margin;
+            if (!offscreen && distance < 2.6f) return; // right in front of you: the prompts under the crosshair say it all
             if (offscreen)
             {
                 // Pin to the edge in the target's direction.
@@ -70,10 +73,12 @@ namespace PleaseDontDrown.UI
 
             string info = state switch
             {
+                VictimState.Unconscious when v.IsFlatlined => $"NO PULSE: DEFIBRILLATOR!  {v.ConditionSecondsLeft:F0}s",
                 VictimState.Unconscious => $"UNCONSCIOUS  {v.ConditionSecondsLeft:F0}s",
                 VictimState.Saved => "SAVED",
                 _ => state.Label()
             };
+            if (v.HasLostLeg && state != VictimState.Saved && state != VictimState.Lost) info += $"  BLEEDING {v.BleedSecondsLeft:F0}s";
             if (v.Item.IsHeld) info += $"  (with {v.Item.Holder.DisplayName})";
             string text = $"<b>{v.Name}</b>  {info}\n{distance:F0} m";
             // Label and bar above the dot (clear of the tourist), or below it when pinned to the top edge.
@@ -102,7 +107,9 @@ namespace PleaseDontDrown.UI
             if (held == null || !held.TryGetComponent(out VictimBrain v)) return;
             string drop = GameInput.KeyLabel(GameInput.Drop);
             string cpr = GameInput.KeyLabel(GameInput.Secondary);
-            string text = v.State == VictimState.Unconscious
+            string text = v.HasLostLeg && v.State != VictimState.Saved
+                ? $"Rush <b>{v.Name}</b> to the hotel infirmary and put them on the bed (<b>[{GameInput.KeyLabel(GameInput.Interact)}]</b>)  -  {v.BleedSecondsLeft:F0}s left"
+                : v.State == VictimState.Unconscious
                 ? $"Get <b>{v.Name}</b> onto the sand, put them down (tap <b>[{drop}]</b>) and do CPR (<b>[{cpr}]</b>)  -  {v.ConditionSecondsLeft:F0}s left"
                 : v.State.NeedsHelp()
                     ? $"Bring <b>{v.Name}</b> back to the shallows!"
@@ -117,6 +124,7 @@ namespace PleaseDontDrown.UI
             VictimState.Drowning => new Color(1f, 0.4f, 0.25f),
             VictimState.Unconscious => new Color(1f, 0.2f, 0.2f),
             VictimState.Saved => new Color(0.45f, 1f, 0.5f),
+            VictimState.Injured => new Color(1f, 0.35f, 0.35f),
             _ => Color.white
         };
 

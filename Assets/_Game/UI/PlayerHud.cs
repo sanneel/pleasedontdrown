@@ -72,8 +72,10 @@ namespace PleaseDontDrown.UI
                 string dropKey = GameInput.KeyLabel(GameInput.Drop);
                 bool food = hands.HeldItem.GetComponent<Items.Edible>() != null;
                 string eat = food ? $"    hold <b>[{GameInput.KeyLabel(GameInput.Secondary)}]</b> to eat" : "";
+                var tool = hands.HeldItem.GetComponent<Combat.IHeldTool>();
+                string use = tool != null ? $"<b>[{throwKey}]</b> {tool.UseLabel}    hold <b>[{dropKey}]</b> to throw" : $"<b>[{throwKey}]</b> or hold <b>[{dropKey}]</b> to throw";
                 DrawShadowed(new Rect(cx - 500f, Screen.height - 112f, 1000f, 30f),
-                    $"Holding <b>{hands.HeldItem.DisplayName}</b>    <b>[{throwKey}]</b> or hold <b>[{dropKey}]</b> to throw    tap <b>[{dropKey}]</b> to drop{eat}", _prompt);
+                    $"Holding <b>{hands.HeldItem.DisplayName}</b>    {use}    tap <b>[{dropKey}]</b> to drop{eat}", _prompt);
 
                 if (hands.IsEating || hands.EatProgress01 > 0.01f)
                 {

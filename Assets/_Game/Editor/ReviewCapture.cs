@@ -90,7 +90,13 @@ namespace PleaseDontDrown.Editor
             AvatarLook look = lookSpec[0] switch
             {
                 "tourist" => AvatarLook.RandomTourist(seed),
+                "woman" => AvatarLook.RandomTourist(seed, 1),
+                "man" => AvatarLook.RandomTourist(seed, 0),
                 "random" => AvatarLook.Random(new System.Random(seed)),
+                "sandy" => Story.StoryDirector.SandyLook,
+                "receptionist" => Story.StoryDirector.ReceptionistLook,
+                "robber" => Story.StoryDirector.RobberLook,
+                "pirate" => Story.StoryDirector.PirateLook(seed),
                 _ => AvatarLook.Lifeguard
             };
             AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
@@ -128,6 +134,12 @@ namespace PleaseDontDrown.Editor
                 case "charge": m.Charge = 1f; break;
                 case "eat": m.Eating = true; break;
                 case "cpr": m.Cpr = true; m.CprPoint = go.transform.position + forward * 0.6f + Vector3.up * 0.2f; break;
+                case "down": m.Pose = AvatarPose.Down; m.Mood = AvatarMood.Hurt; break;
+                case "kneel": m.Pose = AvatarPose.Kneel; m.Mood = AvatarMood.Scared; break;
+                case "scared": m.Pose = AvatarPose.Scared; m.Mood = AvatarMood.Scared; break;
+                case "handsup": m.Pose = AvatarPose.HandsUp; break;
+                case "seated": m.Seated = true; break;
+                case "happy": m.Mood = AvatarMood.Happy; m.Talking = true; break;
             }
             animator.Motion = m;
             // Face the camera first, so grips computed from "right" below are the avatar's right.

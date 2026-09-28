@@ -38,7 +38,7 @@ namespace PleaseDontDrown.Editor
     /// Batch: -executeMethod PleaseDontDrown.Editor.GameSceneBuilder.BuildBatch (or BuildPlayerBatch for a Windows build).
     /// NOTE: rebuilding overwrites manual edits to Game.unity. Once the level is hand-authored this becomes a prefab/tool builder only.
     /// </summary>
-    public static class GameSceneBuilder
+    public static partial class GameSceneBuilder
     {
         private const string ScenePath = "Assets/_Game/Scenes/Game.unity";
         private const string PlayerPrefabPath = "Assets/_Game/Player/Prefabs/Player.prefab";
@@ -102,6 +102,7 @@ namespace PleaseDontDrown.Editor
             SetupOutlineRendering(outlineLayer);
             BuildPlayerPrefab();
             BuildItems();
+            BuildStoryPrefabs();
             AssetDatabase.SaveAssets();
             RefreshFishNetPrefabs();
             BuildScene();
@@ -267,6 +268,7 @@ namespace PleaseDontDrown.Editor
             SetRef(rig, "_material", AvatarMaterial());
             var animator = avatarGo.AddComponent<AvatarAnimator>();
             SetRef(animator, "_rig", rig);
+            SetRef(avatarGo.AddComponent<AvatarJiggle>(), "_rig", rig);
 
             TextMesh nameTag = WorldText(root.transform, "NameTag", new Vector3(0f, 2.2f, 0f), "Lifeguard", 64, 0.045f, Color.white, onTop: true);
             nameTag.gameObject.SetActive(false);
@@ -294,6 +296,10 @@ namespace PleaseDontDrown.Editor
             SetRef(avatarDriver, "_rig", rig);
             SetRef(avatarDriver, "_animator", animator);
             SetRef(hub, "_avatar", avatarDriver);
+
+            var combat = root.AddComponent<Combat.PlayerCombat>(); // punches, getting knocked about
+            SetRef(combat, "_hub", hub);
+            SetRef(combat, "_audio", SpatialAudio(root, 2f, 30f));
 
             var steps = root.AddComponent<PlayerFootsteps>(); // everyone's footsteps, on every machine
             SetRef(steps, "_hub", hub);
@@ -421,7 +427,9 @@ namespace PleaseDontDrown.Editor
                 catalog = ScriptableObject.CreateInstance<ItemCatalog>();
                 AssetDatabase.CreateAsset(catalog, ItemCatalogPath);
             }
-            SetRefs(catalog, "_items", crate, ball, ring, cooler, coconut, tourist);
+            var items = new List<Object> { crate, ball, ring, cooler, coconut, tourist };
+            items.AddRange(BuildStoryItems(torus));
+            SetRefs(catalog, "_items", items.ToArray());
             EditorUtility.SetDirty(catalog);
             return catalog;
         }
@@ -568,6 +576,9 @@ namespace PleaseDontDrown.Editor
             var victimBody = GetOrAdd<VictimBody>(root); // VictimBrain's RequireComponent already added it
             SetRef(victimBody, "_visual", visual);
             SetRef(victimBody, "_avatar", rig);
+            var jiggle = avatarGo.AddComponent<AvatarJiggle>();
+            SetRef(jiggle, "_rig", rig);
+            SetRef(victimBody, "_jiggle", jiggle);
             SetRef(victimBody, "_audio", SpatialAudio(root, 3f, 70f));
 
             GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, $"{ItemPrefabDir}/Tourist.prefab");
@@ -638,6 +649,7 @@ namespace PleaseDontDrown.Editor
                 MakeShakeable(palm);
             PlaceItems(catalog);
             BuildDrillBoard(env);
+            BuildStoryWorld(env);
             Transform[] spawns = BuildSpawnPoints();
 
             // Rescues: drills now, the emergency director later.
@@ -657,6 +669,7 @@ namespace PleaseDontDrown.Editor
             ui.AddComponent<DevTools>();
             ui.AddComponent<ItemDebugView>();
             ui.AddComponent<RescueHud>();
+            ui.AddComponent<Story.StoryHud>();
             ui.AddComponent<AvatarCustomizer>();
             BuildNetworkManager(playerPrefab, spawns);
 
@@ -734,7 +747,29 @@ namespace PleaseDontDrown.Editor
         private static readonly Vector2 IslandCenter = new(0f, 38f);
         private static readonly Vector2 IslandHalfSize = new(80f, 34f);
         private const float IslandCornerRadius = 28f;
-        private const float TerrainMinX = -160f, TerrainMaxX = 160f, TerrainMinZ = -170f, TerrainMaxZ = 150f, TerrainStep = 2f;
+        private const float TerrainMinX = -160f, TerrainMaxX = 160f, TerrainMinZ = -380f, TerrainMaxZ = 150f, TerrainStep = 2f;
+
+        // The hotel island (chapter 2), ~200 m south across the channel; its beach faces island 1.
+        private static readonly Vector2 Island2Center = new(20f, -250f);
+        private static readonly Vector2 Island2HalfSize = new(60f, 30f);
+        private const float Island2CornerRadius = 24f;
+
+        /// <summary>Signed distance outside a rounded box (negative inside).</summary>
+        private static float BoxDistanceOut(float x, float z, Vector2 center, Vector2 half, float radius)
+        {
+            var p = new Vector2(Mathf.Abs(x - center.x), Mathf.Abs(z - center.y));
+            Vector2 q = p - (half - Vector2.one * radius);
+            float outside = new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude;
+            float inside = Mathf.Min(Mathf.Max(q.x, q.y), 0f);
+            return outside + inside - radius;
+        }
+
+        /// <summary>Island 2's shore coordinate (same meaning as <see cref="ShoreCoordinate"/>: 4 at the edge, growing inland).</summary>
+        private static float Island2Shore(float x, float z)
+        {
+            float wobble = 2.5f * Mathf.Sin(x * 0.05f + 1.3f) + (Mathf.PerlinNoise(x * 0.03f + 11f, z * 0.03f + 5f) - 0.5f) * 6f;
+            return 4f - BoxDistanceOut(x, z, Island2Center, Island2HalfSize, Island2CornerRadius) + wobble;
+        }
 
         /// <summary>
         /// Distance inland from the island's edge in "profile" metres (the old straight beach used z here, so the
@@ -754,10 +789,15 @@ namespace PleaseDontDrown.Editor
             return front - distanceOut + wobble;
         }
 
-        /// <summary>Beach height at a point: flat sand inland, a curvy shoreline all round, shelving to ~9 m deep offshore.</summary>
-        private static float BeachHeight(float x, float z)
+        /// <summary>
+        /// Beach height at a point: flat sand inland, a curvy shoreline all round, shelving to ~9 m deep offshore.
+        /// Two islands: the station island and the hotel island to the south (flat, no dunes, so the hotel sits level).
+        /// </summary>
+        private static float BeachHeight(float x, float z) =>
+            Mathf.Max(ProfileHeight(ShoreCoordinate(x, z), x, z, true), ProfileHeight(Island2Shore(x, z), x, z, false));
+
+        private static float ProfileHeight(float shore, float x, float z, bool dunesInland)
         {
-            float shore = ShoreCoordinate(x, z); // straight around the station (x ~ 0)
             (float z, float h)[] profile = { (-170f, -9f), (-90f, -8f), (-45f, -4.5f), (-20f, -2.3f), (-6f, -0.9f), (4f, 0f), (100f, 0f) };
             float h = profile[0].h;
             for (int i = 0; i < profile.Length - 1; i++)
@@ -768,8 +808,9 @@ namespace PleaseDontDrown.Editor
                 break;
             }
             if (shore > profile[^1].z) h = 0f;
+            if (shore < profile[0].z) h = profile[0].h;
             // Dunes inland, gentle ripples on the seabed.
-            float dunes = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(20f, 36f, shore)) * (Mathf.PerlinNoise(x * 0.04f + 10f, z * 0.04f) * 2.2f);
+            float dunes = dunesInland ? Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(20f, 36f, shore)) * (Mathf.PerlinNoise(x * 0.04f + 10f, z * 0.04f) * 2.2f) : 0f;
             float ripples = shore < -2f ? (Mathf.PerlinNoise(x * 0.15f, z * 0.15f) - 0.5f) * 0.3f : 0f;
             return h + dunes + ripples;
         }

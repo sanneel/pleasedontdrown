@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Interaction;
 using PleaseDontDrown.Items;
@@ -9,27 +11,56 @@ using PleaseDontDrown.Player;
 using PleaseDontDrown.UI;
 using PleaseDontDrown.World.Water;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace PleaseDontDrown.Rescue
 {
     /// <summary>Things everyone should see or hear about a tourist (sent by the host).</summary>
-    public enum VictimEvent : byte { InTrouble, Panicking, GoingUnder, Unconscious, Calmed, Saved, Revived, Lost, SelfRescue }
+    public enum VictimEvent : byte
+    {
+        InTrouble, Panicking, GoingUnder, Unconscious, Calmed, Saved, Revived, Lost, SelfRescue,
+        Flatline, Zapped, Bitten, InjuredAshore, Hospitalized
+    }
+
+    /// <summary>How a tourist behaves in trouble (story beats and island difficulty set this; drills use the default).</summary>
+    [Serializable]
+    public struct TouristProfile
+    {
+        [Tooltip("-1 decided by the seed, 0 man, 1 woman.")]
+        public int Figure;
+        [Tooltip("Seconds from 'help!' to passing out if nobody holds them. 0 = the classic panic/air model.")]
+        public float SecondsToUnconscious;
+        [Tooltip("Seconds of condition once unconscious (the CPR window). 0 = default.")]
+        public float ConditionSeconds;
+        [Tooltip("Unconscious this long = no pulse: CPR stops working, only the defibrillator helps. 0 = never.")]
+        public float FlatlineAfter;
+        [Tooltip("Drowns without a sound: no waving, no shouting (someone else has to raise the alarm).")]
+        public bool Silent;
+        [Tooltip("Seconds a shark-bite victim can bleed before they're lost.")]
+        public float BleedSeconds;
+        public string Name;
+
+        public static TouristProfile Default => new() { Figure = -1, BleedSeconds = 60f };
+    }
 
     /// <summary>
     /// A tourist's mind, run by the host: panic, air, the drowning state machine, and what counts as rescued.
     ///
-    ///  * In deep water panic rises (faster with the head under). Past 50 they're Panicking and dunk under now and then.
-    ///  * Air drains while panicking/drowning (faster with the head under). Low air = Drowning, no air = Unconscious.
+    ///  * Classic model (drills): in deep water panic rises (faster with the head under); past 50 they're Panicking
+    ///    and dunk under now and then; air drains while panicking/drowning. Low air = Drowning, no air = Unconscious.
+    ///  * Timer model (story, <see cref="TouristProfile.SecondsToUnconscious"/>): air runs out in exactly that many
+    ///    seconds unless someone holds them; the state follows the air (distressed, panicking, drowning, out).
     ///  * Being held by a lifeguard or hanging onto a float calms them and lets them breathe.
-    ///  * Reaching the shallows (or the dock) while conscious = Saved. Unconscious ones need CPR on land:
-    ///    lifeguards pump with the Secondary button (placeholder for the M6 timing minigame) before the condition runs out.
-    ///  * Condition runs out = Lost ("airlifted by the rival lifeguard company"), no hard fail.
+    ///  * Reaching the shallows (or the dock) while conscious = Saved. Unconscious ones need CPR on land (Secondary):
+    ///    5 chest compressions, then 2 rescue breaths for a woman or a punch in the face for a man, and again.
+    ///    Someone out too long may flatline: then only the defibrillator brings them back.
+    ///  * Shark bite: a leg is gone and they bleed. On land they need a hospital bed before the bleeding runs out.
+    ///  * Condition or bleeding runs out = Lost ("airlifted by the rival lifeguard company"), no hard fail.
     /// Everyone else reads the synced state; <see cref="VictimBody"/> turns it into motion on every machine.
     /// </summary>
     [RequireComponent(typeof(Item), typeof(VictimBody))]
     public class VictimBrain : NetworkBehaviour, IInteractionSecondary
     {
-
         [Header("Panic (0-100)")]
         [SerializeField] private float _panicRise = 1.2f;
         [SerializeField] private float _panicRiseHeadUnder = 6f;
@@ -50,34 +81,47 @@ namespace PleaseDontDrown.Rescue
         [SerializeField] private float _conditionSeconds = 90f;
         [Tooltip("Condition drains this much slower while someone is doing CPR.")]
         [SerializeField] private float _cprSlowdown = 0.3f;
-        [SerializeField] private int _cprPumpsNeeded = 15;
         [SerializeField] private float _cprDecayPerSecond = 0.04f;
         [SerializeField] private float _cprReach = 3f;
+        [Header("CPR steps (revive progress per press)")]
+        [SerializeField] private int _compressionsPerSet = 5;
+        [SerializeField] private int _breathsPerSet = 2;
+        [SerializeField] private float _compressGain = 0.05f;
+        [SerializeField] private float _breathGain = 0.1f;
+        [SerializeField] private float _punchGain = 0.2f;
 
         [Header("After")]
         [SerializeField] private float _celebrateSeconds = 4f;
         [Tooltip("Saved tourists sit on the sand this long, then go back to their sunbed (despawn).")]
         [SerializeField] private float _leaveAfterSeconds = 45f;
 
-        private static readonly string[] Names =
-        {
-            "Kevin", "Brenda", "Gary", "Linda", "Chad", "Doug", "Tina", "Hank", "Rita", "Bernie",
-            "Gloria", "Steve", "Pam", "Duncan", "Marge", "Otto", "Deb", "Lars", "Yolanda", "Nigel"
-        };
+        private static readonly string[] MaleNames =
+            { "Kevin", "Gary", "Chad", "Doug", "Hank", "Bernie", "Steve", "Duncan", "Otto", "Lars", "Nigel", "Rick", "Barry", "Todd" };
+        private static readonly string[] FemaleNames =
+            { "Brenda", "Linda", "Tina", "Rita", "Gloria", "Pam", "Marge", "Deb", "Yolanda", "Stacy", "Carla", "Jenny", "Donna", "Lola" };
 
         private static readonly List<VictimBrain> _all = new();
 
         private readonly SyncVar<string> _name = new SyncVar<string>();
         private readonly SyncVar<int> _seed = new SyncVar<int>();
+        private readonly SyncVar<ulong> _look = new SyncVar<ulong>();
         private readonly SyncVar<VictimState> _state = new SyncVar<VictimState>(VictimState.Fine);
         private readonly SyncVar<float> _air = new SyncVar<float>(1f, new SyncTypeSettings(0.2f));
         private readonly SyncVar<float> _panic = new SyncVar<float>(0f, new SyncTypeSettings(0.2f));
         private readonly SyncVar<float> _condition = new SyncVar<float>(1f, new SyncTypeSettings(0.25f));
+        private readonly SyncVar<float> _conditionTotal = new SyncVar<float>(90f);
         private readonly SyncVar<float> _cpr = new SyncVar<float>(0f, new SyncTypeSettings(0.1f));
+        private readonly SyncVar<CprStep> _cprStep = new SyncVar<CprStep>(CprStep.Compress);
+        private readonly SyncVar<byte> _cprCount = new SyncVar<byte>();
         private readonly SyncVar<bool> _ashore = new SyncVar<bool>();
+        private readonly SyncVar<bool> _silent = new SyncVar<bool>();
+        private readonly SyncVar<bool> _flatline = new SyncVar<bool>();
+        private readonly SyncVar<bool> _legLost = new SyncVar<bool>();
+        private readonly SyncVar<float> _bleedLeft = new SyncVar<float>(0f, new SyncTypeSettings(0.25f));
 
         private Item _item;
         private VictimBody _body;
+        private AvatarLook _appliedLook;
 
         // Host-only bookkeeping.
         private float _stateSince;
@@ -91,21 +135,40 @@ namespace PleaseDontDrown.Rescue
         private readonly Dictionary<int, float> _lastPumpBy = new();
         private readonly List<string> _cprHelpers = new();
         private bool _autoState;
+        private float _drownSeconds;       // timer model when > 0
+        private float _flatlineAfter;
+        private float _bleedSeconds = 60f;
+        private bool _hospitalized;
 
         public static IReadOnlyList<VictimBrain> All => _all;
+        /// <summary>Host: a tourist was saved, revived, lost... (with whoever gets the credit, if anyone).</summary>
+        public static event Action<VictimBrain, VictimEvent, PlayerHub> ServerEvent;
+
         public string Name => string.IsNullOrEmpty(_name.Value) ? "Tourist" : _name.Value;
         public VictimState State => _state.Value;
         public float Air01 => _air.Value;
         public float Panic01 => _panic.Value / 100f;
         public float Condition01 => _condition.Value;
         public float Cpr01 => _cpr.Value;
+        public CprStep NextCprStep => _cprStep.Value;
         public bool IsAshore => _ashore.Value;
-        public float ConditionSecondsLeft => _condition.Value * _conditionSeconds;
+        public float ConditionSecondsLeft => _condition.Value * _conditionTotal.Value;
+        public bool IsSilent => _silent.Value;
+        public bool IsFlatlined => _flatline.Value;
+        public bool HasLostLeg => _legLost.Value;
+        public float BleedSecondsLeft => _bleedLeft.Value;
+        public bool IsFemale => Look.Feminine;
+        public AvatarLook Look => _look.Value != 0 ? AvatarLook.Unpack(_look.Value) : AvatarLook.RandomTourist(_seed.Value);
         public Item Item => _item;
         public VictimBody Body => _body;
+        private string They => IsFemale ? "her" : "him";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => _all.Clear();
+        private static void ResetStatics()
+        {
+            _all.Clear();
+            ServerEvent = null;
+        }
 
         private void Awake()
         {
@@ -116,8 +179,17 @@ namespace PleaseDontDrown.Rescue
                 _item.SetDisplayName(string.IsNullOrEmpty(next) ? "Tourist" : next);
                 if (!string.IsNullOrEmpty(next)) gameObject.name = $"Tourist_{next}";
             };
-            _seed.OnChange += (_, next, _) => _body.ApplyLooks(next);
+            _seed.OnChange += (_, _, _) => ApplyLook();
+            _look.OnChange += (_, _, _) => ApplyLook();
             _state.OnChange += OnStateChanged;
+        }
+
+        private void ApplyLook()
+        {
+            AvatarLook look = Look;
+            if (_body.IsBuilt && look.Equals(_appliedLook)) return;
+            _appliedLook = look;
+            _body.ApplyLooks(look, _seed.Value);
         }
 
         public override void OnStartNetwork()
@@ -145,15 +217,27 @@ namespace PleaseDontDrown.Rescue
         {
             base.OnStartClient();
             _item.SetDisplayName(Name);
-            _body.ApplyLooks(_seed.Value);
+            ApplyLook();
         }
 
         /// <summary>Host: set up a freshly spawned tourist.</summary>
         [Server]
-        public void ServerSetup(string displayName, int seed, VictimState state, float panic, float air)
+        public void ServerSetup(string displayName, int seed, VictimState state, float panic, float air) =>
+            ServerSetup(displayName, seed, state, panic, air, TouristProfile.Default);
+
+        /// <summary>Host: set up a freshly spawned tourist with a behaviour profile (story tourists, island difficulty).</summary>
+        [Server]
+        public void ServerSetup(string displayName, int seed, VictimState state, float panic, float air, TouristProfile profile)
         {
-            _name.Value = displayName;
+            AvatarLook look = AvatarLook.RandomTourist(seed, profile.Figure);
             _seed.Value = seed;
+            _look.Value = look.Pack();
+            _name.Value = !string.IsNullOrEmpty(profile.Name) ? profile.Name : !string.IsNullOrEmpty(displayName) ? displayName : RandomName(look.Feminine);
+            _silent.Value = profile.Silent;
+            _drownSeconds = Mathf.Max(0f, profile.SecondsToUnconscious);
+            _flatlineAfter = Mathf.Max(0f, profile.FlatlineAfter);
+            _bleedSeconds = profile.BleedSeconds > 0f ? profile.BleedSeconds : 60f;
+            _conditionTotal.Value = profile.ConditionSeconds > 0f ? profile.ConditionSeconds : _conditionSeconds;
             _panic.Value = Mathf.Clamp(panic, 0f, 100f);
             _air.Value = Mathf.Clamp01(air);
             _condition.Value = 1f;
@@ -162,7 +246,8 @@ namespace PleaseDontDrown.Rescue
             if (state.NeedsHelp()) _troubleSince = Time.time;
         }
 
-        public static string RandomName() => Names[Random.Range(0, Names.Length)];
+        public static string RandomName() => RandomName(Random.value < 0.5f);
+        public static string RandomName(bool female) => female ? FemaleNames[Random.Range(0, FemaleNames.Length)] : MaleNames[Random.Range(0, MaleNames.Length)];
 
         // ------------------------------------------------------------------ host simulation
 
@@ -186,14 +271,20 @@ namespace PleaseDontDrown.Rescue
             if (_autoState)
             {
                 _autoState = false;
-                _name.Value = RandomName();
-                _seed.Value = Random.Range(1, int.MaxValue);
+                int seed = Random.Range(1, int.MaxValue);
+                _seed.Value = seed;
+                AvatarLook look = AvatarLook.RandomTourist(seed);
+                _look.Value = look.Pack();
+                _name.Value = RandomName(look.Feminine);
+                _conditionTotal.Value = _conditionSeconds;
                 if (_deep)
                 {
                     _troubleSince = Time.time;
                     SetState(VictimState.Distressed, VictimEvent.InTrouble);
                 }
             }
+
+            UpdateBleeding(dt);
 
             switch (_state.Value)
             {
@@ -221,18 +312,36 @@ namespace PleaseDontDrown.Rescue
                         Rescued(held);
                         break;
                     }
+                    if (_drownSeconds > 0f)
+                    {
+                        UpdateTimedDrowning(dt, supported);
+                        break;
+                    }
                     UpdatePanic(dt, held, onFloat);
                     UpdateAir(dt, supported);
                     UpdateStruggleState(supported);
                     break;
 
                 case VictimState.Unconscious:
-                    bool cprActive = Time.time - _lastPumpTime < 1.5f;
-                    _condition.Value = Mathf.Max(0f, _condition.Value - dt / _conditionSeconds * (cprActive ? _cprSlowdown : 1f));
+                    bool cprActive = Time.time - _lastPumpTime < 1.5f && !_flatline.Value;
+                    _condition.Value = Mathf.Max(0f, _condition.Value - dt / Mathf.Max(1f, _conditionTotal.Value) * (cprActive ? _cprSlowdown : 1f));
                     if (!cprActive && _cpr.Value > 0f)
                         _cpr.Value = Mathf.Max(0f, _cpr.Value - _cprDecayPerSecond * dt);
+                    if (_flatlineAfter > 0f && !_flatline.Value && Time.time - _stateSince > _flatlineAfter)
+                    {
+                        _flatline.Value = true;
+                        _cpr.Value = 0f;
+                        Announce(VictimEvent.Flatline, $"{Name} has no pulse! CPR won't work now: use the defibrillator.");
+                    }
                     if (_condition.Value <= 0f)
                         Lost();
+                    break;
+
+                case VictimState.Injured:
+                    Breathe(dt);
+                    _panic.Value = Mathf.Max(0f, _panic.Value - 10f * dt);
+                    if (_deep && !held)
+                        SetState(VictimState.Panicking, VictimEvent.InTrouble); // back in deep water with one leg
                     break;
 
                 case VictimState.Saved:
@@ -293,10 +402,7 @@ namespace PleaseDontDrown.Rescue
             float air = _air.Value, panic = _panic.Value;
             if (air <= 0f)
             {
-                _condition.Value = 1f;
-                _cpr.Value = 0f;
-                _cprHelpers.Clear();
-                SetState(VictimState.Unconscious, VictimEvent.Unconscious);
+                PassOut();
             }
             else if (s == VictimState.Drowning)
             {
@@ -317,16 +423,68 @@ namespace PleaseDontDrown.Rescue
             }
         }
 
+        /// <summary>
+        /// Story timer: out of air in exactly <see cref="_drownSeconds"/> unless someone holds them (or they hang on
+        /// a float), and the state follows the air: needs help, panicking, going under, out cold.
+        /// </summary>
+        private void UpdateTimedDrowning(float dt, bool supported)
+        {
+            float air = _air.Value;
+            air = supported ? Mathf.Min(1f, air + dt / (_drownSeconds * 0.5f)) : Mathf.Max(0f, air - dt / _drownSeconds);
+            _air.Value = air;
+            _panic.Value = supported ? Mathf.Max(0f, _panic.Value - _panicFallHeld * dt) : Mathf.Max(_panic.Value, (1f - air) * 100f);
+            if (air <= 0f)
+            {
+                PassOut();
+                return;
+            }
+            VictimState target = air > 0.66f ? VictimState.Distressed : air > 0.33f ? VictimState.Panicking : VictimState.Drowning;
+            if (supported && _state.Value > target) target = _state.Value; // don't flip-flop while being towed
+            if (target == _state.Value) return;
+            VictimEvent e = target > _state.Value ? target == VictimState.Drowning ? VictimEvent.GoingUnder : VictimEvent.Panicking : VictimEvent.Calmed;
+            if (_silent.Value && e != VictimEvent.Calmed) SetState(target); // no fuss from the quiet ones
+            else SetState(target, e);
+        }
+
+        private void PassOut()
+        {
+            _air.Value = 0f;
+            _condition.Value = 1f;
+            _cpr.Value = 0f;
+            _cprStep.Value = CprStep.Compress;
+            _cprCount.Value = 0;
+            _flatline.Value = false;
+            _cprHelpers.Clear();
+            SetState(VictimState.Unconscious, VictimEvent.Unconscious);
+        }
+
+        private void UpdateBleeding(float dt)
+        {
+            if (!_legLost.Value || _hospitalized || _state.Value is VictimState.Lost) return;
+            _bleedLeft.Value = Mathf.Max(0f, _bleedLeft.Value - dt);
+            if (_bleedLeft.Value <= 0f)
+            {
+                SetState(VictimState.Lost, VictimEvent.Lost, $"{Name} lost too much blood and was airlifted by the rival lifeguard company.");
+                Debug.Log($"[Victim] {Name} bled out");
+            }
+        }
+
         private void Rescued(bool held)
         {
             // Credit whoever brought them in (holding them now, or let go of them moments ago).
             PlayerHub rescuer = held ? _item.Holder : Time.time - _lastHeldTime < 8f ? _lastHolder : null;
-            if (held) _item.ServerForceDrop(); // put down in the shallows
             string took = _troubleSince >= 0f ? FormatTime(Time.time - _troubleSince) : "?";
             _panic.Value = 0f;
+            if (_legLost.Value)
+            {
+                // Out of the water but still bleeding: they need a hospital bed.
+                SetState(VictimState.Injured, VictimEvent.InjuredAshore, $"{Name} is out of the water but bleeding badly. Carry {They} to the infirmary!", rescuer);
+                return;
+            }
+            if (held) _item.ServerForceDrop(); // put down in the shallows
             if (rescuer != null)
             {
-                SetState(VictimState.Saved, VictimEvent.Saved, $"{Name} was saved by {rescuer.DisplayName}! ({took})");
+                SetState(VictimState.Saved, VictimEvent.Saved, $"{Name} was saved by {rescuer.DisplayName}! ({took})", rescuer);
                 Debug.Log($"[Victim] {Name} saved by {rescuer.DisplayName} after {took}");
             }
             else
@@ -343,65 +501,190 @@ namespace PleaseDontDrown.Rescue
             Debug.Log($"[Victim] {Name} lost (condition ran out)");
         }
 
-        private void SetState(VictimState next, VictimEvent? announce = null, string text = null)
+        private void SetState(VictimState next, VictimEvent? announce = null, string text = null, PlayerHub credit = null)
         {
             if (_state.Value == next) return;
             Debug.Log($"[Victim] {Name}: {_state.Value} -> {next} (air {_air.Value:P0}, panic {_panic.Value:F0})");
             _state.Value = next;
             _stateSince = Time.time;
             if (announce.HasValue)
-                EventObservers(announce.Value, text ?? string.Empty);
+                Announce(announce.Value, text ?? string.Empty, credit);
+        }
+
+        private void Announce(VictimEvent e, string text, PlayerHub credit = null)
+        {
+            EventObservers(e, text ?? string.Empty);
+            ServerEvent?.Invoke(this, e, credit);
         }
 
         private static string FormatTime(float seconds) => $"{(int)seconds / 60}:{(int)seconds % 60:00}";
 
-        // ------------------------------------------------------------------ CPR (placeholder until the M6 minigame)
+        // ------------------------------------------------------------------ CPR
 
         public bool CanSecondary(PlayerHub player) => _state.Value == VictimState.Unconscious && _ashore.Value && !_item.IsHeld;
 
-        public string GetSecondaryPrompt(PlayerHub player) => $"CPR on {Name} (keep tapping)  {_cpr.Value * 100f:F0}%";
+        public string GetSecondaryPrompt(PlayerHub player)
+        {
+            if (_flatline.Value) return $"<color=#ff7060>No pulse!</color> Use the defibrillator on {Name}";
+            string progress = $"{_cpr.Value * 100f:F0}%";
+            return _cprStep.Value switch
+            {
+                CprStep.Breath => $"Mouth-to-mouth ({_cprCount.Value + 1}/{_breathsPerSet})  {progress}",
+                CprStep.Punch => $"Punch {Name} awake!  {progress}",
+                _ => $"Chest compressions ({_cprCount.Value + 1}/{_compressionsPerSet})  {progress}"
+            };
+        }
 
         public void OnSecondary(PlayerHub player)
         {
-            _body.Pump(); // feel it right away; the host counts it
-            if (player != null) player.ShowPump(_body.ChestPoint);
-            CprPumpServer();
+            if (_flatline.Value)
+            {
+                PlayerHud.ShowToast($"{Name} has no pulse. Get the <b>defibrillator</b> (hold it, left mouse on them).", 3f);
+                return;
+            }
+            CprStep step = _cprStep.Value;
+            ShowCpr(player, step); // feel it right away; the host counts it
+            CprServer(step);
         }
 
-        /// <summary>For tests: pump as the local player.</summary>
+        /// <summary>For tests: the next CPR press as the local player.</summary>
         public void RequestPump() => OnSecondary(PlayerHub.Local);
 
-        [ServerRpc(RequireOwnership = false)]
-        private void CprPumpServer(NetworkConnection caller = null)
+        private void ShowCpr(PlayerHub player, CprStep step)
         {
-            if (_state.Value != VictimState.Unconscious || !_ashore.Value || _item.IsHeld || caller == null) return;
-            PlayerHub pumper = null;
-            foreach (PlayerHub p in PlayerHub.All)
-                if (p.Owner == caller) pumper = p;
+            switch (step)
+            {
+                case CprStep.Breath:
+                    _body.RescueBreath();
+                    if (player != null) player.ShowCprAction(step, _body.MouthPoint);
+                    break;
+                case CprStep.Punch:
+                    _body.Punched();
+                    if (player != null) player.ShowCprAction(step, _body.HeadPosition);
+                    break;
+                default:
+                    _body.Pump();
+                    if (player != null) player.ShowPump(_body.ChestPoint);
+                    break;
+            }
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void CprServer(CprStep step, NetworkConnection caller = null)
+        {
+            if (_state.Value != VictimState.Unconscious || !_ashore.Value || _item.IsHeld || caller == null || _flatline.Value) return;
+            if (step != _cprStep.Value) return; // stale press (someone else already moved on)
+            PlayerHub pumper = PlayerOf(caller);
             if (pumper == null || (pumper.transform.position - transform.position).sqrMagnitude > _cprReach * _cprReach) return;
-            if (_lastPumpBy.TryGetValue(caller.ClientId, out float last) && Time.time - last < 0.12f) return;
+            float minGap = step == CprStep.Compress ? 0.12f : 0.45f;
+            if (_lastPumpBy.TryGetValue(caller.ClientId, out float last) && Time.time - last < minGap) return;
             _lastPumpBy[caller.ClientId] = Time.time;
 
             _lastPumpTime = Time.time;
             if (!_cprHelpers.Contains(pumper.DisplayName)) _cprHelpers.Add(pumper.DisplayName);
-            _cpr.Value = Mathf.Min(1f, _cpr.Value + 1f / _cprPumpsNeeded);
-            PumpObservers(caller.ClientId);
+            float gain = step switch { CprStep.Breath => _breathGain, CprStep.Punch => _punchGain, _ => _compressGain };
+            _cpr.Value = Mathf.Min(1f, _cpr.Value + gain);
+            AdvanceCprStep(step);
+            CprObservers(step, caller.ClientId);
             if (_cpr.Value < 1f) return;
 
             string took = _troubleSince >= 0f ? FormatTime(Time.time - _troubleSince) : "?";
-            _air.Value = 0.4f;
-            _panic.Value = 0f;
-            SetState(VictimState.Saved, VictimEvent.Revived, $"{Name} was revived! CPR by {string.Join(" & ", _cprHelpers)} ({took})");
+            Revive(pumper, VictimEvent.Revived, $"{Name} was revived! CPR by {string.Join(" & ", _cprHelpers)} ({took})");
             Debug.Log($"[Victim] {Name} revived by {string.Join(", ", _cprHelpers)} after {took}");
         }
 
-        [ObserversRpc]
-        private void PumpObservers(int pumperId)
+        /// <summary>5 compressions, then 2 breaths (women) or a punch (men), and round again.</summary>
+        private void AdvanceCprStep(CprStep done)
         {
-            if (LocalConnection != null && LocalConnection.ClientId == pumperId) return; // already squished locally
-            _body.Pump();
+            int count = _cprCount.Value + 1;
+            int needed = done switch { CprStep.Compress => _compressionsPerSet, CprStep.Breath => _breathsPerSet, _ => 1 };
+            if (count < needed)
+            {
+                _cprCount.Value = (byte)count;
+                return;
+            }
+            _cprCount.Value = 0;
+            _cprStep.Value = done == CprStep.Compress ? IsFemale ? CprStep.Breath : CprStep.Punch : CprStep.Compress;
+        }
+
+        private void Revive(PlayerHub by, VictimEvent e, string text)
+        {
+            _air.Value = 0.4f;
+            _panic.Value = 0f;
+            _flatline.Value = false;
+            _cpr.Value = 0f;
+            _cprStep.Value = CprStep.Compress;
+            _cprCount.Value = 0;
+            SetState(_legLost.Value && !_hospitalized ? VictimState.Injured : VictimState.Saved, e, text, by);
+        }
+
+        [ObserversRpc]
+        private void CprObservers(CprStep step, int pumperId)
+        {
+            if (LocalConnection != null && LocalConnection.ClientId == pumperId) return; // already shown locally
+            PlayerHub pumper = null;
             foreach (PlayerHub p in PlayerHub.All)
-                if (p.OwnerId == pumperId) p.ShowPump(_body.ChestPoint);
+                if (p.OwnerId == pumperId) pumper = p;
+            ShowCpr(pumper, step);
+        }
+
+        private static PlayerHub PlayerOf(NetworkConnection conn)
+        {
+            foreach (PlayerHub p in PlayerHub.All)
+                if (p.Owner == conn) return p;
+            return null;
+        }
+
+        // ------------------------------------------------------------------ defibrillator, shark, hospital (host)
+
+        /// <summary>Host: electric shock. Brings back anyone unconscious out of deep water, and is the only thing that works after a flatline.</summary>
+        [Server]
+        public bool ServerDefib(PlayerHub by)
+        {
+            if (_state.Value != VictimState.Unconscious || _deep || _item.IsHeld) return false;
+            bool wasFlat = _flatline.Value;
+            ZapObservers();
+            Revive(by, VictimEvent.Zapped, wasFlat
+                ? $"CLEAR! {Name}'s heart is beating again. Defibrillator by {(by != null ? by.DisplayName : "someone")}."
+                : $"{Name} was shocked back awake by {(by != null ? by.DisplayName : "someone")}.");
+            Debug.Log($"[Victim] {Name} defibrillated (flatlined: {wasFlat})");
+            return true;
+        }
+
+        [ObserversRpc]
+        private void ZapObservers() => _body.Zapped();
+
+        /// <summary>Host: a shark took a leg. They bleed from now on and need the infirmary.</summary>
+        [Server]
+        public void ServerBite()
+        {
+            if (_legLost.Value || _state.Value is VictimState.Lost) return;
+            _legLost.Value = true;
+            _bleedLeft.Value = _bleedSeconds;
+            if (_troubleSince < 0f) _troubleSince = Time.time;
+            _panic.Value = 100f;
+            if (_state.Value.IsConscious() && _state.Value != VictimState.Injured && !_ashore.Value)
+            {
+                _air.Value = Mathf.Min(_air.Value, 0.6f); // panicking, not calming down
+                SetState(VictimState.Panicking);
+            }
+            Announce(VictimEvent.Bitten, $"A SHARK bit {Name}'s leg off! Get {They} out and rush {They} to the infirmary!");
+            Debug.Log($"[Victim] {Name} bitten by a shark");
+        }
+
+        /// <summary>Host: carried onto a hospital bed. Bleeding stops, they're saved.</summary>
+        [Server]
+        public void ServerHospitalize(Vector3 position, Quaternion rotation, PlayerHub by)
+        {
+            if (!_legLost.Value || _hospitalized) return;
+            _hospitalized = true;
+            PlayerHub holder = _item.Holder;
+            _item.ServerForceDrop();
+            _body.ServerPlaceAt(position, rotation);
+            _air.Value = 1f;
+            _panic.Value = 0f;
+            string who = by != null ? by.DisplayName : holder != null ? holder.DisplayName : "the lifeguards";
+            SetState(VictimState.Saved, VictimEvent.Hospitalized, $"{Name} is in the infirmary with {_bleedLeft.Value:F0}s to spare. Brought in by {who}!", by ?? holder);
         }
 
         // ------------------------------------------------------------------ announcements (every machine)
@@ -413,7 +696,7 @@ namespace PleaseDontDrown.Rescue
             switch (e)
             {
                 case VictimEvent.Panicking:
-                    FloatingText.Spawn(above, "PANIC!", new Color(1f, 0.55f, 0.2f), 0.9f);
+                    if (!_silent.Value) FloatingText.Spawn(above, "PANIC!", new Color(1f, 0.55f, 0.2f), 0.9f);
                     break;
                 case VictimEvent.GoingUnder:
                     FloatingText.Spawn(above, "blub...", new Color(0.6f, 0.85f, 1f), 0.8f);
@@ -421,21 +704,35 @@ namespace PleaseDontDrown.Rescue
                     break;
                 case VictimEvent.Unconscious:
                     FloatingText.Spawn(above, "!!!", new Color(1f, 0.3f, 0.25f), 1.2f);
-                    PlayerHud.ShowToast($"<color=#ff7060><b>{Name} is unconscious!</b></color> Get them onto the sand for CPR.", 5f);
+                    PlayerHud.ShowToast($"<color=#ff7060><b>{Name} is unconscious!</b></color> Get {They} onto the sand for CPR.", 5f);
                     break;
                 case VictimEvent.Calmed:
                     FloatingText.Spawn(above, "phew", new Color(0.7f, 1f, 0.7f), 0.7f);
                     break;
                 case VictimEvent.Saved:
                 case VictimEvent.SelfRescue:
+                case VictimEvent.Hospitalized:
                     FloatingText.Spawn(above, "SAVED!", new Color(0.4f, 1f, 0.45f), 1.4f, 2f);
                     PlayerHud.ShowToast($"<color=#80ff80>{text}</color>", 5f);
                     _body.PlayCough();
                     break;
                 case VictimEvent.Revived:
-                    FloatingText.Spawn(above, "REVIVED!", new Color(0.4f, 1f, 0.45f), 1.4f, 2f);
+                case VictimEvent.Zapped:
+                    FloatingText.Spawn(above, e == VictimEvent.Zapped ? "ZAP! REVIVED!" : "REVIVED!", new Color(0.4f, 1f, 0.45f), 1.4f, 2f);
                     PlayerHud.ShowToast($"<color=#80ff80>{text}</color>", 5f);
                     _body.PlayCough();
+                    break;
+                case VictimEvent.Flatline:
+                    FloatingText.Spawn(above, "NO PULSE", new Color(1f, 0.25f, 0.25f), 1.2f, 2f);
+                    PlayerHud.ShowToast($"<color=#ff7060><b>{text}</b></color>", 6f);
+                    break;
+                case VictimEvent.Bitten:
+                    FloatingText.Spawn(above, "CHOMP!", new Color(1f, 0.3f, 0.25f), 1.6f, 2f);
+                    PlayerHud.ShowToast($"<color=#ff7060><b>{text}</b></color>", 7f);
+                    break;
+                case VictimEvent.InjuredAshore:
+                    FloatingText.Spawn(above, "MY LEG!", new Color(1f, 0.6f, 0.3f), 1.1f, 2f);
+                    PlayerHud.ShowToast($"<color=#ffb060>{text}</color>", 6f);
                     break;
                 case VictimEvent.Lost:
                     FloatingText.Spawn(above, "LOST TO COMPETITION", new Color(1f, 0.3f, 0.25f), 1.1f, 2.5f);
@@ -460,9 +757,11 @@ namespace PleaseDontDrown.Rescue
                 case "air": _air.Value = Mathf.Clamp01(value); break;
                 case "panic": _panic.Value = Mathf.Clamp(value, 0f, 100f); break;
                 case "condition": _condition.Value = Mathf.Clamp01(value); break;
+                case "flatline": if (_state.Value == VictimState.Unconscious) { _flatline.Value = value > 0.5f; _cpr.Value = 0f; } break;
+                case "bite": ServerBite(); break;
                 case "state":
-                    var s = (VictimState)Mathf.Clamp((int)value, 0, (int)VictimState.Lost);
-                    if (s == VictimState.Unconscious) { _air.Value = 0f; _condition.Value = 1f; _cpr.Value = 0f; _cprHelpers.Clear(); }
+                    var s = (VictimState)Mathf.Clamp((int)value, 0, (int)VictimState.Injured);
+                    if (s == VictimState.Unconscious) { PassOut(); return; }
                     if (s.NeedsHelp() && _troubleSince < 0f) _troubleSince = Time.time;
                     SetState(s);
                     break;
@@ -470,8 +769,9 @@ namespace PleaseDontDrown.Rescue
         }
 
         public string Describe() =>
-            $"{Name,-8} {State,-11} air {Air01:P0}  panic {_panic.Value:F0}  " +
-            (State == VictimState.Unconscious ? $"condition {ConditionSecondsLeft:F0}s  cpr {Cpr01:P0}  " : "") +
+            $"{Name,-8} {(IsFemale ? "F" : "M")} {State,-11} air {Air01:P0}  panic {_panic.Value:F0}  " +
+            (State == VictimState.Unconscious ? $"condition {ConditionSecondsLeft:F0}s  cpr {Cpr01:P0} next {_cprStep.Value}{(_flatline.Value ? " FLATLINE" : "")}  " : "") +
+            (_legLost.Value ? $"leg lost, bleed {_bleedLeft.Value:F0}s  " : "") + (_silent.Value ? "silent  " : "") +
             $"{(IsAshore ? "ashore" : $"depth {Shore.WaterDepthAt(transform.position):F1} m")}  sim: {_item.Sync.AuthorityLabel}" +
             (_item.IsHeld ? $"  held by {_item.Holder.DisplayName}" : "") + (_body.HeldFloat != null ? "  on a float" : "") +
             (_body.DebugState.Length > 0 ? "  " + _body.DebugState : "") +

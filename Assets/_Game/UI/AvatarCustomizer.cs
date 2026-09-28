@@ -179,6 +179,7 @@ namespace PleaseDontDrown.UI
             AvatarLook look = LocalLook;
             bool changed = false;
             changed |= Row("Body", AvatarLook.BuildNames[look.Build], ref look.Build, 4);
+            changed |= Row("Figure", AvatarLook.FigureNames[look.Figure % 2], ref look.Figure, 2);
             changed |= Row("Height", AvatarLook.HeightNames[look.Height], ref look.Height, 4);
             changed |= ColorRow("Skin", ref look.Skin, AvatarLook.SkinTones);
             changed |= EnumRow("Hair", ref look.Hair);

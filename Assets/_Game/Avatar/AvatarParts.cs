@@ -31,25 +31,30 @@ namespace PleaseDontDrown.Avatars
             Color top = look.TopTint;
             Color bottom = look.BottomTint;
             Color hair = look.HairTint;
-            bool swimsuit = look.Top == TopStyle.Swimsuit;
-            bool coveredTorso = look.Top != TopStyle.None;
+            bool feminine = look.Feminine;
+            bool bikini = look.Top == TopStyle.Bikini || (feminine && look.Top == TopStyle.None);
+            bool swimsuit = look.Top == TopStyle.Swimsuit || bikini; // no shorts over it
+            bool coveredTorso = look.Top != TopStyle.None && !bikini;
             Color torso = coveredTorso ? top : skin;
             Color pelvis = swimsuit ? top : bottom;
             Vector3 V(float x, float y, float z) => new Vector3(x, y, z) * s;
+            // Feminine: wider hips, narrower waist and chest.
+            float hipWidth = feminine ? 1.12f : 1f, waistWidth = feminine ? 0.84f : 1f, chestWidth = feminine ? 0.88f : 1f;
 
             // ---------------------------------------------------------- torso
             on(Bone.Hips);
-            kit.Ellipsoid(V(0f, 0f, -0.005f), V(0.165f * width, 0.125f, 0.125f * Mathf.Min(belly, 1.2f)), pelvis, segments: 14);
+            kit.Ellipsoid(V(0f, 0f, -0.005f), V(0.165f * width * hipWidth, 0.125f, 0.125f * Mathf.Min(belly, 1.2f)), pelvis, segments: 14);
 
             on(Bone.Spine);
             var bellyCenter = V(0f, 0.08f, 0.012f * belly);
-            var bellyRadii = V(0.165f * width, 0.15f, 0.125f * belly);
+            var bellyRadii = V(0.165f * width * waistWidth, 0.15f, 0.125f * belly * (feminine ? 0.92f : 1f));
             kit.Ellipsoid(bellyCenter, bellyRadii, torso, segments: 14, rings: 10);
 
             on(Bone.Chest);
             var chestCenter = V(0f, 0.08f, 0f);
-            var chestRadii = V(0.19f * width, 0.17f, 0.125f * Mathf.Lerp(1f, belly, 0.3f));
+            var chestRadii = V(0.19f * width * chestWidth, 0.17f, 0.125f * Mathf.Lerp(1f, belly, 0.3f) * (feminine ? 0.9f : 1f));
             kit.Ellipsoid(chestCenter, chestRadii, torso, segments: 16, rings: 10);
+            if (feminine) BuildBust(kit, look, bikini, torso, chestCenter, chestRadii, s, on);
             bool sleeves = look.Top is TopStyle.TShirt or TopStyle.RashGuard or TopStyle.Hawaiian;
             foreach (float side in new[] { -1f, 1f })
                 kit.Ellipsoid(V(shoulder / s * side, 0.15f, 0f), V(0.068f * limb, 0.066f * limb, 0.07f * limb), sleeves ? top : skin, segments: 10, rings: 6);
@@ -150,6 +155,44 @@ namespace PleaseDontDrown.Avatars
                 kit.Ellipsoid(V(0f, -0.045f, 0.045f), V(0.048f, 0.038f, 0.1f), skin, segments: 10, rings: 6);
                 kit.Box(V(0f, -0.074f, 0.05f), V(0.1f, 0.022f, 0.25f), sandal);
                 kit.Box(V(0f, -0.048f, 0.085f), V(0.092f, 0.012f, 0.016f), sandal);
+            }
+        }
+
+        /// <summary>Bust bone position in chest space for a 1.8 m person (AvatarRig scales it).</summary>
+        public static Vector3 BustOffset(AvatarLook look)
+        {
+            float w = look.Build switch { 0 => 0.9f, 2 => 1.16f, 3 => 1.12f, _ => 1f } * 0.88f;
+            return new Vector3(0.078f * w, 0.035f, 0.075f);
+        }
+
+        private static float BustSize(AvatarLook look) => look.Build switch { 0 => 0.88f, 3 => 1.25f, 2 => 1.08f, _ => 1f };
+
+        /// <summary>
+        /// Two rounded shapes on their own bones (so AvatarJiggle can spring them), covered by bikini cups with a band
+        /// and neck straps, or by the top's colour when it's a swimsuit/shirt.
+        /// </summary>
+        private static void BuildBust(AvatarMeshKit kit, AvatarLook look, bool bikini, Color torso, Vector3 chestCenter, Vector3 chestRadii,
+            float s, Action<Bone> on)
+        {
+            float r = 0.068f * BustSize(look) * s;
+            Color cover = bikini ? look.TopTint : torso;
+            foreach (Bone bust in new[] { Bone.BustL, Bone.BustR })
+            {
+                on(bust);
+                kit.Ellipsoid(Vector3.zero, new Vector3(r, r * 0.92f, r * 0.9f), cover, segments: 12, rings: 8);
+            }
+            if (!bikini) return;
+            on(Bone.Chest);
+            Vector3 b = BustOffset(look) * s;
+            // Band round the ribs under the cups, and two straps up to the neck.
+            kit.Frustum(chestCenter + new Vector3(0f, b.y - chestCenter.y - r * 0.55f, 0f), 1f, 1f, 0.024f * s, look.TopTint,
+                scale: new Vector2(chestRadii.x * 0.99f + 0.003f * s, chestRadii.z * 0.99f + 0.003f * s), segments: 18);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Vector3 from = new Vector3(b.x * side, b.y + r * 0.7f, b.z + r * 0.2f);
+                Vector3 to = new Vector3(0.045f * side * s, 0.235f * s, 0.02f * s);
+                Vector3 dir = to - from;
+                kit.Limb(dir.magnitude, 0.007f * s, 0.007f * s, look.TopTint, from, Quaternion.FromToRotation(Vector3.down, dir.normalized), segments: 5);
             }
         }
 

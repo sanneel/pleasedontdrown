@@ -3,6 +3,7 @@ namespace PleaseDontDrown.Rescue
     /// <summary>
     /// Fine ─► Distressed ─► Panicking ─► Drowning ─► Unconscious ─► (CPR) ─► Saved,
     /// or Unconscious ─► (condition runs out) ─► Lost. Calming moves back down the chain; reaching the shallows saves.
+    /// Injured (shark bite) = awake on land, bleeding: carry them to a hospital bed.
     /// </summary>
     public enum VictimState : byte
     {
@@ -12,13 +13,17 @@ namespace PleaseDontDrown.Rescue
         Drowning,
         Unconscious,
         Saved,
-        Lost
+        Lost,
+        Injured
     }
+
+    /// <summary>What the next CPR press does (story CPR: compressions, then breaths for women / a punch for men).</summary>
+    public enum CprStep : byte { Compress, Breath, Punch }
 
     public static class VictimStateExtensions
     {
-        /// <summary>In the water and in trouble (conscious or not): shows a HUD marker, the rescue clock runs.</summary>
-        public static bool NeedsHelp(this VictimState s) => s >= VictimState.Distressed && s <= VictimState.Unconscious;
+        /// <summary>In trouble (in the water or not, conscious or not): shows a HUD marker, the rescue clock runs.</summary>
+        public static bool NeedsHelp(this VictimState s) => (s >= VictimState.Distressed && s <= VictimState.Unconscious) || s == VictimState.Injured;
 
         public static bool IsConscious(this VictimState s) => s != VictimState.Unconscious && s != VictimState.Lost;
 
@@ -33,6 +38,7 @@ namespace PleaseDontDrown.Rescue
             VictimState.Drowning => "DROWNING",
             VictimState.Unconscious => "UNCONSCIOUS",
             VictimState.Saved => "saved",
+            VictimState.Injured => "BLEEDING",
             _ => "lost"
         };
     }

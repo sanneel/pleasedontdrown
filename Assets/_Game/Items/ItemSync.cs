@@ -58,6 +58,8 @@ namespace PleaseDontDrown.Items
         public Buoyancy Buoyancy => _buoyancy;
         /// <summary>Set while the body moves by itself (a struggling swimmer): never counts as "at rest".</summary>
         public bool KeepAwake { get; set; }
+        /// <summary>Set while someone drives it (vehicles): the current owner keeps simulating, no hand-back to the host.</summary>
+        public bool KeepAuthority { get; set; }
         /// <summary>Touching something right now (held items use this to slide along walls instead of fighting them).</summary>
         public bool IsTouching => Time.time - _lastContactTime < 0.1f;
         /// <summary>True on the one machine that runs physics for this body.</summary>
@@ -226,7 +228,7 @@ namespace PleaseDontDrown.Items
                 _sending = true;
                 SendState(Channel.Unreliable);
                 // Whoever bumped or threw a struggling swimmer hands it back to the host once it's left alone.
-                if (Owner.IsValid && Time.time - _lastInteractionTime > SelfMovingHandBack)
+                if (Owner.IsValid && !KeepAuthority && Time.time - _lastInteractionTime > SelfMovingHandBack)
                 {
                     _lastInteractionTime = Time.time; // don't repeat while the hand-back is on its way
                     if (IsServerInitialized) RemoveOwnership();

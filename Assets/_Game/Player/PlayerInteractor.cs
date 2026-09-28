@@ -33,7 +33,7 @@ namespace PleaseDontDrown.Player
         {
             Interactable found = null;
             Camera cam = _hub.Look.Camera;
-            if (cam != null && GameInput.GameplayActive)
+            if (cam != null && GameInput.GameplayActive && _hub.Motor.Seat == null) // driving: E only gets you off
                 found = FindTarget(cam.transform);
 
             if (found != _current)

@@ -22,7 +22,7 @@ namespace PleaseDontDrown.Player
         private const float MaxReach = 0.85f;    // from the eye
         private const float IdlePitch = 5f;
 
-        private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave }
+        private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave, Punch, Breath, Drive }
 
         private sealed class Hand
         {
@@ -221,7 +221,31 @@ namespace PleaseDontDrown.Player
             float sincePump = t - _lastPump;
             float sinceGesture = t - _gestureStart;
 
-            if (sincePump < 1.2f)
+            if (hand.Right && _gesture == AvatarGesture.Punch && sinceGesture < 0.34f)
+            {
+                // Punch: a fist jabs out to the target (or straight ahead) and back.
+                state = State.Punch;
+                float u = sinceGesture / 0.34f;
+                float extend = u < 0.25f ? -0.3f * (u / 0.25f) : Mathf.Sin((u - 0.25f) / 0.75f * Mathf.PI);
+                Vector3 rest = cam.TransformPoint(new Vector3(0.22f, -0.3f, 0.3f));
+                Vector3 target = _reach != Vector3.zero ? _reach : cam.position + cam.forward * 0.85f - cam.up * 0.08f;
+                target = cam.position + Vector3.ClampMagnitude(target - cam.position, MaxReach + 0.2f);
+                palm = Vector3.LerpUnclamped(rest, target, extend);
+                rot = HandBones.Orient(target - rest, -cam.up, side);
+                pose = HandPose.Fist;
+                blend = 0.05f;
+            }
+            else if (_gesture == AvatarGesture.Breath && sinceGesture < 1.0f && _reach != Vector3.zero)
+            {
+                // Rescue breath: left hand on the forehead, right hand lifting the chin, face right down there.
+                state = State.Breath;
+                Vector3 across = Vector3.ProjectOnPlane(cam.right, Vector3.up).normalized;
+                palm = hand.Right ? _reach - Vector3.up * 0.05f + across * 0.06f : _reach + Vector3.up * 0.06f - across * 0.1f;
+                rot = HandBones.Orient(hand.Right ? cam.forward : -across, Vector3.down, side);
+                pose = hand.Right ? HandPose.Cup : HandPose.Flat;
+                blend = 0.12f;
+            }
+            else if (sincePump < 1.2f)
             {
                 // CPR: palms flat on the chest, right hand on top, pressing on each pump.
                 state = State.Cpr;
@@ -238,6 +262,21 @@ namespace PleaseDontDrown.Player
                 rot = grip.Rotation(side);
                 pose = grip.Pose;
                 blend = followThrown ? 0.05f : 0.16f;
+                // Tools kick: a pistol jumps up and back, the defibrillator's paddles push forward.
+                if (_gesture == AvatarGesture.Shoot && sinceGesture < 0.16f)
+                    palm += (cam.up * 0.05f - cam.forward * 0.06f) * (1f - sinceGesture / 0.16f);
+                else if (_gesture == AvatarGesture.Zap && sinceGesture < 0.5f)
+                    palm += (cam.forward * 0.18f - cam.up * 0.08f) * Mathf.Sin(sinceGesture / 0.5f * Mathf.PI);
+            }
+            else if (Vehicles.Vehicle.SeatOf(_hub) is { } vehicle && vehicle.GetHandlebars(out HandGrip barL, out HandGrip barR))
+            {
+                // Driving: both hands on the handlebars.
+                state = State.Drive;
+                HandGrip bar = hand.Right ? barR : barL;
+                palm = bar.Point;
+                rot = bar.Rotation(side);
+                pose = bar.Pose;
+                blend = 0.15f;
             }
             else if (hand.Right && _gesture == AvatarGesture.Interact && sinceGesture < 0.4f)
             {

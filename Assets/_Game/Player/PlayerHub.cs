@@ -200,26 +200,34 @@ namespace PleaseDontDrown.Player
             if (_arms != null) _arms.Build(look);
         }
 
-        /// <summary>Owner: play a gesture (throw, reach, wave...) here and on everyone else's screen.</summary>
+        /// <summary>Owner: play a gesture (throw, reach, wave, punch...) here and on everyone else's screen.</summary>
         public void Gesture(AvatarGesture gesture, Vector3 point = default)
         {
             if (!IsOwner) return;
-            _avatar.OnGesture(gesture);
+            _avatar.OnGesture(gesture, point);
             if (_arms != null) _arms.Play(gesture, point);
-            GestureServer(gesture);
+            GestureServer(gesture, point);
         }
 
         [ServerRpc]
-        private void GestureServer(AvatarGesture gesture) => GestureObservers(gesture);
+        private void GestureServer(AvatarGesture gesture, Vector3 point) => GestureObservers(gesture, point);
 
         [ObserversRpc(ExcludeOwner = true)]
-        private void GestureObservers(AvatarGesture gesture) => _avatar.OnGesture(gesture);
+        private void GestureObservers(AvatarGesture gesture, Vector3 point) => _avatar.OnGesture(gesture, point);
 
         /// <summary>This player pressed a chest for CPR (called on every machine; see VictimBrain).</summary>
         public void ShowPump(Vector3 chest)
         {
             _avatar.OnPump(chest);
             if (_arms != null) _arms.OnPump(chest);
+        }
+
+        /// <summary>The other CPR steps: a rescue breath at the mouth, or a punch to the face (every machine).</summary>
+        public void ShowCprAction(Rescue.CprStep step, Vector3 point)
+        {
+            AvatarGesture gesture = step == Rescue.CprStep.Breath ? AvatarGesture.Breath : AvatarGesture.Punch;
+            _avatar.OnCprGesture(gesture, point);
+            if (_arms != null) _arms.Play(gesture, point);
         }
 
         [ServerRpc]

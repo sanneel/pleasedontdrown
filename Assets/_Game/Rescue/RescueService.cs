@@ -93,6 +93,51 @@ namespace PleaseDontDrown.Rescue
             return false;
         }
 
+        /// <summary>Host: a spot in open water inside an x/z box, between the given depths (story tourists).</summary>
+        [Server]
+        public bool TryFindSeaSpot(Vector2 xRange, Vector2 zRange, float minDepth, float maxDepth, out Vector3 spot)
+        {
+            for (int i = 0; i < 40; i++)
+            {
+                var p = new Vector3(Random.Range(xRange.x, xRange.y), 0f, Random.Range(zRange.x, zRange.y));
+                p.y = WaterSurface.Exists ? WaterSurface.HeightAt(p) - 0.4f : -0.7f;
+                float depth = Shore.WaterDepthAt(p);
+                if (depth < minDepth || depth > maxDepth) continue;
+                spot = p;
+                return true;
+            }
+            spot = default;
+            return false;
+        }
+
+        /// <summary>Host: ring the station bell (if there is one).</summary>
+        [Server]
+        public void ServerRingBell(string why)
+        {
+            if (_bell == null) _bell = FindFirstObjectByType<StationBell>();
+            if (_bell != null) _bell.ServerRing(why);
+        }
+
+        [Server]
+        public void ServerAnnounce(string text) => AnnounceObservers(text);
+
+        /// <summary>Host: put a tourist in the world with a behaviour profile (story tourists).</summary>
+        [Server]
+        public VictimBrain SpawnVictim(Vector3 position, float yaw, VictimState state, float panic, float air, TouristProfile profile)
+        {
+            Item prefab = GameContent.Items != null ? GameContent.Items.Find(_touristItem) : null;
+            if (prefab == null)
+            {
+                Debug.LogError($"[Rescue] no '{_touristItem}' in the item catalog");
+                return null;
+            }
+            Item instance = Instantiate(prefab, position, Quaternion.Euler(0f, yaw, 0f));
+            Spawn(instance.gameObject);
+            var brain = instance.GetComponent<VictimBrain>();
+            brain.ServerSetup(null, Random.Range(1, int.MaxValue), state, panic, air, profile);
+            return brain;
+        }
+
         /// <summary>Host: put a tourist in the world.</summary>
         [Server]
         public VictimBrain SpawnVictim(Vector3 position, float yaw, VictimState state, float panic, float air)
@@ -106,7 +151,7 @@ namespace PleaseDontDrown.Rescue
             Item instance = Instantiate(prefab, position, Quaternion.Euler(0f, yaw, 0f));
             Spawn(instance.gameObject);
             var brain = instance.GetComponent<VictimBrain>();
-            brain.ServerSetup(VictimBrain.RandomName(), Random.Range(1, int.MaxValue), state, panic, air);
+            brain.ServerSetup(null, Random.Range(1, int.MaxValue), state, panic, air);
             return brain;
         }
 

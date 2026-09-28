@@ -50,7 +50,16 @@ namespace PleaseDontDrown.Player
         public void SetLocal(bool local) => _rig.SetShadowsOnly(local);
 
         /// <summary>A gesture from this player (played locally for the owner, relayed to everyone else).</summary>
-        public void OnGesture(AvatarGesture gesture)
+        public void OnGesture(AvatarGesture gesture) => OnGesture(gesture, Vector3.zero);
+
+        /// <summary>A CPR breath or punch: stays kneeling by the tourist.</summary>
+        public void OnCprGesture(AvatarGesture gesture, Vector3 point)
+        {
+            _lastPumpTime = Time.time;
+            _animator.Play(gesture, point);
+        }
+
+        public void OnGesture(AvatarGesture gesture, Vector3 point)
         {
             switch (gesture)
             {
@@ -71,7 +80,7 @@ namespace PleaseDontDrown.Player
                     _remoteEating = false;
                     return;
             }
-            _animator.Play(gesture);
+            _animator.Play(gesture, point);
         }
 
         /// <summary>A CPR compression by this player on a chest at <paramref name="chest"/>.</summary>
@@ -155,6 +164,23 @@ namespace PleaseDontDrown.Player
 
             m.Cpr = Time.time - _lastPumpTime < 1.3f && !m.Swimming;
             m.CprPoint = _cprPoint;
+
+            // On a vehicle: sitting, hands on the handlebars.
+            Vehicles.Vehicle seat = Vehicles.Vehicle.SeatOf(_hub);
+            if (seat != null)
+            {
+                m.Seated = true;
+                m.Crouch = 0f;
+                m.Swimming = m.Underwater = false;
+                m.Grounded = true;
+                m.Velocity = Vector3.zero; // no walking legs
+                if (!m.Holding && seat.GetHandlebars(out HandGrip left, out HandGrip right))
+                {
+                    m.GripLeft = left;
+                    m.GripRight = right;
+                    m.Holding = m.TwoHanded = true;
+                }
+            }
             _animator.Motion = m;
         }
 
