@@ -143,19 +143,12 @@ namespace PleaseDontDrown.UI
         {
             GUILayout.Label("Rescue tourists. Return lost items. Find out what is happening on the beach.", _body);
             GUILayout.Space(16f);
-            if (Button("PLAY SOLO", Coral, 48f)) _connection.HostOffline();
-
-            GUI.enabled = SteamBootstrap.IsReady;
-            if (Button("HOST FOR FRIENDS", Teal, 42f)) _connection.HostSteam();
-            GUI.enabled = true;
+            if (Button("PLAY", Coral, 48f)) _connection.Play();
             GUILayout.Label(SteamBootstrap.IsReady
-                ? "Steam: " + SteamBootstrap.LocalName + "  |  Friends can join through Steam."
-                : "Steam is unavailable. Solo and LAN still work.", _small);
-            GUI.enabled = SteamBootstrap.OverlayAvailable;
-            if (Button("OPEN STEAM FRIENDS", Teal, 36f)) SteamBootstrap.OpenFriendsOverlay();
-            GUI.enabled = true;
-            if (SteamBootstrap.IsReady && !SteamBootstrap.OverlayAvailable)
-                GUILayout.Label("Steam overlay unavailable here. Launch the game through Steam to use Shift+Tab.", _small);
+                ? "Steam: " + SteamBootstrap.LocalName + "  |  Your Steam friends can join you."
+                : "Steam isn't running: offline only. Start Steam to play with friends.", _small);
+            DrawFriendsPlaying();
+            DrawOverlayButton();
             GUILayout.Space(10f);
 
             GUILayout.Label("JOIN LOCAL / LAN GAME", _subtitle);
@@ -185,11 +178,15 @@ namespace PleaseDontDrown.UI
             if (Button("RESUME", Coral, 48f)) SetPause(false);
             if (Button(Screen.fullScreen ? "WINDOWED  /  F11" : "FULLSCREEN  /  F11", Color.white, 36f))
                 ToggleFullscreen();
-            if (_connection.Mode == ConnectionMode.Steam && Button("INVITE FRIENDS", Teal, 36f))
-                _connection.InviteFriends();
-            GUI.enabled = SteamBootstrap.OverlayAvailable;
-            if (Button("OPEN STEAM FRIENDS", Teal, 36f)) SteamBootstrap.OpenFriendsOverlay();
-            GUI.enabled = true;
+            if (SteamLobbyService.InLobby)
+            {
+                if (SteamBootstrap.OverlayAvailable && Button("INVITE FRIENDS  /  STEAM", Teal, 36f))
+                    _connection.InviteFriends();
+                DrawInviteList();
+            }
+            else if (SteamBootstrap.IsReady)
+                GUILayout.Label("Offline session: friends can't join it. Leave and press PLAY to host through Steam.", _small);
+            DrawOverlayButton();
 
             if (Dev.DevIsland.Instance != null)
             {
@@ -221,6 +218,68 @@ namespace PleaseDontDrown.UI
             }
             GUILayout.Space(8f);
             GUILayout.Label("WASD move  |  E use  |  R reload  |  F inspect  |  Tab guide", _small);
+        }
+
+        /// <summary>Friends in this game with a session to join (a Steam invite or their friends list works too).</summary>
+        private void DrawFriendsPlaying()
+        {
+            if (!SteamBootstrap.IsReady) return;
+            bool any = false;
+            foreach (SteamLobbyService.Friend friend in SteamLobbyService.Friends())
+            {
+                if (!friend.InGame) break; // sorted: the ones in this game come first
+                if (!any)
+                {
+                    GUILayout.Space(8f);
+                    GUILayout.Label("FRIENDS PLAYING", _subtitle);
+                    any = true;
+                }
+                GUILayout.BeginHorizontal();
+                string state = !friend.SameVersion ? "  (other build)" : friend.Lobby == Steamworks.CSteamID.Nil ? "  (in the menu)" : string.Empty;
+                GUILayout.Label(friend.Name + state, _body, GUILayout.Height(32f));
+                GUI.enabled = friend.SameVersion && friend.Lobby != Steamworks.CSteamID.Nil;
+                if (Button("JOIN", Teal, 32f, 94f)) _connection.JoinFriend(friend.Lobby);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        /// <summary>Online Steam friends to invite: Steam sends them the invite, no overlay needed.</summary>
+        private void DrawInviteList()
+        {
+            if (!SteamBootstrap.IsReady) return;
+            var friends = SteamLobbyService.Friends();
+            GUILayout.Space(8f);
+            GUILayout.Label("INVITE A FRIEND", _subtitle);
+            if (friends.Count == 0)
+            {
+                GUILayout.Label("No Steam friends online right now.", _small);
+                return;
+            }
+            int shown = 0;
+            foreach (SteamLobbyService.Friend friend in friends)
+            {
+                if (SteamLobbyService.IsMember(friend.Id)) continue;
+                if (++shown > 12) break;
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(friend.InGame ? friend.Name + "  (playing)" : friend.Name, _body, GUILayout.Height(30f));
+                bool invited = SteamLobbyService.RecentlyInvited(friend.Id);
+                GUI.enabled = !invited;
+                if (Button(invited ? "SENT" : "INVITE", Teal, 30f, 94f)) SteamLobbyService.Invite(friend.Id);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.Label("They accept it in Steam; the game must already be running on their PC.", _small);
+        }
+
+        private void DrawOverlayButton()
+        {
+            if (!SteamBootstrap.IsReady) return;
+            GUI.enabled = SteamBootstrap.OverlayAvailable;
+            if (Button("OPEN STEAM FRIENDS  /  SHIFT+TAB", Teal, 34f)) SteamBootstrap.OpenFriendsOverlay();
+            GUI.enabled = true;
+            if (!SteamBootstrap.OverlayAvailable)
+                GUILayout.Label("No Steam overlay: start the game from your Steam library (Games > Add a Non-Steam Game).", _small);
         }
 
         private void DrawGuide(float width)

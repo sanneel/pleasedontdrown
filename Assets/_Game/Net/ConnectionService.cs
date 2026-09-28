@@ -40,6 +40,10 @@ namespace PleaseDontDrown.Net
 
         private int _tugboatIndex = -1;
         private int _steamIndex = -1;
+        // Play(): a Steam lobby was asked for; if Steam can't make one, play offline instead of failing.
+        private bool _offlineIfLobbyFails;
+        // A friend's lobby to join once the current session has shut down.
+        private CSteamID _pendingJoin = CSteamID.Nil;
 
         private void Awake()
         {
@@ -63,6 +67,7 @@ namespace PleaseDontDrown.Net
             _lobby.HostLobbyReady += OnHostLobbyReady;
             _lobby.JoinedLobby += OnJoinedLobby;
             _lobby.LobbyFailed += OnLobbyFailed;
+            _lobby.JoinRequested += JoinFriend;
             _networkManager.ClientManager.OnClientConnectionState += OnClientConnectionState;
             _networkManager.ServerManager.OnRemoteConnectionState += OnRemoteConnectionState;
         }
@@ -80,6 +85,7 @@ namespace PleaseDontDrown.Net
                 _lobby.HostLobbyReady -= OnHostLobbyReady;
                 _lobby.JoinedLobby -= OnJoinedLobby;
                 _lobby.LobbyFailed -= OnLobbyFailed;
+                _lobby.JoinRequested -= JoinFriend;
             }
             if (_networkManager != null)
             {
@@ -89,6 +95,37 @@ namespace PleaseDontDrown.Net
         }
 
         // ---------- Public API ----------
+
+        /// <summary>
+        /// The menu's Play: with Steam running, a friends-only Steam session (friends join from their Steam friends
+        /// list, an invite, or the menu's list of friends playing); otherwise, or if Steam can't make a lobby, offline.
+        /// </summary>
+        public bool Play()
+        {
+            if (IsActive || _offlineIfLobbyFails) return false; // a lobby is already on its way
+            LastError = string.Empty;
+            if (!SteamBootstrap.IsReady) return HostOffline();
+            _offlineIfLobbyFails = true;
+            if (HostSteam()) return true;
+            _offlineIfLobbyFails = false;
+            return HostOffline();
+        }
+
+        /// <summary>Joins a friend's Steam lobby, ending the current session first if there is one.</summary>
+        public void JoinFriend(CSteamID lobby)
+        {
+            if (!SteamBootstrap.IsReady || lobby == CSteamID.Nil || lobby == SteamLobbyService.CurrentLobby) return;
+            LastError = string.Empty;
+            if (!IsActive)
+            {
+                _lobby.Join(lobby);
+                return;
+            }
+            // Leaving is finished when the local client reports Stopped (OnClientConnectionState joins then).
+            _pendingJoin = lobby;
+            Leave();
+            if (!IsActive) JoinPending();
+        }
 
         public bool HostOffline()
         {
@@ -142,6 +179,13 @@ namespace PleaseDontDrown.Net
 
         private void OnHostLobbyReady(CSteamID lobby)
         {
+            bool offlineIfFails = _offlineIfLobbyFails;
+            _offlineIfLobbyFails = false;
+            if (IsActive)
+            {
+                _lobby.Leave(); // something else started meanwhile (a LAN join)
+                return;
+            }
             var steam = (SteamTransport)_multipass.GetTransport(_steamIndex);
             steam.SetMaximumClients(_maxPlayers);
             _multipass.SetClientTransport(_steamIndex);
@@ -150,13 +194,20 @@ namespace PleaseDontDrown.Net
             {
                 _lobby.Leave();
                 Fail("Could not start Steam host.");
+                if (offlineIfFails) HostOffline();
             }
         }
 
         private void OnJoinedLobby(CSteamID lobby, CSteamID owner)
         {
             if (IsActive)
+            {
+                // Still in a session (should have ended first): end it, then come back to this lobby.
+                _pendingJoin = lobby;
                 Leave();
+                if (!IsActive) JoinPending();
+                return;
+            }
             Mode = ConnectionMode.Steam;
             var steam = (SteamTransport)_multipass.GetTransport(_steamIndex);
             steam.SetClientAddress(owner.m_SteamID.ToString());
@@ -182,11 +233,27 @@ namespace PleaseDontDrown.Net
             _lobby.Leave();
             Mode = ConnectionMode.None;
             SessionEnded?.Invoke();
+            JoinPending();
+        }
+
+        private void JoinPending()
+        {
+            if (_pendingJoin == CSteamID.Nil) return;
+            CSteamID lobby = _pendingJoin;
+            _pendingJoin = CSteamID.Nil;
+            _lobby.Join(lobby);
         }
 
         private void OnLobbyFailed(string message)
         {
             Mode = ConnectionMode.None;
+            if (_offlineIfLobbyFails && !IsActive)
+            {
+                _offlineIfLobbyFails = false;
+                Fail($"{message}. Playing offline: friends can't join this time.");
+                HostOffline();
+                return;
+            }
             Fail(message);
         }
 

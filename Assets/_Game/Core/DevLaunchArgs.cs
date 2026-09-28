@@ -9,6 +9,7 @@ namespace PleaseDontDrown.Core
     /// Command-line switches for automated and multi-instance testing:
     ///   -pdd-nosteam            skip Steam init (read by SteamBootstrap)
     ///   -pdd-host-offline       start a local host immediately
+    ///   -pdd-host-steam         press Play at once: a friends-only Steam session (offline if Steam can't)
     ///   -pdd-join &lt;address&gt;    join a local/LAN host immediately
     ///   -pdd-quit-after &lt;sec&gt;  quit after N seconds (smoke tests)
     ///   -pdd-noinput            ignore real input devices (automated windowed tests)
@@ -42,6 +43,11 @@ namespace PleaseDontDrown.Core
             {
                 Debug.Log("[Dev] Auto-hosting offline");
                 _connection.HostOffline();
+            }
+            else if (Has("-pdd-host-steam"))
+            {
+                Debug.Log("[Dev] Auto-hosting through Steam");
+                _connection.Play();
             }
             else if (Value("-pdd-join") is { } address)
             {
