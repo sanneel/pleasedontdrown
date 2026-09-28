@@ -60,6 +60,39 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[Build] generated bodies: {string.Join(", ", baked.Select(b => b.DisplayName))}");
         }
 
+        /// <summary>
+        /// A plain URP Lit material with only Meshy's colour texture: its normal and metal/roughness maps were baked for
+        /// the full-detail model (seam streaks on the reduced one) and "metal" patches render as dark specks on skin.
+        /// </summary>
+        private static Material BodyMaterial(Material imported, string file)
+        {
+            Texture baseColor = null;
+            foreach (string property in imported.GetTexturePropertyNames())
+                if (property.IndexOf("baseColor", StringComparison.OrdinalIgnoreCase) >= 0 || property == "_BaseMap" || property == "_MainTex")
+                {
+                    baseColor = imported.GetTexture(property);
+                    if (baseColor != null) break;
+                }
+            string path = $"{OutputDir}/{file}_material.mat";
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(lit);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.shader = lit;
+            mat.SetTexture("_BaseMap", baseColor);
+            mat.mainTexture = baseColor;
+            mat.SetColor("_BaseColor", Color.white);
+            mat.SetFloat("_Metallic", 0f);
+            mat.SetFloat("_Smoothness", 0.28f);
+            mat.enableInstancing = true;
+            EditorUtility.SetDirty(mat);
+            if (baseColor == null) Debug.LogWarning($"[Build] body {file}: no colour texture found on {imported.name}");
+            return mat;
+        }
+
         private static AvatarBody Bake(string glbPath, byte id, string displayName, string file)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(glbPath);
@@ -206,7 +239,7 @@ namespace PleaseDontDrown.Editor
                 if (isNew) AssetDatabase.CreateAsset(mesh, meshPath);
                 else EditorUtility.SetDirty(mesh);
                 body.Mesh = mesh;
-                body.Material = skin.sharedMaterial;
+                body.Material = BodyMaterial(skin.sharedMaterial, file);
 
                 string bodyPath = $"{OutputDir}/{file}.asset";
                 var existing = AssetDatabase.LoadAssetAtPath<AvatarBody>(bodyPath);

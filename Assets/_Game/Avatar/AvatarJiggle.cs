@@ -13,6 +13,7 @@ namespace PleaseDontDrown.Avatars
         public float Damping = 5.5f;     // (1/s)
         public float MaxOffset = 0.05f;  // metres (for a 1.8 m person)
         public float Inertia = 1f;       // how much the parent's acceleration shoves it
+        public float Squash = 0.12f;     // squash and stretch with the bounce (0 for skinned Meshy bodies: it creases them)
 
         private Vector3 _restLocal;
         private Vector3 _offset;         // parent space
@@ -75,7 +76,7 @@ namespace PleaseDontDrown.Avatars
             }
             Bone.localPosition = _restLocal + _offset;
             // Squash and stretch a touch with the bounce, so it reads at a distance.
-            float squash = Mathf.Clamp(-_offset.y / Mathf.Max(0.001f, max), -1f, 1f) * 0.12f;
+            float squash = Mathf.Clamp(-_offset.y / Mathf.Max(0.001f, max), -1f, 1f) * Squash;
             Bone.localScale = new Vector3(1f + squash * 0.5f, 1f - squash, 1f + squash * 0.5f);
         }
     }
@@ -134,6 +135,15 @@ namespace PleaseDontDrown.Avatars
                 b.MaxOffset = 0.045f / soft;
             }
             _bones[1].Stiffness *= 1.06f; // a little out of phase
+            if (_rig.GeneratedBody != null)
+            {
+                // A Meshy body's chest is one smooth skin: smaller swings and no squash, or the skin creases.
+                foreach (JiggleBone b in _bones)
+                {
+                    b.MaxOffset *= 0.6f;
+                    b.Squash = 0f;
+                }
+            }
         }
 
         /// <summary>Extra kick in world space (m/s), e.g. a CPR compression pushes down.</summary>

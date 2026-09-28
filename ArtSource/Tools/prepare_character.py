@@ -3,7 +3,7 @@
 blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- <in.glb> <out.glb> [options]
   --pick left|right|only   which figure to keep when the picture had several side by side (default: only)
   --height 1.72            final height in metres (top of the head, hair included)
-  --tris 14000             triangle budget after decimation
+  --tris 22000             triangle budget after decimation
   --texture 2048           largest texture size
   --bust 1                 women: add BustL/BustR spring bones (the game jiggles them, e.g. during CPR)
   --preview <prefix>       also render front/side pictures with the skeleton drawn in
@@ -28,7 +28,7 @@ from mathutils.kdtree import KDTree
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, DST = argv[0], argv[1]
-opts = {'pick': 'only', 'height': 1.72, 'tris': 14000, 'texture': 2048, 'bust': 0, 'preview': ''}
+opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'preview': ''}
 i = 2
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -57,6 +57,9 @@ for o in list(bpy.context.scene.objects):
     if o != body:
         bpy.data.objects.remove(o, do_unlink=True)
 
+bpy.context.view_layer.objects.active = body
+bpy.ops.object.select_all(action='DESELECT')
+body.select_set(True)
 bpy.ops.object.mode_set(mode='EDIT')
 bpy.ops.mesh.select_all(action='SELECT')
 bpy.ops.mesh.remove_doubles(threshold=0.0001)  # Meshy splits vertices along UV seams: stitch them back
@@ -352,6 +355,65 @@ for vert in body.data.vertices:
     empty += 1
 log(f'{empty} vertices had no weight (given to the nearest bone)')
 
+# Heat weighting lets the arm bones reach onto the chest and flanks (the arms start out close to the body), so
+# lowering or raising the arms dragged the chest, bust and bikini along. Below the armpits, only what is really arm
+# (the arm's outline in the front silhouette) keeps arm weights; the torso gives them back to the spine.
+arm_groups = {g.index for g in body.vertex_groups if g.name.startswith(('UpperArm', 'Forearm', 'Hand'))}
+cleared = 0
+torso_runs = {}
+for vert in body.data.vertices if opts['armclamp'] else []:
+    x, _, z = vert.co
+    if z > armpit_z - 0.03 or z < split_z:
+        continue  # the shoulders blend between arm and chest; hips and legs are not the arms' business
+    r_, c_ = int(z / CELL), int((x - xmin) / CELL)
+    if not (0 <= r_ < R and 0 <= c_ < W) or arms[r_, c_]:
+        continue
+    if r_ not in torso_runs:  # the body's own run (arms taken out) through the middle of this row
+        middle = [q for q in runs(r_) if col_x(q[0]) <= 0.0 <= col_x(q[1])]
+        torso_runs[r_] = middle[0] if middle else None
+    run = torso_runs[r_]
+    if run is None or not (run[0] - 1 <= c_ <= run[1] + 1):
+        continue
+    if sum(g.weight for g in vert.groups if g.group in arm_groups) <= 0.0:
+        continue
+    for g in vert.groups:
+        if g.group in arm_groups:
+            g.weight = 0.0
+    if sum(g.weight for g in vert.groups) < 1e-4:
+        body.vertex_groups['Chest' if z > (joints['Chest'][2] + joints['Spine'][2]) / 2 else 'Spine'].add([vert.index], 1.0, 'REPLACE')
+    cleared += 1
+log(f'{cleared} torso vertices freed from the arms')
+
+# The upper chest (armpit height up to the shoulders, the front half, inside the torso): the bust and the top live
+# here, so raising the arms over the head (lying, waving, swimming) must not drag it along. The arm weight fades out
+# toward the middle; the shoulder edges keep theirs so the shoulders still bend smoothly.
+below = [q for q in runs(max(0, armpit_row - 4)) if col_x(q[0]) <= 0.0 <= col_x(q[1])]
+chest_half = (col_x(below[0][1]) - col_x(below[0][0])) / 2 if below else 0.15 * unit
+front_y = joints['Chest'][1]
+eased = 0
+for vert in body.data.vertices if opts['armclamp'] else []:
+    x, y, z = vert.co
+    if not (armpit_z - 0.03 <= z <= shoulder_z + 0.04) or y > front_y or abs(x) > 1.05 * chest_half:
+        continue
+    def smooth(u):
+        u = min(1.0, max(0.0, u))
+        return u * u * (3.0 - 2.0 * u)
+    lateral = smooth((abs(x) - 0.75 * chest_half) / (0.3 * chest_half))  # 0 mid-chest, 1 at the shoulder edge
+    v_ = (z - (armpit_z - 0.03)) / max(1e-3, shoulder_z + 0.04 - (armpit_z - 0.03))
+    # Blends into the full clamp below (at the armpits) and back to the heat weights above (collarbones): no seams.
+    keep = lateral * smooth(v_ / 0.4)
+    keep += (1.0 - keep) * smooth((v_ - 0.6) / 0.4)
+    arm_w = sum(g.weight for g in vert.groups if g.group in arm_groups)
+    if arm_w <= 0.0:
+        continue
+    for g in vert.groups:
+        if g.group in arm_groups:
+            g.weight *= keep
+    if sum(g.weight for g in vert.groups) < 1e-4:
+        body.vertex_groups['Chest'].add([vert.index], 1.0, 'REPLACE')
+    eased += 1
+log(f'{eased} upper-chest vertices eased off the arms')
+
 if opts['bust']:
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.mode_set(mode='EDIT')
@@ -371,13 +433,18 @@ if opts['bust']:
             if p[0] * sign < 0.005 or p[1] > center[1] + 0.3 * r:
                 continue  # other side, or the back
             d = np.linalg.norm((p - center) / np.array([1.0, 1.0, 1.15]))
+            # The arms keep off the whole breast and a margin round it (raised arms flared the top's corners).
+            a_ = min(1.0, max(0.0, 1.0 - d / (1.9 * r)))
+            a_ = a_ * a_ * (3.0 - 2.0 * a_)
+            for g in vert.groups:
+                if g.group in arm_groups:
+                    g.weight *= 1.0 - min(1.0, 1.6 * a_)
             w = 1.0 - d / (1.3 * r)
             if w <= 0.0:
                 continue
             w = w * w * (3.0 - 2.0 * w) * 0.9  # smooth falloff to the chest
-            # Heat weighting lets the arms pull on the chest of wide figures: take that out here.
             for g in vert.groups:
-                g.weight *= (1.0 - min(1.0, 2.0 * w)) if g.group in arm_groups else (1.0 - w)
+                g.weight *= 1.0 - w
             group.add([vert.index], w, 'REPLACE')
             count += 1
         log(f'bust {side}: {count} vertices')
@@ -390,13 +457,41 @@ bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=F
 
 # ------------------------------------------------------------------ decimate (weights and UVs carry over)
 
-before = len(body.data.polygons)
+# Stitching keeps the texture seams in the UVs (per corner), but reducing across a seam blends the texture islands
+# on either side into smears. So the seam vertices go in a group the decimator leaves alone.
+bm = bmesh.new()
+bm.from_mesh(body.data)
+uv_layer = bm.loops.layers.uv.active
+seam_verts = set()
+for edge in bm.edges:
+    faces = edge.link_faces
+    if len(faces) != 2:
+        seam_verts.update(v.index for v in edge.verts)  # open borders too
+        continue
+    for vert in edge.verts:
+        a = next(l for l in faces[0].loops if l.vert == vert)[uv_layer].uv
+        b = next(l for l in faces[1].loops if l.vert == vert)[uv_layer].uv
+        if (a - b).length > 1e-5:
+            seam_verts.update(v.index for v in edge.verts)
+            break
+bm.free()
+keep = body.vertex_groups.new(name='_KeepSeams')
+keep.add(sorted(seam_verts), 1.0, 'REPLACE')
+log(f'{len(seam_verts)} texture-seam vertices protected')
+
+bpy.context.view_layer.objects.active = body
+bpy.ops.object.select_all(action='DESELECT')
+body.select_set(True)
 tris_now = sum(len(p.vertices) - 2 for p in body.data.polygons)
 dec = body.modifiers.new('Decimate', 'DECIMATE')
 dec.ratio = min(1.0, opts['tris'] / max(1, tris_now))
 dec.use_collapse_triangulate = True
+dec.vertex_group = keep.name
+dec.invert_vertex_group = True  # weight 0 = keep: the seams
+dec.vertex_group_factor = 1.0
 body.modifiers.move(body.modifiers.find('Decimate'), 0)  # before the armature modifier
 bpy.ops.object.modifier_apply(modifier='Decimate')
+body.vertex_groups.remove(body.vertex_groups['_KeepSeams'])
 log(f'triangles {tris_now} -> {sum(len(p.vertices) - 2 for p in body.data.polygons)}')
 
 for img in bpy.data.images:
