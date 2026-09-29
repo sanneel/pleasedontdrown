@@ -40,6 +40,7 @@ namespace PleaseDontDrown.Player
         [SerializeField] private float _stepAtHeight = -0.02f;    // a footstep sounds when the bob dips below this
 
         private Camera _camera;
+        private float _seatEyeY, _seatEyeVelocity;
         private float _yaw;
         private float _pitch;
         private float _roll, _rollVelocity;
@@ -249,7 +250,20 @@ namespace PleaseDontDrown.Player
             HeadBob(dt);
             _delayedBob = Vector3.Lerp(_delayedBob, _bob, Mathf.Min(1f, _bobFollowRate * dt));
 
-            _camera.transform.localPosition = _delayedBob;
+            // Riding: the seat rises and falls with every wave (and the hull's pitch swings it). The eye follows it
+            // softly, so the view floats over the chop instead of shaking with it.
+            float headY = _head.position.y;
+            if (_motor.Seat != null)
+                _seatEyeY = Mathf.SmoothDamp(_seatEyeY, headY, ref _seatEyeVelocity, 0.14f, Mathf.Infinity, dt);
+            else
+            {
+                _seatEyeY = headY;
+                _seatEyeVelocity = 0f;
+            }
+            float settle = Mathf.Clamp(_seatEyeY - headY, -0.15f, 0.15f);
+            _seatEyeY = headY + settle;
+
+            _camera.transform.localPosition = _delayedBob + _head.InverseTransformVector(Vector3.up * settle);
             _camera.transform.localRotation = Quaternion.Euler(_fallTilt, 0f, _roll);
 
             // Leaning in (mouth-to-mouth): the eye comes down over their face (they lie on their back, face up) to just
@@ -273,7 +287,7 @@ namespace PleaseDontDrown.Player
         private void HeadBob(float dt)
         {
             float moving = _motor.SpeedFraction;
-            bool bobbing = moving > _bobMinSpeed && _motor.IsGrounded && !_motor.IsSwimming;
+            bool bobbing = moving > _bobMinSpeed && _motor.IsGrounded && !_motor.IsSwimming && _motor.Seat == null; // no steps while sitting
             Vector3 target = Vector3.zero;
             if (bobbing)
             {

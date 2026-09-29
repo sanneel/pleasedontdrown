@@ -177,6 +177,8 @@ namespace PleaseDontDrown.Player
 
         public void Teleport(Vector3 position)
         {
+            // A climb cut short (teleported mid-climb) would leave the body kinematic for good.
+            if (_climbing && Seat == null) _rb.isKinematic = Noclip;
             _rb.position = position;
             transform.position = position;
             if (!_rb.isKinematic)
@@ -187,29 +189,107 @@ namespace PleaseDontDrown.Player
 
         /// <summary>The vehicle we're sitting on (the vehicle glues us to its seat), or null.</summary>
         public Vehicles.Vehicle Seat { get; private set; }
+        private float _seatLostSince = float.PositiveInfinity;
 
         /// <summary>Sit on a vehicle (body goes kinematic, eyes drop to sitting height) or get off at <paramref name="exitPosition"/>.</summary>
-        public void SetSeat(Vehicles.Vehicle vehicle, Vector3 exitPosition)
+        public void SetSeat(Vehicles.Vehicle vehicle, Vector3 exitPosition, Vector3 exitVelocity = default)
         {
             if (Seat == vehicle) return;
             Seat = vehicle;
+            _seatLostSince = float.PositiveInfinity;
             _climbing = false;
+            // Whatever the walk/swim was doing stops here: no stale speed (head bob and footsteps while sitting),
+            // no half-done jump, crouch or hop carried over to the other side.
+            _moveVelocity = Vector3.zero;
+            SpeedFraction = HorizontalSpeed = 0f;
+            IsSprinting = IsCrouching = false;
+            _crouchBlend = 0f;
+            _hasJumped = false;
+            _lastJumpPressedTime = float.NegativeInfinity;
+            _hopUntil = float.NegativeInfinity;
+            _controlLossUntil = float.NegativeInfinity;
+            _height = _standHeight;
             if (vehicle != null)
             {
-                _rb.linearVelocity = Vector3.zero;
+                if (!_rb.isKinematic) _rb.linearVelocity = _rb.angularVelocity = Vector3.zero;
                 _rb.isKinematic = true;
+                _rb.useGravity = false;
                 _rb.interpolation = RigidbodyInterpolation.None;
                 IsGrounded = true;
-                IsCrouching = false;
-                _height = _standHeight;
+                IsSwimming = false;
+                _seatedAt = Time.time;
                 ApplyHeight();
                 if (_head != null) _head.localPosition = new Vector3(0f, 1.22f, 0f); // sitting eye height
                 return;
             }
             _rb.isKinematic = Noclip;
+            _rb.useGravity = true;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
+            _rb.constraints = RigidbodyConstraints.FreezeRotation;
+            IsGrounded = false;
             ApplyHeight();
             Teleport(exitPosition);
+            PlayerLook.ResetBodyRotation(transform);
+            UpdateWater(); // in the water or on a deck from the first step, not a frame of falling
+            if (!_rb.isKinematic && exitVelocity != Vector3.zero)
+            {
+                _rb.linearVelocity = exitVelocity;
+                _moveVelocity = new Vector3(exitVelocity.x, 0f, exitVelocity.z);
+            }
+            Debug.Log($"[Player] got off at {exitPosition:F2} (swimming {IsSwimming}, depth {WaterDepthAtFeet:F2})");
+        }
+
+        /// <summary>
+        /// Every step while seated: the seat must still exist and still have us as its driver. If the vehicle was
+        /// despawned, disabled, or its driver changed without telling us (a lost message), we get off by ourselves
+        /// after half a second instead of staying frozen on nothing.
+        /// </summary>
+        private void CheckSeat()
+        {
+            Vehicles.Vehicle seat = Seat;
+            PlayerHub me = _hub != null ? _hub : (_hub = GetComponent<PlayerHub>());
+            bool valid = seat != null && seat.isActiveAndEnabled && seat.IsSpawned && (me == null || seat.Driver == me || seat.Driver == null && Time.time - _seatedAt < 1f);
+            if (valid)
+            {
+                _seatLostSince = float.PositiveInfinity;
+                return;
+            }
+            if (float.IsPositiveInfinity(_seatLostSince)) _seatLostSince = Time.time;
+            if (Time.time - _seatLostSince < 0.5f) return;
+            Vector3 spot = seat != null ? seat.SafeExitPosition() : transform.position + Vector3.up * 1.5f;
+            Debug.LogWarning("[Player] seat lost (vehicle gone or no longer ours): getting off by ourselves");
+            SetSeat(null, spot);
+        }
+
+        private PlayerHub _hub;
+        private float _seatedAt;
+
+        /// <summary>
+        /// Last line of defence against "I can't move": out of a seat, not climbing, not in noclip, the body must be
+        /// a dynamic, upright rigidbody with a sane capsule. Anything else is repaired (and logged).
+        /// </summary>
+        private void EnsureMobile()
+        {
+            if (Seat != null || _climbing || Noclip) return;
+            if (_rb.isKinematic)
+            {
+                Debug.LogWarning("[Player] body was left kinematic outside a seat/climb: fixed");
+                _rb.isKinematic = false;
+                _rb.interpolation = RigidbodyInterpolation.Interpolate;
+            }
+            if ((_rb.constraints & RigidbodyConstraints.FreezePosition) != 0)
+                _rb.constraints = RigidbodyConstraints.FreezeRotation;
+            if (!_capsule.enabled) _capsule.enabled = true;
+            if (_height < CrouchHeight - 0.01f || _height > _standHeight + 0.01f)
+            {
+                _height = _standHeight;
+                ApplyHeight();
+            }
+            if (float.IsNaN(_rb.position.x) || float.IsNaN(_moveVelocity.x))
+            {
+                _moveVelocity = Vector3.zero;
+                Teleport(_spawnPoint);
+            }
         }
 
         /// <summary>
@@ -259,7 +339,11 @@ namespace PleaseDontDrown.Player
         {
             float dt = Time.fixedDeltaTime;
             if (Seat != null)
-                return; // the vehicle carries us
+            {
+                CheckSeat();
+                if (Seat != null) return; // the vehicle carries us
+            }
+            EnsureMobile();
             if (Noclip)
             {
                 FlyNoclip(dt);

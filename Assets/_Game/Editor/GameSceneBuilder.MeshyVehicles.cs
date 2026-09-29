@@ -67,16 +67,20 @@ namespace PleaseDontDrown.Editor
             t.localScale = size;
         }
 
-        /// <summary>The jet ski's model (3 m). Returns false when the GLB isn't there.</summary>
+        /// <summary>
+        /// The lifeguard jet ski's model (3 m, stylized by ArtSource/Tools/stylize_prop.py). Measured in Blender: the
+        /// saddle's low point is 0.72 m up at z -0.2, the handlebar ends at x ±0.48, y 0.99, z 0.42, the hull 1.07 m wide
+        /// at the bumper. Returns false when the GLB isn't there.
+        /// </summary>
         private static bool DressJetSki(GameObject root)
         {
             GameObject prefab = LoadMeshyModel("jetski");
             if (prefab == null) return false;
             SwapGreybox(root.transform, prefab, Vector3.zero, "Hull");
             FitBox(root.transform, "Hull", new Vector3(0f, 0.3f, 0f), new Vector3(1f, 0.6f, 2.9f));
-            MovePoint(root.transform, "Seat", new Vector3(0f, 0.88f, -0.3f));
-            MovePoint(root.transform, "GripLeft", new Vector3(-0.4f, 1f, 0.38f));
-            MovePoint(root.transform, "GripRight", new Vector3(0.4f, 1f, 0.38f));
+            MovePoint(root.transform, "Seat", new Vector3(0f, 0.84f, -0.3f));
+            MovePoint(root.transform, "GripLeft", new Vector3(-0.38f, 1f, 0.4f));
+            MovePoint(root.transform, "GripRight", new Vector3(0.38f, 1f, 0.4f));
             MovePoint(root.transform, "Thrust", new Vector3(0f, 0.05f, -1.4f));
             return true;
         }

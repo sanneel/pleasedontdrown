@@ -13,7 +13,8 @@ namespace PleaseDontDrown.Story
     ///  * in a wall: the body overlaps static geometry;
     ///  * under the ground / floating: feet not on the ground while walking;
     ///  * popping: moved far faster than it can walk (outside a teleport);
-    ///  * idle too long: an active tourist (walker, wader, swimmer) that hasn't moved for 60 s;
+    ///  * idle too long: a walker or wader that hasn't moved for 60 s, a swimmer treading water for over 16 s;
+    ///  * swimming in place: on a swim route but making under 0.3 m/s for 3 s;
     ///  * broken body: the rig's joints far from where they belong (stretched limbs, a head below the hips when upright).
     /// Each problem is logged once per character per kind every 10 s, and a summary every 30 s.
     /// </summary>
@@ -127,8 +128,14 @@ namespace PleaseDontDrown.Story
             }
             if (npc.TakeGaveUp(out string why)) Report(npc, t, "gave-up", why);
 
-            if (npc.Activity is NpcActivity.Stroll or NpcActivity.Swim or NpcActivity.Wade && Time.time - t.LastMoved > 60f)
+            if (npc.Activity is NpcActivity.Stroll or NpcActivity.Wade && Time.time - t.LastMoved > 60f)
                 Report(npc, t, "idle", $"{npc.Activity} hasn't moved for {Time.time - t.LastMoved:F0} s");
+            // Swimmers: a pause to tread water lasts 12 s at most, and a swim leg is swum at a real pace (treading
+            // water "on the way" somewhere is the swimming-in-place look).
+            if (npc.Activity == NpcActivity.Swim && npc.IsSwimming && !npc.IsMoving && Time.time - t.LastMoved > 16f)
+                Report(npc, t, "swim-idle", $"treading water for {Time.time - t.LastMoved:F0} s");
+            if (npc.IsSwimming && npc.IsMoving && npc.Ride == null && step / dt < 0.3f)
+                Lasting(npc, t, "swim-slow", $"routing at {step / dt:F2} m/s ({npc.PathInfo})", 3f);
 
             // Feet and walls (upright people on land only: lying/sitting bodies sit on towels by design).
             bool swimming = npc.IsSwimming;

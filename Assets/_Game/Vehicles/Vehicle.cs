@@ -169,14 +169,30 @@ namespace PleaseDontDrown.Vehicles
             ServerKickDriver();
         }
 
-        /// <summary>Host: the driver gets off (or left the game).</summary>
+        /// <summary>
+        /// Host: the driver gets off (or left the game). The engine cuts out; the hull coasts to a stop quickly (it
+        /// doesn't keep ploughing on and run over the one who just jumped off), and the simulation goes back to the
+        /// host a moment later, once the ex-driver's machine has streamed the stop.
+        /// </summary>
         [Server]
         public void ServerKickDriver()
         {
             if (_driver.Value == null) return;
             Debug.Log($"[Vehicle] {_driver.Value.DisplayName} got off the {_displayName}");
             _driver.Value = null;
+            _throttle = 0f;
+            if (!_rb.isKinematic) _rb.linearVelocity *= 0.3f;
+            StopBrakingOwner(); // the ex-driver's machine brakes too, if it's the simulator
         }
+
+        [ObserversRpc]
+        private void StopBrakingOwner()
+        {
+            _brakeUntil = Time.time + 2.5f;
+            _throttle = 0f;
+        }
+
+        private float _brakeUntil = float.NegativeInfinity;
 
         /// <summary>Host: lock or unlock (the pirate boat can't be taken while pirates are on it).</summary>
         [Server]
@@ -191,15 +207,17 @@ namespace PleaseDontDrown.Vehicles
         [Server]
         public void ServerAutopilot(Vector3? target, float speed = 8f)
         {
+            if (target.HasValue) ServerKickDriver(); // nobody rides along on autopilot
             _autopilotTarget = target;
             _autopilotSpeed = speed;
             if (target.HasValue && Owner.IsValid) RemoveOwnership();
         }
 
-        /// <summary>Host: put it somewhere (story setup, teleports).</summary>
+        /// <summary>Host: put it somewhere (story setup, teleports). Whoever sat on it gets off first.</summary>
         [Server]
         public void ServerPlace(Vector3 position, float yaw)
         {
+            ServerKickDriver();
             if (Owner.IsValid) RemoveOwnership();
             _rb.position = position;
             _rb.rotation = Quaternion.Euler(0f, yaw, 0f);
@@ -210,41 +228,86 @@ namespace PleaseDontDrown.Vehicles
         private void OnDriverChanged(PlayerHub prev, PlayerHub next, bool asServer)
         {
             if (asServer && IsClientStarted) return; // a host handles it once, as a client
-            // Seated bodies don't bump into their own vehicle. Getting off, they stay ghosts to it for a moment, so a
-            // hull still drifting (or bobbing on a wave) can't trap, shove or launch them while they swim clear.
-            if (prev != null && prev != next) StartCoroutine(RestoreCollisionLater(prev));
+            // Seated bodies don't bump into their own vehicle. Getting off, they stay ghosts to it until they are
+            // really clear of the hull, so a hull still drifting (or bobbing on a wave) can't trap, shove or launch
+            // them while they swim away.
+            if (prev != null && prev != next) StartCoroutine(RestoreCollisionWhenClear(prev));
             SetIgnore(next, true);
             _lastYaw = transform.eulerAngles.y;
 
             PlayerHub local = PlayerHub.Local;
-            if (local != null && prev == local)
+            if (local != null && prev == local && local.Motor != null && local.Motor.Seat == this)
             {
-                local.Motor.SetSeat(null, ExitPosition());
+                // Off beside the hull, drifting with it a little and a small push away, so we don't start in its path.
+                Vector3 feet = ExitPosition();
+                Vector3 away = Vector3.ProjectOnPlane(feet - transform.position, Vector3.up);
+                Vector3 drift = _rb != null && !_rb.isKinematic ? Vector3.ProjectOnPlane(_rb.linearVelocity, Vector3.up) * 0.3f : Vector3.zero;
+                Vector3 push = away.sqrMagnitude > 1e-4f ? away.normalized * 1.2f : Vector3.zero;
+                local.Motor.SetSeat(null, feet, drift + push);
                 PlayerHud.ShowToast($"Off the {_displayName}.", 1.5f);
             }
             if (local != null && next == local)
             {
-                // Both hands on the handlebars: whatever small thing we held goes in a pocket.
+                // Both hands on the handlebars: whatever small thing we held goes in a pocket; if every pocket is
+                // full it's dropped (a dangling item would keep shoving the hull from the inside).
                 PlayerHands hands = local.Hands;
-                if (hands != null && hands.HeldItem != null && hands.HeldItem.Pocketable && hands.FirstFreeSlot() is var free && free >= 0)
-                    hands.SelectSlot(free);
+                if (hands != null && hands.HeldItem != null && hands.HeldItem.Pocketable)
+                {
+                    int free = hands.FirstFreeSlot();
+                    if (free >= 0) hands.SelectSlot(free);
+                    else hands.Drop();
+                }
                 local.Motor.SetSeat(this, Vector3.zero);
                 PlayerHud.ShowToast($"<b>W/S</b> throttle, <b>A/D</b> steer, <b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> to get off.", 5f);
             }
         }
 
-        private System.Collections.IEnumerator RestoreCollisionLater(PlayerHub player)
+        private readonly HashSet<PlayerHub> _ghosts = new();
+
+        /// <summary>
+        /// Collision with the ex-driver comes back only once their body has been clear of every hull collider for
+        /// half a second (checked five times a second), or after 8 s at most. Never while they sit on it again.
+        /// </summary>
+        private System.Collections.IEnumerator RestoreCollisionWhenClear(PlayerHub player)
         {
-            yield return new WaitForSeconds(1.2f);
+            float clearFor = 0f;
+            float started = Time.time;
+            var wait = new WaitForSeconds(0.2f);
+            while (player != null && _driver.Value != player && Time.time - started < 8f)
+            {
+                clearFor = TouchesHull(player) ? 0f : clearFor + 0.2f;
+                if (clearFor >= 0.5f) break;
+                yield return wait;
+            }
             if (player != null && _driver.Value != player) SetIgnore(player, false);
+        }
+
+        private bool TouchesHull(PlayerHub player)
+        {
+            if (player.BodyCollider is not CapsuleCollider body) return false;
+            Vector3 feet = player.transform.position;
+            float r = body.radius + 0.15f;
+            int count = Physics.OverlapCapsuleNonAlloc(feet + Vector3.up * r, feet + Vector3.up * Mathf.Max(r, body.height - r), r,
+                _exitOverlaps, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+                if (_exitOverlaps[i].transform.IsChildOf(transform)) return true;
+            return false;
         }
 
         private void SetIgnore(PlayerHub player, bool ignore)
         {
             if (player == null || player.BodyCollider == null) return;
+            if (ignore) _ghosts.Add(player); else _ghosts.Remove(player);
             foreach (Collider c in _colliders)
                 if (c != null) Physics.IgnoreCollision(c, player.BodyCollider, ignore);
         }
+
+        /// <summary>A swimmer may climb up onto this vehicle only while it's still and they're solid to it.</summary>
+        public bool AllowsClimbOnto(PlayerHub player) =>
+            player != null && !_ghosts.Contains(player) && _driver.Value == null && Speed < 0.8f;
+
+        /// <summary>Where to put someone who has to get off right now (their seat vanished): a free spot beside it.</summary>
+        public Vector3 SafeExitPosition() => ExitPosition();
 
         private readonly Collider[] _exitOverlaps = new Collider[32];
 
@@ -265,15 +328,17 @@ namespace PleaseDontDrown.Vehicles
             {
                 start + right * 1.3f, start - right * 1.3f, start - forward * 2.2f, start + forward * 2.4f
             };
-            foreach (float distance in new[] { 2f, 3f, 4.5f })
+            foreach (float distance in new[] { 2f, 3f, 4.5f, 6f, 8f })
                 for (int i = 0; i < 12; i++)
                     candidates.Add(start + Quaternion.Euler(0f, i * 30f, 0f) * right * distance);
 
             foreach (Vector3 feet in candidates)
                 if (ExitFree(feet, local))
                     return feet;
-            // Nowhere free (packed in by the dock and rocks): into the water well behind it, never on top of it.
-            return start - forward * 3f;
+            // Nowhere free at all (packed in by the dock, rocks and people): straight up off the seat. We stay a
+            // ghost to this hull until clear of it, so we drop through it into the water and swim out, never stuck.
+            Debug.LogWarning($"[Vehicle] no free spot to get off the {_displayName}: dropping through it");
+            return seat.position + Vector3.up * 0.3f;
         }
 
         private bool ExitFree(Vector3 feet, PlayerHub local)
@@ -317,18 +382,31 @@ namespace PleaseDontDrown.Vehicles
 
         // ------------------------------------------------------------------ every frame
 
-        private void LateUpdate()
+        /// <summary>
+        /// Glue the driver to the seat (their own machine and everyone else's) and turn their view with the hull.
+        /// Done in Update, right after the physics interpolation moved the hull, so every LateUpdate (camera, hands,
+        /// body) this frame already sees the rider on the seat: gluing later made the view lag a frame and judder.
+        /// Again in LateUpdate so a remote rider's NetworkTransform smoothing can't pull them off the seat.
+        /// </summary>
+        private void GlueDriver(bool turnView)
         {
             PlayerHub driver = _driver.Value;
             float yaw = transform.eulerAngles.y;
             if (driver != null)
             {
-                // Glue the driver to the seat (their own machine and everyone else's).
-                driver.transform.position = DriverFeetPosition;
-                if (driver == PlayerHub.Local && driver.Look != null)
+                Vector3 feet = DriverFeetPosition;
+                driver.transform.position = feet;
+                if (driver.TryGetComponent(out Rigidbody body) && body.isKinematic) body.position = feet;
+                if (turnView && driver == PlayerHub.Local && driver.Look != null)
                     driver.Look.AddYaw(Mathf.DeltaAngle(_lastYaw, yaw)); // the view turns with the vehicle
             }
-            _lastYaw = yaw;
+            if (turnView) _lastYaw = yaw;
+        }
+
+        private void LateUpdate()
+        {
+            PlayerHub driver = _driver.Value;
+            GlueDriver(false);
 
             if (_engineAudio != null)
             {
@@ -350,6 +428,14 @@ namespace PleaseDontDrown.Vehicles
             _sync.KeepAwake = driver != null || _autopilotTarget.HasValue; // stream while it's going somewhere
             _sync.KeepAuthority = driver != null; // the driver's machine keeps simulating it
             if (_rb.isKinematic || !_sync.IsSimulator) return;
+
+            // Just abandoned: the hull slows to a stop instead of gliding on (over the one who jumped off).
+            if (driver == null && !_autopilotTarget.HasValue && Time.time < _brakeUntil)
+            {
+                Vector3 flat = Vector3.ProjectOnPlane(_rb.linearVelocity, Vector3.up);
+                _rb.AddForce(-flat * 1.8f, ForceMode.Acceleration);
+                _rb.AddTorque(Vector3.up * (-_rb.angularVelocity.y * 3f), ForceMode.Acceleration);
+            }
 
             float throttle = 0f, steer = 0f;
             if (driver != null && driver == PlayerHub.Local && driver.IsOwner)
@@ -454,8 +540,13 @@ namespace PleaseDontDrown.Vehicles
             if (IsServerInitialized && !ReferenceEquals(driver, null) && (driver == null || !driver.IsSpawned))
                 _driver.Value = null;
             // Our driver: Interact always means "get off" (whatever the crosshair is on).
-            if (driver != null && driver == PlayerHub.Local && GameInput.GameplayActive && GameInput.Interact.WasPressedThisFrame())
+            if (driver != null && driver == PlayerHub.Local && GameInput.GameplayActive && GameInput.Interact.WasPressedThisFrame()
+                && Time.time > _nextEnterRequest) // not the same press that just got us on
+            {
+                _nextEnterRequest = Time.time + 0.5f;
                 ExitServer();
+            }
+            GlueDriver(true);
         }
     }
 }

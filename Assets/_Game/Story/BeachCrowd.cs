@@ -92,6 +92,15 @@ namespace PleaseDontDrown.Story
             public float BusyUntil;          // talking to a player
             public AvatarPose? NextPose;     // the second half of a pose change (via sitting up)
             public float NextPoseAt;
+            // Swimming (see SwimThink): a planned route of legs, a deadline per leg, pauses to tread water.
+            public readonly List<Vector3> Legs = new();
+            public int LegIndex;
+            public string RouteKind;
+            public float LegDeadline;
+            public float SwimSpeed;          // this person's cruising speed (m/s), picked once
+            public float TreadUntil;
+            public bool JustTreaded;
+            public int SwimFails;            // routes that went nowhere in a row
         }
 
         private readonly List<Member> _members = new();
@@ -254,12 +263,19 @@ namespace PleaseDontDrown.Story
             return true;
         }
 
-        /// <summary>Something solid (a dock post, a buoy, a rock) right at this spot (the seabed doesn't count).</summary>
+        /// <summary>
+        /// Something solid (a dock post, a buoy, a rock, a moored jet ski, a floating crate) right at this spot (the
+        /// seabed doesn't count, nor do other characters: they move and are steered round).
+        /// </summary>
         private static bool Blocked(Vector3 p)
         {
             Collider[] hits = Physics.OverlapSphere(p + Vector3.down * 0.3f, 0.6f, ~0, QueryTriggerInteraction.Ignore);
             foreach (Collider c in hits)
-                if (c.attachedRigidbody == null && c.GetComponent<Seabed>() == null && !(c is TerrainCollider)) return true;
+            {
+                if (c.GetComponent<Seabed>() != null || c is TerrainCollider) continue;
+                if (c.attachedRigidbody != null && StoryNpc.IsCharacter(c.attachedRigidbody)) continue;
+                return true;
+            }
             return false;
         }
 
@@ -363,6 +379,9 @@ namespace PleaseDontDrown.Story
                     return;
 
                 case NpcActivity.Swim:
+                    SwimThink(m);
+                    return;
+
                 case NpcActivity.Wade:
                     if (npc.IsMoving) { m.NextThink = Time.time + 1f; return; }
                     if (m.Home is Activity.Sunbathe or Activity.Stroll && Time.time > m.SwimUntil)
@@ -472,6 +491,9 @@ namespace PleaseDontDrown.Story
             m.Now = now;
             m.Npc.Activity = now;
             if (now is NpcActivity.Stroll or NpcActivity.Swim or NpcActivity.Wade or NpcActivity.Sunbathe) m.Target = null;
+            m.Legs.Clear();
+            m.LegIndex = 0;
+            m.TreadUntil = 0f;
         }
 
         /// <summary>A route ended (host): arrived somewhere, or gave up. Decide what's next right away.</summary>
@@ -521,13 +543,376 @@ namespace PleaseDontDrown.Story
                     break;
 
                 case NpcActivity.Swim:
-                    m.NextThink = Time.time + (arrived ? Range(0.3f, 2.5f) : 0.3f); // tread water a moment
+                    if (arrived)
+                    {
+                        // Carry on with the next leg almost at once (a swimmer turning at a buoy, not stopping).
+                        if (m.Target.HasValue) RememberGoodSwimSpot(m.Target.Value);
+                        m.SwimFails = 0;
+                        m.NextThink = Time.time + Range(0.15f, 0.7f);
+                    }
+                    else
+                    {
+                        m.Legs.Clear(); // this route is off; a fresh one next think
+                        m.SwimFails++;
+                        m.NextThink = Time.time + 0.3f;
+                    }
                     break;
 
                 case NpcActivity.Wade:
                     m.NextThink = Time.time + (arrived ? Range(1f, 5f) : 0.3f);
                     break;
             }
+        }
+
+        // ------------------------------------------------------------------ swimming (host)
+
+        private const float MaxTread = 12f;           // never tread water longer than this in one go
+        private readonly List<Vector3> _goodSwimSpots = new();
+        private Creatures.Shark[] _sharks = System.Array.Empty<Creatures.Shark>();
+        private float _nextSharkScan;
+
+        /// <summary>
+        /// A swimmer's next move, checked in this order (the first that applies wins):
+        /// 1. on a leg: keep going; past the leg's deadline, or a jet ski bearing down, or a shark close: break off;
+        /// 2. a visitor whose swim time is up: back to the towel / the sand;
+        /// 3. drifted out of the swimming area or into the shallows: swim back in;
+        /// 4. treading water: until the pause ends (never more than <see cref="MaxTread"/> s);
+        /// 5. more legs on the route: the next one (re-checked: still water, still a clear line);
+        /// 6. a new plan: now and then a pause to tread water (never twice running), otherwise a route (a lap along
+        ///    the shore and back, out to the buoys and back, out and back, or a loop), then plain nearby spots, then
+        ///    spots toward the middle of the area, then places swimmers reached before; nothing at all: tread 2 s.
+        /// Every target is swimming-depth water inside the area, open sky, a line a swimmer can really swim.
+        /// </summary>
+        private void SwimThink(Member m)
+        {
+            StoryNpc npc = m.Npc;
+            Vector3 p = npc.transform.position;
+            if (m.SwimSpeed <= 0f) m.SwimSpeed = Range(0.9f, 1.35f);
+            m.NextThink = Time.time + 0.5f;
+
+            if (SharkNear(p, 16f, out Vector3 shark))
+            {
+                // Everyone heads for the beach; visitors go home, locals wait near the shallow edge.
+                if (m.Home != Activity.Swim) { npc.ServerStop(); GoBack(m); return; }
+                if (!npc.IsMoving || m.RouteKind != "flee")
+                {
+                    npc.ServerShout(Pick("SHARK!", "Get out of the water!", "Aaah!"), cry: true);
+                    SwimAwayFrom(m, shark, 10f, "flee");
+                }
+                return;
+            }
+
+            if (npc.IsMoving)
+            {
+                if (m.RouteKind != "dodge" && m.RouteKind != "flee" && VehicleBearingDown(p, out Vector3 vehicle))
+                {
+                    SwimAwayFrom(m, vehicle, 6f, "dodge");
+                    return;
+                }
+                if (Time.time > m.LegDeadline)
+                {
+                    Debug.Log($"[Crowd] {npc.Name}: swim leg ({m.RouteKind}) took too long, new plan");
+                    npc.ServerStop();
+                    m.Legs.Clear();
+                    m.SwimFails++;
+                    m.NextThink = Time.time + 0.2f;
+                }
+                return;
+            }
+
+            if (m.Home is Activity.Sunbathe or Activity.Stroll && Time.time > m.SwimUntil)
+            {
+                GoBack(m);
+                return;
+            }
+
+            if (!InSwimArea(p, 3f) || Shore.WaterDepthAt(p + Vector3.up * 0.1f) < SwimMin - 0.6f)
+            {
+                m.Legs.Clear();
+                if (TowardMiddle(p, out Vector3 back))
+                {
+                    SetRoute(m, "back in", back);
+                    StartLeg(m);
+                    return;
+                }
+            }
+
+            if (Time.time < m.TreadUntil)
+            {
+                m.NextThink = Mathf.Min(m.TreadUntil, Time.time + 1f);
+                return;
+            }
+
+            if (m.LegIndex < m.Legs.Count && StartLeg(m)) return;
+
+            if (!m.JustTreaded && m.SwimFails == 0 && _rng.NextDouble() < 0.3)
+            {
+                // A breather: tread water, look around, maybe say something.
+                m.JustTreaded = true;
+                m.TreadUntil = Time.time + Mathf.Min(MaxTread, Range(3f, 9f));
+                m.NextThink = Time.time + 1f;
+                if (_rng.NextDouble() < 0.2 && Near(p, 14f)) npc.ServerSay(SwimTalk[_rng.Next(SwimTalk.Length)]);
+                return;
+            }
+            m.JustTreaded = false;
+
+            if (PlanSwimRoute(m) && StartLeg(m)) return;
+            foreach (float radius in new[] { 12f, 20f })
+                if (NearbyWaterSpot(p, radius, _swimX, _swimZ, SwimMin, SwimMax, out Vector3 near))
+                {
+                    SetRoute(m, "nearby", near);
+                    if (StartLeg(m)) return;
+                }
+            if (TowardMiddle(p, out Vector3 middle))
+            {
+                SetRoute(m, "middle", middle);
+                if (StartLeg(m)) return;
+            }
+            foreach (Vector3 known in _goodSwimSpots.ToArray())
+            {
+                if ((known - p).sqrMagnitude < 9f || !StoryNpc.SwimLineClear(p, known)) continue;
+                SetRoute(m, "known", known);
+                if (StartLeg(m)) return;
+            }
+
+            // Boxed in (a crowd of floating things all round): tread a moment and try again. A visitor who keeps
+            // failing goes back to the beach; a regular swimmer who is truly stuck is moved when nobody's looking.
+            m.SwimFails++;
+            m.TreadUntil = Time.time + 2f;
+            if (m.SwimFails > 5 && m.Home != Activity.Swim) GoBack(m);
+            else if (m.SwimFails > 8 && !Near(p, 30f) && TryWaterSpot(_swimX, _swimZ, SwimMin, SwimMax, out Vector3 fresh))
+            {
+                Debug.Log($"[Crowd] {npc.Name}: boxed in at {p:F1}, moved out of sight");
+                npc.ServerTeleport(fresh, (float)_rng.NextDouble() * 360f, keepExact: true);
+                m.SwimFails = 0;
+            }
+        }
+
+        private void SetRoute(Member m, string kind, params Vector3[] legs)
+        {
+            m.Legs.Clear();
+            m.Legs.AddRange(legs);
+            m.LegIndex = 0;
+            m.RouteKind = kind;
+        }
+
+        /// <summary>Swim the next leg that's still good; false when none is left.</summary>
+        private bool StartLeg(Member m)
+        {
+            Vector3 p = m.Npc.transform.position;
+            while (m.LegIndex < m.Legs.Count)
+            {
+                Vector3 t = m.Legs[m.LegIndex++];
+                if (!WaterSpotAt(ref t, SwimMin - 0.4f, SwimMax + 1f)) continue;   // the water's not right there any more
+                bool straight = StoryNpc.SwimLineClear(p, t);
+                if (!straight && !StoryNpc.SwimDetour(p, t, out _)) continue;       // no way round either
+                float distance = Vector2.Distance(new Vector2(p.x, p.z), new Vector2(t.x, t.z));
+                if (distance < 1f) continue;
+                float speed = m.SwimSpeed * Range(0.92f, 1.08f);
+                Walk(m, t, speed, water: true);
+                m.NextThink = Time.time + 0.5f;
+                // Twice the time it should take (a detour is longer), plus slack for dodging others.
+                m.LegDeadline = Time.time + distance / speed * (straight ? 2f : 2.8f) + 6f;
+                return true;
+            }
+            m.Legs.Clear();
+            m.LegIndex = 0;
+            return false;
+        }
+
+        /// <summary>
+        /// A route of a few legs from here, all swimming-depth water in the area with clear lines between them.
+        /// Kinds: a lap along the shore and back, out to the buoy line and back, out and back, or a loop.
+        /// </summary>
+        private bool PlanSwimRoute(Member m)
+        {
+            Vector3 p = m.Npc.transform.position;
+            Vector3 along = AlongShore(p), outward = Outward(p);
+            for (int attempt = 0; attempt < 6; attempt++)
+            {
+                int kind = _rng.Next(4);
+                var legs = new List<Vector3>();
+                string name;
+                switch (kind)
+                {
+                    case 0: // lap: along the beach, a little further out, and back
+                        name = "lap";
+                        float dir = _rng.NextDouble() < 0.5 ? -1f : 1f;
+                        float length = Range(9f, 18f);
+                        legs.Add(p + along * (dir * length) + outward * Range(-1.5f, 2.5f));
+                        legs.Add(p + along * (dir * Range(1f, 4f)) + outward * Range(-1f, 1f));
+                        break;
+                    case 1: // out to the buoy line (or the far edge), then back toward the beach
+                        name = "buoys";
+                        Vector3 buoy = NearestBuoy(p, 30f) ?? p + outward * Range(8f, 14f);
+                        Vector3 inside = buoy - outward * 2.5f; // just this side of the line, not tangled in it
+                        legs.Add(inside);
+                        legs.Add(inside - outward * Range(6f, 11f) + along * Range(-4f, 4f));
+                        break;
+                    case 2: // straight out and back
+                        name = "out and back";
+                        Vector3 far = p + outward * Range(6f, 12f) + along * Range(-3f, 3f);
+                        legs.Add(far);
+                        legs.Add(p + along * Range(-3f, 3f));
+                        break;
+                    default: // a loop of 3-4 points round a circle
+                        name = "loop";
+                        float radius = Range(4f, 7f);
+                        Vector3 centre = p + outward * radius;
+                        float start = (float)_rng.NextDouble() * 360f;
+                        int points = _rng.Next(3, 5);
+                        for (int i = 1; i <= points; i++)
+                            legs.Add(centre + Quaternion.Euler(0f, start + i * 360f / points, 0f) * Vector3.forward * radius);
+                        break;
+                }
+                // Keep only a chain of good points: each in the area, right depth, reachable from the one before.
+                Vector3 from = p;
+                var good = new List<Vector3>();
+                foreach (Vector3 leg in legs)
+                {
+                    Vector3 t = ClampToSwimArea(leg);
+                    if (!WaterSpotAt(ref t, SwimMin, SwimMax)) break;
+                    if (VehicleNear(t, 6f)) break;
+                    if (!StoryNpc.SwimLineClear(from, t) && !StoryNpc.SwimDetour(from, t, out _)) break;
+                    good.Add(t);
+                    from = t;
+                }
+                if (good.Count == 0) continue;
+                SetRoute(m, name, good.ToArray());
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Break off and swim away from a danger (a shark, a jet ski), toward the beach side if possible.</summary>
+        private void SwimAwayFrom(Member m, Vector3 danger, float distance, string kind)
+        {
+            Vector3 p = m.Npc.transform.position;
+            Vector3 away = p - danger;
+            away.y = 0f;
+            away = away.sqrMagnitude > 0.01f ? away.normalized : -Outward(p);
+            Vector3 shoreward = -Outward(p);
+            foreach (Vector3 dir in new[] { (away + shoreward * 0.5f).normalized, away, Quaternion.Euler(0f, 60f, 0f) * away, Quaternion.Euler(0f, -60f, 0f) * away })
+            {
+                Vector3 t = ClampToSwimArea(p + dir * distance);
+                if (!WaterSpotAt(ref t, SwimMin - 0.4f, SwimMax + 1f) || !StoryNpc.SwimLineClear(p, t)) continue;
+                SetRoute(m, kind, t);
+                float keep = m.SwimSpeed;
+                m.SwimSpeed = Mathf.Max(keep, 1.5f); // a burst
+                StartLeg(m);
+                m.SwimSpeed = keep;
+                return;
+            }
+        }
+
+        private bool InSwimArea(Vector3 p, float margin) =>
+            p.x > _swimX.x - margin && p.x < _swimX.y + margin && p.z > _swimZ.x - margin && p.z < _swimZ.y + margin;
+
+        private Vector3 ClampToSwimArea(Vector3 p) =>
+            new(Mathf.Clamp(p.x, _swimX.x + 0.5f, _swimX.y - 0.5f), p.y, Mathf.Clamp(p.z, _swimZ.x + 0.5f, _swimZ.y - 0.5f));
+
+        private bool TowardMiddle(Vector3 p, out Vector3 spot)
+        {
+            var centre = new Vector3((_swimX.x + _swimX.y) * 0.5f, p.y, (_swimZ.x + _swimZ.y) * 0.5f);
+            for (int i = 0; i < 10; i++)
+            {
+                Vector3 t = Vector3.Lerp(ClampToSwimArea(p), centre, 0.3f + i * 0.07f) + new Vector3(Range(-3f, 3f), 0f, Range(-3f, 3f));
+                if (WaterSpotAt(ref t, SwimMin, SwimMax) && StoryNpc.SwimLineClear(p, t))
+                {
+                    spot = t;
+                    return true;
+                }
+            }
+            spot = default;
+            return false;
+        }
+
+        /// <summary>Which way the water gets deeper here (the open sea), flat and normalised.</summary>
+        private static Vector3 Outward(Vector3 p)
+        {
+            Vector3 grad = Vector3.zero;
+            foreach (Vector3 d in new[] { Vector3.right, Vector3.forward, Vector3.left, Vector3.back })
+                grad += d * Shore.WaterDepthAt(p + d * 5f + Vector3.up * 0.1f);
+            grad.y = 0f;
+            return grad.sqrMagnitude > 1e-4f ? grad.normalized : Vector3.back;
+        }
+
+        private static Vector3 AlongShore(Vector3 p) => Vector3.Cross(Vector3.up, Outward(p));
+
+        private void RememberGoodSwimSpot(Vector3 spot)
+        {
+            if (!InSwimArea(spot, 0f)) return;
+            foreach (Vector3 s in _goodSwimSpots) if ((s - spot).sqrMagnitude < 16f) return;
+            if (_goodSwimSpots.Count >= 24) _goodSwimSpots.RemoveAt(0);
+            _goodSwimSpots.Add(spot);
+        }
+
+        private static readonly List<Transform> _buoys = new();
+        private static float _buoysFoundAt = float.NegativeInfinity;
+
+        private static Vector3? NearestBuoy(Vector3 p, float range)
+        {
+            if (Time.time - _buoysFoundAt > 30f)
+            {
+                _buoysFoundAt = Time.time;
+                _buoys.Clear();
+                foreach (WaveBobber b in FindObjectsByType<WaveBobber>(FindObjectsSortMode.None))
+                    if (b.name.StartsWith("Buoy")) _buoys.Add(b.transform);
+            }
+            Vector3? best = null;
+            float bestSq = range * range;
+            foreach (Transform b in _buoys)
+            {
+                if (b == null) continue;
+                float d = (b.position - p).sqrMagnitude;
+                if (d < bestSq) { bestSq = d; best = b.position; }
+            }
+            return best;
+        }
+
+        private bool SharkNear(Vector3 p, float range, out Vector3 at)
+        {
+            if (Time.time > _nextSharkScan)
+            {
+                _nextSharkScan = Time.time + 3f;
+                _sharks = FindObjectsByType<Creatures.Shark>(FindObjectsSortMode.None);
+            }
+            foreach (Creatures.Shark s in _sharks)
+                if (s != null && s.isActiveAndEnabled && (s.transform.position - p).sqrMagnitude < range * range)
+                {
+                    at = s.transform.position;
+                    return true;
+                }
+            at = default;
+            return false;
+        }
+
+        private static bool VehicleNear(Vector3 p, float range)
+        {
+            foreach (Vehicles.Vehicle v in Vehicles.Vehicle.All)
+                if (v != null && (v.transform.position - p).sqrMagnitude < range * range) return true;
+            return false;
+        }
+
+        /// <summary>A driven (or autopiloted) vehicle close by and coming this way.</summary>
+        private static bool VehicleBearingDown(Vector3 p, out Vector3 at)
+        {
+            foreach (Vehicles.Vehicle v in Vehicles.Vehicle.All)
+            {
+                if (v == null || v.Speed < 2f) continue;
+                Vector3 d = p - v.transform.position;
+                d.y = 0f;
+                if (d.sqrMagnitude > 9f * 9f) continue;
+                Vector3 vel = v.Body != null ? v.Body.linearVelocity : Vector3.zero;
+                vel.y = 0f;
+                if (Vector3.Dot(vel, d) > 0f) // heading our way
+                {
+                    at = v.transform.position;
+                    return true;
+                }
+            }
+            at = default;
+            return false;
         }
 
         // ------------------------------------------------------------------ chatting

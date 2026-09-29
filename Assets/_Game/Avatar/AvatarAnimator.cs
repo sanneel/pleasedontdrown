@@ -67,6 +67,7 @@ namespace PleaseDontDrown.Avatars
         private float _run;           // 0..1 walk -> run
         private float _swim;          // 0..1 blend into the water poses
         private float _swimMove;      // 0..1 swimming vs treading
+        private bool _crawling;
         private float _under;         // 0..1 underwater (dive) pose
         private float _air;
         private float _crouch;
@@ -161,7 +162,10 @@ namespace PleaseDontDrown.Avatars
             _move = Mathf.Clamp01(_move);
             _run = Mathf.MoveTowards(_run, Mathf.InverseLerp(4.8f, 7f, speed), dt * 3f);
             _swim = Mathf.MoveTowards(_swim, m.Swimming ? 1f : 0f, dt * 3f);
-            _swimMove = Mathf.MoveTowards(_swimMove, m.Swimming && speed > 0.6f ? 1f : 0f, dt * 2.5f);
+            // Crawl while making way, tread water when (nearly) still; the gap between the two thresholds keeps a
+            // slow swimmer, or one nudged sideways, from flickering between lying flat and standing up in the water.
+            _crawling = m.Swimming && (_crawling ? speed > 0.18f : speed > 0.35f);
+            _swimMove = Mathf.MoveTowards(_swimMove, _crawling ? 1f : 0f, dt * 2.5f);
             _under = Mathf.MoveTowards(_under, m.Swimming && m.Underwater ? 1f : 0f, dt * 2.5f);
             _air = Mathf.MoveTowards(_air, !m.Grounded && !m.Swimming && !m.Climbing ? 1f : 0f, dt * 7f);
             _crouch = Mathf.Lerp(_crouch, m.Crouch, k(12f));
@@ -183,7 +187,10 @@ namespace PleaseDontDrown.Avatars
             // One cycle = two steps; stride grows with speed so feet don't skate.
             float stride = StepLength;
             _phase = Mathf.Repeat(_phase + speed * dt / (2f * stride) + (_turningInPlace ? dt * 1.3f : 0f), 1f);
-            _swimPhase = Mathf.Repeat(_swimPhase + dt * Mathf.Lerp(0.45f, 0.8f + speed * 0.12f, _swimMove), 1f);
+            // One arm cycle (two strokes) carries a crawling swimmer about 1.8 m, so the arms keep pace with the
+            // body instead of churning in place; treading sculls at an easy fixed rate.
+            float strokeRate = Mathf.Clamp(speed / 1.8f, 0.45f, 1.1f);
+            _swimPhase = Mathf.Repeat(_swimPhase + dt * Mathf.Lerp(0.45f, strokeRate, _swimMove), 1f);
         }
 
         private float GestureT(float duration) => Mathf.Clamp01((Now - _gestureStart) / duration);
@@ -411,9 +418,11 @@ namespace PleaseDontDrown.Avatars
         private void PoseSwimArm(Transform upper, Transform fore, float side, int index)
         {
             if (_swim <= 0.01f) return;
-            // Crawl: each arm windmills, half a cycle apart.
+            // Crawl: each arm windmills, half a cycle apart. The body lies face down, so a positive swing (the arm's
+            // "backwards" on land) carries the hand from the hip up over the back through the air, out ahead of the
+            // head, then pulls it down under the chest back to the hip: recovery in the air, pull in the water.
             float crawlAngle = Mathf.Repeat(_swimPhase + index * 0.5f, 1f) * 360f;
-            Quaternion crawl = Quaternion.Euler(-crawlAngle, 0f, 14f * side);
+            Quaternion crawl = Quaternion.Euler(crawlAngle, 0f, 14f * side);
             Quaternion crawlElbow = Quaternion.Euler(-Mathf.Lerp(10f, 60f, Mathf.Max(0f, Mathf.Sin(crawlAngle * Mathf.Deg2Rad))), 0f, 0f);
             // Treading water: sculling in front of the chest.
             float scull = Mathf.Sin(_swimPhase * Mathf.PI * 4f + index * Mathf.PI);

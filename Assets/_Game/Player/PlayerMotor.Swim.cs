@@ -193,6 +193,16 @@ namespace PleaseDontDrown.Player
             float rise = hit.point.y - feet.y;
             if (rise < 0.4f || rise > _climbMaxRise || hit.normal.y < 0.7f)
                 return false;
+            // Only climb onto things that hold still: not a floating crate or ball, and a vehicle only when it's not
+            // moving and not still "ghosted" to us after getting off (we'd land inside a hull we don't collide with).
+            Rigidbody body = hit.collider.attachedRigidbody;
+            if (body != null)
+            {
+                Vehicles.Vehicle vehicle = body.GetComponent<Vehicles.Vehicle>();
+                bool loose = !body.isKinematic || body.GetComponent<Items.Item>() != null; // items are kinematic where someone else simulates them
+                if (vehicle != null ? !vehicle.AllowsClimbOnto(_hub != null ? _hub : (_hub = GetComponent<PlayerHub>())) : loose)
+                    return false;
+            }
 
             Vector3 top = new Vector3(hit.point.x, hit.point.y + 0.03f, hit.point.z) + forward * 0.15f;
             Vector3 bottom = top + Vector3.up * (radius + 0.05f);

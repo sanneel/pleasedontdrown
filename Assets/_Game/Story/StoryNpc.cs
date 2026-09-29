@@ -297,11 +297,21 @@ namespace PleaseDontDrown.Story
             Vector3 target = _moveTarget.Value;
             // Swimming from water to water: straight there if nothing's in the way (the navmesh lies on the seabed and
             // would lead under the dock).
-            if (Shore.WaterDepthAt(transform.position + Vector3.up * 0.1f) > 1.1f && Shore.WaterDepthAt(target + Vector3.up * 0.1f) > 1.1f &&
-                SwimLineClear(transform.position, target))
+            if (Shore.WaterDepthAt(transform.position + Vector3.up * 0.1f) > 1.1f && Shore.WaterDepthAt(target + Vector3.up * 0.1f) > 1.1f)
             {
-                _path.Add(target);
-                return;
+                if (SwimLineClear(transform.position, target))
+                {
+                    _path.Add(target);
+                    return;
+                }
+                // Something in the way (a buoy, a moored jet ski, the dock's corner): swim round it through one open
+                // water point off to the side, never along the seabed navmesh (that leads under the dock).
+                if (SwimDetour(transform.position, target, out Vector3 via))
+                {
+                    _path.Add(via);
+                    _path.Add(target);
+                    return;
+                }
             }
             if (NavMesh.SamplePosition(transform.position, out NavMeshHit from, 10f, NavMesh.AllAreas) &&
                 NavMesh.SamplePosition(target, out NavMeshHit to, 10f, NavMesh.AllAreas) &&
@@ -330,9 +340,36 @@ namespace PleaseDontDrown.Story
             for (int i = 0; i < n; i++)
             {
                 Collider c = _lineHits[i].collider;
-                if (c.attachedRigidbody == null && !IsGround(c) && !(c is TerrainCollider)) return false;
+                if (IsGround(c) || c is TerrainCollider) continue;
+                // Floating things (buoys, a parked jet ski, crates) block a swimmer just like the dock: the same rule
+                // the movement sweep uses, so a line judged clear here is one the swimmer can really swim. Other
+                // characters are steered round on the way instead.
+                Rigidbody body = c.attachedRigidbody;
+                if (body != null && IsCharacter(body)) continue;
+                if (body != null && _lineHits[i].distance <= 0f) continue; // already touching it: swim off, don't freeze
+                return false;
             }
             return true;
+        }
+
+        /// <summary>An open-water point beside the straight line that both halves of the trip can swim to.</summary>
+        public static bool SwimDetour(Vector3 from, Vector3 to, out Vector3 via)
+        {
+            Vector3 d = to - from;
+            d.y = 0f;
+            via = default;
+            if (d.sqrMagnitude < 0.01f) return false;
+            Vector3 side = Vector3.Cross(Vector3.up, d.normalized);
+            foreach (float along in new[] { 0.5f, 0.35f, 0.65f })
+                foreach (float off in new[] { 3f, -3f, 5.5f, -5.5f, 8f, -8f })
+                {
+                    Vector3 p = from + d * along + side * off;
+                    if (Shore.WaterDepthAt(p + Vector3.up * 0.1f) < 1.6f || !OpenSky(p)) continue;
+                    if (!SwimLineClear(from, p) || !SwimLineClear(p, to)) continue;
+                    via = new Vector3(p.x, from.y, p.z);
+                    return true;
+                }
+            return false;
         }
 
         /// <summary>Open water above this spot (not under a dock or a pier).</summary>
@@ -683,7 +720,9 @@ namespace PleaseDontDrown.Story
                     return;
                 }
                 _replans++;
-                if (_replans > 6) EndRoute(false, $"blocked at {p:F1} on the way to {_moveTarget.Value:F1}");
+                // A swimmer gives up sooner: open water always has somewhere else to go, and treading water in front
+                // of a buoy for half a minute looks broken.
+                if (_replans > (IsSwimming ? 3 : 6)) EndRoute(false, $"blocked at {p:F1} on the way to {_moveTarget.Value:F1}");
                 else if (_replans % 2 == 1) PlanPath();
                 else SideStep(p, step);
                 _stuckTime = 0f;
@@ -805,7 +844,7 @@ namespace PleaseDontDrown.Story
         private static readonly Dictionary<Collider, bool> _groundColliders = new();
         private static readonly Dictionary<Rigidbody, bool> _characterBodies = new();
 
-        private static bool IsCharacter(Rigidbody body)
+        internal static bool IsCharacter(Rigidbody body)
         {
             if (!_characterBodies.TryGetValue(body, out bool yes)) _characterBodies[body] = yes = body.GetComponent<StoryNpc>() != null;
             return yes;
