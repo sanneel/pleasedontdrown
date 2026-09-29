@@ -8,7 +8,7 @@
 > from an A-pose picture (Pose Control is Pro-only). It also adds `tower_wide`, `lf_sign_frame`, `lf_shelf`, `lost_box`
 > and `radio`.
 
-**Already done (keep):** `station_rusty` (the shack, now Sandy's Lost & Found), `tower`, `palm_tall`.
+**Already done (keep):** `station_rusty` (the shack, now Sandy's Lost & Found), `tower`, `palm_tall`, `jetski`, `shark`, `pirate_boat` (vehicles/creatures: `ArtSource/Tools/prepare_prop.py`, then `GameSceneBuilder.MeshyVehicles.cs`).
 **Must be redone:** `tourist_dad` and `lifeguard` came out as statues (no A-pose, no skeleton), so they can't move.
 
 Everything in the game today is a stand-in built in code. Each model below replaces one of them. The code only needs

@@ -648,7 +648,9 @@ namespace PleaseDontDrown.Story
             for (int i = 0; i < 4; i++)
             {
                 StoryNpc pirate = SpawnNpc(names[i], NpcRole.Pirate, PirateLook(i), _pirateBoatStart.position, 0f, 100);
-                pirate.ServerRide(_pirateBoat, new Vector3(i % 2 == 0 ? -0.7f : 0.7f, 0.86f, 1.8f - i / 2 * 1.4f)); // on the fore deck
+                Transform spot = _pirateBoat.transform.Find("Ride" + i); // the boat model's own spots, if it has them
+                pirate.ServerRide(_pirateBoat, spot != null ? spot.localPosition
+                    : new Vector3(i % 2 == 0 ? -0.7f : 0.7f, 0.86f, 1.8f - i / 2 * 1.4f)); // on the fore deck
                 pirates.Add(pirate);
             }
             SetObjective("A boat is coming in fast...");

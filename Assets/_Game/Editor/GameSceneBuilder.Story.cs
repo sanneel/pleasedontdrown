@@ -218,6 +218,7 @@ namespace PleaseDontDrown.Editor
             Primitive(PrimitiveType.Cube, "TailDown", tail, new Vector3(0f, -0.15f, -0.15f), new Vector3(0.06f, 0.35f, 0.25f), grey, keepCollider: false)
                 .transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
             var sharkLogic = shark.AddComponent<Shark>();
+            DressShark(shark, tail);
             SetRef(sharkLogic, "_tail", tail);
             SetRef(sharkLogic, "_audio", SpatialAudio(shark, 4f, 60f));
             PrefabUtility.SaveAsPrefabAsset(shark, SharkPrefabPath);
@@ -814,6 +815,7 @@ namespace PleaseDontDrown.Editor
             Transform gripL = P("GripLeft", new Vector3(-0.3f, 0.86f, 0.5f), Quaternion.LookRotation(Vector3.forward, Vector3.up));
             Transform gripR = P("GripRight", new Vector3(0.3f, 0.86f, 0.5f), Quaternion.LookRotation(Vector3.forward, Vector3.up));
             Transform thrust = P("Thrust", new Vector3(0f, -0.05f, -1.35f), Quaternion.identity);
+            DressJetSki(root);
             return FinishVehicle(root, displayName, key, seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.32f,
                 thrustForce: 11f, maxSpeed: 17f, turnRate: 1.7f);
         }
@@ -856,7 +858,9 @@ namespace PleaseDontDrown.Editor
             Transform gripL = P("GripLeft", new Vector3(-0.2f, 1.62f, -1.12f), Quaternion.LookRotation(Vector3.up, Vector3.back));
             Transform gripR = P("GripRight", new Vector3(0.2f, 1.62f, -1.12f), Quaternion.LookRotation(Vector3.up, Vector3.back));
             Transform thrust = P("Thrust", new Vector3(0f, -0.1f, -3.5f), Quaternion.identity);
-            return FinishVehicle(root, "Pirate Boat", "", seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.3f,
+            // The model's floor sits low in its tubes: float higher so the water stays outside.
+            float density = DressPirateBoat(root) ? 0.17f : 0.3f;
+            return FinishVehicle(root, "Pirate Boat", "", seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), density,
                 thrustForce: 6f, maxSpeed: 11f, turnRate: 0.9f);
         }
 
