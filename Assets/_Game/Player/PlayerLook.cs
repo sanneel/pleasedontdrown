@@ -5,8 +5,13 @@ namespace PleaseDontDrown.Player
 {
     /// <summary>
     /// Mouse / stick look. Yaw and pitch both live on the head (which is network-synced, so others see where you
-    /// look); the physics body never rotates. Also owns camera feel: sprint FOV kick, strafe roll, a stepped
-    /// head bob and a landing dip. Owner only.
+    /// look); the physics body never rotates. Owner only.
+    ///
+    /// Camera feel is How to Fish's (tuning measured from the game; our own code): a head bob that follows two
+    /// curves through each step cycle (sideways once, up-down twice), eased in with a short smoothing and a delayed
+    /// follow; a 1° roll into strafes; a pitch that follows how fast we rise or fall; the view climbing with recoil
+    /// (it stays up: you pull it back down); and the field of view easing to the sights' when aiming, with mouse
+    /// sensitivity scaled to match.
     /// </summary>
     [DefaultExecutionOrder(-10)]
     public class PlayerLook : MonoBehaviour
@@ -18,33 +23,52 @@ namespace PleaseDontDrown.Player
         [SerializeField] private PlayerMotor _motor;
         [SerializeField] private float _stickDegreesPerSecond = 180f;
 
-        [Header("Camera feel")]
-        [SerializeField] private float _sprintFovBoost = 7f;
-        [SerializeField] private float _strafeRoll = 1.4f;
-        [SerializeField] private float _bobVertical = 0.045f;
-        [SerializeField] private float _bobHorizontal = 0.03f;
-        [SerializeField] private float _walkStride = 1.5f;
-        [SerializeField] private float _landDipPerSpeed = 0.014f;
+        [Header("Tilt")]
+        [SerializeField] private float _strafeRoll = 1f;          // degrees at full strafe
+        [SerializeField] private float _rollSmoothTime = 0.15f;
+        [SerializeField] private float _fallPitch = 0.25f;        // degrees per m/s of vertical speed
+        [SerializeField] private float _fallPitchSmoothTime = 0.08f;
+
+        [Header("Head bob")]
+        [SerializeField] private float _bobCyclesPerSecond = 3f;  // at full speed; half that when slow
+        [SerializeField] private float _bobMinSpeed = 0.1f;       // speed fraction below which it stops
+        [SerializeField] private float _bobFullAt = 7f;           // speed fraction scale (as in the original: the bob stays small)
+        [SerializeField] private float _bobSideways = 0.5f;
+        [SerializeField] private float _bobUpDown = 0.75f;
+        [SerializeField] private float _bobSmoothTime = 0.08f;
+        [SerializeField] private float _bobFollowRate = 7.5f;
+        [SerializeField] private float _stepAtHeight = -0.02f;    // a footstep sounds when the bob dips below this
 
         private Camera _camera;
         private float _yaw;
         private float _pitch;
-        private float _fovBoost;
-        private float _roll;
-        private float _stridePhase;
-        private float _bobWeight;
-        private float _dip;
-        private float _dipVelocity;
+        private float _roll, _rollVelocity;
+        private float _fallTilt, _fallTiltVelocity;
+        private float _bobTime;
+        private bool _stepArmed;
+        private Vector3 _bob, _bobVelocity, _delayedBob;
         private Vector2 _recoilTarget, _recoilCurrent;   // x = yaw right, y = pitch up (degrees)
-        private float _zoomFov, _zoomWeight;
-        private int _zoomFrame = -10;
+        private float _aimFov, _aimSmoothTime = 0.1f;
+        private int _aimFrame = -10;
+        private float _fov, _fovVelocity;
+
+        private static AnimationCurve _bobSidewaysCurve, _bobUpDownCurve;
 
         public Camera Camera => _camera;
         public float Sensitivity { get; private set; }
         public float BaseFov { get; private set; }
         public float Yaw => _yaw;
+        public float Pitch => _pitch;
         /// <summary>Horizontal facing, used for movement.</summary>
         public Quaternion YawRotation => Quaternion.Euler(0f, _yaw, 0f);
+        /// <summary>How far the view turned this frame (degrees): x = pitch (+ down), y = yaw (+ right). Held guns sway from it.</summary>
+        public Vector2 LookDelta { get; private set; }
+        /// <summary>The head bob this frame (camera space, before the delayed follow): held guns bob along with it.</summary>
+        public Vector3 BobPosition => _bob;
+        /// <summary>How quickly the strafe roll settles (held guns level out at the same pace).</summary>
+        public float RollSmoothTime => _rollSmoothTime;
+        /// <summary>Current field of view relative to the base one (mouse sensitivity follows it).</summary>
+        public float ZoomSensitivity => _fov > 1f ? _fov / Mathf.Max(1f, BaseFov) : 1f;
 
         /// <summary>Raised on each footfall of the camera bob (for footstep sounds).</summary>
         public event System.Action Step;
@@ -63,19 +87,41 @@ namespace PleaseDontDrown.Player
         private void Awake()
         {
             Sensitivity = PlayerPrefs.GetFloat(SensitivityKey, 0.1f);
-            BaseFov = PlayerPrefs.GetFloat(FovKey, 80f);
+            BaseFov = PlayerPrefs.GetFloat(FovKey, 74f);
+            _fov = BaseFov;
+            BuildBobCurves();
+        }
+
+        /// <summary>
+        /// One step cycle of head bob (as in the original): sideways out and back once, up and down twice with a
+        /// sharp dip at each footfall.
+        /// </summary>
+        private static void BuildBobCurves()
+        {
+            if (_bobSidewaysCurve != null) return;
+            _bobSidewaysCurve = new AnimationCurve(
+                new Keyframe(0f, 0f, 6.43f, 6.43f),
+                new Keyframe(0.4223f, 1f, 0f, 0f),
+                new Keyframe(0.8523f, -1f, 0f, 0f),
+                new Keyframe(1f, 0f, 5.916f, 5.916f));
+            _bobUpDownCurve = new AnimationCurve(
+                new Keyframe(0f, 0f, -8.153f, -8.153f),
+                new Keyframe(0.1504f, -1f, 0f, 0f),
+                new Keyframe(0.4210f, 1f, 0f, 0f),
+                new Keyframe(0.6808f, -1f, 0.0427f, 0.0427f),
+                new Keyframe(0.8509f, 1f, -0.0362f, -0.0362f),
+                new Keyframe(1f, 0f, -7.130f, -7.130f));
         }
 
         private void OnEnable()
         {
-            _motor.Landed += OnLanded;
             DevCommands.Register("sens", "<degrees per pixel>", "Mouse sensitivity (default 0.1).", args =>
             {
                 Sensitivity = Mathf.Clamp(DevCommands.ParseFloat(args, 0), 0.01f, 1f);
                 PlayerPrefs.SetFloat(SensitivityKey, Sensitivity);
                 DevCommands.Print($"sensitivity = {Sensitivity}");
             }, owner: this);
-            DevCommands.Register("fov", "<degrees>", "Field of view (default 80).", args =>
+            DevCommands.Register("fov", "<degrees>", "Field of view (default 74).", args =>
             {
                 BaseFov = Mathf.Clamp(DevCommands.ParseFloat(args, 0), 60f, 110f);
                 PlayerPrefs.SetFloat(FovKey, BaseFov);
@@ -88,7 +134,6 @@ namespace PleaseDontDrown.Player
 
         private void OnDisable()
         {
-            _motor.Landed -= OnLanded;
             DevCommands.Unregister("sens", this);
             DevCommands.Unregister("fov", this);
             DevCommands.Unregister("lookat", this);
@@ -139,15 +184,18 @@ namespace PleaseDontDrown.Player
         /// <summary>Gun recoil: the view climbs (x right, y up, degrees) quickly and stays there.</summary>
         public void AddRecoil(Vector2 kick) => _recoilTarget += kick;
 
-        /// <summary>Aiming down the sights: blend the view towards <paramref name="fov"/>. Call every frame while it applies.</summary>
-        public void SetZoom(float fov, float weight)
+        /// <summary>
+        /// Aiming down the sights: the field of view eases to <paramref name="fov"/> (smoothing time
+        /// <paramref name="smoothTime"/>, the sights' own). Call every frame while aiming.
+        /// </summary>
+        public void SetAimFov(float fov, float smoothTime)
         {
-            _zoomFov = fov;
-            _zoomWeight = Mathf.Clamp01(weight);
-            _zoomFrame = Time.frameCount;
+            _aimFov = fov;
+            _aimSmoothTime = Mathf.Max(0.01f, smoothTime);
+            _aimFrame = Time.frameCount;
         }
 
-        private float ZoomWeight => Time.frameCount - _zoomFrame <= 1 ? _zoomWeight : 0f;
+        private bool Aiming => Time.frameCount - _aimFrame <= 1;
 
         /// <summary>Players' bodies never rotate; facing lives on the head.</summary>
         public static void ResetBodyRotation(Transform body)
@@ -159,21 +207,23 @@ namespace PleaseDontDrown.Player
 
         private void Update()
         {
+            LookDelta = Vector2.zero;
             if (!GameInput.GameplayActive)
                 return;
 
             Vector2 mouse = GameInput.LookMouse.ReadValue<Vector2>() * Sensitivity;
             Vector2 stick = GameInput.LookStick.ReadValue<Vector2>() * (_stickDegreesPerSecond * Time.deltaTime);
-            Vector2 look = mouse + stick;
-            // Zoomed in: turn slower, so the same hand movement covers the same part of the picture.
-            float zoom = ZoomWeight;
-            if (zoom > 0f) look *= Mathf.Lerp(1f, _zoomFov / Mathf.Max(1f, BaseFov), zoom);
+            // Zoomed in (aiming): turn slower, in step with the field of view.
+            Vector2 look = (mouse + stick) * ZoomSensitivity;
+            LookDelta = new Vector2(-look.y, look.x);
 
-            // Recoil eases in over a few frames.
-            Vector2 before = _recoilCurrent;
-            _recoilCurrent = Vector2.Lerp(_recoilCurrent, _recoilTarget, 1f - Mathf.Exp(-25f * Time.deltaTime));
-            look += _recoilCurrent - before;
-            if ((_recoilTarget - _recoilCurrent).sqrMagnitude < 1e-6f) _recoilTarget = _recoilCurrent = Vector2.zero;
+            // Recoil: the climb catches up with where the kicks put it (a quarter of the way per 1/100 s), and stays.
+            if (_recoilTarget.x != 0f || _recoilTarget.y != 0f)
+            {
+                Vector2 before = _recoilCurrent;
+                _recoilCurrent = Vector2.Lerp(_recoilCurrent, _recoilTarget, Mathf.Min(1f, 25f * Time.deltaTime));
+                look += _recoilCurrent - before;
+            }
 
             _yaw = Mathf.Repeat(_yaw + look.x, 360f);
             _pitch = Mathf.Clamp(_pitch - look.y, -88f, 88f);
@@ -184,32 +234,23 @@ namespace PleaseDontDrown.Player
         {
             if (_camera == null)
                 return;
-            float dt = Time.deltaTime;
+            float dt = Mathf.Max(Time.deltaTime, 1e-5f);
 
-            float zoom = ZoomWeight;
-            float targetBoost = _motor.IsSprinting && _motor.HorizontalSpeed > 1f && zoom < 0.1f ? _sprintFovBoost : 0f;
-            _fovBoost = Mathf.Lerp(_fovBoost, targetBoost, 1f - Mathf.Exp(-8f * dt));
-            _camera.fieldOfView = Mathf.Lerp(BaseFov + _fovBoost, _zoomFov, zoom);
+            // Field of view: eases to the sights' when aiming (at their pace), back to the base one otherwise.
+            bool aiming = Aiming;
+            _fov = Mathf.SmoothDamp(_fov, aiming ? _aimFov : BaseFov, ref _fovVelocity, aiming ? _aimSmoothTime : 0.1f, Mathf.Infinity, dt);
+            _camera.fieldOfView = _fov;
 
-            // Lean a touch into strafes.
-            _roll = Mathf.Lerp(_roll, -_motor.StrafeInput * _strafeRoll, 1f - Mathf.Exp(-6f * dt));
+            // Roll into strafes; pitch with the vertical speed (up when falling, down a touch when rising).
+            _roll = Mathf.SmoothDamp(_roll, -_motor.StrafeInput * _strafeRoll, ref _rollVelocity, _rollSmoothTime, Mathf.Infinity, dt);
+            float vy = _motor.IsSwimming ? 0f : _motor.Velocity.y;
+            _fallTilt = Mathf.SmoothDamp(_fallTilt, vy * _fallPitch, ref _fallTiltVelocity, _fallPitchSmoothTime, Mathf.Infinity, dt);
 
-            // Bob: one full cycle per two steps, driven by distance walked so it matches any speed.
-            bool walking = _motor.IsGrounded && !_motor.IsSwimming && _motor.HorizontalSpeed > 0.4f;
-            _bobWeight = Mathf.Lerp(_bobWeight, walking ? Mathf.Clamp01(_motor.HorizontalSpeed / 4.5f) : 0f, 1f - Mathf.Exp(-9f * dt));
-            float previousPhase = _stridePhase;
-            if (walking)
-                _stridePhase += _motor.HorizontalSpeed * dt / _walkStride;
-            if (Mathf.Floor(_stridePhase) > Mathf.Floor(previousPhase))
-                Step?.Invoke(); // a foot came down
-            float step = _stridePhase * Mathf.PI;
-            float bobY = -Mathf.Abs(Mathf.Sin(step)) * _bobVertical * _bobWeight;       // dips on each footfall
-            float bobX = Mathf.Sin(step * 0.5f) * _bobHorizontal * _bobWeight;         // sways once per two steps
+            HeadBob(dt);
+            _delayedBob = Vector3.Lerp(_delayedBob, _bob, Mathf.Min(1f, _bobFollowRate * dt));
 
-            _dip = Mathf.SmoothDamp(_dip, 0f, ref _dipVelocity, 0.14f);
-
-            _camera.transform.localPosition = new Vector3(bobX, bobY - _dip, 0f);
-            _camera.transform.localRotation = Quaternion.Euler(_dip * 12f, 0f, _roll);
+            _camera.transform.localPosition = _delayedBob;
+            _camera.transform.localRotation = Quaternion.Euler(_fallTilt, 0f, _roll);
 
             // Leaning in (mouth-to-mouth): the eye comes down over their face (they lie on their back, face up) to just
             // above the lips, looking down at them, head tipped a little, then back up.
@@ -225,6 +266,35 @@ namespace PleaseDontDrown.Player
             }
         }
 
-        private void OnLanded(float impactSpeed) => _dip = Mathf.Min(0.3f, impactSpeed * _landDipPerSpeed);
+        /// <summary>
+        /// The step cycle runs at 1.5..3 cycles a second (with speed), the bob follows the two curves, sized by the
+        /// speed, eased in and out; a footstep sounds each time it dips below the step height.
+        /// </summary>
+        private void HeadBob(float dt)
+        {
+            float moving = _motor.SpeedFraction;
+            bool bobbing = moving > _bobMinSpeed && _motor.IsGrounded && !_motor.IsSwimming;
+            Vector3 target = Vector3.zero;
+            if (bobbing)
+            {
+                float amount = Mathf.Clamp01(moving / Mathf.Max(_bobFullAt, _bobMinSpeed + 0.01f));
+                float rate = Mathf.Lerp(_bobCyclesPerSecond * 0.5f, _bobCyclesPerSecond, amount);
+                _bobTime = Mathf.Repeat(_bobTime + dt * rate, 1f);
+                target = new Vector3(_bobSidewaysCurve.Evaluate(_bobTime) * _bobSideways, _bobUpDownCurve.Evaluate(_bobTime) * _bobUpDown, 0f) * amount;
+            }
+            else
+            {
+                _bobTime = 0f;
+                _stepArmed = false;
+            }
+            _bob = Vector3.SmoothDamp(_bob, target, ref _bobVelocity, _bobSmoothTime, Mathf.Infinity, dt);
+            if (!bobbing) return;
+            if (_bob.y > _stepAtHeight) _stepArmed = true;
+            if (_stepArmed && _bob.y <= _stepAtHeight)
+            {
+                _stepArmed = false;
+                Step?.Invoke(); // a foot came down
+            }
+        }
     }
 }

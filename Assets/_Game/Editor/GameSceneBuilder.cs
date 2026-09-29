@@ -245,9 +245,9 @@ namespace PleaseDontDrown.Editor
             physicsBody.interpolation = RigidbodyInterpolation.Interpolate;
             physicsBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             var capsule = root.AddComponent<CapsuleCollider>();
-            capsule.height = 1.8f;
-            capsule.radius = 0.35f;
-            capsule.center = new Vector3(0f, 0.9f, 0f);
+            capsule.height = 1.7f;   // How to Fish's player: 1.7 m capsule, 0.375 m radius, eyes 1.6 m up
+            capsule.radius = 0.375f;
+            capsule.center = new Vector3(0f, 0.85f, 0f);
             // No friction: the motor controls speed itself, and walls shouldn't grab you when you slide along them.
             capsule.sharedMaterial = GetPhysicsMaterial("PlayerBody", 0f, 0f, PhysicsMaterialCombine.Minimum, PhysicsMaterialCombine.Minimum);
 
@@ -258,7 +258,7 @@ namespace PleaseDontDrown.Editor
 
             var head = new GameObject("Head").transform;
             head.SetParent(root.transform, false);
-            head.localPosition = new Vector3(0f, 1.65f, 0f);
+            head.localPosition = new Vector3(0f, 1.6f, 0f);
             var headSync = head.gameObject.AddComponent<NetworkTransform>(); // local height (crouch) + pitch
             headSync.SetSynchronizeScale(false);
 

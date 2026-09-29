@@ -7,46 +7,59 @@ namespace PleaseDontDrown.Player
 {
     /// <summary>
     /// Physics-body first-person movement (owner only; FishNet's NetworkTransform syncs the position).
-    /// The player is a real rigidbody capsule, so it shoves crates, kicks balls, can be knocked back and
-    /// ridden on by joints later. Velocity is shaped each physics step: eased walk/sprint speed, ground
-    /// acceleration and braking, air control that keeps momentum, extra gravity for a snappy jump,
-    /// coyote time + jump buffering, sliding off steep slopes and a small step-up assist.
+    /// The player is a real rigidbody capsule, so it shoves crates, kicks balls and can be knocked back.
+    ///
+    /// The movement model is How to Fish's (its tuning measured from the game; our own code): every 1/100 s the
+    /// horizontal velocity keeps 90% of itself and gains 10% of the wished speed (the same on the ground and in
+    /// the air), capped at the current speed; walk 5, sprint 7.5 m/s with a 0.1 s eased change between them;
+    /// gravity plus 20 m/s² extra all the time, a 9 m/s jump with 0.2 s coyote time; slopes over 45° push you
+    /// off; crouching shortens the capsule to 85% (and tucks the legs up while airborne). The constants are
+    /// per-100 Hz-step in the original and converted here to our physics rate.
     /// The body never rotates; facing comes from <see cref="PlayerLook.YawRotation"/>.
     /// </summary>
     [RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
     public partial class PlayerMotor : MonoBehaviour
     {
         [Header("Speed (m/s)")]
-        [SerializeField] private float _walkSpeed = 4.6f;
-        [SerializeField] private float _sprintSpeed = 7.4f;
-        [SerializeField] private float _crouchSpeed = 2.3f;
-        [Tooltip("Seconds to ease between walk / sprint / crouch speed.")]
-        [SerializeField] private float _speedEaseTime = 0.18f;
+        [SerializeField] private float _walkSpeed = 5f;
+        [SerializeField] private float _sprintSpeed = 7.5f;
+        [Tooltip("Crouching walk speed, relative to walking.")]
+        [SerializeField] private float _crouchSpeedScale = 0.65f;
+        [Tooltip("Speed change per second between walk / sprint / crouch (eased).")]
+        [SerializeField] private float _speedChangeRate = 10f;
 
-        [Header("Acceleration (m/s²)")]
-        [SerializeField] private float _groundAccel = 55f;
-        [SerializeField] private float _groundBrake = 40f;
-        [SerializeField] private float _airAccel = 11f;
+        [Header("Acceleration (per 1/100 s step, as in the original)")]
+        [Tooltip("Share of the wished speed added each step.")]
+        [SerializeField] private float _accelPerStep = 0.1f;
+        [Tooltip("Share of the velocity kept each step.")]
+        [SerializeField] private float _keepPerStep = 0.9f;
 
         [Header("Jump & gravity")]
-        [SerializeField] private float _jumpHeight = 1.15f;
-        [Tooltip("Added on top of Physics.gravity while airborne (snappier arcs).")]
-        [SerializeField] private float _extraGravity = 14f;
-        [SerializeField] private float _coyoteTime = 0.12f;
-        [SerializeField] private float _jumpBuffer = 0.14f;
+        [SerializeField] private float _jumpSpeed = 9f;
+        [Tooltip("Pulled down this much on top of Physics.gravity, all the time (m/s²).")]
+        [SerializeField] private float _extraGravity = 20f;
+        [SerializeField] private float _coyoteTime = 0.2f;
+        [Tooltip("A press this early (before landing) still jumps: one physics step, so no press is lost between frames.")]
+        [SerializeField] private float _jumpBuffer = 0.05f;
+        /// <summary>Swimming keeps its own, longer press window (unchanged by the walking rework).</summary>
+        private const float SwimJumpBuffer = 0.14f;
+        [SerializeField] private float _jumpRepeatDelay = 0.2f;
 
         [Header("Ground")]
-        [SerializeField] private float _maxWalkAngle = 48f;
-        [SerializeField] private float _groundProbe = 0.14f;
-        [SerializeField] private float _slideAccel = 16f;
+        [SerializeField] private float _maxWalkAngle = 45f;
+        [SerializeField] private float _groundProbe = 0.2f;
+        [Tooltip("Sideways push off slopes steeper than the walk angle (m/s).")]
+        [SerializeField] private float _slipPush = 2f;
         [SerializeField] private float _maxStepHeight = 0.36f;
 
         [Header("Crouch")]
-        [SerializeField] private float _standHeight = 1.8f;
-        [SerializeField] private float _crouchHeight = 1.15f;
-        [SerializeField] private float _crouchSharpness = 12f;
+        [SerializeField] private float _standHeight = 1.7f;
+        [Tooltip("Crouched height, relative to standing.")]
+        [SerializeField] private float _crouchHeightScale = 0.85f;
+        [Tooltip("Crouch blend per second (eased in).")]
+        [SerializeField] private float _crouchRate = 7.5f;
         [Tooltip("Eye distance below the top of the capsule.")]
-        [SerializeField] private float _eyeBelowTop = 0.15f;
+        [SerializeField] private float _eyeBelowTop = 0.1f;
         [SerializeField] private Transform _head;
 
         private Rigidbody _rb;
@@ -63,8 +76,12 @@ namespace PleaseDontDrown.Player
         private bool _scriptedSprint;
         private float _scriptedUntil = float.NegativeInfinity;
 
-        private float _maxSpeed;
-        private float _maxSpeedVelocity;
+        private float _maxSpeed;                 // current speed cap (eases between walk / sprint / crouch)
+        private float _speedFrom, _speedTo, _speedBlend = 1f;
+        private Vector3 _moveVelocity;           // the horizontal velocity the movement model keeps
+        private float _crouchBlend;              // 0 standing .. 1 crouched
+        private bool _hasJumped;
+        private float _slipSpeed;                // how much of the speed is sliding down a steep slope (the camera doesn't bob)
         private float _lastGroundedTime = float.NegativeInfinity;
         private float _lastJumpTime = float.NegativeInfinity;
         private float _controlLossUntil = float.NegativeInfinity;
@@ -77,6 +94,11 @@ namespace PleaseDontDrown.Player
         public bool IsCrouching { get; private set; }
         public float HorizontalSpeed { get; private set; }
         public float StrafeInput => _moveInput.x;
+        public Vector2 MoveInput => _moveInput;
+        /// <summary>Horizontal speed as a share of the current top speed (0..1), 0 while sliding off a slope: drives the head bob.</summary>
+        public float SpeedFraction { get; private set; }
+        /// <summary>Set by the gun in our hands: no sprinting while aiming down the sights.</summary>
+        public bool AimBlocksSprint { get; set; }
         public Collider GroundCollider { get; private set; }
         public Vector3 Velocity => Noclip || _rb == null ? Vector3.zero : _rb.linearVelocity;
         public bool Noclip { get; set; }
@@ -86,7 +108,7 @@ namespace PleaseDontDrown.Player
         /// <summary>Set by PlayerVitals: hungry lifeguards get their breath back slowly.</summary>
         public float StaminaRefillScale { get; set; } = 1f;
         private Quaternion Facing => _look != null ? _look.YawRotation : Quaternion.identity;
-        private float TotalGravity => -Physics.gravity.y + _extraGravity;
+        private float CrouchHeight => _standHeight * _crouchHeightScale;
 
         /// <summary>Fired when touching ground after falling; argument is the downward speed at impact.</summary>
         public event Action<float> Landed;
@@ -98,7 +120,7 @@ namespace PleaseDontDrown.Player
             _look = GetComponent<PlayerLook>();
             _hands = GetComponent<PlayerHands>();
             _height = _standHeight;
-            _maxSpeed = _walkSpeed;
+            _maxSpeed = _speedFrom = _speedTo = _walkSpeed;
             ApplyHeight();
         }
 
@@ -159,6 +181,7 @@ namespace PleaseDontDrown.Player
             transform.position = position;
             if (!_rb.isKinematic)
                 _rb.linearVelocity = Vector3.zero;
+            _moveVelocity = Vector3.zero;
             _climbing = false;
         }
 
@@ -187,6 +210,17 @@ namespace PleaseDontDrown.Player
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             ApplyHeight();
             Teleport(exitPosition);
+        }
+
+        /// <summary>
+        /// A small shove that the movement soaks up (How to Fish's knockback, e.g. a shotgun's kick): added to the
+        /// moving velocity, so it fades out in the normal way.
+        /// </summary>
+        public void Knockback(Vector3 velocityChange)
+        {
+            if (_rb.isKinematic) return;
+            _moveVelocity += new Vector3(velocityChange.x, 0f, velocityChange.z);
+            _rb.linearVelocity += velocityChange;
         }
 
         /// <summary>Knockback / explosion / boat hit: an instant velocity change plus a moment of reduced control.</summary>
@@ -238,6 +272,8 @@ namespace PleaseDontDrown.Player
             if (IsSwimming)
             {
                 SwimMove(dt);
+                Vector3 swum = _rb.linearVelocity;
+                _moveVelocity = new Vector3(swum.x, 0f, swum.z); // walking out of the water carries on from here
                 return;
             }
             _rb.useGravity = true;
@@ -247,31 +283,12 @@ namespace PleaseDontDrown.Player
             GroundCheck();
             UpdateCrouch(dt);
 
-            // Eased target speed.
-            IsSprinting = _sprintHeld && _moveInput.y > 0.1f && !IsCrouching;
-            float targetSpeed = IsCrouching ? _crouchSpeed : IsSprinting ? _sprintSpeed : _walkSpeed;
-            _maxSpeed = Mathf.SmoothDamp(_maxSpeed, targetSpeed, ref _maxSpeedVelocity, _speedEaseTime, Mathf.Infinity, dt);
+            // Sprinting: holding sprint and moving (any direction), on the ground (or already sprinting when leaving
+            // it), never while aiming down the sights.
+            bool moving = _moveInput.sqrMagnitude > 0.0001f;
+            IsSprinting = _sprintHeld && moving && (IsGrounded || IsSprinting) && !AimBlocksSprint;
+            UpdateSpeedCap(dt);
             float speed = _maxSpeed * SpeedMultiplier * HungerSpeedScale * WadeFactor * CarryFactor(0.015f);
-            Vector3 wish = Facing * new Vector3(_moveInput.x, 0f, _moveInput.y) * speed;
-
-            Vector3 v = _rb.linearVelocity;
-            var horizontal = new Vector3(v.x, 0f, v.z);
-            float control = Time.time < _controlLossUntil ? 0.1f : 1f;
-            bool hasInput = wish.sqrMagnitude > 0.01f;
-
-            if (IsGrounded)
-            {
-                float rate = (hasInput ? _groundAccel : _groundBrake) * control;
-                horizontal = Vector3.MoveTowards(horizontal, wish, rate * dt);
-            }
-            else if (hasInput)
-            {
-                // Air control steers toward the wish but never brakes you below your current momentum.
-                Vector3 steered = Vector3.MoveTowards(horizontal, wish, _airAccel * control * dt);
-                horizontal = steered.sqrMagnitude < horizontal.sqrMagnitude && Vector3.Dot(horizontal, wish) > 0f
-                    ? steered.normalized * horizontal.magnitude
-                    : steered;
-            }
 
             // Waist-deep or more: Jump climbs a ledge in front (dock, rock) if there is one.
             if (WaterDepthAtFeet > 0.5f && Time.time - _lastJumpPressedTime <= _jumpBuffer && TryStartClimb())
@@ -280,41 +297,77 @@ namespace PleaseDontDrown.Player
                 return;
             }
 
-            float vy = v.y;
-            bool jumped = false;
-            bool canJump = Time.time - _lastGroundedTime <= _coyoteTime && !IsCrouching && control >= 1f;
-            if (canJump && Time.time - _lastJumpPressedTime <= _jumpBuffer)
+            Vector3 v = _rb.linearVelocity;
+            bool knocked = Time.time < _controlLossUntil;
+            Vector3 input = _moveInput.sqrMagnitude > 1f ? (Vector3)_moveInput.normalized : (Vector3)_moveInput;
+            Vector3 wish = Facing * new Vector3(input.x, 0f, input.y);
+            if (knocked)
             {
-                vy = Mathf.Sqrt(2f * TotalGravity * _jumpHeight);
-                _lastJumpPressedTime = _lastGroundedTime = float.NegativeInfinity;
-                _lastJumpTime = Time.time;
-                IsGrounded = false;
-                jumped = true;
-            }
-
-            Vector3 velocity;
-            if (IsGrounded && !jumped)
-            {
-                // Follow the ground: project onto the slope and press down lightly so we don't skip off bumps.
-                velocity = Vector3.ProjectOnPlane(horizontal, _groundNormal) - _groundNormal * 0.5f;
+                // Knocked back: the shove carries us (movement takes over again when it's spent).
+                _moveVelocity = new Vector3(v.x, 0f, v.z);
             }
             else
             {
-                if (!jumped)
-                    vy -= _extraGravity * dt;
-                velocity = new Vector3(horizontal.x, vy, horizontal.z);
-                if (_onSteepSlope)
-                    velocity += Vector3.ProjectOnPlane(Vector3.down, _groundNormal).normalized * (_slideAccel * dt);
+                // The movement model, per 1/100 s step: keep 90%, add 10% of the wished speed, cap at the top speed.
+                float steps = dt / 0.01f;
+                _moveVelocity.y = 0f;
+                _moveVelocity *= Mathf.Pow(_keepPerStep, steps);
+                _moveVelocity += wish * (_accelPerStep * speed * steps);
+                _moveVelocity = Vector3.ClampMagnitude(_moveVelocity, speed);
+            }
+            Vector3 horizontal = _moveVelocity;
+            _slipSpeed = 0f;
+            if (_onSteepSlope && !knocked)
+            {
+                // Too steep to stand on: pushed off it, away from the slope.
+                Vector3 away = new Vector3(_groundNormal.x, 0f, _groundNormal.z);
+                if (away.sqrMagnitude > 1e-4f)
+                {
+                    horizontal += away.normalized * _slipPush;
+                    _slipSpeed = _slipPush;
+                }
             }
 
-            _rb.linearVelocity = velocity;
-            HorizontalSpeed = horizontal.magnitude;
+            // Jump: straight up at 9 m/s, from the ground or just after running off it (not from a too-steep slope).
+            float vy = v.y;
+            bool canJump = !_hasJumped && Time.time - _lastGroundedTime <= _coyoteTime && !_onSteepSlope && !knocked;
+            if (canJump && Time.time - _lastJumpPressedTime <= _jumpBuffer)
+            {
+                vy = _jumpSpeed;
+                _hasJumped = true;
+                _lastJumpPressedTime = float.NegativeInfinity;
+                _lastJumpTime = Time.time;
+                IsGrounded = false;
+            }
+            else
+            {
+                vy -= _extraGravity * dt; // extra gravity, on the ground too (keeps us pressed to it)
+            }
 
-            if (IsGrounded && hasInput)
+            _rb.linearVelocity = new Vector3(horizontal.x, vy, horizontal.z);
+            HorizontalSpeed = new Vector2(horizontal.x, horizontal.z).magnitude;
+            SpeedFraction = _slipSpeed > 0f ? 0f : new Vector2(_moveVelocity.x, _moveVelocity.z).magnitude / Mathf.Max(0.01f, _maxSpeed);
+
+            if (IsGrounded && moving && !knocked)
                 TryStepUp(wish.normalized);
 
             if (!wasGrounded && IsGrounded && fallSpeed > 3f)
                 Landed?.Invoke(fallSpeed);
+        }
+
+        /// <summary>The top speed eases (over 1/10 s) between walking, sprinting and crouch-walking.</summary>
+        private void UpdateSpeedCap(float dt)
+        {
+            float target = IsSprinting ? _sprintSpeed : _walkSpeed;
+            if (IsCrouching && IsGrounded) target *= _crouchSpeedScale;
+            if (!Mathf.Approximately(_speedTo, target))
+            {
+                _speedFrom = _maxSpeed;
+                _speedTo = target;
+                _speedBlend = 0f;
+            }
+            _speedBlend = Mathf.MoveTowards(_speedBlend, 1f, _speedChangeRate * dt);
+            _maxSpeed = Mathf.Lerp(_speedFrom, _speedTo, Mathf.SmoothStep(0f, 1f, _speedBlend));
         }
 
         // ------------------------------------------------------------------ ground
@@ -334,7 +387,10 @@ namespace PleaseDontDrown.Player
             _groundNormal = hit ? ground.normal : Vector3.up;
             GroundCollider = hit ? ground.collider : null;
             if (IsGrounded)
+            {
                 _lastGroundedTime = Time.time;
+                if (Time.time >= _lastJumpTime + _jumpRepeatDelay) _hasJumped = false;
+            }
         }
 
         /// <summary>Walking into a low ledge (dock edge, step, crate lip): pop up onto it if there's room.</summary>
@@ -406,17 +462,32 @@ namespace PleaseDontDrown.Player
 
         // ------------------------------------------------------------------ crouch
 
+        /// <summary>
+        /// Crouching (held), or airborne for more than 1/10 s (the legs tuck up, so ledges are easier to land on).
+        /// On the ground the head comes down; in the air the feet come up and the head stays where it is.
+        /// </summary>
         private void UpdateCrouch(float dt)
         {
-            bool wantCrouch = _crouchHeld;
+            bool airborne = !IsGrounded && Time.time > _lastGroundedTime + 0.1f;
+            bool wantCrouch = _crouchHeld || airborne;
             if (!wantCrouch && IsCrouching && !HasHeadroom(_standHeight))
                 wantCrouch = true; // stay down under low ceilings
             IsCrouching = wantCrouch;
 
-            float target = IsCrouching ? _crouchHeight : _standHeight;
-            if (Mathf.Abs(_height - target) > 0.001f)
+            _crouchBlend = Mathf.MoveTowards(_crouchBlend, IsCrouching ? 1f : 0f, _crouchRate * dt);
+            float eased = _crouchBlend * _crouchBlend; // eases in (slow start, quick finish)
+            float target = Mathf.Lerp(_standHeight, CrouchHeight, eased);
+            if (Mathf.Abs(_height - target) > 0.0005f)
             {
-                _height = Mathf.Lerp(_height, target, 1f - Mathf.Exp(-_crouchSharpness * dt));
+                float change = _height - target;
+                _height = target;
+                if (!IsGrounded)
+                {
+                    // Keep the top (and the eyes) still: move the feet.
+                    Vector3 p = _rb.position + Vector3.up * change;
+                    _rb.position = p;
+                    transform.position = p;
+                }
                 ApplyHeight();
             }
         }

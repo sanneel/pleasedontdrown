@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using PleaseDontDrown.Combat;
 using PleaseDontDrown.Items;
+using PleaseDontDrown.Player;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -29,6 +30,12 @@ namespace PleaseDontDrown.Editor
             public Vector2 Climb, KickTurn;
             public Vector3 Kick;
             public float SlideTravel = 0.03f;
+            // How to Fish's handling (measured from the game): recoil spring, aiming, cycling, the motion in the hands.
+            public float SpringPosition, DampPosition, SpringRotation, DampRotation;
+            public float AimKickPosition = 1f, AimKickRotation = 1f, AimSpringStiffer = 1f, KickBack;
+            public bool CycleBlocks, NoQueue;
+            public float AimTime = 0.05f, AimSway = 0.2f;
+            public ToolFeel Feel = ToolFeel.Default;
             public (string name, int damage, int price)[] Tiers;
             public (string name, string model, string eye, float eyeDistance, float fov, bool scope, int price)[] Sights;
             public (string name, string model, string muzzle, bool suppressed, float climb, float kick, int price)[] Barrels;
@@ -69,11 +76,19 @@ namespace PleaseDontDrown.Editor
                 HandGrips(root, new Vector3(0.033f, -0.06f, -0.05f), -12f, left: null, leftPalmUp: false); // one-handed
             }, new GunSetup
             {
-                Kind = "Pistol", Sound = GunSound.Pistol, Projectile = ProjectileKind.Bullet, Interval = 0.16f, HipSpread = 1.6f, AimSpread = 0.15f,
-                Speed = 200f, Gravity = 3f, Force = 3f, FlashSize = 0.8f, Magazine = 12, ExtendedMagazine = 18, ReloadTime = 1.35f,
-                Climb = new Vector2(0.35f, 1.3f), Kick = new Vector3(0.004f, 0.012f, 0.05f), KickTurn = new Vector2(2.5f, 9f), SlideTravel = 0.028f,
-                Tiers = new[] { ("Standard rounds", 34, 0), ("Hollow points", 45, 150), ("Magnum rounds", 60, 300) },
-                Sights = new[] { ("Iron sights", "", "EyeIron", 0.38f, 62f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.38f, 58f, false, 120) },
+                Kind = "Pistol", Sound = GunSound.Pistol, Projectile = ProjectileKind.Bullet, Interval = 0.15f, HipSpread = 0f, AimSpread = 0f,
+                Speed = 350f, Gravity = 0f, Force = 3f, FlashSize = 0.8f, Magazine = 10, ExtendedMagazine = 17, ReloadTime = 1.35f,
+                Climb = new Vector2(2f, 4f), Kick = new Vector3(0f, 0.05f, 0.5f), KickTurn = new Vector2(15f, 15f), SlideTravel = 0.028f,
+                SpringPosition = 2500f, DampPosition = 1f, SpringRotation = 5000f, DampRotation = 100f, AimSpringStiffer = 3f, AimTime = 0.05f,
+                Feel = new ToolFeel
+                {
+                    Tilt = -10f, CanLookAround = true, MaxLook = new Vector3(2f, 8f, 5f), LookSpeed = 0.25f, SwayPosition = 1f,
+                    SwayRotation = new Vector3(500f, 250f, 250f), MaxSwayPosition = 0.1f, MaxSwayRotation = 25f, FallForce = 1e-5f,
+                    SprintPosition = new Vector3(-0.1f, -0.1f, 0f), SprintRotation = new Vector3(30f, -35f, 25f), SprintTime = 0.15f,
+                    DrawPosition = new Vector3(0.15f, -0.5f, 0f), DrawRotation = new Vector3(90f, 0f, 0f)
+                },
+                Tiers = new[] { ("Standard rounds", 25, 0), ("Hollow points", 33, 150), ("Magnum rounds", 45, 300) },
+                Sights = new[] { ("Iron sights", "", "EyeIron", 0.38f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.38f, 60f, false, 120) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 150),
                                   ("Compensator", "BarrelCompensator", "BarrelCompensator/Muzzle", false, 0.6f, 0.9f, 120) }
@@ -105,12 +120,20 @@ namespace PleaseDontDrown.Editor
                 HandGrips(root, new Vector3(0.032f, -0.058f, -0.035f), -12f, left: new Vector3(0f, -0.018f, 0.14f), leftPalmUp: true);
             }, new GunSetup
             {
-                Kind = "SMG", Sound = GunSound.Smg, Projectile = ProjectileKind.Bullet, FullAuto = true, Interval = 0.075f, HipSpread = 2.8f, AimSpread = 0.6f,
-                Speed = 180f, Gravity = 3f, Force = 1.5f, FlashSize = 0.8f, Range = 150f, Magazine = 30, ExtendedMagazine = 45, ReloadTime = 1.7f,
-                Climb = new Vector2(0.35f, 0.55f), Kick = new Vector3(0.003f, 0.006f, 0.022f), KickTurn = new Vector2(1.5f, 3f), SlideTravel = 0.04f,
-                Tiers = new[] { ("Standard rounds", 16, 0), ("Hollow points", 21, 200), ("Armour piercing", 27, 400) },
-                Sights = new[] { ("Iron sights", "", "EyeIron", 0.28f, 62f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.28f, 55f, false, 150),
-                                 ("Scope (2x)", "SightScope", "SightScope/Eye", 0.14f, 38f, true, 250) },
+                Kind = "SMG", Sound = GunSound.Smg, Projectile = ProjectileKind.Bullet, FullAuto = true, Interval = 0.05f, HipSpread = 0f, AimSpread = 0f,
+                Speed = 350f, Gravity = 0f, Force = 1.5f, FlashSize = 0.8f, Range = 150f, Magazine = 30, ExtendedMagazine = 40, ReloadTime = 1.7f,
+                Climb = new Vector2(5f, 3f), Kick = new Vector3(0.1f, 0.1f, 0.5f), KickTurn = new Vector2(6f, 6f), SlideTravel = 0.04f,
+                SpringPosition = 20000f, DampPosition = 0f, SpringRotation = 1000f, DampRotation = 0f, AimKickPosition = 0.5f, AimSpringStiffer = 2f, AimTime = 0.05f,
+                Feel = new ToolFeel
+                {
+                    Tilt = -10f, CanLookAround = true, MaxLook = new Vector3(2f, 8f, 5f), LookSpeed = 0.25f, SwayPosition = 1f,
+                    SwayRotation = new Vector3(500f, 250f, 500f), MaxSwayPosition = 0.1f, MaxSwayRotation = 25f, FallForce = 1e-5f,
+                    SprintPosition = new Vector3(-0.2f, -0.1f, -0.1f), SprintRotation = new Vector3(20f, -35f, 25f), SprintTime = 0.15f,
+                    DrawPosition = new Vector3(0.15f, -0.4f, -0.1f), DrawRotation = new Vector3(90f, 0f, 0f)
+                },
+                Tiers = new[] { ("Standard rounds", 24, 0), ("Hollow points", 28, 200), ("Armour piercing", 35, 400) },
+                Sights = new[] { ("Iron sights", "", "EyeIron", 0.28f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.28f, 60f, false, 150),
+                                 ("Scope", "SightScope", "SightScope/Eye", 0.14f, 15f, true, 250) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 200),
                                   ("Compensator", "BarrelCompensator", "BarrelCompensator/Muzzle", false, 0.55f, 0.9f, 150) }
@@ -139,11 +162,19 @@ namespace PleaseDontDrown.Editor
                 HandGrips(root, new Vector3(0.03f, -0.045f, -0.1f), -20f, left: new Vector3(0f, -0.028f, 0.27f), leftPalmUp: true);
             }, new GunSetup
             {
-                Kind = "Shotgun", Sound = GunSound.Shotgun, Projectile = ProjectileKind.Pellet, Interval = 0.8f, Pellets = 8, HipSpread = 5.5f, AimSpread = 4f,
-                Speed = 120f, Gravity = 6f, Force = 2f, ShooterPush = 3.5f, Range = 60f, FlashSize = 1.4f, Magazine = 6, ExtendedMagazine = 9, ReloadTime = 2.6f,
-                Climb = new Vector2(1.2f, 5f), Kick = new Vector3(0.01f, 0.02f, 0.1f), KickTurn = new Vector2(4f, 16f), SlideTravel = 0.08f,
-                Tiers = new[] { ("Buckshot", 14, 0), ("Magnum buckshot", 18, 250), ("Dragon shells", 23, 500) },
-                Sights = new[] { ("Bead", "", "EyeIron", 0.3f, 64f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.3f, 58f, false, 150) },
+                Kind = "Shotgun", Sound = GunSound.Shotgun, Projectile = ProjectileKind.Pellet, Interval = 0.22f, Pellets = 25, HipSpread = 6f, AimSpread = 6f,
+                Speed = 100f, Gravity = 0f, Force = 2f, Range = 60f, FlashSize = 1.4f, Magazine = 2, ExtendedMagazine = 2, ReloadTime = 2f,
+                Climb = new Vector2(6f, 6f), Kick = new Vector3(0.1f, 0.1f, 0.3f), KickTurn = new Vector2(25f, 30f), SlideTravel = 0.08f,
+                SpringPosition = 500f, DampPosition = 1f, SpringRotation = 500f, DampRotation = 25f, KickBack = 5f, AimTime = 0.1f,
+                Feel = new ToolFeel
+                {
+                    Tilt = -10f, CanLookAround = true, MaxLook = new Vector3(2f, 8f, 5f), LookSpeed = 0.25f, SwayPosition = 1f,
+                    SwayRotation = new Vector3(500f, 250f, 500f), MaxSwayPosition = 0.1f, MaxSwayRotation = 25f, FallForce = 1e-5f,
+                    SprintPosition = new Vector3(-0.1f, -0.1f, 0f), SprintRotation = new Vector3(20f, -45f, 25f), SprintTime = 0.15f,
+                    DrawPosition = new Vector3(0.1f, -0.5f, -0.1f), DrawRotation = new Vector3(90f, 0f, 0f)
+                },
+                Tiers = new[] { ("Buckshot", 3, 0), ("Magnum buckshot", 5, 250), ("Dragon shells", 8, 500) },
+                Sights = new[] { ("Bead", "", "EyeIron", 0.3f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.3f, 60f, false, 150) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 250),
                                   ("Choke", "BarrelCompensator", "BarrelCompensator/Muzzle", false, 0.75f, 0.9f, 200) }
@@ -175,12 +206,20 @@ namespace PleaseDontDrown.Editor
                 HandGrips(root, new Vector3(0.03f, -0.062f, -0.08f), -15f, left: new Vector3(0f, -0.012f, 0.25f), leftPalmUp: true);
             }, new GunSetup
             {
-                Kind = "Rifle", Sound = GunSound.Rifle, Projectile = ProjectileKind.Bullet, FullAuto = true, Interval = 0.1f, HipSpread = 2.2f, AimSpread = 0.2f,
-                Speed = 260f, Gravity = 2f, Force = 2.5f, Range = 300f, Magazine = 30, ExtendedMagazine = 40, ReloadTime = 2f,
-                Climb = new Vector2(0.45f, 0.8f), Kick = new Vector3(0.003f, 0.008f, 0.03f), KickTurn = new Vector2(1.5f, 4f), SlideTravel = 0.04f,
-                Tiers = new[] { ("Standard rounds", 25, 0), ("Match rounds", 32, 250), ("Armour piercing", 40, 500) },
-                Sights = new[] { ("Iron sights", "", "EyeIron", 0.24f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.26f, 54f, false, 150),
-                                 ("Scope (4x)", "SightScope", "SightScope/Eye", 0.12f, 26f, true, 350) },
+                Kind = "Rifle", Sound = GunSound.Rifle, Projectile = ProjectileKind.Bullet, FullAuto = true, Interval = 0.07f, HipSpread = 0f, AimSpread = 0f,
+                Speed = 900f, Gravity = 0f, Force = 2.5f, Range = 300f, Magazine = 30, ExtendedMagazine = 40, ReloadTime = 2f,
+                Climb = new Vector2(1.5f, 3f), Kick = new Vector3(0.03f, 0.03f, 0.4f), KickTurn = new Vector2(5f, 2f), SlideTravel = 0.04f,
+                SpringPosition = 10000f, DampPosition = 0f, SpringRotation = 1000f, DampRotation = 0f, AimKickPosition = 0.75f, AimSpringStiffer = 2f, AimTime = 0.06f,
+                Feel = new ToolFeel
+                {
+                    Tilt = -5f, CanLookAround = true, MaxLook = new Vector3(1f, 4f, 3f), LookSpeed = 0.25f, SwayPosition = 1f,
+                    SwayRotation = new Vector3(150f, 150f, 150f), MaxSwayPosition = 0.1f, MaxSwayRotation = 25f, FallForce = 1e-5f,
+                    SprintPosition = new Vector3(-0.1f, -0.1f, 0f), SprintRotation = new Vector3(20f, -45f, 25f), SprintTime = 0.2f,
+                    DrawPosition = new Vector3(0.2f, -0.5f, 0.3f), DrawRotation = new Vector3(90f, 90f, 0f)
+                },
+                Tiers = new[] { ("Standard rounds", 40, 0), ("Match rounds", 55, 250), ("Armour piercing", 70, 500) },
+                Sights = new[] { ("Iron sights", "", "EyeIron", 0.24f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.26f, 60f, false, 150),
+                                 ("Scope", "SightScope", "SightScope/Eye", 0.12f, 15f, true, 350) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 250),
                                   ("Compensator", "BarrelCompensator", "BarrelCompensator/Muzzle", false, 0.55f, 0.9f, 200) }
@@ -208,11 +247,19 @@ namespace PleaseDontDrown.Editor
                 HandGrips(root, new Vector3(0.03f, -0.035f, -0.1f), -18f, left: new Vector3(0f, -0.03f, 0.22f), leftPalmUp: true);
             }, new GunSetup
             {
-                Kind = "Sniper", Sound = GunSound.Sniper, Projectile = ProjectileKind.Heavy, Interval = 1.2f, HipSpread = 7f, AimSpread = 0.02f,
-                Speed = 400f, Gravity = 1.5f, Force = 6f, FlashSize = 1.3f, Range = 500f, Magazine = 5, ExtendedMagazine = 8, ReloadTime = 2.8f,
-                Climb = new Vector2(0.6f, 6f), Kick = new Vector3(0.01f, 0.02f, 0.12f), KickTurn = new Vector2(3f, 14f), SlideTravel = 0.06f,
-                Tiers = new[] { ("Standard rounds", 100, 0), ("Match rounds", 130, 300), ("Elephant rounds", 170, 600) },
-                Sights = new[] { ("Scope (8x)", "SightScope", "SightScope/Eye", 0.1f, 14f, true, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.26f, 55f, false, 150) },
+                Kind = "Sniper", Sound = GunSound.Sniper, Projectile = ProjectileKind.Heavy, Interval = 1f, HipSpread = 0f, AimSpread = 0f,
+                Speed = 1000f, Gravity = 0f, Force = 6f, FlashSize = 1.3f, Range = 500f, Magazine = 5, ExtendedMagazine = 8, ReloadTime = 2.8f,
+                Climb = new Vector2(5f, 5f), Kick = new Vector3(0.1f, 0.05f, 0.3f), KickTurn = new Vector2(10f, 5f), SlideTravel = 0.06f,
+                SpringPosition = 500f, DampPosition = 1f, SpringRotation = 500f, DampRotation = 100f, CycleBlocks = true, NoQueue = true, AimTime = 0.1f, AimSway = 0f,
+                Feel = new ToolFeel
+                {
+                    Tilt = -5f, CanLookAround = true, MaxLook = new Vector3(2f, 6f, 2f), LookSpeed = 0.25f, SwayPosition = 1f,
+                    SwayRotation = new Vector3(100f, 100f, 100f), MaxSwayPosition = 0.1f, MaxSwayRotation = 15f, FallForce = 1e-5f,
+                    SprintPosition = new Vector3(-0.15f, -0.2f, 0f), SprintRotation = new Vector3(25f, -35f, 25f), SprintTime = 0.25f,
+                    DrawPosition = new Vector3(0.2f, 0.1f, -0.3f), DrawRotation = new Vector3(-90f, 0f, 0f)
+                },
+                Tiers = new[] { ("Standard rounds", 200, 0), ("Match rounds", 250, 300), ("Elephant rounds", 350, 600) },
+                Sights = new[] { ("Scope", "SightScope", "SightScope/Eye", 0.1f, 15f, true, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.26f, 60f, false, 150) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 300),
                                   ("Muzzle brake", "BarrelCompensator", "BarrelCompensator/Muzzle", false, 0.6f, 0.85f, 250) }
@@ -256,6 +303,31 @@ namespace PleaseDontDrown.Editor
                 Require(so, "_kick").vector3Value = setup.Kick;
                 Require(so, "_kickTurn").vector2Value = setup.KickTurn;
                 Require(so, "_slideTravel").floatValue = setup.SlideTravel;
+                Require(so, "_springPosition").floatValue = setup.SpringPosition;
+                Require(so, "_dampPosition").floatValue = setup.DampPosition;
+                Require(so, "_springRotation").floatValue = setup.SpringRotation;
+                Require(so, "_dampRotation").floatValue = setup.DampRotation;
+                Require(so, "_aimKickPosition").floatValue = setup.AimKickPosition;
+                Require(so, "_aimKickRotation").floatValue = setup.AimKickRotation;
+                Require(so, "_aimSpringStiffer").floatValue = setup.AimSpringStiffer;
+                Require(so, "_kickBack").floatValue = setup.KickBack;
+                Require(so, "_cycleBlocks").boolValue = setup.CycleBlocks;
+                Require(so, "_noQueue").boolValue = setup.NoQueue;
+                SerializedProperty feel = Require(so, "_feel");
+                feel.FindPropertyRelative("Tilt").floatValue = setup.Feel.Tilt;
+                feel.FindPropertyRelative("CanLookAround").boolValue = setup.Feel.CanLookAround;
+                feel.FindPropertyRelative("MaxLook").vector3Value = setup.Feel.MaxLook;
+                feel.FindPropertyRelative("LookSpeed").floatValue = setup.Feel.LookSpeed;
+                feel.FindPropertyRelative("SwayPosition").floatValue = setup.Feel.SwayPosition;
+                feel.FindPropertyRelative("SwayRotation").vector3Value = setup.Feel.SwayRotation;
+                feel.FindPropertyRelative("MaxSwayPosition").floatValue = setup.Feel.MaxSwayPosition;
+                feel.FindPropertyRelative("MaxSwayRotation").floatValue = setup.Feel.MaxSwayRotation;
+                feel.FindPropertyRelative("FallForce").floatValue = setup.Feel.FallForce;
+                feel.FindPropertyRelative("SprintPosition").vector3Value = setup.Feel.SprintPosition;
+                feel.FindPropertyRelative("SprintRotation").vector3Value = setup.Feel.SprintRotation;
+                feel.FindPropertyRelative("SprintTime").floatValue = setup.Feel.SprintTime;
+                feel.FindPropertyRelative("DrawPosition").vector3Value = setup.Feel.DrawPosition;
+                feel.FindPropertyRelative("DrawRotation").vector3Value = setup.Feel.DrawRotation;
 
                 SerializedProperty tiers = Require(so, "_tiers");
                 tiers.arraySize = setup.Tiers.Length;
@@ -277,9 +349,10 @@ namespace PleaseDontDrown.Editor
                     p.FindPropertyRelative("EyePoint").objectReferenceValue = Find(go, s.eye);
                     p.FindPropertyRelative("EyeDistance").floatValue = s.eyeDistance;
                     p.FindPropertyRelative("AimFov").floatValue = s.fov;
-                    p.FindPropertyRelative("AimTime").floatValue = s.scope ? 0.2f : setup.Pellets > 1 || setup.Kind == "Rifle" ? 0.15f : 0.11f;
+                    // How to Fish's sights: iron sights / red dots ease in at the gun's pace, scopes at 0.1 s with no sway.
+                    p.FindPropertyRelative("AimTime").floatValue = s.scope ? 0.1f : setup.AimTime;
                     p.FindPropertyRelative("Scope").boolValue = s.scope;
-                    p.FindPropertyRelative("AimSway").floatValue = s.scope ? 0.15f : 0.3f;
+                    p.FindPropertyRelative("AimSway").floatValue = s.scope ? 0f : setup.AimSway;
                     p.FindPropertyRelative("Price").intValue = s.price;
                 }
                 SerializedProperty barrels = Require(so, "_barrels");
@@ -311,7 +384,65 @@ namespace PleaseDontDrown.Editor
                     Transform t = go.transform.Find(part);
                     if (t != null && setup.Sights[0].model != part) t.gameObject.SetActive(false);
                 }
+                AttachGunModel(go.transform, setup.Kind);
+                SetRefs(go.GetComponent<PleaseDontDrown.Interaction.Interactable>(), "_outlineRenderers",
+                    go.GetComponentsInChildren<Renderer>(true));
             });
+        }
+
+        /// <summary>Replace the greybox body with the matching Meshy model while retaining its physics and handling points.</summary>
+        private static void AttachGunModel(Transform gun, string kind)
+        {
+            string asset;
+            float length;
+            float centreZ;
+            float centreY;
+            switch (kind)
+            {
+                case "Pistol": asset = "pistol"; length = 0.28f; centreZ = 0f; centreY = -0.035f; break;
+                case "Rifle": asset = "rifle"; length = 0.88f; centreZ = 0.065f; centreY = -0.025f; break;
+                case "Sniper": asset = "sniper"; length = 1.19f; centreZ = 0.195f; centreY = 0f; break;
+                default: return; // Keep the existing models for weapons without a supplied GLB.
+            }
+
+            string path = $"Assets/_Game/Art/Weapons/{asset}.glb";
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null)
+            {
+                if (File.Exists(path)) throw new InvalidDataException($"Gun GLB failed to import: {path}");
+                return;
+            }
+
+            // Keep primitive colliders, muzzle, sights, moving parts, and hand grips in place.
+            // Only their plain body renderers disappear; attachment models can still be fitted at the shop.
+            foreach (Transform child in gun)
+            {
+                if (child.name == "SightRedDot" || child.name == "SightScope" || child.name == "BarrelSuppressor" ||
+                    child.name == "BarrelCompensator" || child.name == "Laser" || child.name == "MagazineExtended")
+                    continue;
+                foreach (Renderer renderer in child.GetComponentsInChildren<Renderer>(true))
+                    renderer.enabled = false;
+            }
+
+            GameObject model = Object.Instantiate(prefab, gun, false);
+            model.name = "Meshy_" + asset;
+            Bounds source = RendererBounds(model);
+            bool longOnX = source.size.x >= source.size.z;
+            float sourceLength = Mathf.Max(source.size.x, source.size.z);
+            if (sourceLength < 0.001f) throw new InvalidDataException($"Gun GLB has no mesh bounds: {path}");
+            model.transform.localRotation = longOnX ? Quaternion.Euler(0f, -90f, 0f) : Quaternion.identity;
+            model.transform.localScale = Vector3.one * (length / sourceLength);
+            Bounds fitted = RendererBounds(model);
+            model.transform.localPosition = new Vector3(0f, centreY, centreZ) - fitted.center;
+        }
+
+        private static Bounds RendererBounds(GameObject root)
+        {
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) return new Bounds(root.transform.position, Vector3.zero);
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            return bounds;
         }
 
         // ------------------------------------------------------------------ gun parts

@@ -137,7 +137,7 @@ namespace PleaseDontDrown.Player
             IsSprinting = _sprintHeld && _moveInput.sqrMagnitude > 0.01f && Stamina01 > 0.02f;
 
             // At the surface, Jump climbs out onto a ledge in front of you, or does a little hop.
-            if (!IsHeadUnderwater && Time.time - _lastJumpPressedTime <= _jumpBuffer && Time.time > _hopUntil + 0.3f)
+            if (!IsHeadUnderwater && Time.time - _lastJumpPressedTime <= SwimJumpBuffer && Time.time > _hopUntil + 0.3f)
             {
                 _lastJumpPressedTime = float.NegativeInfinity;
                 if (TryStartClimb())

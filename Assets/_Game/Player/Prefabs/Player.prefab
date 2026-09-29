@@ -96,10 +96,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.35
-  m_Height: 1.8
+  m_Radius: 0.375
+  m_Height: 1.7
   m_Direction: 1
-  m_Center: {x: 0, y: 0.9, z: 0}
+  m_Center: {x: 0, y: 0.85, z: 0}
 --- !u!114 &3796914769783393310
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -228,25 +228,25 @@ MonoBehaviour:
   _staminaRefillPerSecond: 0.2
   _climbMaxRise: 2.3
   _climbDuration: 0.45
-  _walkSpeed: 4.6
-  _sprintSpeed: 7.4
-  _crouchSpeed: 2.3
-  _speedEaseTime: 0.18
-  _groundAccel: 55
-  _groundBrake: 40
-  _airAccel: 11
-  _jumpHeight: 1.15
-  _extraGravity: 14
-  _coyoteTime: 0.12
-  _jumpBuffer: 0.14
-  _maxWalkAngle: 48
-  _groundProbe: 0.14
-  _slideAccel: 16
+  _walkSpeed: 5
+  _sprintSpeed: 7.5
+  _crouchSpeedScale: 0.65
+  _speedChangeRate: 10
+  _accelPerStep: 0.1
+  _keepPerStep: 0.9
+  _jumpSpeed: 9
+  _extraGravity: 20
+  _coyoteTime: 0.2
+  _jumpBuffer: 0.05
+  _jumpRepeatDelay: 0.2
+  _maxWalkAngle: 45
+  _groundProbe: 0.2
+  _slipPush: 2
   _maxStepHeight: 0.36
-  _standHeight: 1.8
-  _crouchHeight: 1.15
-  _crouchSharpness: 12
-  _eyeBelowTop: 0.15
+  _standHeight: 1.7
+  _crouchHeightScale: 0.85
+  _crouchRate: 7.5
+  _eyeBelowTop: 0.1
   _head: {fileID: 3186703825988934154}
 --- !u!114 &7652899364528602708
 MonoBehaviour:
@@ -263,12 +263,18 @@ MonoBehaviour:
   _head: {fileID: 3186703825988934154}
   _motor: {fileID: 9182613706609225228}
   _stickDegreesPerSecond: 180
-  _sprintFovBoost: 7
-  _strafeRoll: 1.4
-  _bobVertical: 0.045
-  _bobHorizontal: 0.03
-  _walkStride: 1.5
-  _landDipPerSpeed: 0.014
+  _strafeRoll: 1
+  _rollSmoothTime: 0.15
+  _fallPitch: 0.25
+  _fallPitchSmoothTime: 0.08
+  _bobCyclesPerSecond: 3
+  _bobMinSpeed: 0.1
+  _bobFullAt: 7
+  _bobSideways: 0.5
+  _bobUpDown: 0.75
+  _bobSmoothTime: 0.08
+  _bobFollowRate: 7.5
+  _stepAtHeight: -0.02
 --- !u!114 &6554976529463611952
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -885,7 +891,7 @@ Transform:
   m_GameObject: {fileID: 8598090722559763707}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.65, z: 0}
+  m_LocalPosition: {x: 0, y: 1.6, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

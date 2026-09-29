@@ -65,20 +65,29 @@ namespace PleaseDontDrown.Combat
         [Tooltip("How far into the reload the magazine counts as full (dropping it before that loses the reload).")]
         [Range(0f, 1f)] [SerializeField] private float _refillAt = 0.85f;
 
-        [Header("Recoil")]
-        [Tooltip("View climb per shot in degrees: x = random sideways range, y = up.")]
-        [SerializeField] private Vector2 _climb = new(0.5f, 1.4f);
-        [Tooltip("Gun kick in the hands (m): x = random sideways, y = up, z = back.")]
-        [SerializeField] private Vector3 _kick = new(0.004f, 0.01f, 0.045f);
-        [Tooltip("Gun twist in the hands (degrees): x = random roll/yaw, y = muzzle up.")]
-        [SerializeField] private Vector2 _kickTurn = new(2f, 8f);
-        [SerializeField] private float _springPosition = 230f, _dampPosition = 21f, _springRotation = 260f, _dampRotation = 23f;
-        [Tooltip("Recoil while aiming, relative to the hip.")]
-        [SerializeField] private float _aimRecoil = 0.55f;
+        [Header("Recoil (How to Fish's model; the barrel scales it)")]
+        [Tooltip("View climb per shot in degrees: x = random sideways range, y = up. It stays: you pull it back down.")]
+        [SerializeField] private Vector2 _climb = new(2f, 4f);
+        [Tooltip("The gun trails the climb by this share (it tips up in the hands too).")]
+        [SerializeField] private float _gunClimbShare = 1f;
+        [Tooltip("Gun kick on its recoil spring (m): x = random sideways, y = up, z = back.")]
+        [SerializeField] private Vector3 _kick = new(0f, 0.05f, 0.5f);
+        [Tooltip("Gun twist on its recoil spring (degrees): x = random yaw/roll, y = muzzle up.")]
+        [SerializeField] private Vector2 _kickTurn = new(15f, 15f);
+        [Tooltip("The recoil spring: stiffness and damping for the kick back (position) and the twist (rotation).")]
+        [SerializeField] private float _springPosition = 2500f, _dampPosition = 1f, _springRotation = 5000f, _dampRotation = 100f;
+        [Tooltip("While aiming: the kick's position / twist share and how much stiffer the spring gets.")]
+        [SerializeField] private float _aimKickPosition = 1f, _aimKickRotation = 1f, _aimSpringStiffer = 3f;
+        [Tooltip("Shoves the shooter back (m/s) on each shot (the shotgun).")]
+        [SerializeField] private float _kickBack;
 
-        [Header("Pose")]
-        [SerializeField] private Vector3 _sprintOffset = new(-0.04f, -0.07f, -0.06f);
-        [SerializeField] private Vector3 _sprintEuler = new(12f, -38f, 14f);
+        [Header("Handling")]
+        [Tooltip("No shooting (and no aiming) while the action cycles after a shot (bolt / pump): the sniper.")]
+        [SerializeField] private bool _cycleBlocks;
+        [Tooltip("Presses during the cooldown don't queue a shot (the sniper).")]
+        [SerializeField] private bool _noQueue;
+        [Tooltip("How the gun moves in the hands (sway, tilt, trailing the view, sprint and draw poses).")]
+        [SerializeField] private Player.ToolFeel _feel = Player.ToolFeel.Default;
 
         [Header("Parts (index 0 is what the gun comes with)")]
         [SerializeField] private WeaponSight[] _sights = { new() };
@@ -122,12 +131,11 @@ namespace PleaseDontDrown.Combat
         private float _reloadStart;
         private float _aim, _aimVelocity;
         private bool _wasAiming;
-        private float _sprint;
         private float _equip;
         private float _inspectStart = -10f;
         private float _wall, _wallVelocity;
-        private Vector2 _sway;
-        private Vector3 _kickPosition, _kickPositionVelocity, _kickRotation, _kickRotationVelocity;
+        private readonly Player.HeldToolMotion _motion = new();
+        private float _cycleUntil;
         private int _scriptShots;
         private bool _scriptAim;
         private Coroutine _reloadSounds;
@@ -153,6 +161,8 @@ namespace PleaseDontDrown.Combat
         public bool IsReloading => _reloading;
         public float ReloadProgress => _reloading ? Mathf.Clamp01((Time.time - _reloadStart) / _reloadTime) : 0f;
         public float Aim => _aim;
+        /// <summary>Aiming down the sights right now (the player can't sprint meanwhile).</summary>
+        public bool IsAiming { get; private set; }
         public bool IsScopedIn { get; private set; }
         public bool IsInspecting => Time.time - _inspectStart < InspectSeconds;
         public WeaponSight Sight => _sights[Mathf.Min(_sight.Value, _sights.Length - 1)];
@@ -255,12 +265,29 @@ namespace PleaseDontDrown.Combat
             _localAmmo = _ammo.Value;
             _equip = 0f;
             _aim = _aimVelocity = 0f;
-            _sprint = 0f;
+            IsAiming = false;
             _reloading = _queued = false;
             _wantsReload = _localAmmo == 0;
-            _kickPosition = _kickPositionVelocity = _kickRotation = _kickRotationVelocity = Vector3.zero;
             _inspectStart = -10f;
             _scriptShots = 0;
+            _cycleUntil = 0f;
+            // Drawn up from the hip.
+            _motion.Feel = _feel;
+            _motion.BasePosition = _item.HoldOffset;
+            _motion.AimOffset = Vector3.zero;
+            _motion.Aiming = false;
+            SetRecoilSprings();
+            _motion.Draw();
+        }
+
+        /// <summary>The recoil spring: the gun's own, stiffer while aiming.</summary>
+        private void SetRecoilSprings()
+        {
+            float stiffer = IsAiming ? _aimSpringStiffer : 1f;
+            _motion.RecoilPositionSpring = _springPosition * stiffer;
+            _motion.RecoilPositionDamper = _dampPosition;
+            _motion.RecoilRotationSpring = _springRotation * stiffer;
+            _motion.RecoilRotationDamper = _dampRotation;
         }
 
         private void EndLocal()
@@ -270,6 +297,10 @@ namespace PleaseDontDrown.Combat
             _reloading = false;
             _scriptAim = false;
             _aim = 0f;
+            IsAiming = false;
+            PlayerHub holder = _item.Holder;
+            if (holder != null && holder.Motor != null) holder.Motor.AimBlocksSprint = false;
+            else if (PlayerHub.Local != null && PlayerHub.Local.Motor != null) PlayerHub.Local.Motor.AimBlocksSprint = false;
             if (IsScopedIn) SetScoped(false);
             if (_reloadSounds != null) StopCoroutine(_reloadSounds);
         }
@@ -286,7 +317,7 @@ namespace PleaseDontDrown.Combat
             bool inspect = canAct && GameInput.Inspect.WasPressedThisFrame();
             if (scripted && fireDown) _scriptShots--;
 
-            _equip = Mathf.MoveTowards(_equip, 1f, dt / 0.3f);
+            _equip = Mathf.MoveTowards(_equip, 1f, dt / 0.4f);
 
             // Reload: the magazine counts as full near the end of the motion.
             if (_reloading)
@@ -299,52 +330,50 @@ namespace PleaseDontDrown.Combat
                 }
                 if (Time.time - _reloadStart >= _reloadTime) _reloading = false;
             }
+            bool cycling = _cycleBlocks && Time.time < _cycleUntil; // the bolt / pump working after a shot
 
-            // Aim down the sights.
-            bool aiming = aimHeld && !_reloading && _equip > 0.6f;
-            _aim = Mathf.SmoothDamp(_aim, aiming ? 1f : 0f, ref _aimVelocity, Mathf.Max(0.03f, Sight.AimTime), Mathf.Infinity, dt);
-            if (aiming != _wasAiming) PlayLocal(aiming ? ProceduralAudio.AimIn : ProceduralAudio.AimOut, 0.35f);
+            // Aim down the sights (not while reloading, nor while a bolt cycles). No sprinting while aiming.
+            bool aiming = aimHeld && !_reloading && !cycling;
+            _aim = Mathf.SmoothDamp(_aim, aiming ? 1f : 0f, ref _aimVelocity, Mathf.Max(0.01f, Sight.AimTime), Mathf.Infinity, dt);
+            if (aiming != _wasAiming)
+            {
+                PlayLocal(aiming ? ProceduralAudio.AimIn : ProceduralAudio.AimOut, 0.35f);
+                IsAiming = aiming;
+                SetRecoilSprings();
+            }
             _wasAiming = aiming;
-            if (holder.Look != null) holder.Look.SetZoom(Sight.AimFov, Ease(_aim));
-            bool sprinting = motor != null && motor.IsSprinting && motor.IsGrounded && motor.HorizontalSpeed > 1.5f;
-            _sprint = Mathf.MoveTowards(_sprint, sprinting && !aiming && !_reloading ? 1f : 0f, dt * 5f);
+            if (motor != null) motor.AimBlocksSprint = aiming;
+            if (aiming && holder.Look != null) holder.Look.SetAimFov(Sight.AimFov, Sight.AimTime);
 
             if (inspect && !_reloading && _aim < 0.1f) _inspectStart = Time.time;
             if (fireHeld || aiming || _reloading) _inspectStart = -10f;
 
-            // Trigger.
-            bool trigger = fireDown || (_fullAuto && fireHeld);
-            if ((trigger || _queued) && _equip > 0.8f && _sprint < 0.5f)
+            // Trigger: a press fires when the gun is ready, or (unless it doesn't queue) as soon as it's ready again;
+            // full auto keeps firing while held. Sprinting doesn't stop you shooting.
+            bool ready = Time.time >= _nextShot && !cycling;
+            if (fireDown)
             {
-                if (Time.time >= _nextShot && !_reloading)
+                if (ready && !_reloading)
                 {
-                    _queued = false;
                     if (_localAmmo > 0) Fire(holder);
-                    else if (fireDown)
+                    else
                     {
                         PlayLocal(ProceduralAudio.DryFire, 0.8f);
                         _wantsReload = true;
                     }
                 }
-                else if (fireDown && !_reloading && _nextShot - Time.time < 0.2f)
-                {
-                    _queued = true; // pressed a moment early: fire as soon as it's ready
-                }
+                else if (!_noQueue && !_reloading) _queued = true;
             }
-            if ((reload || _wantsReload) && !_reloading && _localAmmo < MagazineSize && Time.time >= _nextShot) StartReload();
+            else if (ready && !_reloading && _localAmmo > 0 && ((_fullAuto && fireHeld) || _queued))
+            {
+                Fire(holder);
+            }
+            if (_reloading) _queued = false;
+            if ((reload || _wantsReload) && !_reloading && _localAmmo < MagazineSize && Time.time >= _nextShot && !cycling) StartReload();
             if (_wantsReload && (_reloading || _localAmmo >= MagazineSize)) _wantsReload = false;
 
-            // Spread for the crosshair: wider moving, in the air and from the hip; the laser tightens the hip.
-            float hip = _hipSpread * (HasLaser ? 0.7f : 1f);
-            float moving = motor != null ? Mathf.Clamp01(motor.HorizontalSpeed / 5f) : 0f;
-            float air = motor != null && !motor.IsGrounded && !motor.IsSwimming ? 1f : 0f;
-            CurrentSpread = Mathf.Lerp(hip, _aimSpread, Ease(_aim)) * (1f + moving * 0.6f + air);
-
-            // Sway with the mouse (much less when aiming), a slow breath while aiming.
-            Vector2 look = canAct ? GameInput.LookMouse.ReadValue<Vector2>() : Vector2.zero;
-            float swayScale = Mathf.Lerp(1f, Sight.AimSway, _aim);
-            Vector2 swayTarget = Vector2.ClampMagnitude(-look * (0.0012f * swayScale), 0.035f);
-            _sway = Vector2.Lerp(_sway, swayTarget, 1f - Mathf.Exp(-10f * dt));
+            // Spread (shotgun pellets; the others fly true).
+            CurrentSpread = Mathf.Lerp(_hipSpread * (HasLaser ? 0.7f : 1f), _aimSpread, Ease(_aim));
 
             // Pull the gun back from walls instead of pushing it through them.
             float wallTarget = 0f;
@@ -354,23 +383,28 @@ namespace PleaseDontDrown.Combat
                 wallTarget = Mathf.Clamp(0.95f - wallHit.distance, 0f, 0.45f);
             _wall = Mathf.SmoothDamp(_wall, wallTarget, ref _wallVelocity, 0.06f, Mathf.Infinity, dt);
 
-            StepSprings(dt);
+            // The gun's motion in the hands (sway, bob, tilt, trailing the view, sprint pose, recoil springs).
+            PlayerLook look = holder.Look;
+            _motion.Feel = _feel;
+            _motion.BasePosition = _item.HoldOffset;
+            _motion.AimOffset = AimedOffset() * _aim;
+            _motion.AimSwayShare = Sight.AimSway;
+            _motion.Aiming = aiming;
+            _motion.Update(dt, look != null ? look.LookDelta : Vector2.zero, look != null ? look.BobPosition : Vector3.zero,
+                motor != null ? motor.MoveInput : Vector2.zero, motor != null && motor.IsSprinting, motor == null || motor.IsGrounded,
+                motor != null ? motor.Velocity.y : 0f, look != null ? look.RollSmoothTime : 0.15f);
+
             bool scoped = Sight.Scope && _aim > 0.9f;
             if (scoped != IsScopedIn) SetScoped(scoped);
         }
 
-        private void StepSprings(float dt)
+        /// <summary>From the hip pose to the aimed one: the sight's eye point straight ahead of the eye.</summary>
+        private Vector3 AimedOffset()
         {
-            float stiff = Mathf.Lerp(1f, 1.4f, _aim);
-            int steps = Mathf.Clamp(Mathf.CeilToInt(dt * 240f), 1, 24);
-            float h = dt / steps;
-            for (int i = 0; i < steps; i++)
-            {
-                _kickPositionVelocity += (-_kickPosition * (_springPosition * stiff) - _kickPositionVelocity * _dampPosition) * h;
-                _kickPosition += _kickPositionVelocity * h;
-                _kickRotationVelocity += (-_kickRotation * (_springRotation * stiff) - _kickRotationVelocity * _dampRotation) * h;
-                _kickRotation += _kickRotationVelocity * h;
-            }
+            WeaponSight sight = Sight;
+            if (sight.EyePoint == null) return Vector3.zero;
+            Vector3 aimed = new Vector3(0f, 0f, sight.EyeDistance) - _item.HoldRotation * transform.InverseTransformPoint(sight.EyePoint.position);
+            return aimed - _item.HoldOffset;
         }
 
         private void SetScoped(bool scoped)
@@ -400,21 +434,9 @@ namespace PleaseDontDrown.Combat
                 return;
             }
 
-            // Aimed: the sight's eye point sits straight ahead of the eye.
-            Vector3 aimed = hip;
-            WeaponSight sight = Sight;
-            if (sight.EyePoint != null)
-                aimed = new Vector3(0f, 0f, sight.EyeDistance) - baseRotation * transform.InverseTransformPoint(sight.EyePoint.position);
-            float a = Ease(_aim);
-            Vector3 position = Vector3.Lerp(hip, aimed, a);
-            Quaternion rot = baseRotation;
-
-            // Raise it into view when taken out; lower and turn it while sprinting.
-            float down = 1f - Ease(_equip);
-            position += new Vector3(0.02f, -0.22f, -0.08f) * down;
-            float sprint = Ease(_sprint);
-            position += _sprintOffset * sprint;
-            rot = Quaternion.Euler(_sprintEuler * sprint + new Vector3(35f * down, 0f, 0f)) * rot;
+            // The motion in the hands (HeldToolMotion): hip / aimed pose, sway, bob, tilt, sprint and draw poses, recoil.
+            Vector3 position = _motion.Position;
+            Quaternion rot = _motion.Rotation * baseRotation;
 
             // Reload: tip it over to the side and bring it in, then back.
             if (_reloading)
@@ -441,10 +463,6 @@ namespace PleaseDontDrown.Combat
             position += new Vector3(0f, -0.05f, -1f) * _wall;
             rot = Quaternion.Euler(60f * _wall, 0f, 0f) * rot;
 
-            // Sway and recoil.
-            position += new Vector3(_sway.x, _sway.y, 0f) + _kickPosition;
-            rot = Quaternion.Euler(_kickRotation + new Vector3(_sway.y * 250f, -_sway.x * 250f, _sway.x * 400f)) * rot;
-
             offset = position;
             rotation = rot;
         }
@@ -467,16 +485,24 @@ namespace PleaseDontDrown.Combat
 
             _localAmmo--;
             _nextShot = Time.time + _interval;
+            _queued = false;
+            if (_cycleBlocks) _cycleUntil = Time.time + _interval * 0.85f; // the bolt: no aiming or shooting till it's worked
             FireEffects();
 
-            // Recoil: the view climbs for good; the gun jumps on its springs and settles.
+            // Recoil (How to Fish's model): one random sideways direction for the whole kick.
             WeaponBarrel barrel = Barrel;
-            float scale = Mathf.Lerp(1f, _aimRecoil, Ease(_aim));
-            if (holder.Look != null)
-                holder.Look.AddRecoil(new Vector2(Random.Range(-_climb.x, _climb.x), _climb.y) * (barrel.ClimbScale * scale));
             float side = Random.Range(-1f, 1f);
-            _kickPosition += new Vector3(side * _kick.x, _kick.y, -_kick.z) * (barrel.KickScale * scale);
-            _kickRotation += new Vector3(-_kickTurn.y, side * _kickTurn.x, -side * _kickTurn.x) * (barrel.KickScale * scale);
+            // The view climbs (random sideways, up) and stays there; the gun tips up with it.
+            Vector2 climb = new Vector2(side * _climb.x, _climb.y) * barrel.ClimbScale;
+            if (holder.Look != null) holder.Look.AddRecoil(new Vector2(Random.Range(-Mathf.Abs(climb.x), Mathf.Abs(climb.x)), climb.y));
+            _motion.KickLook(climb * _gunClimbShare);
+            // The gun jumps on its recoil spring: turned (yaw and roll one way, muzzle up) and pushed back; less while aiming.
+            float turnShare = (1f - (1f - _aimKickRotation) * _aim) * barrel.KickScale;
+            float pushShare = (1f - (1f - _aimKickPosition) * _aim) * barrel.KickScale;
+            _motion.Kick(new Vector3(side * _kick.x, _kick.y, -_kick.z) * pushShare,
+                new Vector3(-_kickTurn.y, side * _kickTurn.x, -side * _kickTurn.x) * turnShare);
+            // Heavy guns shove you back a little.
+            if (_kickBack > 0f && holder.Motor != null) holder.Motor.Knockback(-forward * _kickBack);
             if (_shooterPush > 0f && holder.Motor != null) holder.Motor.AddImpulse(-forward * _shooterPush);
             holder.Gesture(AvatarGesture.Shoot);
             if (_localAmmo <= 0) _wantsReload = true;
