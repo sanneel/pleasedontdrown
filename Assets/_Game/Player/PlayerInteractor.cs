@@ -14,8 +14,8 @@ namespace PleaseDontDrown.Player
     {
         [SerializeField] private PlayerHub _hub;
         [SerializeField] private float _rayDistance = 3.4f;
-        [SerializeField] private float _grabRange = 3.2f;
-        [SerializeField] private float _grabRadius = 0.4f;
+        [SerializeField] private float _grabRange = 2f;     // How to Fish: items within 2 m, a 0.5 m wide reach
+        [SerializeField] private float _grabRadius = 0.5f;
         [Tooltip("Candidates further than this from the crosshair (degrees) are ignored.")]
         [SerializeField] private float _maxAngle = 14f;
         [SerializeField] private LayerMask _mask = ~0;

@@ -289,8 +289,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Player.PlayerInteractor
   _hub: {fileID: 6590466689215046085}
   _rayDistance: 3.4
-  _grabRange: 3.2
-  _grabRadius: 0.4
+  _grabRange: 2
+  _grabRadius: 0.5
   _maxAngle: 14
   _mask:
     serializedVersion: 2
@@ -309,16 +309,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Player.PlayerHands
   _hub: {fileID: 6590466689215046085}
   _head: {fileID: 3186703825988934154}
-  _holdSpeed: 22
-  _holdRotateSpeed: 14
-  _pickUpGlideTime: 0.2
-  _maxSpeedWhileTouching: 3
-  _unstuckDistance: 1.6
-  _minThrowSpeed: 3
-  _maxThrowSpeed: 15
-  _chargeTime: 0.75
-  _tapTime: 0.18
-  _chargePullback: 0.28
+  _holdDistance: 1.5
+  _holdSpeed: 15
+  _holdRotateSpeed: 15
+  _carryVelocityShare: 0.75
+  _carryVelocitySmoothing: 0.05
+  _pickUpRate: 2
+  _maxSpeedWhileTouching: 10
+  _maxTurnWhileTouching: 5
+  _unstuckDistance: 2
+  _unstuckAfter: 1
+  _sprintBob: 1.5
+  _maxThrowSpeed: 10
+  _chargeTime: 0.5
+  _throwThreshold: 0.3
+  _chargePullback: 0.2
   _remoteHoldScale: {x: 0.9, y: 0.85, z: 0.66}
   _mouthOffset: {x: 0.03, y: -0.13, z: 0.3}
   _biteInterval: 0.42
@@ -410,9 +415,9 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 0}
   _hub: {fileID: 6590466689215046085}
   _audio: {fileID: 4001305862416589337}
-  _reach: 1.9
-  _radius: 0.28
-  _cooldown: 0.42
+  _reach: 1.5
+  _radius: 0.5
+  _cooldown: 0.1
   _shove: 5.5
 --- !u!82 &4001305862416589337
 AudioSource:

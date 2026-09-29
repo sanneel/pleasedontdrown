@@ -29,20 +29,35 @@ namespace PleaseDontDrown.Player
         [SerializeField] private PlayerHub _hub;
         [SerializeField] private Transform _head;
 
+        // Holding and throwing are How to Fish's (its tuning measured from the game; our own code).
         [Header("Holding (local physics)")]
-        [SerializeField] private float _holdSpeed = 22f;
-        [SerializeField] private float _holdRotateSpeed = 14f;
-        [SerializeField] private float _pickUpGlideTime = 0.2f;
-        [SerializeField] private float _maxSpeedWhileTouching = 3f;
-        [SerializeField] private float _unstuckDistance = 1.6f;
+        [Tooltip("Plain things float this far straight ahead of the eyes.")]
+        [SerializeField] private float _holdDistance = 1.5f;
+        [Tooltip("Velocity toward the hold point per metre off it (and turning, per radian).")]
+        [SerializeField] private float _holdSpeed = 15f;
+        [SerializeField] private float _holdRotateSpeed = 15f;
+        [Tooltip("Share of our own (smoothed) velocity the held thing gets on top.")]
+        [SerializeField] private float _carryVelocityShare = 0.75f;
+        [SerializeField] private float _carryVelocitySmoothing = 0.05f;
+        [Tooltip("Picked up: the steering eases in at this rate (per second).")]
+        [SerializeField] private float _pickUpRate = 2f;
+        [SerializeField] private float _maxSpeedWhileTouching = 10f;
+        [SerializeField] private float _maxTurnWhileTouching = 5f;
+        [Tooltip("Stuck this far behind (after the first second): back to the hold point.")]
+        [SerializeField] private float _unstuckDistance = 2f;
+        [SerializeField] private float _unstuckAfter = 1f;
+        [Tooltip("Held things bob with the head, more while sprinting.")]
+        [SerializeField] private float _sprintBob = 1.5f;
 
-        [Header("Throwing")]
-        [SerializeField] private float _minThrowSpeed = 3f;
-        [SerializeField] private float _maxThrowSpeed = 15f;
-        [SerializeField] private float _chargeTime = 0.75f;
-        [Tooltip("Releasing Drop faster than this just drops the item.")]
-        [SerializeField] private float _tapTime = 0.18f;
-        [SerializeField] private float _chargePullback = 0.28f;
+        [Header("Throwing (hold Drop)")]
+        [Tooltip("Throw speed at full charge (m/s, added to how it's moving).")]
+        [SerializeField] private float _maxThrowSpeed = 10f;
+        [Tooltip("Seconds of holding Drop to full charge.")]
+        [SerializeField] private float _chargeTime = 0.5f;
+        [Tooltip("Released before this share of the charge: just dropped.")]
+        [SerializeField] private float _throwThreshold = 0.3f;
+        [Tooltip("Pulled back toward you while charging (m).")]
+        [SerializeField] private float _chargePullback = 0.2f;
 
         [Header("Seen by others")]
         [Tooltip("Remote players' held items sit closer to their body than in first person, so their arms reach them.")]
@@ -58,6 +73,9 @@ namespace PleaseDontDrown.Player
 
         private ChargeSource _chargeSource;
         private float _chargeStart;
+        private float _dropForce;                 // 0..1 while Drop is held
+        private Vector3 _carryVelocity, _carryVelocityRef;
+        private float _bobShare = 1f;
         private float _holdPercent;
         private float _heldSince;
         private float _stuckTime;
@@ -172,6 +190,7 @@ namespace PleaseDontDrown.Player
         {
             _chargeSource = ChargeSource.None;
             Charge01 = 0f;
+            _dropForce = 0f;
             _holdPercent = 0f;
             _heldSince = Time.time;
             _stuckTime = 0f;
@@ -225,19 +244,16 @@ namespace PleaseDontDrown.Player
                 velocity = Vector3.zero;
                 spin = Vector3.zero;
             }
-            else if (charge < 0f)
-            {
-                velocity = playerVelocity + AimTransform.forward * 0.8f;
-                spin = Vector3.zero;
-            }
             else
             {
-                // Light things fly far, heavy things plop. Clamp so a beach ball doesn't become a missile.
-                float massScale = Mathf.Clamp(Mathf.Sqrt(3f / Mathf.Max(0.1f, item.Mass)), 0.35f, 1.3f);
-                float speed = Mathf.Lerp(_minThrowSpeed, _maxThrowSpeed, charge) * massScale * item.ThrowStrength;
-                Vector3 direction = (AimTransform.forward + Vector3.up * 0.08f).normalized;
-                velocity = direction * speed + playerVelocity;
-                spin = Random.insideUnitSphere * (2f + 6f * charge);
+                // Let go: it carries on as it was moving in our hands (a gun: as we were moving); a throw adds up to
+                // 10 m/s straight where we look, whatever it weighs.
+                Rigidbody body = item.Sync.Body;
+                bool live = !body.isKinematic;
+                velocity = live ? body.linearVelocity : playerVelocity;
+                spin = live ? body.angularVelocity : Vector3.zero;
+                if (charge > 0f)
+                    velocity += AimTransform.forward * (charge * _maxThrowSpeed * item.ThrowStrength);
             }
 
             StopEating();
@@ -262,6 +278,7 @@ namespace PleaseDontDrown.Player
             _chargeAnnounced = false;
             _chargeSource = ChargeSource.None;
             Charge01 = 0f;
+            _dropForce = 0f;
         }
 
         private Transform AimTransform => _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _head;
@@ -395,20 +412,15 @@ namespace PleaseDontDrown.Player
                 return;
             }
 
-            if (_chargeSource == ChargeSource.None)
-            {
-                if (GameInput.Primary.WasPressedThisFrame()) BeginCharge(ChargeSource.Primary);
-                else if (GameInput.Drop.WasPressedThisFrame()) BeginCharge(ChargeSource.Drop);
-            }
-
+            // Hold Drop to throw: the charge builds over half a second (the item pulls back toward you); let go
+            // before 30% of it and it's just dropped.
+            if (_chargeSource == ChargeSource.None && GameInput.Drop.WasPressedThisFrame()) BeginCharge(ChargeSource.Drop);
             if (_chargeSource == ChargeSource.None)
                 return;
 
-            float heldFor = Time.time - _chargeStart;
-            // Drop only starts charging after a tap's worth of time, so a quick tap is a plain drop.
-            float chargeTime = _chargeSource == ChargeSource.Drop ? heldFor - _tapTime : heldFor;
-            Charge01 = Mathf.Clamp01(chargeTime / _chargeTime);
-            if (!_chargeAnnounced && Charge01 > 0.05f)
+            _dropForce = Mathf.Clamp01((Time.time - _chargeStart) / _chargeTime);
+            Charge01 = _dropForce >= _throwThreshold ? _dropForce : 0f;
+            if (!_chargeAnnounced && Charge01 > 0f)
             {
                 _chargeAnnounced = true; // others see the wind-up
                 _hub.Gesture(AvatarGesture.ChargeStart);
@@ -417,10 +429,11 @@ namespace PleaseDontDrown.Player
             InputActionReleased(out bool released);
             if (!released)
                 return;
-            ChargeSource source = _chargeSource;
             _chargeSource = ChargeSource.None;
-            if (source == ChargeSource.Drop && heldFor < _tapTime) Drop();
-            else Throw(Charge01);
+            float force = _dropForce >= _throwThreshold ? _dropForce : 0f;
+            _dropForce = 0f;
+            if (force <= 0f) Drop();
+            else Throw(force);
         }
 
         private void ReadSlotInput()
@@ -457,42 +470,38 @@ namespace PleaseDontDrown.Player
             if (body.isKinematic) return;
             float dt = Time.fixedDeltaTime;
 
-            _holdPercent = Mathf.Min(1f, _holdPercent + dt / _pickUpGlideTime);
-            float ease = Mathf.SmoothStep(0f, 1f, _holdPercent);
+            // Steering eases in after pickup (half a second), and carries a share of our own velocity.
+            _holdPercent = Mathf.Min(1f, _holdPercent + _pickUpRate * dt);
+            _carryVelocity = Vector3.SmoothDamp(_carryVelocity, _hub.Motor.Velocity, ref _carryVelocityRef, _carryVelocitySmoothing, Mathf.Infinity, dt);
             GetHoldTarget(item, out Vector3 target, out Quaternion targetRotation);
 
-            // Stuck behind something far from the hands for a moment: pop it back.
-            Vector3 toTarget = target - body.position;
-            if (Time.time - _heldSince > 0.5f && toTarget.sqrMagnitude > _unstuckDistance * _unstuckDistance)
+            // Fallen far behind (stuck on something) after the first second: back to the hold point.
+            if (Time.time - _heldSince > _unstuckAfter && (target - body.position).sqrMagnitude > _unstuckDistance * _unstuckDistance)
             {
-                _stuckTime += dt;
-                if (_stuckTime > 0.25f)
-                {
-                    body.position = target;
-                    body.rotation = targetRotation;
-                    body.linearVelocity = _hub.Motor.Velocity;
-                    _stuckTime = 0f;
-                    return;
-                }
-            }
-            else
-            {
-                _stuckTime = 0f;
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+                body.position = target;
+                return;
             }
 
-            // Heavier things follow more lazily.
-            float follow = _holdSpeed / (1f + item.Mass / 15f);
-            Vector3 velocity = toTarget * (follow * ease) + _hub.Motor.Velocity;
+            // Toward the hold point at 15x the distance per second (and turning likewise), plus 75% of our velocity;
+            // slower while it's bumping into something, so it slides along instead of fighting.
+            Vector3 velocity = (target - body.position) * (_holdSpeed * _holdPercent) + _carryVelocity * _carryVelocityShare;
             if (item.Sync.IsTouching && velocity.sqrMagnitude > _maxSpeedWhileTouching * _maxSpeedWhileTouching)
-                velocity = velocity.normalized * _maxSpeedWhileTouching; // slide along walls instead of fighting them
+                velocity = velocity.normalized * _maxSpeedWhileTouching;
+            Vector3 turn = AngularVelocityTowards(body.rotation, targetRotation) * (_holdRotateSpeed * _holdPercent);
+            if (item.Sync.IsTouching && turn.sqrMagnitude > _maxTurnWhileTouching * _maxTurnWhileTouching)
+                turn = turn.normalized * _maxTurnWhileTouching;
             body.linearVelocity = velocity;
-            body.angularVelocity = AngularVelocityTowards(body.rotation, targetRotation) * (_holdRotateSpeed * ease);
+            body.angularVelocity = turn;
         }
 
         private void LateUpdate()
         {
             bool eating = IsLocal ? IsEating : _hub.Avatar != null && _hub.Avatar.RemoteEating;
             _eatBlend = Mathf.MoveTowards(_eatBlend, eating ? 1f : 0f, Time.deltaTime * 4f);
+            bool sprinting = _hub.Motor != null && _hub.Motor.IsSprinting;
+            _bobShare = Mathf.Lerp(_bobShare, sprinting ? _sprintBob : 1f, Mathf.Min(1f, 10f * Time.deltaTime));
 
             // Pocketed items ride along with us, hidden (so they drop right here if we leave).
             Vector3 hip = transform.position + Vector3.up * 0.9f;
@@ -528,6 +537,17 @@ namespace PleaseDontDrown.Player
         {
             Transform aim = IsLocal ? AimTransform : _head;
             item.GetHoldPose(_hub, out Vector3 holdOffset, out Quaternion holdRotation, out float pitchFollow);
+            if (IsLocal && !item.HasCustomHoldPose && !item.RigidInHand && _eatBlend <= 0f)
+            {
+                // Plain things (How to Fish): straight ahead of the eyes at the hold distance, turning with the view,
+                // bobbing with the head (more while sprinting), pulled back a little while a throw charges.
+                Quaternion view = aim.rotation;
+                float back = _chargePullback * Mathf.SmoothStep(0f, 1f, _dropForce);
+                Vector3 bob = _hub.Look != null ? _hub.Look.BobPosition * _bobShare : Vector3.zero;
+                position = _head.position + view * (new Vector3(0f, 0f, _holdDistance - back) + bob);
+                rotation = view * holdRotation;
+                return;
+            }
             if (!IsLocal) holdOffset = Vector3.Scale(holdOffset, _remoteHoldScale);
             // Eating: up to the mouth, with a little bob per bite.
             if (_eatBlend > 0f)
@@ -536,7 +556,7 @@ namespace PleaseDontDrown.Player
                 holdOffset = Vector3.Lerp(holdOffset, _mouthOffset + new Vector3(0f, chew, 0f), Mathf.SmoothStep(0f, 1f, _eatBlend));
             }
             // Wind-up: pull the item back (and a little down) while a throw charges.
-            float pull = Mathf.SmoothStep(0f, 1f, Charge01);
+            float pull = Mathf.SmoothStep(0f, 1f, IsLocal ? _dropForce : Charge01);
             Vector3 offset = holdOffset + new Vector3(0.05f, -0.06f, -_chargePullback) * pull;
             Quaternion windUp = Quaternion.Euler(-25f * pull, 0f, 0f);
             if (pitchFollow >= 0.999f)

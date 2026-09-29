@@ -13,21 +13,29 @@ namespace PleaseDontDrown.Combat
     /// Fists and getting knocked about. With empty hands, Primary throws a punch at whatever is in front of you:
     /// robbers and pirates take damage (the host decides), other lifeguards get shoved, loose things get knocked.
     /// Also the host's way to knock this player back (a pirate's punch, a shark bump).
+    ///
+    /// Punching is How to Fish's (its tuning measured from the game; our own code): straight punches, right then
+    /// left in turn. The target is picked when you press (1.5 m ahead, a 0.5 m wide reach for loose things); the
+    /// fist gets there in 1/10 s, locked to the spot it's going for, and lands on arrival; it comes back in 1/4 s.
+    /// The next punch can go as soon as the last fist has landed, so a quick one-two is quick; a press while a fist
+    /// is still on its way is kept and thrown the moment it can be.
     /// </summary>
     public class PlayerCombat : NetworkBehaviour
     {
         [SerializeField] private PlayerHub _hub;
         [SerializeField] private AudioSource _audio;
-        [SerializeField] private float _reach = 1.9f;
-        [SerializeField] private float _radius = 0.28f;
-        [SerializeField] private float _cooldown = 0.42f;
+        [SerializeField] private float _reach = 1.5f;
+        [SerializeField] private float _radius = 0.5f;
+        [SerializeField] private float _cooldown = 0.1f;
         [SerializeField] private float _shove = 5.5f;
 
+        /// <summary>A fist travels to its target in this long, and back in <see cref="ReturnTime"/>.</summary>
+        public const float StrikeTime = 0.1f, ReturnTime = 0.25f;
+
         private readonly RaycastHit[] _hits = new RaycastHit[12];
-        private float _nextPunch;
-        private float _lastPunchTime = -10f;
+        private readonly float[] _punchedAt = { -10f, -10f }; // per fist: 0 right, 1 left
         private bool _lastLeft = true;
-        private PunchKind _lastKind;
+        private bool _queued;
         private float _lastServerPunch;
 
         public float LastKnockedTime { get; private set; } = -10f;
@@ -36,10 +44,24 @@ namespace PleaseDontDrown.Combat
         {
             if (!IsOwner || !GameInput.GameplayActive || _hub.Motor == null || !_hub.Motor.enabled) return;
             if (_hub.Motor.Seat != null) return;
-            if (_hub.Hands != null && _hub.Hands.HeldItem != null) return; // hands full: Primary throws / uses the item
-            if (GameInput.Primary.WasPressedThisFrame() && Time.time >= _nextPunch)
-                Punch();
+            if (_hub.Hands != null && _hub.Hands.HeldItem != null)
+            {
+                _queued = false; // hands full: Primary uses the item
+                return;
+            }
+            if (GameInput.Primary.WasPressedThisFrame())
+            {
+                if (CanPunch()) Punch();
+                else _queued = true;
+            }
+            else if (_queued && CanPunch()) Punch();
         }
+
+        private bool Striking(int fist) => Time.time - _punchedAt[fist] < StrikeTime;
+        private bool Returning(int fist) => Time.time - _punchedAt[fist] < StrikeTime + ReturnTime;
+
+        /// <summary>Not while a fist is still on its way; and not while both are still coming back.</summary>
+        private bool CanPunch() => !Striking(0) && !Striking(1) && !(Returning(0) && Returning(1));
 
         public override void OnStartClient()
         {
@@ -59,74 +81,35 @@ namespace PleaseDontDrown.Combat
             DevCommands.Unregister("punch", this);
         }
 
-        /// <summary>
-        /// UFC-style combos: a fresh combo opens with a left jab, then the hands alternate and each punch is a
-        /// straight, hook, uppercut or overhand (no two of the same fancy one in a row).
-        /// </summary>
         private (PunchKind kind, bool left)? _forced;
 
-        private (PunchKind kind, bool left) NextPunch()
-        {
-            if (_forced is { } forced)
-            {
-                _forced = null;
-                _lastPunchTime = Time.time;
-                return forced;
-            }
-            bool fresh = Time.time - _lastPunchTime > 1.1f;
-            bool left = fresh || !_lastLeft;
-            PunchKind kind;
-            if (fresh) kind = PunchKind.Straight;
-            else
-            {
-                float r = Random.value;
-                kind = r < 0.4f ? PunchKind.Straight : r < 0.65f ? PunchKind.Hook : r < 0.83f ? PunchKind.Uppercut : PunchKind.Overhand;
-                if (kind != PunchKind.Straight && kind == _lastKind) kind = PunchKind.Straight;
-            }
-            _lastPunchTime = Time.time;
-            _lastLeft = left;
-            _lastKind = kind;
-            return (kind, left);
-        }
-
-        /// <summary>Which way a punch shoves what it hits: hooks sweep across, uppercuts lift, overhands drive down.</summary>
-        private static Vector3 PunchDirection(PunchKind kind, bool left, Transform view)
-        {
-            Vector3 f = view.forward, r = view.right;
-            float across = left ? 1f : -1f; // a left hook sweeps to the right
-            return kind switch
-            {
-                PunchKind.Hook => (f + r * (across * 0.9f)).normalized,
-                PunchKind.Uppercut => (f * 0.6f + Vector3.up).normalized,
-                PunchKind.Overhand => (f - Vector3.up * 0.35f).normalized,
-                _ => f
-            };
-        }
-
-        /// <summary>Owner: swing. Picks the target here (instant feel); the host validates and applies it.</summary>
+        /// <summary>Owner: punch (right, left, right...). The target is picked now; the fist lands on it in 1/10 s.</summary>
         public void Punch()
         {
-            (PunchKind kind, bool left) = NextPunch();
-            _nextPunch = Time.time + FirstPersonArms.PunchDuration(kind) * 0.8f;
+            _queued = false;
+            bool left = _forced is { } forced ? forced.left : !_lastLeft;
+            _forced = null;
+            _lastLeft = left;
+            _punchedAt[left ? 1 : 0] = Time.time;
             Transform view = _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _hub.Head;
-            _hub.Gesture(AvatarGesture.Punch, view.position + view.forward * 1.1f);
-            if (_hub.Arms != null) _hub.Arms.PlayPunch(kind, left);
-            StartCoroutine(LandPunch(kind, left, FirstPersonArms.PunchDuration(kind) * 0.42f));
+            bool found = FindTarget(view.position, view.forward, out RaycastHit hit);
+            Transform target = found ? hit.collider.transform : null;
+            Vector3 local = found ? target.InverseTransformPoint(hit.point - view.forward * 0.15f) : Vector3.zero; // stop short of the surface
+            _hub.Gesture(AvatarGesture.Punch, found ? hit.point : view.position + view.forward * 1.1f);
+            if (_hub.Arms != null) _hub.Arms.PlayPunch(PunchKind.Straight, left, target, local);
+            PlaySwish();
+            StartCoroutine(LandPunch(found, hit, target, local));
         }
 
-        /// <summary>The hit happens when the fist gets there, aimed where we look at that moment.</summary>
-        private System.Collections.IEnumerator LandPunch(PunchKind kind, bool left, float delay)
+        /// <summary>The fist arrives: the target picked at the press is hit (or, if there was none, whatever is there now).</summary>
+        private System.Collections.IEnumerator LandPunch(bool found, RaycastHit hit, Transform target, Vector3 local)
         {
-            yield return new WaitForSeconds(delay);
+            yield return new WaitForSeconds(StrikeTime);
             Transform view = _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _hub.Head;
-            Vector3 origin = view.position, dir = view.forward;
-            bool found = FindTarget(origin, dir, out RaycastHit hit);
-            dir = PunchDirection(kind, left, view);
-            if (!found)
-            {
-                PlaySwish();
-                yield break;
-            }
+            Vector3 dir = view.forward;
+            if (found && target != null) hit.point = target.TransformPoint(local);
+            else if (!FindTarget(view.position, dir, out hit)) yield break; // swung at nothing
+            if (dir.y < 0f) dir = new Vector3(dir.x, 0f, dir.z).normalized; // never drives things into the ground
 
             IDamageable damageable = DamageUtil.Find(hit.collider);
             var targetObject = damageable as Component;

@@ -163,25 +163,31 @@ namespace PleaseDontDrown.Player
             _reach = point;
         }
 
-        /// <summary>How long each punch takes (wind-up, strike, back to guard). The hit lands at 45%.</summary>
-        public static float PunchDuration(PunchKind kind) => kind switch
-        {
-            PunchKind.Straight => 0.32f,
-            PunchKind.Hook => 0.4f,
-            PunchKind.Uppercut => 0.38f,
-            _ => 0.44f
-        };
+        /// <summary>How long a punch takes: out to the target, then back (How to Fish's 1/10 s + 1/4 s).</summary>
+        public static float PunchDuration(PunchKind kind) => Combat.PlayerCombat.StrikeTime + Combat.PlayerCombat.ReturnTime;
 
-        private const float GuardHold = 0.9f; // fists stay up this long after the last punch
+        private const float GuardHold = 0f; // no guard stance: the fist goes back to where the hand rests
 
-        /// <summary>Throw a punch with one fist (the other one stays up in guard).</summary>
-        public void PlayPunch(PunchKind kind, bool leftHand)
+        private Transform _punchTarget;   // what the fist is going for (it follows it), or none
+        private Vector3 _punchLocal;      // the spot on it (its local space)
+        private Vector3 _punchImpact;     // camera space: where the fist got to (it comes back from there)
+
+        // The fist's speed along its way out, and back (as in the original).
+        private static readonly AnimationCurve PunchOut = new(new Keyframe(0f, 0f, 0.485f, 0.485f), new Keyframe(1f, 1f, 1.559f, 1.559f));
+        private static readonly AnimationCurve PunchBack = new(new Keyframe(0f, 0f, 0f, 0f), new Keyframe(0.4334f, 0.609f, 1.502f, 1.502f),
+            new Keyframe(1f, 1f, -0.0108f, -0.0108f));
+
+        /// <summary>Throw a punch with one fist at a spot on <paramref name="target"/> (null: straight ahead).</summary>
+        public void PlayPunch(PunchKind kind, bool leftHand, Transform target = null, Vector3 localPoint = default)
         {
             _punchKind = kind;
             _punchLeft = leftHand;
             _punchStart = Time.time;
+            _punchTarget = target;
+            _punchLocal = localPoint;
             Hand hand = leftHand ? _left : _right;
             _punchFrom = _camera.transform.InverseTransformPoint(hand.Palm);
+            _punchImpact = new Vector3(0f, 0f, 1f);
         }
 
         /// <summary>Boxing (camera space; <paramref name="side"/> -1 left fist, +1 right).</summary>
@@ -259,45 +265,31 @@ namespace PleaseDontDrown.Player
             float duration = PunchDuration(_punchKind);
             if (since > duration + GuardHold) return false;
             float side = hand.Side;
+            // Only the punching fist moves; the other hand stays as it is (resting).
+            if (hand.Right == _punchLeft) return false;
 
-            // Guard: fists up by the chin, knuckles up, palms in, a little bounce.
-            Vector3 guard = Guard(side) + new Vector3(0f, Mathf.Sin(Time.time * 7f + side) * 0.008f, 0f);
-            Vector3 guardKnuckles = (cam.up * 0.8f + cam.forward * 0.6f).normalized;
-            Vector3 guardPalm = (-cam.forward * 0.6f - cam.right * (side * 0.7f)).normalized;
-            bool punching = hand.Right != _punchLeft && since < duration;
-            if (!punching)
+            // How to Fish: out to the spot it's going for (following it if it moves) in 1/10 s, then back to where the
+            // hand rests in 1/4 s. The fist turns over on the way out and back again on the way home.
+            float strike = Combat.PlayerCombat.StrikeTime, back = Combat.PlayerCombat.ReturnTime;
+            Vector3 restKnuckles = (cam.forward * 0.6f + cam.up * 0.8f).normalized;
+            Vector3 restPalm = (-cam.forward * 0.6f - cam.right * (side * 0.7f)).normalized;
+            PunchOrientation(PunchKind.Straight, side, cam, out Vector3 knuckles, out Vector3 palmDir);
+            float percent; // 0 at rest .. 1 at the target
+            if (since < strike)
             {
-                palm = cam.TransformPoint(guard);
-                rot = HandBones.Orient(guardKnuckles, guardPalm, side);
-                return true;
-            }
-
-            float u = since / duration;
-            PunchPath(_punchKind, side, out Vector3 wind, out Vector3 control, out Vector3 impact);
-            PunchOrientation(_punchKind, side, cam, out Vector3 knuckles, out Vector3 palmDir);
-            Vector3 local;
-            float turn; // 0 = guard orientation, 1 = impact orientation
-            if (u < 0.22f)
-            {
-                float t = Mathf.SmoothStep(0f, 1f, u / 0.22f);
-                local = Vector3.Lerp(_punchFrom, wind, t);
-                turn = t * 0.3f;
-            }
-            else if (u < 0.45f)
-            {
-                float t = (u - 0.22f) / 0.23f;
-                t = 1f - (1f - t) * (1f - t); // snaps out fast, eases into the target
-                local = Bezier(wind, control, impact, t);
-                turn = 0.3f + 0.7f * t;
+                Vector3 target = _punchTarget != null ? _punchTarget.TransformPoint(_punchLocal) : cam.TransformPoint(new Vector3(side * 0.05f, -0.05f, 1f));
+                percent = since / strike;
+                Vector3 local = Vector3.Lerp(_punchFrom, cam.InverseTransformPoint(target), PunchOut.Evaluate(percent));
+                _punchImpact = local;
+                palm = cam.TransformPoint(local);
             }
             else
             {
-                float t = Mathf.SmoothStep(0f, 1f, (u - 0.45f) / 0.55f);
-                local = Vector3.Lerp(impact, guard, t);
-                turn = 1f - t;
+                percent = Mathf.Clamp01(1f - (since - strike) / back);
+                palm = cam.TransformPoint(Vector3.Lerp(_punchFrom, _punchImpact, PunchBack.Evaluate(percent)));
             }
-            palm = cam.TransformPoint(local);
-            rot = Quaternion.Slerp(HandBones.Orient(guardKnuckles, guardPalm, side), HandBones.Orient(knuckles, palmDir, side), turn);
+            float turn = 1f - (1f - percent) * (1f - percent);
+            rot = Quaternion.Slerp(HandBones.Orient(restKnuckles, restPalm, side), HandBones.Orient(knuckles, palmDir, side), turn);
             return true;
         }
 

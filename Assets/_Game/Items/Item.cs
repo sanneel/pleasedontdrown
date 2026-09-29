@@ -120,6 +120,9 @@ namespace PleaseDontDrown.Items
         /// <summary>Per-instance name (e.g. a tourist's), set on every machine by whoever knows it.</summary>
         public void SetDisplayName(string displayName) => _displayName = displayName;
 
+        /// <summary>Has its own hold pose (a gun, a person); plain things are held at the standard hold point.</summary>
+        public bool HasCustomHoldPose => _holdPose != null;
+
         public void GetHoldPose(PlayerHub holder, out Vector3 offset, out Quaternion rotation, out float pitchFollow)
         {
             if (_holdPose != null)
