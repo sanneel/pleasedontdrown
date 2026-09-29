@@ -154,6 +154,20 @@ namespace PleaseDontDrown.Player
             hand.Rot = _root.rotation;
         }
 
+        /// <summary>Editor review renders: put a hand on a grip right now (or out of the way with none).</summary>
+        public void PlaceForReview(bool right, HandGrip? grip)
+        {
+            Hand hand = right ? _right : _left;
+            if (grip is not { } g)
+            {
+                hand.Wrist.position += Vector3.down * 50f;
+                return;
+            }
+            Quaternion rot = g.Rotation(hand.Side);
+            hand.Wrist.SetPositionAndRotation(g.Point - rot * hand.Bones.PalmContact, rot);
+            hand.Bones.Pose(g.Pose);
+        }
+
         public void Play(AvatarGesture gesture, Vector3 point = default)
         {
             if (gesture is AvatarGesture.ChargeStart or AvatarGesture.ChargeEnd or AvatarGesture.EatStart or AvatarGesture.EatStop or AvatarGesture.Bite)

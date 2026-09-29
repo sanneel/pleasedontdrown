@@ -23,7 +23,7 @@ namespace PleaseDontDrown.Combat
     /// numbers; every part's model is already on the gun and just switched on.
     /// </summary>
     [RequireComponent(typeof(Item))]
-    public class Weapon : NetworkBehaviour, IHeldTool, IHoldPose
+    public partial class Weapon : NetworkBehaviour, IHeldTool, IHoldPose
     {
         public enum PartKind : byte { Sight, Barrel, Laser, Magazine, Rounds }
 

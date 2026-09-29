@@ -52,6 +52,27 @@ namespace PleaseDontDrown.Editor
                     SpawnAvatar(p);
                     continue;
                 }
+                if (p[0] == "fphands")
+                {
+                    // fphands <prefab> x y z yaw: the item with our first-person hands on its grips (as when held).
+                    var gunPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Items/Prefabs/{p[1]}.prefab");
+                    if (gunPrefab == null) { Debug.LogError($"[Review] no item {p[1]}"); continue; }
+                    GameObject gun = Object.Instantiate(gunPrefab, new Vector3(F(2), F(3), F(4)), Quaternion.Euler(0f, F(5), 0f));
+                    if (gun.TryGetComponent(out Rigidbody gunBody)) gunBody.isKinematic = true;
+                    AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
+                    var holder = new GameObject("ReviewHands");
+                    var eye = new GameObject("ReviewEye").AddComponent<Camera>();
+                    eye.enabled = false;
+                    eye.transform.SetPositionAndRotation(gun.transform.position, gun.transform.rotation);
+                    var arms = holder.AddComponent<Player.FirstPersonArms>();
+                    arms.Init(null, eye);
+                    arms.Build(AvatarLook.Lifeguard);
+                    var gunItem = gun.GetComponent<Items.Item>();
+                    Transform gr = gunItem.GripRight, gl = gunItem.GripLeft;
+                    arms.PlaceForReview(true, gr != null ? new HandGrip(gr.position, gr.forward, -gr.up, gunItem.GripPose) : null);
+                    arms.PlaceForReview(false, gl != null ? new HandGrip(gl.position, gl.forward, -gl.up, gunItem.GripPose) : null);
+                    continue;
+                }
                 if (p[0] == "item")
                 {
                     // item <prefab> x y z yaw [child to switch on...]: e.g. a gun with its scope and suppressor showing.
@@ -61,6 +82,30 @@ namespace PleaseDontDrown.Editor
                     if (item.TryGetComponent(out Rigidbody body)) body.isKinematic = true;
                     for (int k = 6; k < p.Length; k++)
                     {
+                        if (p[k] == "markers")
+                        {
+                            // Coloured balls on the gun's named points: grips (red right / blue left), eye (green),
+                            // muzzle (yellow), eject port (white); a short stick shows each grip's finger direction.
+                            foreach (Transform t in item.GetComponentsInChildren<Transform>(true))
+                            {
+                                Color? c = t.name == "GripRight" ? Color.red : t.name == "GripLeft" ? Color.blue : t.name.StartsWith("Eye") ? Color.green
+                                    : t.name.StartsWith("Muzzle") ? Color.yellow : t.name == "EjectPort" ? Color.white : null;
+                                if (c == null) continue;
+                                GameObject ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                                Object.DestroyImmediate(ball.GetComponent<Collider>());
+                                ball.transform.position = t.position;
+                                ball.transform.localScale = Vector3.one * 0.012f;
+                                var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = c.Value };
+                                ball.GetComponent<Renderer>().sharedMaterial = mat;
+                                if (!t.name.StartsWith("Grip")) continue;
+                                GameObject stick = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                                Object.DestroyImmediate(stick.GetComponent<Collider>());
+                                stick.transform.SetPositionAndRotation(t.position + t.forward * 0.03f, t.rotation);
+                                stick.transform.localScale = new Vector3(0.003f, 0.003f, 0.06f);
+                                stick.GetComponent<Renderer>().sharedMaterial = mat;
+                            }
+                            continue;
+                        }
                         bool on = !p[k].StartsWith("-");
                         string part = p[k].TrimStart('-');
                         foreach (Transform t in item.GetComponentsInChildren<Transform>(true))

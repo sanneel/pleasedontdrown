@@ -434,6 +434,23 @@ namespace PleaseDontDrown.Editor
             model.transform.localScale = Vector3.one * (length / sourceLength);
             Bounds fitted = RendererBounds(model);
             model.transform.localPosition = new Vector3(0f, centreY, centreZ) - fitted.center;
+
+            // The hand goes on this model's own handle (measured from side renders of the fitted model), not where the
+            // greybox gun had its grip: palm on the handle's right side, fingers wrapping round its front, the knuckles
+            // along the handle's slant. (The old point sat at the trigger guard with the fingers pointing along the
+            // barrel, so a finger stuck out through the middle of the pistol.)
+            (Vector3 right, float slant) = kind switch
+            {
+                "Pistol" => (new Vector3(0.026f, -0.065f, -0.072f), 18f),
+                "Rifle" => (new Vector3(0.03f, -0.092f, -0.105f), 32f),
+                _ => (new Vector3(0.03f, -0.08f, -0.095f), 17f), // sniper
+            };
+            Transform grip = gun.Find("GripRight");
+            if (grip != null)
+            {
+                grip.localPosition = right;
+                grip.localRotation = Quaternion.Euler(slant, 0f, 0f) * Quaternion.LookRotation(Vector3.forward, Vector3.right);
+            }
         }
 
         private static Bounds RendererBounds(GameObject root)
