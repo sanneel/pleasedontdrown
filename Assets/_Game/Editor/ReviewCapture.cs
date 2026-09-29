@@ -262,6 +262,16 @@ namespace PleaseDontDrown.Editor
                 AvatarAnimator.TimeOverride = 100f + i / 30f;
                 animator.Tick(1f / 30f);
             }
+            // Optional 8th value: tick on this many more seconds (walk-cycle phases for a filmstrip).
+            if (p.Length > 7)
+            {
+                int extra = Mathf.RoundToInt(F(7) * 30f);
+                for (int i = 0; i < extra; i++)
+                {
+                    AvatarAnimator.TimeOverride = 103f + i / 30f;
+                    animator.Tick(1f / 30f);
+                }
+            }
             if (blendTo != null && PoseByName(blendTo) is { } next)
             {
                 m.Pose = next;

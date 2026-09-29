@@ -181,7 +181,7 @@ namespace PleaseDontDrown.Avatars
             _chair = Mathf.MoveTowards(_chair, m.Pose == AvatarPose.SitChair ? 1f : 0f, dt * 3f);
 
             // One cycle = two steps; stride grows with speed so feet don't skate.
-            float stride = Mathf.Lerp(0.62f, 1.05f, _run) * _rig.Scale;
+            float stride = StepLength;
             _phase = Mathf.Repeat(_phase + speed * dt / (2f * stride) + (_turningInPlace ? dt * 1.3f : 0f), 1f);
             _swimPhase = Mathf.Repeat(_swimPhase + dt * Mathf.Lerp(0.45f, 0.8f + speed * 0.12f, _swimMove), 1f);
         }
@@ -211,7 +211,7 @@ namespace PleaseDontDrown.Avatars
             float swimBob = Mathf.Sin(_swimPhase * Mathf.PI * 4f) * 0.025f * s * _swim * _swimMove;
 
             Transform hips = B(Bone.Hips);
-            hips.localPosition = _rig.RestPosition(Bone.Hips) + new Vector3(0f, stepBob - drop - pumpDip + lift + breathe + swimBob, 0f);
+            hips.localPosition = _rig.RestPosition(Bone.Hips) + new Vector3(0f, stepBob - drop - pumpDip + lift + breathe + swimBob + StandTall() * land, 0f);
             float lean = (4f + 9f * _run) * _move * land + _crouch * 18f * land + _cpr * 34f + _air * -6f;
             hips.localRotation = Quaternion.Euler(lean * 0.35f + swimPitch * _swim, Wave(_phase) * 4f * _move * land, stroke * 7f);
 
@@ -219,6 +219,24 @@ namespace PleaseDontDrown.Avatars
             // The chest takes a share of looking around (before the arms, which hang off it).
             B(Bone.Chest).localRotation = Quaternion.Euler(lean * 0.3f + LookPitch * 0.15f, -Wave(_phase) * 5f * _move * land + LookYaw * 0.25f, stroke * 1.5f);
         }
+
+        /// <summary>
+        /// How far to lift the hips so a planted leg is straight: the legs reach a bit further than the hips are high
+        /// (more so on the generated bodies), and walking plants each foot half a step away, so without this every
+        /// step sags into bent knees. Faded out for crouching, kneeling, sitting and lying.
+        /// </summary>
+        private float StandTall()
+        {
+            float reach = (_rig.ThighLength + _rig.ShinLength) * 0.985f;
+            float height = _rig.RestPosition(Bone.Hips).y + _rig.RestPosition(Bone.ThighL).y - _rig.AnkleHeight;
+            float half = StepLength * 0.25f * _move; // where the planted foot is, on average
+            float straight = Mathf.Sqrt(Mathf.Max(0f, reach * reach - half * half));
+            float calm = (1f - _crouch) * (1f - _cpr) * (1f - _kneel) * (1f - _down) * (1f - _sit) * (1f - _chair) * (1f - _lie) * (1f - _lieFront) * (1f - _seat);
+            return Mathf.Clamp(straight - height, 0f, 0.08f * _rig.Scale) * calm;
+        }
+
+        /// <summary>One step (the body travels this far per half cycle), so planted feet stay put on the ground.</summary>
+        private float StepLength => Mathf.Lerp(0.62f, 1.05f, _run) * _rig.Scale;
 
         private float LookYaw => Mathf.Clamp(Mathf.DeltaAngle(_bodyYaw, Motion.FacingYaw), -85f, 85f);
         private float LookPitch => Mathf.Clamp(Motion.LookPitch, -70f, 70f) * (1f - _under); // underwater the whole body aims
@@ -258,7 +276,9 @@ namespace PleaseDontDrown.Avatars
             // Stepping: the foot is planted during stance and swings forward in an arc.
             Vector3 local = transform.InverseTransformDirection(new Vector3(_smoothVelocity.x, 0f, _smoothVelocity.z));
             Vector3 moveDir = local.sqrMagnitude > 0.01f ? local.normalized : Vector3.forward;
-            float stride = Mathf.Lerp(0.34f, 0.55f, _run) * s * _move;
+            // Planted, a foot slides back exactly as far as the body moves on in half a cycle (one step), so it
+            // stays put on the ground; it only shortens while starting and stopping.
+            float stride = StepLength * Mathf.SmoothStep(0f, 1f, _move);
             float along, lift;
             if (q < 0.5f)
             {
@@ -298,7 +318,7 @@ namespace PleaseDontDrown.Avatars
         private void PoseArms()
         {
             float land = 1f - _swim;
-            float swing = (18f + 30f * _run) * _move * land;
+            float swing = (24f + 26f * _run) * _move * land;
             float elbow = Mathf.Lerp(12f, 85f, _run) * _move + 8f;
             for (int i = 0; i < 2; i++)
             {
@@ -312,7 +332,8 @@ namespace PleaseDontDrown.Avatars
                 float idleSway = Mathf.Sin(Now * 1.1f + i) * 2f * (1f - _move);
                 float spread = 7f + 5f * _run + _air * 35f + _crouch * 6f;
                 float raise = _air * 20f;
-                upper.localRotation = Quaternion.Euler(-armSwing - raise + idleSway, 0f, spread * side);
+                float back = 16f * _move * land; // hands trail a little: the swing centres behind the hip, not in front
+                upper.localRotation = Quaternion.Euler(-armSwing - raise + idleSway + back, 0f, spread * side);
                 fore.localRotation = Quaternion.Euler(-elbow - _air * 25f, 0f, 0f);
 
                 PoseSwimArm(upper, fore, side, i);
