@@ -57,11 +57,21 @@ namespace PleaseDontDrown.Editor
                     // A trailing "nogun" hides the item, to look at the hands alone.
                     bool noGun = p[p.Length - 1] == "nogun";
                     if (noGun) p = p[..^1];
+                    // A trailing "eye": x y z yaw is the player's eye, and the item sits at its hold pose in front of it
+                    // (then a shot from that eye with FOV 74 is the first-person view).
+                    bool fromEye = p[p.Length - 1] == "eye";
+                    if (fromEye) p = p[..^1];
                     // fphands <prefab> x y z yaw: the item with our first-person hands on its grips (as when held).
                     var gunPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Items/Prefabs/{p[1]}.prefab");
                     if (gunPrefab == null) { Debug.LogError($"[Review] no item {p[1]}"); continue; }
                     GameObject gun = Object.Instantiate(gunPrefab, new Vector3(F(2), F(3), F(4)), Quaternion.Euler(0f, F(5), 0f));
                     if (gun.TryGetComponent(out Rigidbody gunBody)) gunBody.isKinematic = true;
+                    if (fromEye)
+                    {
+                        var held = gun.GetComponent<Items.Item>();
+                        Quaternion view = Quaternion.Euler(0f, F(5), 0f);
+                        gun.transform.SetPositionAndRotation(new Vector3(F(2), F(3), F(4)) + view * held.HoldOffset, view * held.HoldRotation);
+                    }
                     AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
                     var holder = new GameObject("ReviewHands");
                     var eye = new GameObject("ReviewEye").AddComponent<Camera>();
