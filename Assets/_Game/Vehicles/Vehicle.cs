@@ -210,8 +210,9 @@ namespace PleaseDontDrown.Vehicles
         private void OnDriverChanged(PlayerHub prev, PlayerHub next, bool asServer)
         {
             if (asServer && IsClientStarted) return; // a host handles it once, as a client
-            // Seated bodies don't bump into their own vehicle.
-            SetIgnore(prev, false);
+            // Seated bodies don't bump into their own vehicle. Getting off, they stay ghosts to it for a moment, so a
+            // hull still drifting (or bobbing on a wave) can't trap, shove or launch them while they swim clear.
+            if (prev != null && prev != next) StartCoroutine(RestoreCollisionLater(prev));
             SetIgnore(next, true);
             _lastYaw = transform.eulerAngles.y;
 
@@ -232,6 +233,12 @@ namespace PleaseDontDrown.Vehicles
             }
         }
 
+        private System.Collections.IEnumerator RestoreCollisionLater(PlayerHub player)
+        {
+            yield return new WaitForSeconds(1.2f);
+            if (player != null && _driver.Value != player) SetIgnore(player, false);
+        }
+
         private void SetIgnore(PlayerHub player, bool ignore)
         {
             if (player == null || player.BodyCollider == null) return;
@@ -239,34 +246,60 @@ namespace PleaseDontDrown.Vehicles
                 if (c != null) Physics.IgnoreCollision(c, player.BodyCollider, ignore);
         }
 
-        private readonly Collider[] _exitOverlaps = new Collider[16];
+        private readonly Collider[] _exitOverlaps = new Collider[32];
 
         /// <summary>
-        /// Where the driver gets off: beside the seat (in the water for a jet ski, on the deck for the boat), or the
-        /// other side, behind, in front, on top, whichever is free first, so nobody ends up inside the dock or a hull.
+        /// Where the driver gets off: beside the seat (in the water for a jet ski, on the deck for the boat), else the
+        /// other side, behind, in front, then further out all round, whichever is free first, so nobody ends up
+        /// inside the dock, a rock or a hull. Our own body, whatever we carry and this vehicle's riders don't count.
         /// </summary>
         private Vector3 ExitPosition()
         {
             Transform seat = _seat != null ? _seat : transform;
             Vector3 right = Vector3.ProjectOnPlane(seat.right, Vector3.up).normalized;
             Vector3 forward = Vector3.ProjectOnPlane(seat.forward, Vector3.up).normalized;
-            Vector3 up = Vector3.up * 0.2f;
-            Vector3[] candidates =
+            Vector3 start = seat.position + Vector3.up * 0.2f;
+            PlayerHub local = PlayerHub.Local;
+
+            var candidates = new List<Vector3>
             {
-                seat.position + right * 1.2f + up, seat.position - right * 1.2f + up, seat.position - forward * 2f + up,
-                seat.position + forward * 2.2f + up, seat.position + right * 2f + up, seat.position - right * 2f + up,
-                seat.position + Vector3.up * 1.2f
+                start + right * 1.3f, start - right * 1.3f, start - forward * 2.2f, start + forward * 2.4f
             };
-            Collider mine = PlayerHub.Local != null ? PlayerHub.Local.BodyCollider : null;
+            foreach (float distance in new[] { 2f, 3f, 4.5f })
+                for (int i = 0; i < 12; i++)
+                    candidates.Add(start + Quaternion.Euler(0f, i * 30f, 0f) * right * distance);
+
             foreach (Vector3 feet in candidates)
+                if (ExitFree(feet, local))
+                    return feet;
+            // Nowhere free (packed in by the dock and rocks): into the water well behind it, never on top of it.
+            return start - forward * 3f;
+        }
+
+        private bool ExitFree(Vector3 feet, PlayerHub local)
+        {
+            const float radius = 0.4f;
+            int count = Physics.OverlapCapsuleNonAlloc(feet + Vector3.up * (radius + 0.05f), feet + Vector3.up * 1.6f, radius,
+                _exitOverlaps, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
             {
-                int count = Physics.OverlapCapsuleNonAlloc(feet + Vector3.up * 0.4f, feet + Vector3.up * 1.45f, 0.35f, _exitOverlaps, ~0, QueryTriggerInteraction.Ignore);
-                bool blocked = false;
-                for (int i = 0; i < count && !blocked; i++)
-                    blocked = _exitOverlaps[i] != mine;
-                if (!blocked) return feet;
+                Collider c = _exitOverlaps[i];
+                if (local != null && c.transform.IsChildOf(local.transform)) continue; // ourselves
+                Rigidbody body = c.attachedRigidbody;
+                if (local != null && body != null && body.TryGetComponent(out Item item) && item.Holder == local) continue; // what we carry
+                return false;
             }
-            return candidates[candidates.Length - 1];
+            // Something solid between the seat and the spot (a dock post, a wall): not through it.
+            Vector3 from = (_seat != null ? _seat.position : transform.position) + Vector3.up * 0.3f;
+            Vector3 to = feet + Vector3.up * 0.5f;
+            foreach (RaycastHit hit in Physics.RaycastAll(from, to - from, (to - from).magnitude, ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider.transform.IsChildOf(transform)) continue;
+                if (local != null && hit.collider.transform.IsChildOf(local.transform)) continue;
+                if (hit.collider.attachedRigidbody != null && hit.collider.attachedRigidbody.TryGetComponent(out Item carried) && carried.Holder == local) continue;
+                return false;
+            }
+            return true;
         }
 
         /// <summary>World handlebar grips (fingers forward over the bar, palms down).</summary>

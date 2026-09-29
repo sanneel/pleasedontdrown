@@ -26,6 +26,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _Ambient: 0.55
+    - _Cull: 2
     - _Rim: 0.28
     - _ShadowAmount: 1
     - _Softness: 0

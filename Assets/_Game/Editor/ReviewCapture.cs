@@ -54,6 +54,9 @@ namespace PleaseDontDrown.Editor
                 }
                 if (p[0] == "fphands")
                 {
+                    // A trailing "nogun" hides the item, to look at the hands alone.
+                    bool noGun = p[p.Length - 1] == "nogun";
+                    if (noGun) p = p[..^1];
                     // fphands <prefab> x y z yaw: the item with our first-person hands on its grips (as when held).
                     var gunPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Items/Prefabs/{p[1]}.prefab");
                     if (gunPrefab == null) { Debug.LogError($"[Review] no item {p[1]}"); continue; }
@@ -81,6 +84,7 @@ namespace PleaseDontDrown.Editor
                     }
                     arms.PlaceForReview(true, gr != null ? new HandGrip(gr.position, gr.forward, -gr.up, handPose) : null);
                     arms.PlaceForReview(false, gl != null ? new HandGrip(gl.position, gl.forward, -gl.up, handPose) : null);
+                    if (noGun) foreach (Renderer r in gun.GetComponentsInChildren<Renderer>()) r.enabled = false;
                     continue;
                 }
                 if (p[0] == "item")

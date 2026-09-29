@@ -10,6 +10,7 @@ Shader "PleaseDontDrown/Avatar"
         _Rim ("Rim light", Float) = 0.28
         _ShadowAmount ("Receive shadows", Range(0, 1)) = 1
         _Softness ("Soft light (0 toon .. 1 smooth wrap)", Range(0, 1)) = 0
+        [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
     SubShader
     {
@@ -31,7 +32,7 @@ Shader "PleaseDontDrown/Avatar"
         {
             Name "ForwardLit"
             Tags { "LightMode" = "UniversalForward" }
-            Cull Back
+            Cull [_Cull]
 
             HLSLPROGRAM
             #pragma vertex vert

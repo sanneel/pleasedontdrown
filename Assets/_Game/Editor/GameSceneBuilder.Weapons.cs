@@ -451,8 +451,8 @@ namespace PleaseDontDrown.Editor
             (Vector3 right, float slant, float wrap) = kind switch
             {
                 "Pistol" => (new Vector3(0.026f, -0.065f, -0.072f), 18f, 50f),
-                "Rifle" => (new Vector3(0.03f, -0.092f, -0.105f), 32f, 0f),
-                _ => (new Vector3(0.03f, -0.08f, -0.095f), 17f, 0f), // sniper
+                "Rifle" => (new Vector3(0.03f, -0.062f, -0.09f), 32f, 30f),
+                _ => (new Vector3(0.03f, -0.052f, -0.088f), 17f, 30f), // sniper
             };
             Transform grip = gun.Find("GripRight");
             if (grip != null)

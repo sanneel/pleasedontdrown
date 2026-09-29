@@ -112,38 +112,57 @@ namespace PleaseDontDrown.Avatars
         public readonly float Side;       // +1 right, -1 left
         private readonly Quaternion[] _rest = new Quaternion[BoneCount];
         private readonly float _scale;
+        private readonly Shape _shape;
 
         /// <summary>Palm centre and palm surface, in hand space (for putting the palm on a point).</summary>
         public Vector3 PalmCenter => new Vector3(0f, -0.05f, 0f) * _scale;
-        public Vector3 PalmContact => new Vector3(-Side * 0.02f, -0.052f, 0f) * _scale;
+        public Vector3 PalmContact => (_shape != null ? Mirror(_shape.Palm) : new Vector3(-Side * 0.02f, -0.052f, 0f)) * _scale;
 
         public static int BoneIndex(int finger, int segment) => finger * Segments + segment;
 
+        /// <summary>
+        /// Finger layout taken from a modelled hand (right hand, scale 1): where each finger starts, which way it
+        /// points, and its three bone lengths. The bones then run down the middle of that model's fingers.
+        /// </summary>
+        public sealed class Shape
+        {
+            public Vector3[] Bases = new Vector3[Fingers];
+            public Vector3[] Directions = new Vector3[Fingers];
+            public float[] Lengths = new float[BoneCount];
+            public Vector3 Palm;  // the palm's surface, where it touches what it holds
+            public float ThumbTuck = 45f; // curling also swings the (spread) thumb in toward the fingers, degrees
+        }
+
         /// <summary>Creates (or re-seats) the finger bones under <paramref name="hand"/>.</summary>
-        public HandBones(Transform hand, float side, float scale, Transform[] reuse = null)
+        public HandBones(Transform hand, float side, float scale, Transform[] reuse = null, Shape shape = null)
         {
             Hand = hand;
             Side = side;
             _scale = scale;
+            _shape = shape;
             string prefix = side > 0f ? "R" : "L";
             string[] names = { "Thumb", "Index", "Middle", "Ring", "Pinky" };
             for (int f = 0; f < Fingers; f++)
             {
                 Transform parent = hand;
-                Vector3 local = Mirror(Bases[f]) * scale;
+                Vector3 local = Mirror(shape != null ? shape.Bases[f] : Bases[f]) * scale;
                 for (int s = 0; s < Segments; s++)
                 {
                     int i = BoneIndex(f, s);
                     Transform bone = reuse != null && reuse[i] != null ? reuse[i] : new GameObject($"{names[f]}{s + 1}{prefix}").transform;
                     bone.SetParent(parent, false);
                     bone.localPosition = local;
-                    // The thumb starts angled down, forward and toward the palm; fingers start straight.
-                    _rest[i] = f == 0 && s == 0 ? Quaternion.Euler(-42f, 0f, -Side * 18f) : Quaternion.identity;
+                    if (shape != null)
+                        // Along the model's finger (bones point down their -Y, so the curl axis stays across the hand).
+                        _rest[i] = s == 0 ? Quaternion.FromToRotation(Vector3.down, Mirror(shape.Directions[f]).normalized) : Quaternion.identity;
+                    else
+                        // The thumb starts angled down, forward and toward the palm; fingers start straight.
+                        _rest[i] = f == 0 && s == 0 ? Quaternion.Euler(-42f, 0f, -Side * 18f) : Quaternion.identity;
                     bone.localRotation = _rest[i];
                     bone.localScale = Vector3.one;
                     Bones[i] = bone;
                     parent = bone;
-                    local = new Vector3(0f, -Lengths[f][s] * scale, 0f);
+                    local = new Vector3(0f, -(shape != null ? shape.Lengths[i] : Lengths[f][s]) * scale, 0f);
                 }
             }
         }
@@ -162,7 +181,9 @@ namespace PleaseDontDrown.Avatars
                     // Curling bends toward the palm side (about the hand's Z axis); spreading fans the fingers in the palm's plane.
                     Quaternion bend = Quaternion.Euler(0f, 0f, -Side * curl * Flex[f][s]);
                     Quaternion fan = s == 0 ? Quaternion.Euler(SpreadFactor[f] * pose.Spread * 16f, 0f, 0f) : Quaternion.identity;
-                    Bones[i].localRotation = _rest[i] * fan * bend;
+                    // A modelled thumb stands out to the side: gripping brings it in across the palm first.
+                    Quaternion tuck = _shape != null && f == 0 && s == 0 ? Quaternion.Euler(curl * _shape.ThumbTuck, 0f, 0f) : Quaternion.identity;
+                    Bones[i].localRotation = tuck * _rest[i] * fan * bend;
                 }
             }
         }

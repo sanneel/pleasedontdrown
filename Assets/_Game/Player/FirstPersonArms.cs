@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Items;
 using UnityEngine;
@@ -95,19 +96,45 @@ namespace PleaseDontDrown.Player
                 _bones[i].localPosition = new Vector3(i == 0 ? -0.2f : 0.2f, -0.35f, 0.4f);
                 _bones[i].localRotation = Quaternion.identity;
             }
-            SetupHand(_left, 0, s);
-            SetupHand(_right, 1, s);
+            // The modelled hand (Meshy sculpt) when it's there; the code-built one otherwise.
+            FirstPersonHandModel model = FirstPersonHandModel.Load();
+            SetupHand(_left, 0, s, model);
+            SetupHand(_right, 1, s, model);
 
-            var kit = new AvatarMeshKit();
             var bindposes = new Matrix4x4[_bones.Length];
             _left.Bones.ResetPose();
             _right.Bones.ResetPose();
             Matrix4x4 rootToWorld = _root.localToWorldMatrix;
             for (int i = 0; i < _bones.Length; i++) bindposes[i] = _bones[i].worldToLocalMatrix * rootToWorld;
-            void Use(int index) => kit.SetBone(index, bindposes[index].inverse);
-            _left.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f));
-            _right.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f));
-            _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh);
+            if (model != null)
+            {
+                var vertices = new List<Vector3>();
+                var colors = new List<Color32>();
+                var weights = new List<BoneWeight>();
+                var triangles = new List<int>();
+                Color32 skin = look.SkinColor;
+                model.AddHand(-1f, s * HandSize, bindposes[0].inverse, 0, 2, skin, vertices, colors, weights, triangles);
+                model.AddHand(1f, s * HandSize, bindposes[1].inverse, 1, 2 + HandBones.BoneCount, skin, vertices, colors, weights, triangles);
+                if (_mesh == null) _mesh = new Mesh();
+                _mesh.Clear();
+                _mesh.name = "FirstPersonHands";
+                _mesh.indexFormat = vertices.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
+                _mesh.SetVertices(vertices);
+                _mesh.SetColors(colors);
+                _mesh.SetTriangles(triangles, 0);
+                _mesh.boneWeights = weights.ToArray();
+                _mesh.bindposes = bindposes;
+                _mesh.RecalculateNormals();
+                _mesh.RecalculateBounds();
+            }
+            else
+            {
+                var kit = new AvatarMeshKit();
+                void Use(int index) => kit.SetBone(index, bindposes[index].inverse);
+                _left.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f));
+                _right.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f));
+                _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh);
+            }
 
             if (_renderer == null)
             {
@@ -116,7 +143,7 @@ namespace PleaseDontDrown.Player
                 _renderer.receiveShadows = false;
                 _renderer.updateWhenOffscreen = true;
                 _renderer.skinnedMotionVectors = false;
-                _renderer.quality = SkinQuality.Bone1;
+                _renderer.quality = SkinQuality.Bone2; // the modelled hand blends across the knuckles
             }
             _renderer.sharedMesh = _mesh;
             _renderer.bones = _bones;
@@ -139,16 +166,18 @@ namespace PleaseDontDrown.Player
             _handMaterial.SetFloat("_Rim", 0f);
             _handMaterial.SetFloat("_Ambient", 0.8f);
             _handMaterial.SetColor("_ShadowTint", new Color(0.86f, 0.8f, 0.8f));
+            // Curled fingers of the modelled hand fold skin over itself: show the inside rather than a hole.
+            _handMaterial.SetFloat("_Cull", (float)CullMode.Off);
             return _handMaterial;
         }
 
-        private void SetupHand(Hand hand, int wrist, float s)
+        private void SetupHand(Hand hand, int wrist, float s, FirstPersonHandModel model)
         {
             hand.Wrist = _bones[wrist];
             int first = 2 + (hand.Right ? HandBones.BoneCount : 0);
             var reuse = new Transform[HandBones.BoneCount];
             System.Array.Copy(_bones, first, reuse, 0, HandBones.BoneCount);
-            hand.Bones = new HandBones(hand.Wrist, hand.Side, s * HandSize, reuse);
+            hand.Bones = new HandBones(hand.Wrist, hand.Side, s * HandSize, reuse, model?.Shape);
             System.Array.Copy(hand.Bones.Bones, 0, _bones, first, HandBones.BoneCount);
             hand.Palm = hand.Wrist.position;
             hand.Rot = _root.rotation;
