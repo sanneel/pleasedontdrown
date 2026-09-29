@@ -69,8 +69,18 @@ namespace PleaseDontDrown.Editor
                     arms.Build(AvatarLook.Lifeguard);
                     var gunItem = gun.GetComponent<Items.Item>();
                     Transform gr = gunItem.GripRight, gl = gunItem.GripLeft;
-                    arms.PlaceForReview(true, gr != null ? new HandGrip(gr.position, gr.forward, -gr.up, gunItem.GripPose) : null);
-                    arms.PlaceForReview(false, gl != null ? new HandGrip(gl.position, gl.forward, -gl.up, gunItem.GripPose) : null);
+                    HandPose handPose = gunItem.GripPose;
+                    // Optional: fphands ... thumb index fingers (to try a grip pose before baking it).
+                    if (p.Length > 8) handPose = new HandPose(F(8), F(6), 0f) { Index = F(7) };
+                    // ... wrap: turns the right hand around the handle (palm toward the front strap), as if baked.
+                    if (p.Length > 9 && gr != null)
+                    {
+                        Vector3 axis = -gr.right, pivot = gr.position - gr.up * 0.016f;
+                        Quaternion turn = Quaternion.AngleAxis(F(9), axis);
+                        gr.SetPositionAndRotation(pivot + turn * (gr.position - pivot), turn * gr.rotation);
+                    }
+                    arms.PlaceForReview(true, gr != null ? new HandGrip(gr.position, gr.forward, -gr.up, handPose) : null);
+                    arms.PlaceForReview(false, gl != null ? new HandGrip(gl.position, gl.forward, -gl.up, handPose) : null);
                     continue;
                 }
                 if (p[0] == "item")

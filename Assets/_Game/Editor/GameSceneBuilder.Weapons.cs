@@ -277,6 +277,13 @@ namespace PleaseDontDrown.Editor
                 SetEnum(item, "_grip", (int)(Find(go, "GripLeft") != null ? ItemGrip.TwoHands : ItemGrip.OneHand));
                 SetRef(item, "_gripRight", Find(go, "GripRight"));
                 SetRef(item, "_gripLeft", Find(go, "GripLeft"));
+                // Fingers wrapped round the handle, thumb only half curled so it lies along the frame.
+                var itemSo = new SerializedObject(item);
+                SerializedProperty pose = Require(itemSo, "_gripPose");
+                foreach (string finger in new[] { "Index", "Middle", "Ring", "Pinky" }) pose.FindPropertyRelative(finger).floatValue = 0.9f;
+                pose.FindPropertyRelative("Thumb").floatValue = 0.3f;
+                pose.FindPropertyRelative("Spread").floatValue = 0f;
+                itemSo.ApplyModifiedPropertiesWithoutUndo();
 
                 var weapon = go.AddComponent<Weapon>();
                 var so = new SerializedObject(weapon);
@@ -439,17 +446,22 @@ namespace PleaseDontDrown.Editor
             // greybox gun had its grip: palm on the handle's right side, fingers wrapping round its front, the knuckles
             // along the handle's slant. (The old point sat at the trigger guard with the fingers pointing along the
             // barrel, so a finger stuck out through the middle of the pistol.)
-            (Vector3 right, float slant) = kind switch
+            // Wrap turns the hand around the handle (palm onto the back strap) so the thumb ends on the left side
+            // instead of its tip poking out through the frame.
+            (Vector3 right, float slant, float wrap) = kind switch
             {
-                "Pistol" => (new Vector3(0.026f, -0.065f, -0.072f), 18f),
-                "Rifle" => (new Vector3(0.03f, -0.092f, -0.105f), 32f),
-                _ => (new Vector3(0.03f, -0.08f, -0.095f), 17f), // sniper
+                "Pistol" => (new Vector3(0.026f, -0.065f, -0.072f), 18f, 50f),
+                "Rifle" => (new Vector3(0.03f, -0.092f, -0.105f), 32f, 0f),
+                _ => (new Vector3(0.03f, -0.08f, -0.095f), 17f, 0f), // sniper
             };
             Transform grip = gun.Find("GripRight");
             if (grip != null)
             {
-                grip.localPosition = right;
-                grip.localRotation = Quaternion.Euler(slant, 0f, 0f) * Quaternion.LookRotation(Vector3.forward, Vector3.right);
+                Quaternion rot = Quaternion.Euler(slant, 0f, 0f) * Quaternion.LookRotation(Vector3.forward, Vector3.right);
+                Vector3 pivot = right - rot * Vector3.up * 0.016f; // the handle's middle, behind the palm
+                Quaternion turn = Quaternion.AngleAxis(wrap, rot * Vector3.left);
+                grip.localPosition = pivot + turn * (right - pivot);
+                grip.localRotation = turn * rot;
             }
         }
 
