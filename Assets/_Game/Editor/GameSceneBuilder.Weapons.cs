@@ -117,7 +117,7 @@ namespace PleaseDontDrown.Editor
                 Suppressor(root, "BarrelSuppressor", new Vector3(0f, 0.03f, 0.258f), 0.019f, 0.15f, metal);
                 Compensator(root, "BarrelCompensator", new Vector3(0f, 0.03f, 0.258f), 0.032f, metal);
                 Laser(root, new Vector3(0.03f, 0.02f, 0.17f), laserBody, glow);
-                HandGrips(root, new Vector3(0.032f, -0.058f, -0.035f), -12f, left: new Vector3(0f, -0.018f, 0.14f), leftPalmUp: true);
+                HandGrips(root, new Vector3(0.032f, -0.058f, -0.035f), -12f, left: new Vector3(-0.026f, 0.002f, 0.14f), leftPalmUp: false);
             }, new GunSetup
             {
                 Kind = "SMG", Sound = GunSound.Smg, Projectile = ProjectileKind.Bullet, FullAuto = true, Interval = 0.05f, HipSpread = 0f, AimSpread = 0f,
@@ -159,7 +159,7 @@ namespace PleaseDontDrown.Editor
                 Suppressor(root, "BarrelSuppressor", new Vector3(0f, 0.035f, 0.622f), 0.024f, 0.16f, metal);
                 Compensator(root, "BarrelCompensator", new Vector3(0f, 0.035f, 0.622f), 0.04f, metal);
                 Laser(root, new Vector3(0.03f, 0f, 0.36f), laserBody, glow);
-                HandGrips(root, new Vector3(0.03f, -0.045f, -0.1f), -20f, left: new Vector3(0f, -0.028f, 0.27f), leftPalmUp: true);
+                HandGrips(root, new Vector3(0.03f, -0.045f, -0.1f), -20f, left: new Vector3(-0.03f, -0.024f, 0.27f), leftPalmUp: false);
             }, new GunSetup
             {
                 Kind = "Shotgun", Sound = GunSound.Shotgun, Projectile = ProjectileKind.Pellet, Interval = 0.22f, Pellets = 25, HipSpread = 6f, AimSpread = 6f,
@@ -455,6 +455,19 @@ namespace PleaseDontDrown.Editor
                 "Rifle" => (new Vector3(0.03f, -0.092f, -0.105f), 32f, 0f),
                 _ => (new Vector3(0.03f, -0.08f, -0.095f), 17f, 0f), // sniper
             };
+            // Support hand on the model's fore-end, left face (measured in Blender: ArtSource/Tools/measure_guns.py).
+            Vector3? leftAt = kind switch
+            {
+                "Rifle" => new Vector3(-0.044f, 0.036f, 0.25f),   // handguard x +-0.040, y -0.008..0.088
+                "Sniper" => new Vector3(-0.05f, -0.004f, 0.37f),  // fore-end x -0.046..0.008, y -0.03..0.04
+                _ => null,
+            };
+            Transform leftGrip = gun.Find("GripLeft");
+            if (leftGrip != null && leftAt != null)
+            {
+                leftGrip.localPosition = leftAt.Value;
+                leftGrip.localRotation = LeftGripRotation;
+            }
             Transform grip = gun.Find("GripRight");
             if (grip != null)
             {
@@ -564,6 +577,14 @@ namespace PleaseDontDrown.Editor
         /// either under the fore-end (palm up), cupping the right hand on the other side of the grip, or nowhere (null:
         /// a one-handed gun, the left hand stays free).
         /// </summary>
+        /// <summary>
+        /// The support hand, How to Fish style: palm flat on the left side of the fore-end, fingers up and a little
+        /// forward so they curl over the top. (Place the grip on the fore-end's left face, a hand's knuckle height below
+        /// its top.)
+        /// </summary>
+        private static Quaternion LeftGripRotation =>
+            Quaternion.LookRotation(Quaternion.Euler(28f, 0f, 0f) * Vector3.up, Vector3.left); // palm faces +x
+
         private static void HandGrips(Transform gun, Vector3 right, float gripTilt, Vector3? left, bool leftPalmUp)
         {
             Quaternion tilt = Quaternion.Euler(gripTilt, 0f, 0f);
@@ -571,9 +592,7 @@ namespace PleaseDontDrown.Editor
             r.localRotation = tilt * Quaternion.LookRotation(Vector3.forward, Vector3.right); // palm faces -x, onto the grip
             if (left == null) return;
             var l = Node(gun, "GripLeft", left.Value);
-            l.localRotation = leftPalmUp
-                ? Quaternion.LookRotation(Vector3.forward, Vector3.down) // palm faces up under the fore-end
-                : tilt * Quaternion.LookRotation(Vector3.forward, Vector3.left);
+            l.localRotation = LeftGripRotation;
         }
 
         /// <summary>
