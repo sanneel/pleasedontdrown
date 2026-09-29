@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Ocean
-  m_Shader: {fileID: 4800000, guid: ae1685bcdc2a4a5468e3d9d682d6cfb2, type: 3}
+  m_Name: Sky
+  m_Shader: {fileID: 4800000, guid: 88f821e1238cbd144888b4836e2f84b6, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,19 +25,21 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _DepthBands: 5
-    - _DepthFade: 5
-    - _MinAlpha: 0.3
-    - _PixelSize: 0.2
-    - _Shininess: 90
-    - _ShoreFoam: 0.45
-    - _Specular: 1.6
+    - _BandCurve: 0.55
+    - _Bands: 6
+    - _CloudCover: 0.52
+    - _CloudPixels: 90
+    - _CloudScale: 2.2
+    - _CloudSpeed: 0.004
+    - _SunGlow: 0.5
+    - _SunIntensity: 8
+    - _SunRadius: 2.4
     m_Colors:
-    - _DeepColor: {r: 0, g: 0.15, b: 0.3, a: 1}
-    - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
-    - _RippleColor: {r: 0.58, g: 0.87, b: 1, a: 1}
-    - _ShallowColor: {r: 0.04, g: 0.55, b: 0.71, a: 1}
-    - _SkyColor: {r: 0.55, g: 0.78, b: 1, a: 1}
-    - _UnderColor: {r: 0.19999996, g: 0.5, b: 0.6, a: 1}
+    - _BottomColor: {r: 0.54499996, g: 0.78, b: 1, a: 1}
+    - _CloudColor: {r: 1, g: 1, b: 1, a: 1}
+    - _CloudShade: {r: 0.62, g: 0.72, b: 0.92, a: 1}
+    - _HorizonColor: {r: 0.545, g: 0.78, b: 1, a: 1}
+    - _SunColor: {r: 1, g: 0.93, b: 0.72, a: 1}
+    - _TopColor: {r: 0.298, g: 0.405, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

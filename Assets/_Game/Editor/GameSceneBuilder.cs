@@ -641,17 +641,11 @@ namespace PleaseDontDrown.Editor
             menuCam.backgroundColor = new Color(0.55f, 0.8f, 0.95f);
             SetRef(new GameObject("SceneCameras").AddComponent<SceneCameras>(), "_menuCamera", menuCam);
 
-            // Linear fog must be on in the saved scene, or builds strip the fog shader variants that
-            // UnderwaterFx relies on (distance haze above water, thick fog below).
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.72f, 0.85f, 0.95f);
-            RenderSettings.fogStartDistance = 70f;
-            RenderSettings.fogEndDistance = 520f;
-
             Light sun = Object.FindFirstObjectByType<Light>();
             sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-            sun.color = new Color(1f, 0.96f, 0.88f);
+            // Sky, sun, exp2 haze (must be on in the saved scene, or builds strip the fog variants UnderwaterFx
+            // relies on), ambient and the post-processing volumes: GameSceneBuilder.Look.cs.
+            ApplyLook(menuCam, sun);
 
             Transform env = new GameObject("Environment").transform;
             BuildBeach(env);

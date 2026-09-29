@@ -6,7 +6,9 @@
         "GameKit.Dependencies",
         "FishySteamworks",
         "com.rlabrecque.steamworks.net",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

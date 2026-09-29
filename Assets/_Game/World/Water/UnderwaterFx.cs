@@ -4,16 +4,17 @@ namespace PleaseDontDrown.World.Water
 {
     /// <summary>
     /// Camera-side water effects: distance haze above water, thick blue fog + tint + muffled audio below.
-    /// Uses linear fog in both cases so only one fog shader variant needs to exist in builds.
+    /// Uses exponential-squared fog in both cases so only one fog shader variant needs to exist in builds.
     /// </summary>
     public class UnderwaterFx : MonoBehaviour
     {
-        [SerializeField] private Color _aboveFog = new Color(0.72f, 0.85f, 0.95f);
-        [SerializeField] private float _aboveStart = 70f;
-        [SerializeField] private float _aboveEnd = 520f;
-        [SerializeField] private Color _belowFog = new Color(0.05f, 0.3f, 0.4f);
-        [SerializeField] private float _belowEnd = 24f;
-        [SerializeField] private Color _tint = new Color(0.05f, 0.35f, 0.45f, 0.25f);
+        // Sky-blue haze that matches the sky's horizon colour (Data/Shaders/Sky.shader); the density is how
+        // How to Fish's exp2 fog reads (0.01 there, less here: our channel between islands is wider).
+        [SerializeField] private Color _aboveFog = new Color(0.545f, 0.78f, 1f);
+        [SerializeField] private float _aboveDensity = 0.004f;
+        [SerializeField] private Color _belowFog = new Color(0f, 0.3f, 0.42f);
+        [SerializeField] private float _belowDensity = 0.07f;
+        [SerializeField] private Color _tint = new Color(0.05f, 0.35f, 0.45f, 0.1f);
 
         private Camera _camera;
         private Texture2D _pixel;
@@ -40,10 +41,9 @@ namespace PleaseDontDrown.World.Water
         {
             CameraUnderwater = under;
             RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.fogColor = under ? _belowFog : _aboveFog;
-            RenderSettings.fogStartDistance = under ? 0f : _aboveStart;
-            RenderSettings.fogEndDistance = under ? _belowEnd : _aboveEnd;
+            RenderSettings.fogDensity = under ? _belowDensity : _aboveDensity;
             if (_camera == null) return;
             if (_camera.TryGetComponent(out AudioLowPassFilter muffle))
                 muffle.enabled = under;

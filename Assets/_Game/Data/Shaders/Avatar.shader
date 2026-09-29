@@ -8,6 +8,8 @@ Shader "PleaseDontDrown/Avatar"
         _ShadowTint ("Shadow tint", Color) = (0.62, 0.66, 0.8, 1)
         _Ambient ("Ambient strength", Float) = 0.55
         _Rim ("Rim light", Float) = 0.28
+        _SSSColor ("Skin glow when backlit", Color) = (1, 0.48, 0.12, 1)
+        _SSS ("Backlit glow strength", Float) = 0.4
         _ShadowAmount ("Receive shadows", Range(0, 1)) = 1
         _Softness ("Soft light (0 toon .. 1 smooth wrap)", Range(0, 1)) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
@@ -23,6 +25,8 @@ Shader "PleaseDontDrown/Avatar"
             half4 _ShadowTint;
             half _Ambient;
             half _Rim;
+            half4 _SSSColor;
+            half _SSS;
             half _ShadowAmount;
             half _Softness;
         CBUFFER_END
@@ -95,6 +99,11 @@ Shader "PleaseDontDrown/Avatar"
 
                 half rim = pow(1.0 - saturate(dot(n, v)), 3.0) * _Rim;
                 color += rim * (albedo * 0.6 + 0.4) * saturate(sun.color);
+
+                // Backlit glow (How to Fish's character shader has an orange subsurface term): with the sun behind a
+                // thin edge the light shows through warm instead of the body going flat and dark.
+                half through = pow(saturate(dot(v, -sun.direction)), 2.0) * saturate(1.0 - saturate(ndl) * 1.5);
+                color += through * _SSS * _SSSColor.rgb * albedo * sun.color * sun.shadowAttenuation;
                 return half4(MixFog(color, input.fogFactor), 1.0);
             }
             ENDHLSL

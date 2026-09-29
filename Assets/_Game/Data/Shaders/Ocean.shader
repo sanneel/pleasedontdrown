@@ -4,16 +4,19 @@ Shader "PleaseDontDrown/Ocean"
 {
     Properties
     {
-        _ShallowColor ("Shallow", Color) = (0.22, 0.82, 0.8, 1)
-        _DeepColor ("Deep", Color) = (0.03, 0.26, 0.45, 1)
-        _SkyColor ("Sky reflection", Color) = (0.62, 0.8, 0.95, 1)
+        _ShallowColor ("Shallow", Color) = (0.04, 0.55, 0.71, 1)
+        _DeepColor ("Deep", Color) = (0, 0.15, 0.3, 1)
+        _SkyColor ("Sky reflection", Color) = (0.55, 0.78, 1, 1)
+        _RippleColor ("Ripple sparkle", Color) = (0.58, 0.87, 1, 1)
+        _PixelSize ("Pixel size of foam and ripples (m)", Float) = 0.2
+        _DepthBands ("Depth colour bands", Float) = 5
         _FoamColor ("Foam", Color) = (1, 1, 1, 1)
         _UnderColor ("Seen from below", Color) = (0.2, 0.5, 0.6, 1)
         _DepthFade ("Depth fade (m)", Float) = 5
         _ShoreFoam ("Shore foam width (m)", Float) = 0.45
         _MinAlpha ("Shallow alpha", Range(0, 1)) = 0.3
-        _Specular ("Specular", Float) = 1.6
-        _Shininess ("Shininess", Float) = 220
+        _Specular ("Sun glint", Float) = 1.6
+        _Shininess ("Shininess", Float) = 90
     }
     SubShader
     {
@@ -39,7 +42,10 @@ Shader "PleaseDontDrown/Ocean"
                 half4 _DeepColor;
                 half4 _SkyColor;
                 half4 _FoamColor;
+                half4 _RippleColor;
                 half4 _UnderColor;
+                float _PixelSize;
+                float _DepthBands;
                 float _DepthFade;
                 float _ShoreFoam;
                 float _MinAlpha;
@@ -103,6 +109,24 @@ Shader "PleaseDontDrown/Ocean"
                 return h * fade;
             }
 
+            float Hash21(float2 p)
+            {
+                p = frac(p * float2(123.34, 456.21));
+                p += dot(p, p + 45.32);
+                return frac(p.x * p.y);
+            }
+
+            // Smooth value noise sampled on a snapped grid: every "pixel" of foam / ripple is one flat square.
+            float PixelNoise(float2 xz, float scale, float2 drift)
+            {
+                float2 cell = floor(xz / _PixelSize) * _PixelSize;
+                float2 p = cell * scale + drift * _PDD_WaveTime;
+                float2 i = floor(p);
+                float2 f = frac(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return lerp(lerp(Hash21(i), Hash21(i + float2(1, 0)), f.x), lerp(Hash21(i + float2(0, 1)), Hash21(i + float2(1, 1)), f.x), f.y);
+            }
+
             Varyings vert(Attributes input)
             {
                 Varyings output;
@@ -132,6 +156,7 @@ Shader "PleaseDontDrown/Ocean"
                 float sceneDepth = LinearEyeDepth(SampleSceneDepth(uv), _ZBufferParams);
                 float waterDepth = max(sceneDepth - input.screenPos.w, 0.0);
                 float depthT = saturate(waterDepth / _DepthFade);
+                depthT = lerp(depthT, floor(depthT * _DepthBands + 0.5) / _DepthBands, 0.6); // flat colour steps, not a smooth ramp
 
                 Light sun = GetMainLight();
                 half3 water = lerp(_ShallowColor.rgb, _DeepColor.rgb, depthT);
@@ -140,14 +165,25 @@ Shader "PleaseDontDrown/Ocean"
                 float fresnel = pow(1.0 - saturate(dot(n, v)), 4.0);
                 half3 color = lerp(water, _SkyColor.rgb, fresnel * 0.65);
 
+                // Sun glint: a stepped highlight instead of a smooth blob.
                 float3 halfVector = normalize(sun.direction + v);
-                color += sun.color * (_Specular * pow(saturate(dot(n, halfVector)), _Shininess));
+                float glint = smoothstep(0.58, 1.07, pow(saturate(dot(n, halfVector)), _Shininess * 0.25));
+                glint = floor(glint * 3.0 + 0.5) / 3.0;
+                color += sun.color * (_Specular * glint);
 
-                // Foam: a lapping band along the shore plus a little on crests.
+                // Ripples: small light flecks that drift over the surface.
+                float fleck = PixelNoise(input.positionWS.xz, 0.9, float2(0.06, 0.03));
+                float fleck2 = PixelNoise(input.positionWS.xz + 31.0, 1.7, float2(-0.05, 0.08));
+                color = lerp(color, _RippleColor.rgb, step(0.9, fleck * 0.55 + fleck2 * 0.45) * 0.35 * (1.0 - depthT * 0.5));
+
+                // Foam: a lapping band along the shore plus flecks on the crests, all on the pixel grid.
                 float shore = 1.0 - saturate(waterDepth / _ShoreFoam);
                 float lap = 0.5 + 0.5 * sin(_PDD_WaveTime * 2.1 + (input.positionWS.x * 0.9 + input.positionWS.z * 1.7));
-                float crest = saturate((input.waveHeight - 0.24) * 5.0);
-                float foam = saturate(shore * (0.55 + 0.45 * lap) + crest * 0.35);
+                float shoreNoise = PixelNoise(input.positionWS.xz, 2.2, float2(0.2, 0.1));
+                float shoreFoam = step(0.42, shore * (0.55 + 0.45 * lap) * (0.6 + 0.6 * shoreNoise));
+                float crestNoise = PixelNoise(input.positionWS.xz, 3.0, float2(0.15, -0.1));
+                float crestFoam = step(0.5, saturate((input.waveHeight - 0.16) * 5.0) * crestNoise * 1.6);
+                float foam = saturate(shoreFoam + crestFoam * 0.8);
                 color = lerp(color, _FoamColor.rgb, foam);
 
                 float alpha = lerp(_MinAlpha, 0.95, depthT);
