@@ -417,6 +417,34 @@ namespace PleaseDontDrown.Combat
 
         private static float Ease(float t) => t * t * (3f - 2f * t);
 
+        // Inspect keys: time (0..1), lift (camera space, metres), turn (pitch, yaw, roll degrees).
+        private static readonly (float t, Vector3 move, Vector3 turn)[] InspectKeys =
+        {
+            (0f, Vector3.zero, Vector3.zero),
+            (0.2f, new Vector3(-0.1f, 0.06f, -0.1f), new Vector3(-38f, -42f, -48f)),
+            (0.34f, new Vector3(-0.09f, 0.07f, -0.11f), new Vector3(-42f, -46f, -58f)),
+            (0.56f, new Vector3(0.03f, 0.05f, -0.12f), new Vector3(-18f, 34f, 78f)),
+            (0.7f, new Vector3(0.03f, 0.045f, -0.11f), new Vector3(-16f, 38f, 84f)),
+            (0.86f, new Vector3(0f, 0.015f, -0.04f), new Vector3(-6f, 8f, 12f)),
+            (1f, Vector3.zero, Vector3.zero),
+        };
+
+        private static void InspectPose(float u, out Vector3 move, out Vector3 turn)
+        {
+            u = Mathf.Clamp01(u);
+            for (int i = 1; i < InspectKeys.Length; i++)
+            {
+                if (u > InspectKeys[i].t) continue;
+                var a = InspectKeys[i - 1];
+                var b = InspectKeys[i];
+                float k = Ease((u - a.t) / Mathf.Max(1e-4f, b.t - a.t));
+                move = Vector3.Lerp(a.move, b.move, k);
+                turn = Vector3.Lerp(a.turn, b.turn, k);
+                return;
+            }
+            move = turn = Vector3.zero;
+        }
+
         private static Transform ViewOf(PlayerHub holder) =>
             holder.Look != null && holder.Look.Camera != null ? holder.Look.Camera.transform : holder.Head;
 
@@ -448,15 +476,14 @@ namespace PleaseDontDrown.Combat
                 rot = Quaternion.Euler(12f * r, 8f * r, 40f * r) * rot;
             }
 
-            // Inspect: turn it to look at the side, then the other side.
+            // Inspect: lift it and tip the muzzle up and over to look down the left side, swing it across to show the
+            // ejection side, then settle back into the hands.
             float since = Time.time - _inspectStart;
             if (since < InspectSeconds)
             {
-                float u = since / InspectSeconds;
-                float show = Mathf.Sin(Mathf.Clamp01(u) * Mathf.PI);
-                float turn = Mathf.Lerp(-55f, 35f, Ease(Mathf.Clamp01((u - 0.15f) / 0.7f)));
-                position += new Vector3(-0.12f, 0.05f, -0.1f) * show;
-                rot = Quaternion.Euler(-10f * show, turn * show, -25f * show) * rot;
+                InspectPose(since / InspectSeconds, out Vector3 move, out Vector3 turn);
+                position += move;
+                rot = Quaternion.Euler(turn) * rot;
             }
 
             // Too close to a wall: pull back and point down.

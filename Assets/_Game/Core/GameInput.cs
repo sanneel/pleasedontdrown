@@ -23,6 +23,9 @@ namespace PleaseDontDrown.Core
         /// <summary>Guns: reload / look the gun over.</summary>
         public static InputAction Reload { get; private set; }
         public static InputAction Inspect { get; private set; }
+        /// <summary>Z / C: the held item's previous / next skin (How to Fish's weapon skins).</summary>
+        public static InputAction SkinPrev { get; private set; }
+        public static InputAction SkinNext { get; private set; }
         /// <summary>Inventory slots 1-4.</summary>
         public static InputAction[] Slots { get; private set; }
         /// <summary>Mouse wheel (y) cycles slots.</summary>
@@ -61,7 +64,6 @@ namespace PleaseDontDrown.Core
             Sprint = _gameplay.AddAction("Sprint", InputActionType.Button, "<Keyboard>/leftShift");
             Sprint.AddBinding("<Gamepad>/leftStickPress");
             Crouch = _gameplay.AddAction("Crouch", InputActionType.Button, "<Keyboard>/leftCtrl");
-            Crouch.AddBinding("<Keyboard>/c");
             Crouch.AddBinding("<Gamepad>/buttonEast");
             Interact = _gameplay.AddAction("Interact", InputActionType.Button, "<Keyboard>/e");
             Interact.AddBinding("<Gamepad>/buttonWest");
@@ -77,7 +79,9 @@ namespace PleaseDontDrown.Core
             Reload.AddBinding("<Gamepad>/rightShoulder");
             Inspect = _gameplay.AddAction("Inspect", InputActionType.Button, "<Keyboard>/f");
             Inspect.AddBinding("<Gamepad>/dpad/down");
-            Slots = new InputAction[4];
+            SkinPrev = _gameplay.AddAction("SkinPrev", InputActionType.Button, "<Keyboard>/z");
+            SkinNext = _gameplay.AddAction("SkinNext", InputActionType.Button, "<Keyboard>/c");
+            Slots = new InputAction[6];
             for (int i = 0; i < Slots.Length; i++)
                 Slots[i] = _gameplay.AddAction($"Slot{i + 1}", InputActionType.Button, $"<Keyboard>/{i + 1}");
             SlotScroll = _gameplay.AddAction("SlotScroll", InputActionType.Value, "<Mouse>/scroll/y");

@@ -429,6 +429,46 @@ namespace PleaseDontDrown.Core
         });
 
         /// <summary>Low-passed noise burst: cutoff falls from <paramref name="brightStart"/> to <paramref name="brightEnd"/>.</summary>
+        private static AudioClip _knifeSwish, _stab;
+
+        /// <summary>A blade cutting the air: a bright rising-then-falling hiss.</summary>
+        public static AudioClip KnifeSwish
+        {
+            get
+            {
+                if (_knifeSwish != null) return _knifeSwish;
+                var rng = new System.Random(515);
+                float low = 0f;
+                return _knifeSwish = Build("KnifeSwish", 0.22f, t =>
+                {
+                    float u = t / 0.22f;
+                    float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+                    low += (noise - low) * Mathf.Lerp(0.35f, 0.9f, Mathf.Sin(u * Mathf.PI));
+                    float hiss = noise - low; // the high part
+                    return hiss * 0.55f * Mathf.Sin(u * Mathf.PI) * Mathf.Sin(u * Mathf.PI);
+                });
+            }
+        }
+
+        /// <summary>A blade going in: a short dull thud with a wet scrape.</summary>
+        public static AudioClip Stab
+        {
+            get
+            {
+                if (_stab != null) return _stab;
+                var rng = new System.Random(733);
+                float low = 0f;
+                return _stab = Build("Stab", 0.2f, t =>
+                {
+                    float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
+                    low += (noise - low) * 0.18f;
+                    float thud = Mathf.Sin(t * 2f * Mathf.PI * Mathf.Lerp(150f, 70f, t / 0.2f)) * Mathf.Exp(-t * 28f);
+                    float scrape = low * 1.6f * Mathf.Exp(-t * 16f);
+                    return (thud * 0.8f + scrape) * Mathf.Clamp01(t / 0.002f);
+                });
+            }
+        }
+
         private static AudioClip Noise(string name, float seconds, int seed, float brightStart, float brightEnd, float decay, float gain)
         {
             var rng = new System.Random(seed);

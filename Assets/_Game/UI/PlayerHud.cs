@@ -109,29 +109,48 @@ namespace PleaseDontDrown.UI
                 DrawShadowed(new Rect(cx - 400f, Screen.height * 0.16f + i * 30f, 800f, 30f), _toasts[i].Text, _toast);
         }
 
-        /// <summary>Four inventory slots along the bottom edge; the selected one is highlighted.</summary>
+        /// <summary>
+        /// The hotbar, How to Fish style: bottom left, a small number and a picture of what's in each of the six
+        /// slots, a frame round the one in your hands. Above it, while holding something with skins: "[Z/C]".
+        /// </summary>
         private void DrawHotbar(PlayerHands hands, float cx)
         {
-            const float size = 58f, gap = 6f;
-            float total = PlayerHands.SlotCount * size + (PlayerHands.SlotCount - 1) * gap;
-            float x = cx - total * 0.5f, y = Screen.height - size - 12f;
+            const float icon = 46f, gap = 16f, number = 12f;
+            float x0 = 26f, y = Screen.height - icon - 18f;
             for (int i = 0; i < PlayerHands.SlotCount; i++)
             {
-                var r = new Rect(x + i * (size + gap), y, size, size);
+                float x = x0 + i * (icon + number + gap);
                 bool active = i == hands.ActiveSlot;
-                GUI.color = active ? new Color(1f, 0.86f, 0.25f, 0.95f) : new Color(0f, 0f, 0f, 0.45f);
-                GUI.DrawTexture(r, _dot);
-                GUI.color = new Color(0f, 0f, 0f, active ? 0.55f : 0.25f);
-                GUI.DrawTexture(new Rect(r.x + 3f, r.y + 3f, r.width - 6f, r.height - 6f), _dot);
-                GUI.color = Color.white;
+                DrawShadowed(new Rect(x, y + icon * 0.5f - 9f, number, 18f), (i + 1).ToString(), _slotKey);
+                var r = new Rect(x + number, y, icon, icon);
                 Items.Item item = hands.SlotItem(i);
-                if (item != null)
+                Texture picture = item != null ? ItemIcons.Get(item) : null;
+                if (picture != null)
+                {
+                    GUI.color = active ? Color.white : new Color(1f, 1f, 1f, 0.75f);
+                    GUI.DrawTexture(r, picture, ScaleMode.ScaleToFit, true);
+                }
+                else if (item != null)
                 {
                     string label = item.DisplayName.Length > 9 ? item.DisplayName.Substring(0, 8) + "." : item.DisplayName;
-                    GUI.Label(new Rect(r.x + 2f, r.y + 14f, r.width - 4f, r.height - 16f), label, _slot);
+                    GUI.Label(r, label, _slot);
                 }
-                GUI.Label(new Rect(r.x + 4f, r.y + 1f, 20f, 16f), (i + 1).ToString(), _slotKey);
+                if (active)
+                {
+                    // A thin white frame.
+                    GUI.color = new Color(1f, 1f, 1f, 0.9f);
+                    const float t = 2f;
+                    GUI.DrawTexture(new Rect(r.x - 3f, r.y - 3f, r.width + 6f, t), _dot);
+                    GUI.DrawTexture(new Rect(r.x - 3f, r.yMax + 3f - t, r.width + 6f, t), _dot);
+                    GUI.DrawTexture(new Rect(r.x - 3f, r.y - 3f, t, r.height + 6f), _dot);
+                    GUI.DrawTexture(new Rect(r.xMax + 3f - t, r.y - 3f, t, r.height + 6f), _dot);
+                }
+                GUI.color = Color.white;
             }
+
+            if (Items.ItemSkin.LocalHeld != null)
+                DrawShadowed(new Rect(cx - 200f, Screen.height - 150f, 400f, 24f),
+                    $"Change Weapon Skin [{GameInput.KeyLabel(GameInput.SkinPrev)}/{GameInput.KeyLabel(GameInput.SkinNext)}]", _prompt);
         }
 
         /// <summary>Air, stamina and food bars, shown only while they're not (nearly) full.</summary>

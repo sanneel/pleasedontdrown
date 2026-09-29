@@ -109,13 +109,23 @@ namespace PleaseDontDrown.Combat
             Vector3 dir = view.forward;
             if (found && target != null) hit.point = target.TransformPoint(local);
             else if (!FindTarget(view.position, dir, out hit)) yield break; // swung at nothing
-            if (dir.y < 0f) dir = new Vector3(dir.x, 0f, dir.z).normalized; // never drives things into the ground
 
+            ApplyHit(hit, dir, Damage.Punch, 4f, ProceduralAudio.Punch);
+        }
+
+        /// <summary>
+        /// Owner: a blow lands (a fist, a blade). Damageable things take <paramref name="damage"/> (the host decides),
+        /// other lifeguards get shoved, loose things knocked by <paramref name="force"/> (m/s), anything else just thuds.
+        /// </summary>
+        public void ApplyHit(RaycastHit hit, Vector3 dir, int damage, float force, AudioClip sound)
+        {
+            if (dir.y < 0f) dir = new Vector3(dir.x, 0f, dir.z).normalized; // never drives things into the ground
             IDamageable damageable = DamageUtil.Find(hit.collider);
             var targetObject = damageable as Component;
             PlayerHub otherPlayer = hit.collider.GetComponentInParent<PlayerHub>();
+            bool blade = sound != ProceduralAudio.Punch;
             if (damageable != null && targetObject != null && targetObject.TryGetComponent(out NetworkObject nob))
-                PunchServer(nob, hit.point, dir);
+                HitServer(nob, hit.point, dir, damage, blade);
             else if (otherPlayer != null && otherPlayer != _hub)
                 ShovePlayerServer(otherPlayer, dir);
             else if (Item.FromCollider(hit.collider) is { } item && !item.IsHeld)
@@ -123,21 +133,24 @@ namespace PleaseDontDrown.Combat
                 // Knock loose things about (we take over their physics for a moment).
                 item.Sync.RequestAuthority();
                 if (!item.Sync.Body.isKinematic)
-                    item.Sync.Body.AddForceAtPosition(dir * 4f, hit.point, ForceMode.VelocityChange);
-                PlayHit(hit.point);
-                PunchFxServer(hit.point);
+                    item.Sync.Body.AddForceAtPosition(dir * force, hit.point, ForceMode.VelocityChange);
+                PlayHit(hit.point, blade);
+                PunchFxServer(hit.point, blade);
             }
             else
             {
-                PlayHit(hit.point);
-                PunchFxServer(hit.point);
+                PlayHit(hit.point, blade);
+                PunchFxServer(hit.point, blade);
             }
         }
 
-        private bool FindTarget(Vector3 origin, Vector3 dir, out RaycastHit best)
+        private bool FindTarget(Vector3 origin, Vector3 dir, out RaycastHit best) => FindTarget(origin, dir, _reach, _radius, out best);
+
+        /// <summary>What a blow from here would land on: the nearest thing, preferring what can be hurt or shoved.</summary>
+        public bool FindTarget(Vector3 origin, Vector3 dir, float reach, float radius, out RaycastHit best)
         {
             best = default;
-            int count = Physics.SphereCastNonAlloc(origin, _radius, dir, _hits, _reach, ~0, QueryTriggerInteraction.Ignore);
+            int count = Physics.SphereCastNonAlloc(origin, radius, dir, _hits, reach, ~0, QueryTriggerInteraction.Ignore);
             float bestDistance = float.MaxValue;
             Item held = _hub.Hands != null ? _hub.Hands.HeldItem : null;
             for (int i = 0; i < count; i++)
@@ -157,14 +170,15 @@ namespace PleaseDontDrown.Combat
         }
 
         [ServerRpc]
-        private void PunchServer(NetworkObject target, Vector3 point, Vector3 dir)
+        private void HitServer(NetworkObject target, Vector3 point, Vector3 dir, int damage, bool blade)
         {
             if (target == null || Time.time - _lastServerPunch < _cooldown * 0.6f) return;
             if ((target.transform.position - transform.position).sqrMagnitude > 4f * 4f) return;
             _lastServerPunch = Time.time;
+            damage = Mathf.Clamp(damage, 0, Damage.MaxMelee);
             IDamageable damageable = target.GetComponent<IDamageable>();
-            damageable?.ServerTakeHit(Damage.Punch, DamageKind.Punch, _hub, point, dir);
-            PunchFxObservers(point);
+            damageable?.ServerTakeHit(damage, blade ? DamageKind.Blade : DamageKind.Punch, _hub, point, dir);
+            PunchFxObservers(point, blade);
         }
 
         [ServerRpc]
@@ -176,19 +190,20 @@ namespace PleaseDontDrown.Combat
             Vector3 flat = new Vector3(dir.x, 0f, dir.z).normalized;
             if (other.TryGetComponent(out PlayerCombat combat))
                 combat.ServerKnockback(flat * _shove + Vector3.up * 2.5f, _hub.DisplayName);
-            PunchFxObservers(other.transform.position + Vector3.up * 1.4f);
+            PunchFxObservers(other.transform.position + Vector3.up * 1.4f, false);
         }
 
         [ServerRpc]
-        private void PunchFxServer(Vector3 point) => PunchFxObservers(point);
+        private void PunchFxServer(Vector3 point, bool blade) => PunchFxObservers(point, blade);
 
         [ObserversRpc(ExcludeOwner = true)]
-        private void PunchFxObservers(Vector3 point) => PlayHit(point);
+        private void PunchFxObservers(Vector3 point, bool blade) => PlayHit(point, blade);
 
-        private void PlayHit(Vector3 point)
+        private void PlayHit(Vector3 point, bool blade = false)
         {
-            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Punch, 1f);
-            FloatingText.Spawn(point + Vector3.up * 0.2f, Random.value < 0.5f ? "WHAP!" : "BOP!", new Color(1f, 0.85f, 0.3f), 0.8f, 0.8f);
+            if (_audio != null) _audio.PlayOneShot(blade ? ProceduralAudio.Stab : ProceduralAudio.Punch, 1f);
+            string word = blade ? (Random.value < 0.5f ? "SHNK!" : "STAB!") : Random.value < 0.5f ? "WHAP!" : "BOP!";
+            FloatingText.Spawn(point + Vector3.up * 0.2f, word, blade ? new Color(1f, 0.35f, 0.3f) : new Color(1f, 0.85f, 0.3f), 0.8f, 0.8f);
         }
 
         private void PlaySwish()

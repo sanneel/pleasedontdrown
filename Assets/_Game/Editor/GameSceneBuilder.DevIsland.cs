@@ -67,7 +67,7 @@ namespace PleaseDontDrown.Editor
             var shelves = new List<(string item, Transform spot)>();
             GameObject table = Primitive(PrimitiveType.Cube, "GunTable", root, new Vector3(DevFiringLineX + 1f, 0.45f, -47f), new Vector3(0.9f, 0.9f, 14f), wood);
             TagSurface(table, SurfaceKind.Wood);
-            string[] guns = { "Pistol", "SMG", "Shotgun", "Rifle", "Sniper" };
+            string[] guns = { "Pistol", "SMG", "Shotgun", "Rifle", "Sniper", "Knife" };
             for (int i = 0; i < guns.Length; i++)
                 shelves.Add((guns[i], Point(root, $"Shelf_{guns[i]}", new Vector3(DevFiringLineX + 1f, 1.02f, -52.5f + i * 2.6f), -90f)));
             DevSign(root, "RangeSign", new Vector3(DevFiringLineX + 2.5f, 0f, -47f), 90f, new Vector2(3.2f, 1f), "dev_range", 2.6f);

@@ -122,6 +122,7 @@ namespace PleaseDontDrown.Editor
 
             // Guns: pistol, SMG, shotgun, rifle, sniper (GameSceneBuilder.Weapons.cs).
             foreach (Object gun in BuildWeapons(wood)) yield return gun;
+            yield return BuildKnife(wood);
 
             yield return BuildItem("Defibrillator", "Defibrillator", 2.5f, new Vector3(0.05f, -0.4f, 0.62f), Vector3.zero, 0.8f, wood, root =>
             {
@@ -717,6 +718,7 @@ namespace PleaseDontDrown.Editor
             SerializedProperty products = Require(shopSo, "_products");
             (string item, int price, string blurb)[] stock =
             {
+                ("Knife", 80, "Left mouse stabs whatever is in front of you. Z / C change the skin."),
                 ("Pistol", 250, "For when guests get attacked. Left mouse shoots, right mouse aims, R reloads."),
                 ("SMG", 600, "Sprays. Hold the trigger. 30 rounds."),
                 ("Shotgun", 700, "Eight pellets a shot. Knocks you back too."),

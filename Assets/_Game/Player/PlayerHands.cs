@@ -9,7 +9,7 @@ namespace PleaseDontDrown.Player
     /// <summary>
     /// Carrying, pockets, throwing and eating.
     ///
-    /// Four inventory slots (1-4 / mouse wheel). The selected slot is what's in your hands; small things (a life
+    /// Six inventory slots (1-6 / mouse wheel). The selected slot is what's in your hands; small things (a life
     /// ring, a ball, coconuts) wait hidden in the other slots, big ones (crates, people) have to be put down before
     /// you can switch. Which item sits in which slot lives on the items (host-owned), the selected slot on PlayerHub,
     /// so everyone agrees on what you hold.
@@ -24,7 +24,7 @@ namespace PleaseDontDrown.Player
     /// </summary>
     public class PlayerHands : MonoBehaviour
     {
-        public const int SlotCount = 4;
+        public const int SlotCount = 6;
 
         [SerializeField] private PlayerHub _hub;
         [SerializeField] private Transform _head;

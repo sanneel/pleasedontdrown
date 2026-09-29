@@ -285,6 +285,7 @@ namespace PleaseDontDrown.Editor
                 pose.FindPropertyRelative("Spread").floatValue = 0f;
                 itemSo.ApplyModifiedPropertiesWithoutUndo();
 
+                go.AddComponent<ItemSkin>(); // Z / C: weapon skins
                 var weapon = go.AddComponent<Weapon>();
                 var so = new SerializedObject(weapon);
                 Require(so, "_kind").stringValue = setup.Kind;
@@ -573,6 +574,128 @@ namespace PleaseDontDrown.Editor
             l.localRotation = leftPalmUp
                 ? Quaternion.LookRotation(Vector3.forward, Vector3.down) // palm faces up under the fore-end
                 : tilt * Quaternion.LookRotation(Vector3.forward, Vector3.left);
+        }
+
+        /// <summary>
+        /// The knife (How to Fish's melee): a combat knife with a clip point and a serrated spine, held in the right
+        /// hand, blade forward. Primary stabs (the hand flies to what you look at and back); Z / C change its skin.
+        /// </summary>
+        private static Item BuildKnife(PhysicsMaterial physics)
+        {
+            Material steel = GetMaterial("KnifeSteel", new Color(0.78f, 0.8f, 0.83f), metallic: 0.9f, smoothness: 0.75f);
+            Material grip = GetMaterial("KnifeGrip", new Color(0.09f, 0.09f, 0.1f), smoothness: 0.25f);
+            Mesh blade = KnifeBladeMesh();
+            return BuildItem("Knife", "Knife", 0.35f, new Vector3(0.2f, -0.26f, 0.42f), new Vector3(-40f, -12f, 0f), 1.2f, physics, root =>
+            {
+                // Handle behind the origin, blade in front of it (along +z).
+                Part(root, PrimitiveType.Cube, "Handle", new Vector3(0f, 0f, -0.055f), new Vector3(0.022f, 0.03f, 0.11f), grip, collider: true);
+                Part(root, PrimitiveType.Cube, "Pommel", new Vector3(0f, 0f, -0.113f), new Vector3(0.026f, 0.034f, 0.012f), steel);
+                Part(root, PrimitiveType.Cube, "Guard", new Vector3(0f, 0f, 0.004f), new Vector3(0.03f, 0.062f, 0.008f), steel);
+                var bladeGo = new GameObject("Blade");
+                bladeGo.transform.SetParent(root, false);
+                bladeGo.AddComponent<MeshFilter>().sharedMesh = blade;
+                bladeGo.AddComponent<MeshRenderer>().sharedMaterial = steel;
+                var box = bladeGo.AddComponent<BoxCollider>();
+                box.center = new Vector3(0f, 0f, 0.1f);
+                box.size = new Vector3(0.008f, 0.036f, 0.19f);
+                // Right hand round the handle: fingers wrap it from the right side, palm onto it.
+                // The palm sits high on the handle's side so the knuckles are level with it and the fingers wrap under.
+                var r = Node(root, "GripRight", new Vector3(0.013f, 0.032f, -0.052f));
+                r.localRotation = Quaternion.LookRotation(Vector3.down, Vector3.right);
+                Node(root, "Tip", new Vector3(0f, 0.004f, 0.205f));
+            }, density: 1.5f, configure: go =>
+            {
+                Item item = go.GetComponent<Item>();
+                SetBool(item, "_pocketable", true);
+                SetBool(item, "_rigidInHand", true);
+                SetEnum(item, "_grip", (int)ItemGrip.OneHand);
+                SetRef(item, "_gripRight", Find(go, "GripRight"));
+                var itemSo = new SerializedObject(item);
+                SerializedProperty pose = Require(itemSo, "_gripPose");
+                foreach (string finger in new[] { "Index", "Middle", "Ring", "Pinky" }) pose.FindPropertyRelative(finger).floatValue = 0.92f;
+                pose.FindPropertyRelative("Thumb").floatValue = 0.55f;
+                pose.FindPropertyRelative("Spread").floatValue = 0f;
+                itemSo.ApplyModifiedPropertiesWithoutUndo();
+                go.AddComponent<ItemSkin>();
+                var audio = go.AddComponent<AudioSource>();
+                audio.playOnAwake = false;
+                audio.spatialBlend = 1f;
+                audio.minDistance = 1.5f;
+                audio.maxDistance = 25f;
+                var melee = go.AddComponent<Melee>();
+                SetRef(melee, "_audio", audio);
+                var so = new SerializedObject(melee);
+                Require(so, "_damage").intValue = Damage.Knife;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            });
+        }
+
+        /// <summary>A flat blade with a clip point, a slight belly and a few teeth along the spine (mesh asset).</summary>
+        private static Mesh KnifeBladeMesh()
+        {
+            // Outline in (z forward, y up), going round: spine from the guard to the clip, the tip, then the edge back.
+            var outline = new List<Vector2> { new(0.008f, 0.013f), new(0.02f, 0.015f) };
+            for (int i = 0; i < 5; i++) // serrations
+            {
+                float z = 0.03f + i * 0.014f;
+                outline.Add(new Vector2(z, 0.015f));
+                outline.Add(new Vector2(z + 0.007f, 0.02f));
+            }
+            outline.AddRange(new Vector2[]
+            {
+                new(0.1f, 0.016f), new(0.15f, 0.015f), new(0.172f, 0.01f), new(0.205f, 0.004f), // clip down to the tip
+                new(0.19f, -0.006f), new(0.165f, -0.014f), new(0.12f, -0.019f), new(0.06f, -0.02f), new(0.008f, -0.018f),
+            });
+            const float half = 0.0028f;   // spine thickness
+            const float edge = 0.0006f;   // the edge side is thinner
+            int n = outline.Count;
+            var vertices = new List<Vector3>();
+            var triangles = new List<int>();
+            Vector2 centre = Vector2.zero;
+            foreach (Vector2 p in outline) centre += p;
+            centre /= n;
+            float Thick(Vector2 p) => Mathf.Lerp(edge, half, Mathf.InverseLerp(-0.02f, 0.016f, p.y));
+            // Two faces (fans from the middle) and the rim.
+            for (int side = -1; side <= 1; side += 2)
+            {
+                int start = vertices.Count;
+                vertices.Add(new Vector3(side * half, centre.y, centre.x));
+                foreach (Vector2 p in outline) vertices.Add(new Vector3(side * Thick(p), p.y, p.x));
+                for (int i = 0; i < n; i++)
+                {
+                    int a = start + 1 + i, b = start + 1 + (i + 1) % n;
+                    if (side > 0) { triangles.Add(start); triangles.Add(a); triangles.Add(b); }
+                    else { triangles.Add(start); triangles.Add(b); triangles.Add(a); }
+                }
+            }
+            int rim = vertices.Count;
+            foreach (Vector2 p in outline)
+            {
+                vertices.Add(new Vector3(-Thick(p), p.y, p.x));
+                vertices.Add(new Vector3(Thick(p), p.y, p.x));
+            }
+            for (int i = 0; i < n; i++)
+            {
+                int a = rim + 2 * i, b = rim + 2 * ((i + 1) % n);
+                triangles.AddRange(new[] { a, b, a + 1, a + 1, b, b + 1 });
+            }
+
+            Directory.CreateDirectory(MeshDir);
+            string path = $"{MeshDir}/KnifeBlade.asset";
+            var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            bool isNew = mesh == null;
+            if (isNew) mesh = new Mesh { name = "KnifeBlade" };
+            mesh.Clear();
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0);
+            var uv = new Vector2[vertices.Count];
+            for (int i = 0; i < uv.Length; i++) uv[i] = new Vector2(vertices[i].z * 5f, vertices[i].y * 5f);
+            mesh.uv = uv;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            if (isNew) AssetDatabase.CreateAsset(mesh, path);
+            EditorUtility.SetDirty(mesh);
+            return mesh;
         }
 
         /// <summary>The tracer and bullet-hole materials the ProjectileSystem loads (URP Unlit, instanced).</summary>
