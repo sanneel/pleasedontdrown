@@ -131,9 +131,10 @@ namespace PleaseDontDrown.Player
             {
                 var kit = new AvatarMeshKit();
                 void Use(int index) => kit.SetBone(index, bindposes[index].inverse);
-                _left.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f));
-                _right.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f));
-                _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh);
+                // How to Fish's look: chunky low-poly hands with flat, faceted shading (not smooth plastic ones).
+                _left.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f), lowPoly: true);
+                _right.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f), lowPoly: true);
+                _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh, flat: true);
             }
 
             if (_renderer == null)
@@ -154,7 +155,10 @@ namespace PleaseDontDrown.Player
 
         private Material _handMaterial;
 
-        /// <summary>Soft and even, like How to Fish: wrapped light, no toon edge, no rim, no shadows falling on them.</summary>
+        /// <summary>
+        /// Lit like How to Fish's hands: the sun shades the facets (each face its own tone), the side away from it goes
+        /// a warm dark, no rim light and no shadows falling on them.
+        /// </summary>
         private Material HandMaterial()
         {
             if (_handMaterial != null) return _handMaterial;
@@ -162,10 +166,10 @@ namespace PleaseDontDrown.Player
             if (source == null) return null;
             _handMaterial = new Material(source) { name = "FirstPersonHands" };
             _handMaterial.SetFloat("_ShadowAmount", 0f);
-            _handMaterial.SetFloat("_Softness", 1f);
+            _handMaterial.SetFloat("_Softness", 0.6f);
             _handMaterial.SetFloat("_Rim", 0f);
-            _handMaterial.SetFloat("_Ambient", 0.8f);
-            _handMaterial.SetColor("_ShadowTint", new Color(0.86f, 0.8f, 0.8f));
+            _handMaterial.SetFloat("_Ambient", 0.5f);
+            _handMaterial.SetColor("_ShadowTint", new Color(0.62f, 0.54f, 0.5f));
             // Curled fingers of the modelled hand fold skin over itself: show the inside rather than a hole.
             _handMaterial.SetFloat("_Cull", (float)CullMode.Off);
             return _handMaterial;
