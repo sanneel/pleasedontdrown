@@ -61,6 +61,16 @@ namespace PleaseDontDrown.Editor
                     // (then a shot from that eye with FOV 74 is the first-person view).
                     bool fromEye = p[p.Length - 1] == "eye";
                     if (fromEye) p = p[..^1];
+                    // Trying a hold pose before baking it: "at=x,y,z" (camera space) and "rot=pitch,yaw,roll" anywhere.
+                    Vector3? tryAt = null, tryRot = null;
+                    foreach (string token in p)
+                    {
+                        if (!token.StartsWith("at=") && !token.StartsWith("rot=")) continue;
+                        string[] v = token.Substring(token.IndexOf('=') + 1).Split(',');
+                        var vec = new Vector3(float.Parse(v[0], CultureInfo.InvariantCulture), float.Parse(v[1], CultureInfo.InvariantCulture), float.Parse(v[2], CultureInfo.InvariantCulture));
+                        if (token.StartsWith("at=")) tryAt = vec; else tryRot = vec;
+                    }
+                    p = System.Array.FindAll(p, t => !t.StartsWith("at=") && !t.StartsWith("rot="));
                     // fphands <prefab> x y z yaw: the item with our first-person hands on its grips (as when held).
                     var gunPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Items/Prefabs/{p[1]}.prefab");
                     if (gunPrefab == null) { Debug.LogError($"[Review] no item {p[1]}"); continue; }
@@ -70,7 +80,9 @@ namespace PleaseDontDrown.Editor
                     {
                         var held = gun.GetComponent<Items.Item>();
                         Quaternion view = Quaternion.Euler(0f, F(5), 0f);
-                        gun.transform.SetPositionAndRotation(new Vector3(F(2), F(3), F(4)) + view * held.HoldOffset, view * held.HoldRotation);
+                        Vector3 at = tryAt ?? held.HoldOffset;
+                        Quaternion turn = tryRot is { } r ? Quaternion.Euler(r) : held.HoldRotation;
+                        gun.transform.SetPositionAndRotation(new Vector3(F(2), F(3), F(4)) + view * at, view * turn);
                     }
                     AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
                     var holder = new GameObject("ReviewHands");

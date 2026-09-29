@@ -403,7 +403,8 @@ namespace PleaseDontDrown.Combat
         {
             WeaponSight sight = Sight;
             if (sight.EyePoint == null) return Vector3.zero;
-            Vector3 aimed = new Vector3(0f, 0f, sight.EyeDistance) - _item.HoldRotation * transform.InverseTransformPoint(sight.EyePoint.position);
+            // Aimed, the gun points straight ahead (the hip cant is gone), so the eye point sits on the view axis.
+            Vector3 aimed = new Vector3(0f, 0f, sight.EyeDistance) - transform.InverseTransformPoint(sight.EyePoint.position);
             return aimed - _item.HoldOffset;
         }
 
@@ -463,8 +464,9 @@ namespace PleaseDontDrown.Combat
             }
 
             // The motion in the hands (HeldToolMotion): hip / aimed pose, sway, bob, tilt, sprint and draw poses, recoil.
+            // At the hip the gun is canted in toward the middle of the view (How to Fish); aiming squares it up.
             Vector3 position = _motion.Position;
-            Quaternion rot = _motion.Rotation * baseRotation;
+            Quaternion rot = _motion.Rotation * Quaternion.Slerp(baseRotation, Quaternion.identity, Ease(_aim));
 
             // Reload: tip it over to the side and bring it in, then back.
             if (_reloading)

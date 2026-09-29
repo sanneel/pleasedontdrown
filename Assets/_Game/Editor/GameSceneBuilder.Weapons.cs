@@ -117,7 +117,7 @@ namespace PleaseDontDrown.Editor
                 Suppressor(root, "BarrelSuppressor", new Vector3(0f, 0.03f, 0.258f), 0.019f, 0.15f, metal);
                 Compensator(root, "BarrelCompensator", new Vector3(0f, 0.03f, 0.258f), 0.032f, metal);
                 Laser(root, new Vector3(0.03f, 0.02f, 0.17f), laserBody, glow);
-                HandGrips(root, new Vector3(0.032f, -0.058f, -0.035f), -12f, left: new Vector3(-0.026f, 0.002f, 0.14f), leftPalmUp: false);
+                HandGrips(root, new Vector3(0.032f, -0.058f, -0.035f), -12f, left: new Vector3(-0.025f, -0.015f, 0.14f), leftPalmUp: false);
             }, new GunSetup
             {
                 Kind = "SMG", Sound = GunSound.Smg, Projectile = ProjectileKind.Bullet, FullAuto = true, Interval = 0.05f, HipSpread = 0f, AimSpread = 0f,
@@ -159,7 +159,7 @@ namespace PleaseDontDrown.Editor
                 Suppressor(root, "BarrelSuppressor", new Vector3(0f, 0.035f, 0.622f), 0.024f, 0.16f, metal);
                 Compensator(root, "BarrelCompensator", new Vector3(0f, 0.035f, 0.622f), 0.04f, metal);
                 Laser(root, new Vector3(0.03f, 0f, 0.36f), laserBody, glow);
-                HandGrips(root, new Vector3(0.03f, -0.045f, -0.1f), -20f, left: new Vector3(-0.03f, -0.024f, 0.27f), leftPalmUp: false);
+                HandGrips(root, new Vector3(0.03f, -0.045f, -0.1f), -20f, left: new Vector3(-0.029f, -0.028f, 0.27f), leftPalmUp: false);
             }, new GunSetup
             {
                 Kind = "Shotgun", Sound = GunSound.Shotgun, Projectile = ProjectileKind.Pellet, Interval = 0.22f, Pellets = 25, HipSpread = 6f, AimSpread = 6f,
@@ -266,10 +266,24 @@ namespace PleaseDontDrown.Editor
             });
         }
 
+        /// <summary>
+        /// How a gun sits at the hip, How to Fish style: low on the right and close, canted in so the muzzle points
+        /// toward the middle of the view (camera space: position, then pitch/yaw/roll). Aiming squares it up.
+        /// </summary>
+        private static (Vector3 at, Vector3 euler) HipPose(string kind) => kind switch
+        {
+            "Pistol" => (new Vector3(0.15f, -0.14f, 0.34f), new Vector3(-4f, -10f, 0f)),
+            "SMG" => (new Vector3(0.15f, -0.15f, 0.29f), new Vector3(-4f, -14f, 0f)),
+            "Shotgun" => (new Vector3(0.16f, -0.16f, 0.31f), new Vector3(-4f, -16f, 0f)),
+            "Rifle" => (new Vector3(0.16f, -0.16f, 0.3f), new Vector3(-4f, -16f, 0f)),
+            _ => (new Vector3(0.16f, -0.16f, 0.33f), new Vector3(-4f, -14f, 0f)), // sniper
+        };
+
         private static Item BuildGun(string file, string displayName, float mass, Vector3 holdOffset, PhysicsMaterial physics,
             System.Action<Transform> buildVisual, GunSetup setup)
         {
-            return BuildItem(file, displayName, mass, holdOffset, Vector3.zero, 1f, physics, buildVisual, density: 1.6f, configure: go =>
+            var hip = HipPose(setup.Kind);
+            return BuildItem(file, displayName, mass, hip.at, hip.euler, 1f, physics, buildVisual, density: 1.6f, configure: go =>
             {
                 Item item = go.GetComponent<Item>();
                 SetBool(item, "_pocketable", true);
@@ -455,11 +469,11 @@ namespace PleaseDontDrown.Editor
                 "Rifle" => (new Vector3(0.03f, -0.092f, -0.105f), 32f, 0f),
                 _ => (new Vector3(0.03f, -0.08f, -0.095f), 17f, 0f), // sniper
             };
-            // Support hand on the model's fore-end, left face (measured in Blender: ArtSource/Tools/measure_guns.py).
+            // Support hand cradling the model's fore-end from its lower-left edge (measured in Blender: ArtSource/Tools/measure_guns.py).
             Vector3? leftAt = kind switch
             {
-                "Rifle" => new Vector3(-0.044f, 0.036f, 0.25f),   // handguard x +-0.040, y -0.008..0.088
-                "Sniper" => new Vector3(-0.05f, -0.004f, 0.37f),  // fore-end x -0.046..0.008, y -0.03..0.04
+                "Rifle" => new Vector3(-0.042f, -0.012f, 0.25f),   // handguard x +-0.040, y -0.008..0.088
+                "Sniper" => new Vector3(-0.049f, -0.035f, 0.37f),  // fore-end x -0.046..0.008, y -0.03..0.04
                 _ => null,
             };
             Transform leftGrip = gun.Find("GripLeft");
@@ -573,18 +587,26 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>
-        /// Where the hands go: the right hand round the grip (fingers along it, palm against its right side), the left
-        /// either under the fore-end (palm up), cupping the right hand on the other side of the grip, or nowhere (null:
-        /// a one-handed gun, the left hand stays free).
+        /// The support hand, as in How to Fish: the palm cradles the fore-end from its lower-left edge, the fingers run up
+        /// its left side and curl over the top, the wrist tucks in under the gun (where the forearm would come from).
+        /// (Place the grip at the fore-end's lower-left edge.)
         /// </summary>
-        /// <summary>
-        /// The support hand, How to Fish style: palm flat on the left side of the fore-end, fingers up and a little
-        /// forward so they curl over the top. (Place the grip on the fore-end's left face, a hand's knuckle height below
-        /// its top.)
-        /// </summary>
-        private static Quaternion LeftGripRotation =>
-            Quaternion.LookRotation(Quaternion.Euler(28f, 0f, 0f) * Vector3.up, Vector3.left); // palm faces +x
+        private static Quaternion LeftGripRotation
+        {
+            get
+            {
+                Vector3 palm = new Vector3(0.6f, 0.8f, 0f);                   // up and to the right, onto the fore-end
+                Vector3 fingers = new Vector3(-0.8f, 0.6f, 0.35f).normalized;  // up its left side, curling over the top;
+                                                                               // the wrist tucks in under the gun
+                return Quaternion.LookRotation(fingers, -palm);
+            }
+        }
 
+        /// <summary>
+        /// Where the hands go: the right hand round the grip (fingers along it, palm against its right side), the left
+        /// cradling the fore-end (see <see cref="LeftGripRotation"/>), or nowhere (null: a one-handed gun, the left
+        /// hand stays free).
+        /// </summary>
         private static void HandGrips(Transform gun, Vector3 right, float gripTilt, Vector3? left, bool leftPalmUp)
         {
             Quaternion tilt = Quaternion.Euler(gripTilt, 0f, 0f);
