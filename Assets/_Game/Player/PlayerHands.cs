@@ -590,7 +590,7 @@ namespace PleaseDontDrown.Player
             if (item.GripRight != null || item.GripLeft != null)
             {
                 if (item.GripRight != null) right = new HandGrip(item.GripRight.position, item.GripRight.forward, -item.GripRight.up, item.GripPose);
-                if (item.GripLeft != null) left = new HandGrip(item.GripLeft.position, item.GripLeft.forward, -item.GripLeft.up, item.GripPose);
+                if (item.GripLeft != null) left = new HandGrip(item.GripLeft.position, item.GripLeft.forward, -item.GripLeft.up, item.GripPoseLeft);
                 // A gun being worked (reloading, the bolt): the hands follow its moves.
                 if (item.TryGetComponent(out Combat.Weapon gun))
                 {

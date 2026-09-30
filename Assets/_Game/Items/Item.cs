@@ -48,6 +48,9 @@ namespace PleaseDontDrown.Items
         [SerializeField] private Transform _gripRight;
         [SerializeField] private Transform _gripLeft;
         [SerializeField] private Avatars.HandPose _gripPose = new(0.9f, 0.7f, 0f);
+        [Tooltip("The left hand's own finger pose (a gun's support hand lies along the fore-end rather than making a fist).")]
+        [SerializeField] private bool _ownLeftPose;
+        [SerializeField] private Avatars.HandPose _gripPoseLeft = new(0.9f, 0.7f, 0f);
         [Tooltip("Held rigidly in view by our own hands too (guns: no lag, exact aim and recoil); colliders off while held.")]
         [SerializeField] private bool _rigidInHand;
 
@@ -80,6 +83,7 @@ namespace PleaseDontDrown.Items
         public Transform GripRight => _gripRight;
         public Transform GripLeft => _gripLeft;
         public Avatars.HandPose GripPose => _gripPose;
+        public Avatars.HandPose GripPoseLeft => _ownLeftPose ? _gripPoseLeft : _gripPose;
         public bool RigidInHand => _rigidInHand;
 
         /// <summary>Inventory slot of the holder this item is in (our prediction first).</summary>

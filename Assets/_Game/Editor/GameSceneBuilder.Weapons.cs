@@ -272,7 +272,7 @@ namespace PleaseDontDrown.Editor
         /// </summary>
         private static (Vector3 at, Vector3 euler) HipPose(string kind) => kind switch
         {
-            "Pistol" => (new Vector3(0.15f, -0.14f, 0.34f), new Vector3(-4f, -10f, 0f)),
+            "Pistol" => (new Vector3(0.14f, -0.105f, 0.33f), new Vector3(-4f, -10f, 0f)),
             "SMG" => (new Vector3(0.15f, -0.15f, 0.29f), new Vector3(-4f, -14f, 0f)),
             "Shotgun" => (new Vector3(0.16f, -0.16f, 0.31f), new Vector3(-4f, -16f, 0f)),
             "Rifle" => (new Vector3(0.16f, -0.16f, 0.3f), new Vector3(-4f, -16f, 0f)),
@@ -295,8 +295,14 @@ namespace PleaseDontDrown.Editor
                 var itemSo = new SerializedObject(item);
                 SerializedProperty pose = Require(itemSo, "_gripPose");
                 foreach (string finger in new[] { "Index", "Middle", "Ring", "Pinky" }) pose.FindPropertyRelative(finger).floatValue = 0.9f;
-                pose.FindPropertyRelative("Thumb").floatValue = 0.3f;
+                pose.FindPropertyRelative("Thumb").floatValue = 0.6f;
                 pose.FindPropertyRelative("Spread").floatValue = 0f;
+                // The support hand lies along the fore-end: fingers bent round it, not closed into a fist.
+                Require(itemSo, "_ownLeftPose").boolValue = true;
+                SerializedProperty left = Require(itemSo, "_gripPoseLeft");
+                foreach (string finger in new[] { "Index", "Middle", "Ring", "Pinky" }) left.FindPropertyRelative(finger).floatValue = 0.8f;
+                left.FindPropertyRelative("Thumb").floatValue = 0.9f; // tucked along the side, not sticking up
+                left.FindPropertyRelative("Spread").floatValue = 0f;
                 itemSo.ApplyModifiedPropertiesWithoutUndo();
 
                 go.AddComponent<ItemSkin>(); // Z / C: weapon skins
@@ -466,15 +472,16 @@ namespace PleaseDontDrown.Editor
             // (Low-poly Meshy guns of 29 September 2026, measured in Blender with ArtSource/Tools/measure_guns.py.)
             (Vector3 right, float slant, float wrap) = kind switch
             {
-                "Pistol" => (new Vector3(0.027f, -0.08f, -0.088f), 16f, 50f),  // handle z -0.13..-0.05, y -0.05..-0.136
-                "Rifle" => (new Vector3(0.022f, -0.08f, -0.09f), 20f, 0f),    // pistol grip z -0.12..-0.05, y -0.05..-0.124
-                _ => (new Vector3(0.022f, -0.09f, -0.075f), 12f, 0f),         // sniper grip z -0.10..-0.04, y -0.04..-0.155
+                // The palm sits high on the back of the handle so the fist closes round it (checked in side renders).
+                "Pistol" => (new Vector3(0.027f, -0.065f, -0.123f), 16f, 50f), // handle z -0.13..-0.05, y -0.05..-0.136
+                "Rifle" => (new Vector3(0.022f, -0.065f, -0.13f), 20f, 0f),    // pistol grip z -0.12..-0.05, y -0.05..-0.124
+                _ => (new Vector3(0.022f, -0.075f, -0.115f), 12f, 0f),         // sniper grip z -0.10..-0.04, y -0.04..-0.155
             };
-            // Support hand cradling the model's fore-end from its lower-left edge.
+            // Support hand from the fore-end's lower-left edge, fingers wrapping up its side and over the top.
             Vector3? leftAt = kind switch
             {
-                "Rifle" => new Vector3(-0.034f, 0.002f, 0.25f),    // handguard z 0.17..0.33, x -0.031..0.027, y 0.006..0.079
-                "Sniper" => new Vector3(-0.037f, -0.024f, 0.45f),  // fore-end z 0.30..0.58, x -0.034..0.032, y -0.02..0.056
+                "Rifle" => new Vector3(-0.028f, 0.042f, 0.25f),    // handguard z 0.17..0.33, x -0.031..0.027, y 0.006..0.079
+                "Sniper" => new Vector3(-0.031f, 0.016f, 0.45f),   // fore-end z 0.30..0.58, x -0.034..0.032, y -0.02..0.056
                 _ => null,
             };
             // Iron sights: the eye point on the model's own sight line (rear and front sight tops).

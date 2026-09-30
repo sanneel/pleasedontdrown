@@ -62,15 +62,21 @@ namespace PleaseDontDrown.Editor
                     bool fromEye = p[p.Length - 1] == "eye";
                     if (fromEye) p = p[..^1];
                     // Trying a hold pose before baking it: "at=x,y,z" (camera space) and "rot=pitch,yaw,roll" anywhere.
+                    // ... "hand=size" (x life size), "grip=dx,dy,dz" / "lgrip=dx,dy,dz" (move the right / left grip, gun space).
                     Vector3? tryAt = null, tryRot = null;
+                    Vector3 moveGrip = Vector3.zero, moveLeft = Vector3.zero;
                     foreach (string token in p)
                     {
-                        if (!token.StartsWith("at=") && !token.StartsWith("rot=")) continue;
+                        if (token.StartsWith("hand=")) Player.FirstPersonArms.HandSize = float.Parse(token.Substring(5), CultureInfo.InvariantCulture);
+                        if (!token.StartsWith("at=") && !token.StartsWith("rot=") && !token.StartsWith("grip=") && !token.StartsWith("lgrip=")) continue;
                         string[] v = token.Substring(token.IndexOf('=') + 1).Split(',');
                         var vec = new Vector3(float.Parse(v[0], CultureInfo.InvariantCulture), float.Parse(v[1], CultureInfo.InvariantCulture), float.Parse(v[2], CultureInfo.InvariantCulture));
-                        if (token.StartsWith("at=")) tryAt = vec; else tryRot = vec;
+                        if (token.StartsWith("at=")) tryAt = vec;
+                        else if (token.StartsWith("rot=")) tryRot = vec;
+                        else if (token.StartsWith("grip=")) moveGrip = vec;
+                        else moveLeft = vec;
                     }
-                    p = System.Array.FindAll(p, t => !t.StartsWith("at=") && !t.StartsWith("rot="));
+                    p = System.Array.FindAll(p, t => !t.Contains("="));
                     // fphands <prefab> x y z yaw: the item with our first-person hands on its grips (as when held).
                     var gunPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Items/Prefabs/{p[1]}.prefab");
                     if (gunPrefab == null) { Debug.LogError($"[Review] no item {p[1]}"); continue; }
@@ -94,6 +100,8 @@ namespace PleaseDontDrown.Editor
                     arms.Build(AvatarLook.Lifeguard);
                     var gunItem = gun.GetComponent<Items.Item>();
                     Transform gr = gunItem.GripRight, gl = gunItem.GripLeft;
+                    if (gr != null) gr.localPosition += moveGrip;
+                    if (gl != null) gl.localPosition += moveLeft;
                     HandPose handPose = gunItem.GripPose;
                     // Optional: fphands ... thumb index fingers (to try a grip pose before baking it).
                     if (p.Length > 8) handPose = new HandPose(F(8), F(6), 0f) { Index = F(7) };
@@ -105,7 +113,8 @@ namespace PleaseDontDrown.Editor
                         gr.SetPositionAndRotation(pivot + turn * (gr.position - pivot), turn * gr.rotation);
                     }
                     arms.PlaceForReview(true, gr != null ? new HandGrip(gr.position, gr.forward, -gr.up, handPose) : null);
-                    arms.PlaceForReview(false, gl != null ? new HandGrip(gl.position, gl.forward, -gl.up, handPose) : null);
+                    HandPose leftPose = p.Length > 8 ? handPose : gunItem.GripPoseLeft;
+                    arms.PlaceForReview(false, gl != null ? new HandGrip(gl.position, gl.forward, -gl.up, leftPose) : null);
                     if (noGun) foreach (Renderer r in gun.GetComponentsInChildren<Renderer>()) r.enabled = false;
                     continue;
                 }

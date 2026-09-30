@@ -174,7 +174,7 @@ namespace PleaseDontDrown.Combat
         /// <summary>The left hand's own place: on the fore-end, or (one-handed pistol) down out of view.</summary>
         private HandGrip LeftHome(Transform t)
         {
-            if (_gunLeftGrip != null) return new HandGrip(_gunLeftGrip.position, _gunLeftGrip.forward, -_gunLeftGrip.up, _item.GripPose);
+            if (_gunLeftGrip != null) return new HandGrip(_gunLeftGrip.position, _gunLeftGrip.forward, -_gunLeftGrip.up, _item.GripPoseLeft);
             return new HandGrip(t.position - t.up * 0.4f - t.right * 0.14f - t.forward * 0.1f, t.forward, t.right, HandPose.Relaxed);
         }
 

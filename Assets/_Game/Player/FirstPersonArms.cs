@@ -22,7 +22,8 @@ namespace PleaseDontDrown.Player
     [DefaultExecutionOrder(100)]
     public class FirstPersonArms : MonoBehaviour
     {
-        private const float HandSize = 1.35f;    // x life size: big cartoon hands
+        /// <summary>x life size. (Settable only for editor review renders.)</summary>
+        public static float HandSize = 1.1f;
         private const float MaxReach = 0.85f;    // from the eye
         private const float IdlePitch = 5f;
 
