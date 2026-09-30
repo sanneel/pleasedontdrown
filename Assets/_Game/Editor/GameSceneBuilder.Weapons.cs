@@ -169,7 +169,7 @@ namespace PleaseDontDrown.Editor
                 Part(root, PrimitiveType.Cube, "StockNeck", new Vector3(0f, -0.018f, -0.16f), new Vector3(0.036f, 0.066f, 0.1f), wood, euler: new Vector3(-3f, 0f, 0f));
                 Part(root, PrimitiveType.Cube, "Stock", new Vector3(0f, -0.038f, -0.31f), new Vector3(0.042f, 0.1f, 0.24f), wood, euler: new Vector3(-4f, 0f, 0f), collider: true);
                 Part(root, PrimitiveType.Cube, "ButtPad", new Vector3(0f, -0.047f, -0.437f), new Vector3(0.045f, 0.108f, 0.022f), rubber, euler: new Vector3(-4f, 0f, 0f));
-                Part(root, PrimitiveType.Sphere, "Bead", new Vector3(0f, 0.058f, 0.61f), Vector3.one * 0.008f, glow);
+                Part(root, PrimitiveType.Sphere, "Bead", new Vector3(0f, 0.064f, 0.607f), Vector3.one * 0.008f, glow);
                 Node(root, "EyeIron", new Vector3(0f, 0.055f, -0.1f));
                 Node(root, "EjectPort", new Vector3(0.027f, 0.02f, 0.03f));
                 Node(root, "MuzzleStandard", new Vector3(0f, 0.035f, 0.622f));
@@ -292,17 +292,17 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>
-        /// How to Fish's hip pose per gun (read from its data): x, y = where the default sight sits right of and below
-        /// the view axis (minus its ADS offset: the pistol's sight 5.2 cm right and 4.7 cm low), z = how far ahead of
-        /// the eye its rig holds the grip (pistol 33 cm, rifle 19 cm).
+        /// Hip pose per gun: x, y = where the default sight sits right of and below the view axis, z = how far ahead
+        /// of the eye the grip is held. Depth and drop follow How to Fish's rigs (grip 33 cm out for the pistol, 19 cm
+        /// for the rifle); the guns sit further right than its ADS offsets alone give (the user's call, 30 Sep).
         /// </summary>
         private static Vector3 HipSightLine(string kind) => kind switch
         {
-            "Pistol" => new Vector3(0.052f, -0.047f, 0.327f),
-            "SMG" => new Vector3(0.0783f, -0.055f, 0.386f),
-            "Shotgun" => new Vector3(0.0783f, -0.105f, 0.293f),
-            "Rifle" => new Vector3(0.0792f, -0.035f, 0.189f),
-            _ => new Vector3(0.0613f, -0.022f, 0.406f), // sniper (sight line of its iron sights, as the scope eye sits there too)
+            "Pistol" => new Vector3(0.115f, -0.05f, 0.327f),
+            "SMG" => new Vector3(0.14f, -0.06f, 0.386f),
+            "Shotgun" => new Vector3(0.14f, -0.105f, 0.293f),
+            "Rifle" => new Vector3(0.14f, -0.045f, 0.189f),
+            _ => new Vector3(0.13f, -0.035f, 0.406f), // sniper (sight line of its iron sights, as the scope eye sits there too)
         };
 
         /// <summary>Starting hold pose (replaced by the sight-based one once the model is fitted).</summary>
@@ -470,6 +470,8 @@ namespace PleaseDontDrown.Editor
                 case "Pistol": asset = "pistol"; length = 0.28f; centreZ = 0f; centreY = -0.035f; break;
                 case "Rifle": asset = "rifle"; length = 0.88f; centreZ = 0.065f; centreY = -0.025f; break;
                 case "Sniper": asset = "sniper"; length = 1.19f; centreZ = 0.195f; centreY = 0f; break;
+                case "SMG": AttachModelledBody(gun, "smg", "Magazine", "MagazineExtended", "ChargingHandle"); return;
+                case "Shotgun": AttachModelledBody(gun, "shotgun", "Magazine", "MagazineExtended", "Pump", "Bead"); return;
                 default: return; // Keep the existing models for weapons without a supplied GLB.
             }
 
@@ -554,6 +556,36 @@ namespace PleaseDontDrown.Editor
                 grip.localPosition = pivot + turn * (right - pivot);
                 grip.localRotation = turn * rot;
             }
+        }
+
+        /// <summary>
+        /// A gun body modelled in Blender in the gun's own space (ArtSource/Tools/model_guns.py): it replaces the
+        /// greybox renderers one for one (scale 1, no refitting), so grips, sights and muzzles stay where they are.
+        /// The named parts (moving or swappable ones) keep their own models.
+        /// </summary>
+        private static void AttachModelledBody(Transform gun, string asset, params string[] keep)
+        {
+            string path = $"Assets/_Game/Art/Weapons/{asset}.glb";
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null)
+            {
+                if (File.Exists(path)) throw new InvalidDataException($"Gun GLB failed to import: {path}");
+                return;
+            }
+            foreach (Transform child in gun)
+            {
+                if (child.name == "SightRedDot" || child.name == "SightScope" || child.name == "BarrelSuppressor" ||
+                    child.name == "BarrelCompensator" || child.name == "Laser" || System.Array.IndexOf(keep, child.name) >= 0)
+                    continue;
+                foreach (Renderer renderer in child.GetComponentsInChildren<Renderer>(true))
+                    renderer.enabled = false;
+            }
+            GameObject model = Object.Instantiate(prefab, gun, false);
+            model.name = "Model_" + asset;
+            // glTF import puts Blender +X (the muzzle) on Unity -X; a quarter turn about y brings it round to +z.
+            model.transform.localPosition = Vector3.zero;
+            model.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+            model.transform.localScale = Vector3.one;
         }
 
         private static Bounds RendererBounds(GameObject root)
