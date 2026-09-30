@@ -21,6 +21,8 @@ ap.add_argument("--decal", default="", help="PNG lettering (make_decals.py) proj
 ap.add_argument("--decal-on", default="red", help="palette colour the lettering sits on (only those faces get it)")
 ap.add_argument("--decal-band", default="0.05,0.29,-1.05,0.65", help="z0,z1,y0,y1 in Blender axes (nose -Y)")
 ap.add_argument("--iron",type=float, default=0.8, help="Laplacian smoothing strength after the remesh")
+ap.add_argument("--tones", default="", help="paint by lightness rank instead of by colour: comma fractions of the "
+                "faces (darkest first) for each palette colour, e.g. 0.6,0.3,0.1 (for near-monochrome models like guns)")
 ap.add_argument("--preview", default="")
 a = ap.parse_args(argv)
 
@@ -32,6 +34,12 @@ PALETTES = {
         ("grey",   (0.46, 0.48, 0.52), [(0.55, 0.56, 0.58), (0.45, 0.45, 0.47)]),
         ("rubber", (0.15, 0.16, 0.18), [(0.20, 0.20, 0.22), (0.30, 0.30, 0.32)]),
         ("black",  (0.06, 0.06, 0.07), [(0.05, 0.05, 0.06), (0.11, 0.11, 0.12)]),
+    ],
+    # Guns (used with --tones, darkest first): polymer furniture, blued metal, worn steel edges.
+    "gun": [
+        ("polymer", (0.21, 0.22, 0.24), []),
+        ("blued",   (0.38, 0.40, 0.44), []),
+        ("steel",   (0.58, 0.60, 0.63), []),
     ],
 }
 palette = PALETTES[a.palette]
@@ -120,11 +128,24 @@ bm = bmesh.new(); bm.from_mesh(obj.data)
 bm.faces.ensure_lookup_table()
 uv = bm.loops.layers.uv.active
 labels = []
+lights = []
 for f in bm.faces:
     centre = f.calc_center_median()
     pts = [centre] + [l.vert.co.lerp(centre, 0.5) for l in f.loops]
     cols = sorted((c for c in (colour_at(p) for p in pts) if c is not None), key=lambda c: c.x + c.y + c.z)
     labels.append(classify(cols[len(cols) // 2]) if cols else 0)
+    lights.append(sum(cols[len(cols) // 2]) if cols else 0.0)
+if a.tones:
+    # Lightness rank (area weighted): the darkest share of the surface gets the first colour, and so on.
+    shares = [float(v) for v in a.tones.split(",")]
+    order = sorted(range(len(lights)), key=lambda i: lights[i])
+    total = sum(f.calc_area() for f in bm.faces)
+    k, acc, edge = 0, 0.0, shares[0]
+    for i in order:
+        while k < len(shares) - 1 and acc >= edge * total:
+            k += 1; edge += shares[k]
+        labels[i] = k
+        acc += bm.faces[i].calc_area()
 
 # Neighbour vote: a face whose neighbours mostly agree takes their colour (area weighted).
 areas = [f.calc_area() for f in bm.faces]

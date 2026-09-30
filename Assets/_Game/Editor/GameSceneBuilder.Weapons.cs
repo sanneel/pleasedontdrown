@@ -43,9 +43,12 @@ namespace PleaseDontDrown.Editor
 
         private static IEnumerable<Object> BuildWeapons(PhysicsMaterial physics)
         {
-            Material metal = GetMaterial("GunMetal", new Color(0.16f, 0.16f, 0.18f), metallic: 0.5f, smoothness: 0.5f);
-            Material polymer = GetMaterial("GunPolymer", new Color(0.2f, 0.21f, 0.19f), smoothness: 0.3f);
-            Material wood = GetMaterial("GunWood", new Color(0.5f, 0.3f, 0.15f), smoothness: 0.35f);
+            // Flat, matte paint in the same tones as the stylized Meshy guns (ArtSource/Tools/stylize_prop.py --palette gun),
+            // so the greybox SMG and shotgun sit in the same family instead of reading as shiny black boxes.
+            Material metal = GetMaterial("GunMetal", new Color(0.38f, 0.4f, 0.44f), metallic: 0.15f, smoothness: 0.3f);
+            Material polymer = GetMaterial("GunPolymer", new Color(0.21f, 0.22f, 0.24f), smoothness: 0.15f);
+            Material wood = GetMaterial("GunWood", new Color(0.55f, 0.33f, 0.17f), smoothness: 0.2f);
+            Material rubber = GetMaterial("GunRubber", new Color(0.12f, 0.12f, 0.13f), smoothness: 0.1f);
             Material tan = GetMaterial("GunTan", new Color(0.72f, 0.62f, 0.44f), smoothness: 0.3f);
             Material glass = GetMaterial("ScopeGlass", new Color(0.12f, 0.22f, 0.32f), smoothness: 0.95f);
             Material glow = GetMaterial("RedDotGlow", new Color(1f, 0.15f, 0.1f), emission: new Color(3f, 0.25f, 0.15f));
@@ -97,17 +100,27 @@ namespace PleaseDontDrown.Editor
             // ---------------------------------------------------------------- SMG
             yield return BuildGun("SMG", "SMG", 2.4f, new Vector3(0.15f, -0.17f, 0.38f), physics, root =>
             {
-                Part(root, PrimitiveType.Cube, "Receiver", new Vector3(0f, 0.02f, 0.05f), new Vector3(0.045f, 0.06f, 0.28f), metal, collider: true);
+                // Upper receiver (metal) on a polymer lower, a magwell the magazine seats into, a trigger guard and a
+                // short shrouded barrel; the folding stock's rods run into the receiver's back.
+                Part(root, PrimitiveType.Cube, "Receiver", new Vector3(0f, 0.032f, 0.05f), new Vector3(0.045f, 0.042f, 0.28f), metal, collider: true);
+                Part(root, PrimitiveType.Cube, "Lower", new Vector3(0f, 0.001f, 0.035f), new Vector3(0.041f, 0.024f, 0.25f), polymer);
+                Part(root, PrimitiveType.Cube, "TopRail", new Vector3(0f, 0.056f, 0.03f), new Vector3(0.022f, 0.007f, 0.2f), polymer);
+                Part(root, PrimitiveType.Cube, "Magwell", new Vector3(0f, -0.02f, 0.085f), new Vector3(0.034f, 0.03f, 0.05f), polymer);
                 Part(root, PrimitiveType.Cube, "Grip", new Vector3(0f, -0.055f, -0.035f), new Vector3(0.032f, 0.1f, 0.045f), polymer, euler: new Vector3(-12f, 0f, 0f), collider: true);
-                Part(root, PrimitiveType.Cube, "StockTop", new Vector3(0f, 0.035f, -0.17f), new Vector3(0.018f, 0.018f, 0.16f), metal);
-                Part(root, PrimitiveType.Cube, "StockBottom", new Vector3(0f, -0.02f, -0.17f), new Vector3(0.018f, 0.018f, 0.16f), metal);
-                Part(root, PrimitiveType.Cube, "ButtPlate", new Vector3(0f, 0.008f, -0.25f), new Vector3(0.03f, 0.08f, 0.02f), polymer, collider: true);
-                Part(root, PrimitiveType.Cylinder, "Barrel", new Vector3(0f, 0.03f, 0.22f), new Vector3(0.022f, 0.035f, 0.022f), metal, euler: new Vector3(90f, 0f, 0f));
-                Part(root, PrimitiveType.Cube, "RearSight", new Vector3(0f, 0.058f, -0.06f), new Vector3(0.02f, 0.016f, 0.01f), metal);
-                Part(root, PrimitiveType.Cube, "FrontSight", new Vector3(0f, 0.058f, 0.17f), new Vector3(0.005f, 0.016f, 0.006f), metal);
+                Part(root, PrimitiveType.Cube, "GuardBottom", new Vector3(0f, -0.045f, 0.02f), new Vector3(0.01f, 0.006f, 0.056f), polymer);
+                Part(root, PrimitiveType.Cube, "GuardFront", new Vector3(0f, -0.029f, 0.045f), new Vector3(0.01f, 0.034f, 0.006f), polymer);
+                Part(root, PrimitiveType.Cube, "Trigger", new Vector3(0f, -0.024f, 0.012f), new Vector3(0.006f, 0.022f, 0.006f), metal, euler: new Vector3(15f, 0f, 0f));
+                Part(root, PrimitiveType.Cube, "StockTop", new Vector3(0f, 0.035f, -0.17f), new Vector3(0.016f, 0.016f, 0.18f), metal);
+                Part(root, PrimitiveType.Cube, "StockBottom", new Vector3(0f, -0.005f, -0.17f), new Vector3(0.016f, 0.016f, 0.18f), metal);
+                Part(root, PrimitiveType.Cube, "ButtPlate", new Vector3(0f, 0.015f, -0.26f), new Vector3(0.034f, 0.075f, 0.022f), rubber, collider: true);
+                Part(root, PrimitiveType.Cylinder, "Shroud", new Vector3(0f, 0.03f, 0.205f), new Vector3(0.03f, 0.012f, 0.03f), polymer, euler: new Vector3(90f, 0f, 0f));
+                Part(root, PrimitiveType.Cylinder, "Barrel", new Vector3(0f, 0.03f, 0.225f), new Vector3(0.019f, 0.035f, 0.019f), metal, euler: new Vector3(90f, 0f, 0f));
+                Part(root, PrimitiveType.Cylinder, "MuzzleRing", new Vector3(0f, 0.03f, 0.254f), new Vector3(0.024f, 0.005f, 0.024f), rubber, euler: new Vector3(90f, 0f, 0f));
+                Part(root, PrimitiveType.Cube, "RearSight", new Vector3(0f, 0.064f, -0.06f), new Vector3(0.02f, 0.012f, 0.01f), metal);
+                Part(root, PrimitiveType.Cube, "FrontSight", new Vector3(0f, 0.064f, 0.17f), new Vector3(0.005f, 0.012f, 0.006f), metal);
                 Transform handle = Node(root, "ChargingHandle", new Vector3(0.028f, 0.035f, 0.02f));
                 Part(handle, PrimitiveType.Cube, "Knob", Vector3.zero, new Vector3(0.014f, 0.012f, 0.03f), metal);
-                Node(root, "EyeIron", new Vector3(0f, 0.066f, -0.065f));
+                Node(root, "EyeIron", new Vector3(0f, 0.07f, -0.065f));
                 Node(root, "EjectPort", new Vector3(0.025f, 0.035f, 0.07f));
                 Node(root, "MuzzleStandard", new Vector3(0f, 0.03f, 0.258f));
                 Part(root, PrimitiveType.Cube, "Magazine", new Vector3(0f, -0.085f, 0.085f), new Vector3(0.025f, 0.13f, 0.04f), metal);
@@ -142,17 +155,29 @@ namespace PleaseDontDrown.Editor
             // ---------------------------------------------------------------- pump shotgun
             yield return BuildGun("Shotgun", "Shotgun", 3.2f, new Vector3(0.14f, -0.2f, 0.38f), physics, root =>
             {
+                // Receiver with a loading port and trigger guard; the wooden stock runs straight back from the receiver
+                // from the wrist the right hand holds and flares to a rubber butt pad.
                 Part(root, PrimitiveType.Cube, "Receiver", new Vector3(0f, 0.015f, 0f), new Vector3(0.05f, 0.07f, 0.24f), metal, collider: true);
+                Part(root, PrimitiveType.Cube, "LoadingPort", new Vector3(0f, -0.021f, 0.02f), new Vector3(0.034f, 0.003f, 0.09f), rubber);
+                Part(root, PrimitiveType.Cube, "GuardBottom", new Vector3(0f, -0.047f, -0.02f), new Vector3(0.012f, 0.006f, 0.06f), metal);
+                Part(root, PrimitiveType.Cube, "GuardFront", new Vector3(0f, -0.034f, 0.01f), new Vector3(0.012f, 0.03f, 0.006f), metal);
+                Part(root, PrimitiveType.Cube, "Trigger", new Vector3(0f, -0.03f, -0.02f), new Vector3(0.006f, 0.024f, 0.006f), rubber, euler: new Vector3(15f, 0f, 0f));
                 Part(root, PrimitiveType.Cylinder, "Barrel", new Vector3(0f, 0.035f, 0.37f), new Vector3(0.032f, 0.25f, 0.032f), metal, euler: new Vector3(90f, 0f, 0f), collider: true);
-                Part(root, PrimitiveType.Cube, "Stock", new Vector3(0f, -0.035f, -0.26f), new Vector3(0.042f, 0.085f, 0.3f), wood, euler: new Vector3(8f, 0f, 0f), collider: true);
+                Part(root, PrimitiveType.Cube, "BarrelRib", new Vector3(0f, 0.052f, 0.37f), new Vector3(0.008f, 0.004f, 0.48f), polymer);
+                Part(root, PrimitiveType.Cylinder, "BarrelClamp", new Vector3(0f, 0.018f, 0.5f), new Vector3(0.036f, 0.008f, 0.036f), polymer, euler: new Vector3(90f, 0f, 0f));
                 Part(root, PrimitiveType.Cube, "Wrist", new Vector3(0f, -0.04f, -0.1f), new Vector3(0.036f, 0.07f, 0.08f), wood, euler: new Vector3(-20f, 0f, 0f));
-                Part(root, PrimitiveType.Sphere, "Bead", new Vector3(0f, 0.055f, 0.61f), Vector3.one * 0.008f, metal);
+                Part(root, PrimitiveType.Cube, "StockNeck", new Vector3(0f, -0.018f, -0.16f), new Vector3(0.036f, 0.066f, 0.1f), wood, euler: new Vector3(-3f, 0f, 0f));
+                Part(root, PrimitiveType.Cube, "Stock", new Vector3(0f, -0.038f, -0.31f), new Vector3(0.042f, 0.1f, 0.24f), wood, euler: new Vector3(-4f, 0f, 0f), collider: true);
+                Part(root, PrimitiveType.Cube, "ButtPad", new Vector3(0f, -0.047f, -0.437f), new Vector3(0.045f, 0.108f, 0.022f), rubber, euler: new Vector3(-4f, 0f, 0f));
+                Part(root, PrimitiveType.Sphere, "Bead", new Vector3(0f, 0.058f, 0.61f), Vector3.one * 0.008f, glow);
                 Node(root, "EyeIron", new Vector3(0f, 0.055f, -0.1f));
                 Node(root, "EjectPort", new Vector3(0.027f, 0.02f, 0.03f));
                 Node(root, "MuzzleStandard", new Vector3(0f, 0.035f, 0.622f));
                 // The pump (moves back and forth) around the magazine tube.
                 Transform pump = Node(root, "Pump", new Vector3(0f, 0f, 0.26f));
                 Part(pump, PrimitiveType.Cube, "Forend", Vector3.zero, new Vector3(0.052f, 0.046f, 0.15f), wood);
+                for (int g = 0; g < 4; g++) // finger grooves round the pump
+                    Part(pump, PrimitiveType.Cube, "Groove" + g, new Vector3(0f, -0.004f, -0.045f + g * 0.03f), new Vector3(0.054f, 0.034f, 0.006f), rubber);
                 Part(root, PrimitiveType.Cylinder, "Magazine", new Vector3(0f, 0f, 0.33f), new Vector3(0.026f, 0.17f, 0.026f), metal, euler: new Vector3(90f, 0f, 0f));
                 Part(root, PrimitiveType.Cylinder, "MagazineExtended", new Vector3(0f, 0f, 0.37f), new Vector3(0.026f, 0.24f, 0.026f), metal, euler: new Vector3(90f, 0f, 0f));
                 RedDot(root, "SightRedDot", new Vector3(0f, 0.062f, -0.02f), 1.1f, metal, glass, glow);
@@ -267,16 +292,16 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>
-        /// How a gun sits at the hip, How to Fish style: low on the right and close, canted in so the muzzle points
-        /// toward the middle of the view (camera space: position, then pitch/yaw/roll). Aiming squares it up.
+        /// How a gun sits at the hip, How to Fish style: low on the right and close, pointing straight ahead along the
+        /// view (camera space: position, then pitch/yaw/roll). The user found the old inward cant looked crooked.
         /// </summary>
         private static (Vector3 at, Vector3 euler) HipPose(string kind) => kind switch
         {
-            "Pistol" => (new Vector3(0.14f, -0.105f, 0.33f), new Vector3(-4f, -10f, 0f)),
-            "SMG" => (new Vector3(0.15f, -0.15f, 0.29f), new Vector3(-4f, -14f, 0f)),
-            "Shotgun" => (new Vector3(0.16f, -0.16f, 0.31f), new Vector3(-4f, -16f, 0f)),
-            "Rifle" => (new Vector3(0.16f, -0.16f, 0.3f), new Vector3(-4f, -16f, 0f)),
-            _ => (new Vector3(0.16f, -0.16f, 0.33f), new Vector3(-4f, -14f, 0f)), // sniper
+            "Pistol" => (new Vector3(0.14f, -0.105f, 0.33f), Vector3.zero),
+            "SMG" => (new Vector3(0.15f, -0.15f, 0.29f), Vector3.zero),
+            "Shotgun" => (new Vector3(0.16f, -0.16f, 0.31f), Vector3.zero),
+            "Rifle" => (new Vector3(0.16f, -0.16f, 0.3f), Vector3.zero),
+            _ => (new Vector3(0.16f, -0.16f, 0.33f), Vector3.zero), // sniper
         };
 
         private static Item BuildGun(string file, string displayName, float mass, Vector3 holdOffset, PhysicsMaterial physics,
