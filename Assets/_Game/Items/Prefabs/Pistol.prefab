@@ -894,6 +894,37 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &2473894748171814023
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7371655947306478520}
+  m_Layer: 0
+  m_Name: Muzzle
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7371655947306478520
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2473894748171814023}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.0345}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4055348998801272408}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2670923547835873118
 GameObject:
   m_ObjectHideFlags: 0
@@ -1717,11 +1748,11 @@ MonoBehaviour:
     Spread: 0
   _ownLeftPose: 1
   _gripPoseLeft:
-    Thumb: 0.9
-    Index: 0.8
-    Middle: 0.8
-    Ring: 0.8
-    Pinky: 0.8
+    Thumb: 0.5
+    Index: 0.85
+    Middle: 0.85
+    Ring: 0.85
+    Pinky: 0.85
     Spread: 0
   _rigidInHand: 1
 --- !u!114 &6548879775512137604
@@ -1874,7 +1905,7 @@ MonoBehaviour:
     Price: 150
   - Name: Compensator
     Model: {fileID: 5583271757964956868}
-    Muzzle: {fileID: 7889266946828111603}
+    Muzzle: {fileID: 7371655947306478520}
     Suppressed: 0
     ClimbScale: 0.6
     KickScale: 0.9
@@ -2208,37 +2239,6 @@ Transform:
   - {fileID: 1659834559028533438}
   m_Father: {fileID: 5478887259870254467}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &5185373361433437506
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 7889266946828111603}
-  m_Layer: 0
-  m_Name: Muzzle
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &7889266946828111603
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5185373361433437506}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.0345}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 4055348998801272408}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &5265720232093729854
 GameObject:
   m_ObjectHideFlags: 0
@@ -2383,7 +2383,7 @@ Transform:
   - {fileID: 7941850153426900691}
   - {fileID: 5874267329278146345}
   - {fileID: 6916470960502435743}
-  - {fileID: 7889266946828111603}
+  - {fileID: 7371655947306478520}
   m_Father: {fileID: 5478887259870254467}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6329072237469023702

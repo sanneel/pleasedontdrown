@@ -300,8 +300,8 @@ namespace PleaseDontDrown.Editor
                 // The support hand lies along the fore-end: fingers bent round it, not closed into a fist.
                 Require(itemSo, "_ownLeftPose").boolValue = true;
                 SerializedProperty left = Require(itemSo, "_gripPoseLeft");
-                foreach (string finger in new[] { "Index", "Middle", "Ring", "Pinky" }) left.FindPropertyRelative(finger).floatValue = 0.8f;
-                left.FindPropertyRelative("Thumb").floatValue = 0.9f; // tucked along the side, not sticking up
+                foreach (string finger in new[] { "Index", "Middle", "Ring", "Pinky" }) left.FindPropertyRelative(finger).floatValue = 0.85f;
+                left.FindPropertyRelative("Thumb").floatValue = 0.5f; // up the fore-end's left side
                 left.FindPropertyRelative("Spread").floatValue = 0f;
                 itemSo.ApplyModifiedPropertiesWithoutUndo();
 
@@ -474,14 +474,14 @@ namespace PleaseDontDrown.Editor
             {
                 // The palm sits high on the back of the handle so the fist closes round it (checked in side renders).
                 "Pistol" => (new Vector3(0.027f, -0.065f, -0.123f), 16f, 50f), // handle z -0.13..-0.05, y -0.05..-0.136
-                "Rifle" => (new Vector3(0.022f, -0.065f, -0.13f), 20f, 0f),    // pistol grip z -0.12..-0.05, y -0.05..-0.124
-                _ => (new Vector3(0.022f, -0.075f, -0.115f), 12f, 0f),         // sniper grip z -0.10..-0.04, y -0.04..-0.155
+                "Rifle" => (new Vector3(0.022f, -0.075f, -0.102f), 20f, 0f),   // pistol grip z -0.12..-0.05, y -0.05..-0.124
+                _ => (new Vector3(0.022f, -0.09f, -0.08f), 12f, 0f),           // sniper grip z -0.10..-0.04, y -0.04..-0.155
             };
             // Support hand from the fore-end's lower-left edge, fingers wrapping up its side and over the top.
             Vector3? leftAt = kind switch
             {
-                "Rifle" => new Vector3(-0.028f, 0.042f, 0.25f),    // handguard z 0.17..0.33, x -0.031..0.027, y 0.006..0.079
-                "Sniper" => new Vector3(-0.031f, 0.016f, 0.45f),   // fore-end z 0.30..0.58, x -0.034..0.032, y -0.02..0.056
+                "Rifle" => new Vector3(-0.012f, -0.004f, 0.25f),   // handguard z 0.17..0.33, x -0.031..0.027, y 0.006..0.079
+                "Sniper" => new Vector3(-0.012f, -0.03f, 0.45f),   // fore-end z 0.30..0.58, x -0.034..0.032, y -0.02..0.056
                 _ => null,
             };
             // Iron sights: the eye point on the model's own sight line (rear and front sight tops).
@@ -610,17 +610,16 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>
-        /// The support hand, as in How to Fish: the palm cradles the fore-end from its lower-left edge, the fingers run up
-        /// its left side and curl over the top, the wrist tucks in under the gun (where the forearm would come from).
-        /// (Place the grip at the fore-end's lower-left edge.)
+        /// The support hand holds the fore-end from underneath: palm up against its bottom, fingers across it (to the
+        /// right and a little forward) so they curl up its right side, thumb up its left side. (Place the grip just under
+        /// the fore-end, a little left of its middle.)
         /// </summary>
         private static Quaternion LeftGripRotation
         {
             get
             {
-                Vector3 palm = new Vector3(0.6f, 0.8f, 0f);                   // up and to the right, onto the fore-end
-                Vector3 fingers = new Vector3(-0.8f, 0.6f, 0.35f).normalized;  // up its left side, curling over the top;
-                                                                               // the wrist tucks in under the gun
+                Vector3 palm = Vector3.up;                                    // up, against the underside
+                Vector3 fingers = new Vector3(1f, 0f, 0.55f).normalized;       // across it, angled forward
                 return Quaternion.LookRotation(fingers, -palm);
             }
         }
