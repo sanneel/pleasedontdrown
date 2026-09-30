@@ -91,7 +91,7 @@ namespace PleaseDontDrown.Editor
                     DrawPosition = new Vector3(0.15f, -0.5f, 0f), DrawRotation = new Vector3(90f, 0f, 0f)
                 },
                 Tiers = new[] { ("Standard rounds", 25, 0), ("Hollow points", 33, 150), ("Magnum rounds", 45, 300) },
-                Sights = new[] { ("Iron sights", "", "EyeIron", 0.38f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.38f, 60f, false, 120) },
+                Sights = new[] { ("Iron sights", "", "EyeIron", 0.34f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.34f, 60f, false, 120) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 150),
                                   ("Compensator", "BarrelCompensator", "BarrelCompensator/Muzzle", false, 0.6f, 0.9f, 120) }
@@ -145,7 +145,7 @@ namespace PleaseDontDrown.Editor
                     DrawPosition = new Vector3(0.15f, -0.4f, -0.1f), DrawRotation = new Vector3(90f, 0f, 0f)
                 },
                 Tiers = new[] { ("Standard rounds", 24, 0), ("Hollow points", 28, 200), ("Armour piercing", 35, 400) },
-                Sights = new[] { ("Iron sights", "", "EyeIron", 0.28f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.28f, 60f, false, 150),
+                Sights = new[] { ("Iron sights", "", "EyeIron", 0.36f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.36f, 60f, false, 150),
                                  ("Scope", "SightScope", "SightScope/Eye", 0.14f, 15f, true, 250) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 200),
@@ -243,7 +243,7 @@ namespace PleaseDontDrown.Editor
                     DrawPosition = new Vector3(0.2f, -0.5f, 0.3f), DrawRotation = new Vector3(90f, 90f, 0f)
                 },
                 Tiers = new[] { ("Standard rounds", 40, 0), ("Match rounds", 55, 250), ("Armour piercing", 70, 500) },
-                Sights = new[] { ("Iron sights", "", "EyeIron", 0.24f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.26f, 60f, false, 150),
+                Sights = new[] { ("Iron sights", "", "EyeIron", 0.22f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.24f, 60f, false, 150),
                                  ("Scope", "SightScope", "SightScope/Eye", 0.12f, 15f, true, 350) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 250),
@@ -292,17 +292,21 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>
-        /// How a gun sits at the hip, How to Fish style: low on the right and close, pointing straight ahead along the
-        /// view (camera space: position, then pitch/yaw/roll). The user found the old inward cant looked crooked.
+        /// How to Fish's hip pose per gun (read from its data): x, y = where the default sight sits right of and below
+        /// the view axis (minus its ADS offset: the pistol's sight 5.2 cm right and 4.7 cm low), z = how far ahead of
+        /// the eye its rig holds the grip (pistol 33 cm, rifle 19 cm).
         /// </summary>
-        private static (Vector3 at, Vector3 euler) HipPose(string kind) => kind switch
+        private static Vector3 HipSightLine(string kind) => kind switch
         {
-            "Pistol" => (new Vector3(0.14f, -0.105f, 0.33f), Vector3.zero),
-            "SMG" => (new Vector3(0.15f, -0.15f, 0.29f), Vector3.zero),
-            "Shotgun" => (new Vector3(0.16f, -0.16f, 0.31f), Vector3.zero),
-            "Rifle" => (new Vector3(0.16f, -0.16f, 0.3f), Vector3.zero),
-            _ => (new Vector3(0.16f, -0.16f, 0.33f), Vector3.zero), // sniper
+            "Pistol" => new Vector3(0.052f, -0.047f, 0.327f),
+            "SMG" => new Vector3(0.0783f, -0.055f, 0.386f),
+            "Shotgun" => new Vector3(0.0783f, -0.105f, 0.293f),
+            "Rifle" => new Vector3(0.0792f, -0.035f, 0.189f),
+            _ => new Vector3(0.0613f, -0.022f, 0.406f), // sniper (sight line of its iron sights, as the scope eye sits there too)
         };
+
+        /// <summary>Starting hold pose (replaced by the sight-based one once the model is fitted).</summary>
+        private static (Vector3 at, Vector3 euler) HipPose(string kind) => (new Vector3(0.08f, -0.1f, 0.35f), Vector3.zero);
 
         private static Item BuildGun(string file, string displayName, float mass, Vector3 holdOffset, PhysicsMaterial physics,
             System.Action<Transform> buildVisual, GunSetup setup)
@@ -438,6 +442,17 @@ namespace PleaseDontDrown.Editor
                     if (t != null && setup.Sights[0].model != part) t.gameObject.SetActive(false);
                 }
                 AttachGunModel(go.transform, setup.Kind);
+                // Hip pose, How to Fish's: aiming slides the gun straight across and up (never nearer, never turned), so
+                // at the hip the default sight sits that far right and down of the view axis; the depth puts the right
+                // hand's grip where its gun rig holds it.
+                Transform eyePoint = Find(go, setup.Sights[0].eye);
+                Vector3 eyeLocal = go.transform.InverseTransformPoint(eyePoint.position);
+                Vector3 gripLocal = go.transform.InverseTransformPoint(Find(go, "GripRight").position);
+                Vector3 sightLine = HipSightLine(setup.Kind);
+                var holdSo = new SerializedObject(item);
+                Require(holdSo, "_holdOffset").vector3Value = new Vector3(sightLine.x - eyeLocal.x, sightLine.y - eyeLocal.y, sightLine.z - gripLocal.z);
+                Require(holdSo, "_holdEuler").vector3Value = Vector3.zero;
+                holdSo.ApplyModifiedPropertiesWithoutUndo();
                 SetRefs(go.GetComponent<PleaseDontDrown.Interaction.Interactable>(), "_outlineRenderers",
                     go.GetComponentsInChildren<Renderer>(true));
             });

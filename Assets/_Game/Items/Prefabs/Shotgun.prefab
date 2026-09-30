@@ -368,37 +368,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4293024640273781813}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &917093742095264191
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1143692550031992384}
-  m_Layer: 0
-  m_Name: Muzzle
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1143692550031992384
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 917093742095264191}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.045999996}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 8513092241619171580}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1135645238015983239
 GameObject:
   m_ObjectHideFlags: 0
@@ -521,7 +490,7 @@ Transform:
   - {fileID: 6426757588799959544}
   - {fileID: 4085120012660972549}
   - {fileID: 6855600759837475780}
-  - {fileID: 1143692550031992384}
+  - {fileID: 3545126540512975291}
   m_Father: {fileID: 4293024640273781813}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1413710346587509103
@@ -2986,6 +2955,37 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &7833596588961446452
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3545126540512975291}
+  m_Layer: 0
+  m_Name: Muzzle
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3545126540512975291
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7833596588961446452}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.045999996}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8513092241619171580}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8721685200276529981
 GameObject:
   m_ObjectHideFlags: 0
@@ -3295,7 +3295,7 @@ MonoBehaviour:
   _networkObjectCache: {fileID: 0}
   _displayName: Shotgun
   _pickUpVerb: Pick up
-  _holdOffset: {x: 0.16, y: -0.16, z: 0.31}
+  _holdOffset: {x: 0.0783, y: -0.16, z: 0.393}
   _holdEuler: {x: 0, y: 0, z: 0}
   _throwStrength: 1
   _pickupRange: 3.2
@@ -3479,7 +3479,7 @@ MonoBehaviour:
     Price: 250
   - Name: Choke
     Model: {fileID: 1304286135805645450}
-    Muzzle: {fileID: 1143692550031992384}
+    Muzzle: {fileID: 3545126540512975291}
     Suppressed: 0
     ClimbScale: 0.75
     KickScale: 0.9
