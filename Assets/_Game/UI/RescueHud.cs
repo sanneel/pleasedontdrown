@@ -7,22 +7,16 @@ namespace PleaseDontDrown.UI
 {
     /// <summary>
     /// Markers over tourists in trouble (name, state, distance, air or time left), pinned to the screen edge when
-    /// off-screen, plus a hint while you carry someone. IMGUI placeholder like the rest of the prototype HUD.
+    /// off-screen, plus a hint while you carry someone. Drawn with <see cref="Hud"/> on its 1080-high sheet.
     /// </summary>
     public class RescueHud : MonoBehaviour
     {
-        private GUIStyle _label;
-        private GUIStyle _hint;
-        private Texture2D _dot;
-
         private void OnGUI()
         {
             PlayerHub local = PlayerHub.Local;
             Camera cam = local != null && local.Look != null ? local.Look.Camera : null;
             if (cam == null || !GameInput.GameplayActive)
                 return;
-            EnsureStyles();
-
             foreach (VictimBrain v in VictimBrain.All)
             {
                 VictimState state = v.State;
@@ -44,7 +38,7 @@ namespace PleaseDontDrown.UI
             bool behind = screen.z < 0f;
             if (behind) screen = new Vector3(Screen.width - screen.x, Screen.height - screen.y, 0f);
 
-            const float margin = 50f;
+            float margin = 70f * Hud.Scale;
             bool offscreen = behind || screen.x < margin || screen.x > Screen.width - margin || screen.y < margin || screen.y > Screen.height - margin;
             if (!offscreen && distance < 2.6f) return; // right in front of you: the prompts under the crosshair say it all
             if (offscreen)
@@ -58,18 +52,16 @@ namespace PleaseDontDrown.UI
                 screen = new Vector3(edge.x, edge.y, 0f);
             }
 
-            float x = screen.x;
-            float y = Screen.height - screen.y;
+            // From here on: sheet units.
+            float x = screen.x / Hud.Scale;
+            float y = (Screen.height - screen.y) / Hud.Scale;
             Color color = ColorOf(state);
             if (state == VictimState.Unconscious)
                 color = Color.Lerp(color, Color.white, 0.35f * (0.5f + 0.5f * Mathf.Sin(Time.time * 8f)));
 
-            // Diamond-ish dot.
-            float size = offscreen ? 14f : 10f;
-            GUI.color = new Color(0f, 0f, 0f, 0.6f);
-            GUI.DrawTexture(new Rect(x - size * 0.5f - 2f, y - size * 0.5f - 2f, size + 4f, size + 4f), _dot);
-            GUI.color = color;
-            GUI.DrawTexture(new Rect(x - size * 0.5f, y - size * 0.5f, size, size), _dot);
+            float size = offscreen ? 20f : 14f;
+            Hud.Fill(new Rect(x - size * 0.5f - 3f, y - size * 0.5f - 3f, size + 6f, size + 6f), new Color(0f, 0f, 0f, 0.6f), size * 0.5f + 3f);
+            Hud.Fill(new Rect(x - size * 0.5f, y - size * 0.5f, size, size), color, size * 0.5f);
 
             string info = state switch
             {
@@ -82,23 +74,15 @@ namespace PleaseDontDrown.UI
             if (v.Item.IsHeld) info += $"  (with {v.Item.Holder.DisplayName})";
             string text = $"<b>{v.Name}</b>  {info}\n{distance:F0} m";
             // Label and bar above the dot (clear of the tourist), or below it when pinned to the top edge.
-            bool below = y < 70f;
-            var rect = new Rect(x - 150f, below ? y + 10f : y - 58f, 300f, 40f);
-            GUI.color = Color.white;
-            _label.normal.textColor = color;
-            Shadow(rect, text, _label);
+            bool below = y < 100f;
+            var rect = new Rect(x - 300f, below ? y + 16f : y - 84f, 600f, 56f);
+            Hud.Label(rect, text, 21f, color, TextAnchor.UpperCenter);
 
             // Air (awake) or CPR progress (unconscious on land).
             float bar = state == VictimState.Unconscious ? v.Cpr01 : v.Air01;
             if (state.NeedsHelp() && (state != VictimState.Unconscious || bar > 0f))
-            {
-                var back = new Rect(x - 30f, below ? rect.y + 42f : y - 16f, 60f, 5f);
-                GUI.color = new Color(0f, 0f, 0f, 0.55f);
-                GUI.DrawTexture(back, _dot);
-                GUI.color = state == VictimState.Unconscious ? new Color(0.5f, 1f, 0.5f) : bar < 0.35f ? new Color(1f, 0.35f, 0.3f) : new Color(0.45f, 0.8f, 1f);
-                GUI.DrawTexture(new Rect(back.x, back.y, back.width * Mathf.Clamp01(bar), back.height), _dot);
-            }
-            GUI.color = Color.white;
+                Hud.Bar(new Rect(x - 45f, below ? rect.y + 60f : y - 24f, 90f, 8f), bar,
+                    state == VictimState.Unconscious ? new Color(0.5f, 1f, 0.5f) : bar < 0.35f ? new Color(1f, 0.35f, 0.3f) : new Color(0.45f, 0.8f, 1f));
         }
 
         private void DrawCarryHint(PlayerHub local)
@@ -114,7 +98,8 @@ namespace PleaseDontDrown.UI
                 : v.State.NeedsHelp()
                     ? $"Bring <b>{v.Name}</b> back to the shallows!"
                     : $"Carrying <b>{v.Name}</b>";
-            Shadow(new Rect(Screen.width * 0.5f - 450f, Screen.height - 100f, 900f, 30f), text, _hint);
+            // Where the held item's name and keys would be.
+            Hud.Label(new Rect(Hud.Width * 0.5f - 800f, Hud.HotbarTop - 56f, 1600f, 40f), text, 26f, Hud.Sand);
         }
 
         private static Color ColorOf(VictimState s) => s switch
@@ -127,26 +112,5 @@ namespace PleaseDontDrown.UI
             VictimState.Injured => new Color(1f, 0.35f, 0.35f),
             _ => Color.white
         };
-
-        private static void Shadow(Rect rect, string text, GUIStyle style)
-        {
-            Color c = style.normal.textColor;
-            style.normal.textColor = new Color(0f, 0f, 0f, 0.75f);
-            GUI.Label(new Rect(rect.x + 1.5f, rect.y + 1.5f, rect.width, rect.height), text, style);
-            style.normal.textColor = c;
-            GUI.Label(rect, text, style);
-        }
-
-        private void EnsureStyles()
-        {
-            if (_dot == null)
-            {
-                _dot = new Texture2D(1, 1);
-                _dot.SetPixel(0, 0, Color.white);
-                _dot.Apply();
-            }
-            _label ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperCenter, fontSize = 15, richText = true };
-            _hint ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontSize = 18, richText = true, normal = { textColor = new Color(1f, 0.95f, 0.8f) } };
-        }
     }
 }

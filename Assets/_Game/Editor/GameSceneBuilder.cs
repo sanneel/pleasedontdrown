@@ -676,7 +676,7 @@ namespace PleaseDontDrown.Editor
             ui.AddComponent<ItemDebugView>();
             ui.AddComponent<RescueHud>();
             ui.AddComponent<Story.StoryHud>();
-            ui.AddComponent<WeaponHud>(); // ammo, crosshair spread, scope, hit markers
+            ui.AddComponent<WeaponHud>(); // crosshair spread, scope, hit markers, inspect card
             ui.AddComponent<AvatarCustomizer>();
             BuildNetworkManager(playerPrefab, spawns);
             BakeNavMeshes(); // last: everything that blocks walking is in the scene now
