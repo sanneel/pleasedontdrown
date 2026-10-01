@@ -121,7 +121,7 @@ namespace PleaseDontDrown.Editor
             PlayerSettings.productName = "PLEASE DON'T DROWN";
             PlayerSettings.bundleVersion = "0.1.0";
             PlayerSettings.runInBackground = true;          // two local instances must both keep ticking
-            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow; // Core/GameDisplay sets the mode at every start
             PlayerSettings.defaultScreenWidth = 1280;
             PlayerSettings.defaultScreenHeight = 720;
             PlayerSettings.resizableWindow = true;
