@@ -145,6 +145,7 @@ namespace PleaseDontDrown.Editor
         private static void BuildStoryPrefabs()
         {
             Directory.CreateDirectory(StoryPrefabDir);
+            BuildRobberBackpack();
 
             // ---- a story character: host-moved, procedurally animated, talkable, punchable
             var root = new GameObject("StoryNpc");
@@ -480,10 +481,13 @@ namespace PleaseDontDrown.Editor
                     var umbrella = new GameObject("Umbrella").transform;
                     umbrella.SetParent(towel, false);
                     umbrella.localPosition = new Vector3(1.05f, 0f, -0.3f);
-                    Primitive(PrimitiveType.Cylinder, "Pole", umbrella, new Vector3(0f, 1.1f, 0f), new Vector3(0.07f, 1.1f, 0.07f), pole);
-                    Material canopy = GetMaterial($"Umbrella{(n / 2) % umbrellaColors.Length}", umbrellaColors[(n / 2) % umbrellaColors.Length]);
-                    Primitive(PrimitiveType.Sphere, "Canopy", umbrella, new Vector3(0f, 2.15f, 0f), new Vector3(2.3f, 0.45f, 2.3f), canopy, keepCollider: false)
-                        .transform.localRotation = Quaternion.Euler(0f, 0f, 6f);
+                    if (!MeshyUmbrella(umbrella, n / 2))
+                    {
+                        Primitive(PrimitiveType.Cylinder, "Pole", umbrella, new Vector3(0f, 1.1f, 0f), new Vector3(0.07f, 1.1f, 0.07f), pole);
+                        Material canopy = GetMaterial($"Umbrella{(n / 2) % umbrellaColors.Length}", umbrellaColors[(n / 2) % umbrellaColors.Length]);
+                        Primitive(PrimitiveType.Sphere, "Canopy", umbrella, new Vector3(0f, 2.15f, 0f), new Vector3(2.3f, 0.45f, 2.3f), canopy, keepCollider: false)
+                            .transform.localRotation = Quaternion.Euler(0f, 0f, 6f);
+                    }
                 }
                 towels.Add(towel);
                 n++;

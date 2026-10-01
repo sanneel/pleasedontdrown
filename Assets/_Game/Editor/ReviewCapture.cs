@@ -226,6 +226,7 @@ namespace PleaseDontDrown.Editor
             go.transform.position = new Vector3(F(2), F(3), F(4));
             var rig = go.AddComponent<AvatarRig>();
             rig.Build(look);
+            if (lookSpec[0] == "robber") Story.RobberBag.Wear(Story.RobberBag.Create(), rig); // as in the story
             var animator = go.AddComponent<AvatarAnimator>();
             animator.Rig = rig;
             string pose = p.Length > 6 ? p[6] : "idle";

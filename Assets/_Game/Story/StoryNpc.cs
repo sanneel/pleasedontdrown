@@ -955,23 +955,8 @@ namespace PleaseDontDrown.Story
                 return;
             }
             if (_rig == null || !_rig.IsBuilt) return;
-            if (_bag == null)
-            {
-                var kit = new AvatarMeshKit();
-                kit.SetBone(0, Matrix4x4.identity);
-                Color canvas = new Color(0.36f, 0.27f, 0.18f), strap = new Color(0.16f, 0.12f, 0.08f);
-                kit.Ellipsoid(Vector3.zero, new Vector3(0.17f, 0.22f, 0.11f), canvas, segments: 12, rings: 8);
-                kit.Ellipsoid(new Vector3(0f, 0.15f, -0.02f), new Vector3(0.15f, 0.07f, 0.1f), canvas * 0.85f, segments: 10, rings: 6);
-                kit.Box(new Vector3(0f, -0.02f, -0.11f), new Vector3(0.16f, 0.12f, 0.04f), canvas * 0.9f);
-                foreach (float side in new[] { -1f, 1f })
-                    kit.Box(new Vector3(0.1f * side, 0.05f, 0.1f), new Vector3(0.03f, 0.34f, 0.02f), strap);
-                _bag = new GameObject("Bag");
-                _bag.AddComponent<MeshFilter>().sharedMesh = kit.ToMesh("RobberBag", new[] { Matrix4x4.identity });
-                _bag.AddComponent<MeshRenderer>().sharedMaterial = AvatarRig.SharedMaterial;
-            }
-            _bag.transform.SetParent(_rig[AvatarRig.Bone.Chest], false);
-            _bag.transform.localPosition = new Vector3(0f, 0.05f, -0.22f) * _rig.Scale;
-            _bag.transform.localRotation = Quaternion.identity;
+            if (_bag == null) _bag = RobberBag.Create();
+            RobberBag.Wear(_bag, _rig);
             _bag.SetActive(true);
         }
     }

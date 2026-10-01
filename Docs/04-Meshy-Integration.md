@@ -94,3 +94,34 @@ sitting, CPR pose and the ragdoll work on them unchanged.
 Limits: the face is Meshy's painted one (no talking mouth or blinking yet), fingers don't bend (the hand is one
 piece), and textures are whatever Meshy painted (Sandy has pale streaks down the sides of her trousers).
 Review shots: `ReviewCapture` looks `sandy`, `sandyboss`, `sandycode` (the old code-built Sandy), pose `sitchair`.
+
+## Props that keep their painted texture (2 October 2026): backpack, umbrellas
+
+`ArtSource/Tools/polish_prop.py` (Blender). The Meshy mesh (150-250k triangles, its texture cut into hundreds of
+scraps) is only the source: a cleaned, decimated copy gets one tidy UV layout and the colour (and a normal map) is
+baked onto it from the source, so the paint survives any triangle count. Decimating the Meshy mesh directly
+shreds its texture.
+
+```
+blender -b --factory-startup -P ArtSource/Tools/polish_prop.py -- ArtSource/Meshy/raw/robber_backpack_raw.glb Assets/_Game/Art/Meshy/robber_backpack.glb --height 0.46 --turn 180 --strip-thin 0.035 --flat-back 0.16 --tris 3500 --flatten 0.2 --preview Screenshots/Review/Meshy/backpack
+blender -b --factory-startup -P ArtSource/Tools/polish_prop.py -- ArtSource/Meshy/raw/umbrella_raw.glb Assets/_Game/Art/Meshy/umbrella_red.glb --height 2.35 --tris 5000 --normals 0 --umbrella 0.86,0.2,0.16 --preview Screenshots/Review/Meshy/umbrella_red
+```
+
+* `--strip-thin` removes loose ribbons (the backpack's dangling shoulder straps and handle): the model is voxelised,
+  worn down until thin parts vanish and grown back; what stands clear of that bulk is deleted, the holes are closed,
+  the scars ironed and repainted in the cloth's colour. `--flat-back` then slices the strap side flat (it sits
+  against the wearer's back).
+* `--flatten` evens out the big light and dark smears Meshy paints in (fake highlights).
+* `--umbrella r,g,b` repaints the canopy's panels alternately that colour and white. The ribs are found from the
+  shape (12 panels on this model), so the stripes follow them. Teal `0.13,0.62,0.66`, yellow `0.98,0.78,0.2`.
+* `ArtSource/Tools/preview_glb.py` renders any GLB (raw or prepared) from four sides and prints its size and
+  triangle count: look at a new download with it first. `sheet.py` joins pictures side by side.
+
+In the game (`Editor/GameSceneBuilder.MeshyProps.cs`): each gets a plain matte URP Lit material with its colour
+texture. The backpack is saved as `Resources/RobberBackpack.prefab` and worn by the thief (`Story/RobberBag.cs`,
+code-built bag as the fallback). The umbrellas replace the grey-box ones beside every other beach towel, three
+colours in turn, each with a thin collider on the pole only.
+
+**The robber himself is not in**: the download (`ArtSource/Meshy/raw/robber_raw.glb`) stands with his hands in his
+pockets and his elbows out, so there are no free arms to rig (`prepare_character.py` stops at the arms). He needs a
+new picture with the arms away from the body (Docs/07, "Characters on the Free plan").
