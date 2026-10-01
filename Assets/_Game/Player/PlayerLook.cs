@@ -16,9 +16,6 @@ namespace PleaseDontDrown.Player
     [DefaultExecutionOrder(-10)]
     public class PlayerLook : MonoBehaviour
     {
-        private const string SensitivityKey = "pdd.look.sensitivity";
-        private const string FovKey = "pdd.look.fov";
-
         [SerializeField] private Transform _head;
         [SerializeField] private PlayerMotor _motor;
         [SerializeField] private float _stickDegreesPerSecond = 180f;
@@ -56,8 +53,9 @@ namespace PleaseDontDrown.Player
         private static AnimationCurve _bobSidewaysCurve, _bobUpDownCurve;
 
         public Camera Camera => _camera;
-        public float Sensitivity { get; private set; }
-        public float BaseFov { get; private set; }
+        /// <summary>Mouse sensitivity and field of view are the player's settings (options menu): <see cref="LookSettings"/>.</summary>
+        public float Sensitivity => LookSettings.Sensitivity;
+        public float BaseFov => LookSettings.Fov;
         public float Yaw => _yaw;
         public float Pitch => _pitch;
         /// <summary>Horizontal facing, used for movement.</summary>
@@ -87,8 +85,6 @@ namespace PleaseDontDrown.Player
 
         private void Awake()
         {
-            Sensitivity = PlayerPrefs.GetFloat(SensitivityKey, 0.1f);
-            BaseFov = PlayerPrefs.GetFloat(FovKey, 74f);
             _fov = BaseFov;
             BuildBobCurves();
         }
@@ -118,14 +114,12 @@ namespace PleaseDontDrown.Player
         {
             DevCommands.Register("sens", "<degrees per pixel>", "Mouse sensitivity (default 0.1).", args =>
             {
-                Sensitivity = Mathf.Clamp(DevCommands.ParseFloat(args, 0), 0.01f, 1f);
-                PlayerPrefs.SetFloat(SensitivityKey, Sensitivity);
+                LookSettings.Sensitivity = DevCommands.ParseFloat(args, 0);
                 DevCommands.Print($"sensitivity = {Sensitivity}");
             }, owner: this);
             DevCommands.Register("fov", "<degrees>", "Field of view (default 74).", args =>
             {
-                BaseFov = Mathf.Clamp(DevCommands.ParseFloat(args, 0), 60f, 110f);
-                PlayerPrefs.SetFloat(FovKey, BaseFov);
+                LookSettings.Fov = DevCommands.ParseFloat(args, 0);
                 DevCommands.Print($"fov = {BaseFov}");
             }, owner: this);
             DevCommands.Register("lookat", "<x> <y> <z>", "Aim the camera at a world point.", args =>

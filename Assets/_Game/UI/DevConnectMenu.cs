@@ -12,7 +12,7 @@ namespace PleaseDontDrown.UI
     /// </summary>
     public class DevConnectMenu : MonoBehaviour
     {
-        private enum Page { Main, Join, Invite, Travel, ConfirmLeave, ConfirmQuit }
+        private enum Page { Main, Join, Options, Invite, Travel, ConfirmLeave, ConfirmQuit }
 
         [SerializeField] private ConnectionService _connection;
 
@@ -117,7 +117,7 @@ namespace PleaseDontDrown.UI
             Hud.Label(new Rect(62f, 436f, 640f, 70f), "Rescue tourists. Return lost items.\nFind out what is happening on the beach.", 24f, Hud.Sand, TextAnchor.UpperLeft);
 
             // Buttons, stacked up from the bottom left.
-            const int count = 5;
+            const int count = 6;
             float x = 40f, y = height - 40f - count * ButtonHeight - (count - 1) * ButtonGap;
             if (!string.IsNullOrEmpty(_connection.LastError))
                 Hud.Label(new Rect(x, y - 74f, 900f, 60f), _connection.LastError, 22f, Hud.Coral, TextAnchor.LowerLeft, wrap: true);
@@ -125,10 +125,12 @@ namespace PleaseDontDrown.UI
             if (Button(Row(x, ref y), "PLAY", primary: true)) _connection.Play();
             if (Button(Row(x, ref y), "JOIN GAME", selected: _page == Page.Join)) _page = _page == Page.Join ? Page.Main : Page.Join;
             if (Button(Row(x, ref y), "CHARACTER")) AvatarCustomizer.Open();
+            if (Button(Row(x, ref y), "OPTIONS", selected: _page == Page.Options)) _page = _page == Page.Options ? Page.Main : Page.Options;
             if (Button(Row(x, ref y), GameDisplay.IsFullscreen ? "WINDOWED" : "FULLSCREEN")) GameDisplay.Toggle();
             if (Button(Row(x, ref y), "QUIT")) Application.Quit();
 
             if (_page == Page.Join) DrawJoinPanel(x + ButtonWidth + 30f, height - 40f);
+            else if (_page == Page.Options) DrawOptionsPanel(new Rect(x + ButtonWidth + 30f, height - 40f - OptionsHeight, OptionsWidth, OptionsHeight));
 
             string steam = SteamBootstrap.IsReady
                 ? "Steam: " + SteamBootstrap.LocalName + "   Your Steam friends can join you."
@@ -198,6 +200,13 @@ namespace PleaseDontDrown.UI
             switch (_page)
             {
                 case Page.Invite: DrawInvitePage(width, height); return;
+                case Page.Options:
+                {
+                    var panel = new Rect((width - OptionsWidth) * 0.5f, (height - OptionsHeight - ButtonHeight - 20f) * 0.5f, OptionsWidth, OptionsHeight);
+                    DrawOptionsPanel(panel);
+                    if (Button(new Rect(x, panel.yMax + 20f, ButtonWidth, ButtonHeight), "BACK", centred: true)) _page = Page.Main;
+                    return;
+                }
                 case Page.Travel:
                 {
                     int count = Dev.DevIsland.DestinationNames.Length + 1;
@@ -236,12 +245,13 @@ namespace PleaseDontDrown.UI
             string info = (host ? "Host" : "Client") + "   " + _connection.Mode + "   " + players + (players == 1 ? " player" : " players");
             if (!SteamLobbyService.InLobby && SteamBootstrap.IsReady)
                 info += "\nOffline session: friends can't join it. Leave and press PLAY to host through Steam.";
-            int rows = 5 + (SteamLobbyService.InLobby ? 1 : 0) + (travel ? 1 : 0) + (story ? 1 : 0);
+            int rows = 6 + (SteamLobbyService.InLobby ? 1 : 0) + (travel ? 1 : 0) + (story ? 1 : 0);
             float top = Header("PAUSED", info, rows, ButtonWidth, out _);
 
             if (Button(Row(x, ref top), "RESUME", centred: true, primary: true)) SetPause(false);
             if (SteamLobbyService.InLobby && Button(Row(x, ref top), "INVITE FRIENDS", centred: true)) _page = Page.Invite;
             if (Button(Row(x, ref top), "CHARACTER", centred: true)) AvatarCustomizer.Open();
+            if (Button(Row(x, ref top), "OPTIONS", centred: true)) _page = Page.Options;
             if (Button(Row(x, ref top), GameDisplay.IsFullscreen ? "WINDOWED" : "FULLSCREEN", centred: true)) GameDisplay.Toggle();
             if (travel && Button(Row(x, ref top), "TRAVEL", centred: true)) _page = Page.Travel;
             if (story && Button(Row(x, ref top), "RESTART STORY", centred: true))
@@ -252,6 +262,93 @@ namespace PleaseDontDrown.UI
             }
             if (Button(Row(x, ref top), "MAIN MENU", centred: true)) _page = Page.ConfirmLeave;
             if (Button(Row(x, ref top), "QUIT", centred: true)) _page = Page.ConfirmQuit;
+        }
+
+        // ------------------------------------------------------------------ options
+
+        private const float OptionsWidth = 620f, OptionsHeight = 300f;
+
+        /// <summary>Mouse sensitivity and field of view, each a slider with its number; they apply as you drag.</summary>
+        private void DrawOptionsPanel(Rect panel)
+        {
+            Hud.Fill(panel, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.85f), 16f);
+            Hud.Label(new Rect(panel.x + 28f, panel.y + 16f, panel.width - 56f, 44f), "OPTIONS", 36f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            float y = panel.y + 78f;
+
+            // Shown as a plain number, 1.0 = the default.
+            float sensitivity = LookSettings.Sensitivity / LookSettings.DefaultSensitivity;
+            float changed = OptionRow(panel, ref y, "MOUSE SENSITIVITY", sensitivity, LookSettings.MinSensitivity / LookSettings.DefaultSensitivity,
+                LookSettings.MaxSensitivity / LookSettings.DefaultSensitivity, sensitivity.ToString("0.00"));
+            if (!Mathf.Approximately(changed, sensitivity)) LookSettings.Sensitivity = Mathf.Round(changed * 20f) / 20f * LookSettings.DefaultSensitivity;
+
+            float fov = LookSettings.Fov;
+            changed = OptionRow(panel, ref y, "FIELD OF VIEW", fov, LookSettings.MinFov, LookSettings.MaxFov, Mathf.RoundToInt(fov).ToString());
+            if (!Mathf.Approximately(changed, fov)) LookSettings.Fov = Mathf.Round(changed);
+
+            if (Button(new Rect(panel.x + 28f, panel.yMax - 66f, 220f, 46f), "RESET", small: true))
+            {
+                LookSettings.Sensitivity = LookSettings.DefaultSensitivity;
+                LookSettings.Fov = LookSettings.DefaultFov;
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary>A label, a slider and the value's number on one line; returns the slider's value.</summary>
+        private float OptionRow(Rect panel, ref float y, string label, float value, float min, float max, string number)
+        {
+            Hud.Label(new Rect(panel.x + 28f, y, 280f, 30f), label, 21f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Label(new Rect(panel.xMax - 108f, y + 30f, 80f, 36f), number, 26f, Color.white, TextAnchor.MiddleRight, heavy: true, shadow: false);
+            value = Slider(new Rect(panel.x + 28f, y + 30f, panel.width - 160f, 36f), value, min, max);
+            y += 78f;
+            return value;
+        }
+
+        /// <summary>A rounded track with a coral fill and a white knob; click or drag anywhere along it.</summary>
+        private static float Slider(Rect r, float value, float min, float max)
+        {
+            const float knob = 26f, track = 10f;
+            int id = GUIUtility.GetControlID(FocusType.Passive);
+            Event e = Event.current;
+            Rect px = Hud.Px(r);
+            float FromMouse() => Mathf.Lerp(min, max, Mathf.InverseLerp(px.x + knob * 0.5f * Hud.Scale, px.xMax - knob * 0.5f * Hud.Scale, e.mousePosition.x));
+            switch (e.GetTypeForControl(id))
+            {
+                case EventType.MouseDown:
+                    if (e.button == 0 && px.Contains(e.mousePosition))
+                    {
+                        GUIUtility.hotControl = id;
+                        value = FromMouse();
+                        e.Use();
+                    }
+                    break;
+                case EventType.MouseDrag:
+                    if (GUIUtility.hotControl == id)
+                    {
+                        value = FromMouse();
+                        e.Use();
+                    }
+                    break;
+                case EventType.MouseUp:
+                    if (GUIUtility.hotControl == id)
+                    {
+                        GUIUtility.hotControl = 0;
+                        PlayerPrefs.Save();
+                        e.Use();
+                    }
+                    break;
+                case EventType.Repaint:
+                {
+                    float t = Mathf.InverseLerp(min, max, value);
+                    float cx = Mathf.Lerp(r.x + knob * 0.5f, r.xMax - knob * 0.5f, t), cy = r.y + r.height * 0.5f;
+                    bool active = GUIUtility.hotControl == id || Hud.Hovered(r);
+                    Hud.Fill(new Rect(r.x, cy - track * 0.5f, r.width, track), new Color(1f, 1f, 1f, 0.18f), track * 0.5f);
+                    Hud.Fill(new Rect(r.x, cy - track * 0.5f, cx - r.x, track), Hud.Coral, track * 0.5f);
+                    float size = active ? knob + 4f : knob;
+                    Hud.Fill(new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size), Color.white, size * 0.5f);
+                    break;
+                }
+            }
+            return value;
         }
 
         /// <summary>Online Steam friends to invite: Steam sends them the invite, no overlay needed.</summary>
@@ -315,7 +412,7 @@ namespace PleaseDontDrown.UI
 
         private void DrawGuide()
         {
-            const float width = 470f, height = 330f;
+            const float width = 470f, height = 366f;
             var panel = new Rect(Hud.Width - width - 24f, 24f, width, height);
             Hud.Fill(panel, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.85f), 16f);
             Hud.Label(new Rect(panel.x + 24f, panel.y + 14f, width - 48f, 40f), "BEACH GUIDE", 30f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
@@ -328,6 +425,7 @@ namespace PleaseDontDrown.UI
             y += 10f;
             GuideRow(panel, ref y, "Tab", "Close guide", "Esc", "Pause");
             GuideRow(panel, ref y, "F11", "Fullscreen", "Shift+Tab", "Steam");
+            Hud.Label(new Rect(panel.x + 24f, panel.yMax - 40f, width - 48f, 28f), "Mouse sensitivity: Esc, then OPTIONS", 18f, new Color(1f, 1f, 1f, 0.65f), TextAnchor.MiddleLeft, shadow: false);
         }
 
         private static void GuideRow(Rect panel, ref float y, string keyA, string whatA, string keyB, string whatB)
