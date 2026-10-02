@@ -4,11 +4,12 @@ using UnityEngine.Rendering.Universal;
 namespace PleaseDontDrown.Combat
 {
     /// <summary>
-    /// Makes the scope on the gun in your hands something you can see through: a small camera looks down the scope
-    /// and its picture is shown on the glass at the back, so from the hip the lens shows what the gun points at
-    /// (magnified, with the crosshair) instead of a dark disc. Only for the local player's own gun, and not while
+    /// Makes the scope on the gun in your hands something you can see through: a small camera looks from your eye
+    /// through the glass at the back of the scope and its picture is shown on that glass, so the lens shows what is
+    /// really behind it, magnified (like clear glass with a lens in it), instead of a dark disc. Only for the local player's own gun, and not while
     /// the eye is at the scope (then the whole screen is the scope picture). Starts itself.
     /// </summary>
+    [DefaultExecutionOrder(1000)] // after the gun and the view have been placed for this frame
     public sealed class ScopeLens : MonoBehaviour
     {
         private const int Size = 384;
@@ -40,8 +41,27 @@ namespace PleaseDontDrown.Combat
             bool show = _scope != null && _scope.gameObject.activeInHierarchy && !gun.IsScopedIn;
             if (_glass.activeSelf != show) _glass.SetActive(show);
             if (_camera.enabled != show) _camera.enabled = show;
-            if (show) _camera.fieldOfView = Mathf.Clamp(gun.Sight.AimFov * 0.7f, 6f, 40f);
+            Camera eye = Camera.main;
+            if (!show || eye == null) return;
+
+            // Look from the player's own eye through the middle of the glass: what shows in the lens is what is
+            // really behind it (as through clear glass), only magnified. The near plane starts past the muzzle, so
+            // the gun and the hands aren't in the picture.
+            Vector3 centre = _glass.transform.position, from = eye.transform.position;
+            Vector3 through = centre - from;
+            float distance = through.magnitude;
+            if (distance < 0.05f) return;
+            float across = 2f * Mathf.Atan(_glass.transform.lossyScale.x * 1.04f / distance) * Mathf.Rad2Deg; // how big the glass looks
+            float zoom = Mathf.Clamp(eye.fieldOfView / Mathf.Max(1f, gun.Sight.AimFov) * 0.6f, 1.4f, 3f);
+            _camera.transform.SetPositionAndRotation(from, Quaternion.LookRotation(through, eye.transform.up));
+            _camera.fieldOfView = Mathf.Clamp(across / zoom, 0.2f, 60f);
+            _camera.nearClipPlane = distance + 1.1f;
+            // Where each point of the glass lies in that view (unmagnified): the shader looks the picture up there.
+            Matrix4x4 lens = Matrix4x4.Perspective(Mathf.Clamp(across, 0.5f, 120f), 1f, 0.05f, 100f) * _camera.worldToCameraMatrix;
+            _material.SetMatrix(LensView, lens);
         }
+
+        private static readonly int LensView = Shader.PropertyToID("_LensView");
 
         /// <summary>Put the glass and the camera on this gun's scope (or take them off).</summary>
         private void Fit(Weapon gun, Transform scope)
@@ -51,21 +71,16 @@ namespace PleaseDontDrown.Combat
             if (scope == null)
             {
                 if (_glass != null) _glass.SetActive(false);
-                if (_camera != null)
-                {
-                    _camera.enabled = false;
-                    _camera.transform.SetParent(transform, false);
-                }
+                if (_camera != null) _camera.enabled = false;
                 if (_glass != null) _glass.transform.SetParent(transform, false);
                 return;
             }
             if (_glass == null && !Build()) return;
 
             // The scope's own lenses say where its ends are and how wide the glass is (the eye point is at the back).
-            Transform rear = scope.Find("RearLens"), front = scope.Find("FrontLens");
+            Transform rear = scope.Find("RearLens");
             Vector3 back = scope.InverseTransformPoint(gun.Sight.EyePoint.position);
             float radius = rear != null ? rear.localScale.x * 0.5f : 0.024f;
-            float length = front != null ? front.localPosition.z - back.z : 0.24f;
             // A gun whose model has its own scope (the sniper's: the fitted one is hidden): the glass goes on that
             // eyepiece, which ends 4 cm behind the eye point (Editor/WeaponArtPolish's sniper optic).
             bool ownScope = rear != null && rear.TryGetComponent(out Renderer rearGlass) && !rearGlass.enabled;
@@ -75,10 +90,6 @@ namespace PleaseDontDrown.Combat
             _glass.transform.localRotation = Quaternion.identity;
             _glass.transform.localScale = Vector3.one * radius;
             _glass.layer = gun.gameObject.layer;
-            _camera.transform.SetParent(scope, false);
-            // Out past the muzzle, on the scope's line: the gun's own front sight and barrel aren't in the picture.
-            _camera.transform.localPosition = new Vector3(back.x, back.y, back.z + Mathf.Max(length + 0.03f, 0.95f));
-            _camera.transform.localRotation = Quaternion.identity;
         }
 
         private bool Build()

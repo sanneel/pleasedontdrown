@@ -1,5 +1,6 @@
-// The glass at the back of a scope, seen from the hip: the picture a small camera takes down the scope
-// (Combat/Weapons/ScopeLens.cs), darker toward the rim, with the crosshair in it. Unlit: glass you look through.
+// The glass at the back of a scope, seen from the hip: the picture a small camera takes from the player's eye
+// through this glass (Combat/Weapons/ScopeLens.cs), looked up where each point of the glass lies in that view, so
+// what shows is what is behind it. Darker toward the rim. Unlit: glass you look through.
 Shader "PleaseDontDrown/ScopeLens"
 {
     Properties
@@ -28,6 +29,7 @@ Shader "PleaseDontDrown/ScopeLens"
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
                 half4 _Tint;
+                float4x4 _LensView;
             CBUFFER_END
 
             struct Attributes
@@ -40,6 +42,7 @@ Shader "PleaseDontDrown/ScopeLens"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                float4 lens : TEXCOORD1;
             };
 
             Varyings vert(Attributes input)
@@ -47,6 +50,7 @@ Shader "PleaseDontDrown/ScopeLens"
                 Varyings output;
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv;
+                output.lens = mul(_LensView, float4(TransformObjectToWorld(input.positionOS.xyz), 1.0));
                 return output;
             }
 
@@ -54,12 +58,9 @@ Shader "PleaseDontDrown/ScopeLens"
             {
                 float2 p = input.uv * 2.0 - 1.0;          // -1..1 across the glass
                 float r = length(p);
-                half3 view = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).rgb * _Tint.rgb;
-                view *= 1.0 - smoothstep(0.55, 1.0, r) * 0.75;   // the tube shades the edge
-                // Crosshair: two fine lines, open in the middle.
-                float hair = saturate(step(abs(p.x), 0.012) + step(abs(p.y), 0.012));
-                float gap = step(0.06, r);
-                view = lerp(view, half3(0.02, 0.02, 0.02), hair * gap * 0.85);
+                float2 at = input.lens.xy / max(input.lens.w, 1e-4) * 0.5 + 0.5;   // this point of the glass, in the lens camera's picture
+                half3 view = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, saturate(at)).rgb * _Tint.rgb;
+                view *= 1.0 - smoothstep(0.6, 1.0, r) * 0.7;   // the tube shades the edge
                 return half4(view, 1);
             }
             ENDHLSL
