@@ -336,7 +336,6 @@ namespace PleaseDontDrown.Editor
                 left.FindPropertyRelative("Spread").floatValue = 0f;
                 itemSo.ApplyModifiedPropertiesWithoutUndo();
 
-                go.AddComponent<ItemSkin>(); // Z / C: weapon skins
                 var weapon = go.AddComponent<Weapon>();
                 var so = new SerializedObject(weapon);
                 Require(so, "_kind").stringValue = setup.Kind;
@@ -752,7 +751,6 @@ namespace PleaseDontDrown.Editor
                 pose.FindPropertyRelative("Thumb").floatValue = 0.55f;
                 pose.FindPropertyRelative("Spread").floatValue = 0f;
                 itemSo.ApplyModifiedPropertiesWithoutUndo();
-                go.AddComponent<ItemSkin>();
                 var audio = go.AddComponent<AudioSource>();
                 audio.playOnAwake = false;
                 audio.spatialBlend = 1f;

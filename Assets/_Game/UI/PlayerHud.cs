@@ -102,7 +102,7 @@ namespace PleaseDontDrown.UI
                     if (secondary != _secondary)
                     {
                         _secondary = secondary;
-                        _secondaryLine = $"{Key(GameInput.Secondary)} {secondary}";
+                        _secondaryLine = $"{Key(local.Interactor.CurrentSecondaryAction)} {secondary}";
                     }
                     Hud.Label(new Rect(cx - 500f, y, 1000f, 36f), _secondaryLine, 26f, Color.white);
                 }

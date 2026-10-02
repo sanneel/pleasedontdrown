@@ -49,6 +49,13 @@ namespace PleaseDontDrown.Combat
                 _queued = false; // hands full: Primary uses the item
                 return;
             }
+            // Looking at something whose own action is on this button right now (slapping a man awake): that, not a punch.
+            PlayerInteractor interactor = _hub.Interactor;
+            if (interactor != null && interactor.CurrentSecondaryPrompt != null && interactor.CurrentSecondaryAction == GameInput.Primary)
+            {
+                _queued = false;
+                return;
+            }
             if (GameInput.Primary.WasPressedThisFrame())
             {
                 if (CanPunch()) Punch();

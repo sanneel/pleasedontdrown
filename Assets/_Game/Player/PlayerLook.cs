@@ -155,6 +155,19 @@ namespace PleaseDontDrown.Player
 
         private Vector3 _leanPoint;
         private float _leanStart = -10f, _leanLength;
+        private Vector3 _kneelPoint;
+        private float _kneelUntil = -10f, _kneel, _pressAt = -10f;
+
+        /// <summary>
+        /// Doing CPR: the view comes down beside the patient's chest (as if kneeling over them) and stays there while
+        /// the presses keep coming, dipping a little with each one; a moment after the last it stands back up.
+        /// </summary>
+        public void KneelOver(Vector3 chest, bool press)
+        {
+            _kneelPoint = chest;
+            _kneelUntil = Time.time + 1.7f;
+            if (press) _pressAt = Time.time;
+        }
 
         /// <summary>
         /// Lean the view right in to a point and back (mouth-to-mouth: the camera goes down to their lips, holds, and
@@ -259,6 +272,21 @@ namespace PleaseDontDrown.Player
 
             _camera.transform.localPosition = _delayedBob + _head.InverseTransformVector(Vector3.up * settle);
             _camera.transform.localRotation = Quaternion.Euler(_fallTilt, 0f, _roll);
+
+            // Kneeling over a patient (CPR): the eye comes down to arm's length above the chest, looking at it.
+            _kneel = Mathf.MoveTowards(_kneel, Time.time < _kneelUntil ? 1f : 0f, Time.deltaTime * (Time.time < _kneelUntil ? 4f : 2.5f));
+            if (_kneel > 0.001f)
+            {
+                float k = Mathf.SmoothStep(0f, 1f, _kneel);
+                Vector3 eye = _camera.transform.position;
+                Vector3 back = Vector3.ProjectOnPlane(eye - _kneelPoint, Vector3.up);
+                back = back.sqrMagnitude > 1e-4f ? back.normalized : -Vector3.ProjectOnPlane(_camera.transform.forward, Vector3.up).normalized;
+                float sincePress = Time.time - _pressAt;
+                float dip = sincePress < 0.22f ? Mathf.Sin(sincePress / 0.22f * Mathf.PI) * 0.07f : 0f;
+                Vector3 over = _kneelPoint + Vector3.up * (0.78f - dip) + back * 0.5f;
+                Quaternion down = Quaternion.LookRotation(_kneelPoint + Vector3.up * 0.05f - over, Vector3.up);
+                _camera.transform.SetPositionAndRotation(Vector3.Lerp(eye, over, k), Quaternion.Slerp(_camera.transform.rotation, down, k * 0.85f));
+            }
 
             // Leaning in (mouth-to-mouth): the eye comes down over their face (they lie on their back, face up) to just
             // above the lips, looking down at them, head tipped a little, then back up.

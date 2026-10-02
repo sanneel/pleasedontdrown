@@ -24,6 +24,8 @@ namespace PleaseDontDrown.Interaction
         string GetSecondaryPrompt(PlayerHub player);
         /// <summary>Runs on the interacting player's machine.</summary>
         void OnSecondary(PlayerHub player);
+        /// <summary>The button for it right now (the Secondary button unless the object says otherwise: CPR's steps each have their own).</summary>
+        UnityEngine.InputSystem.InputAction SecondaryAction(PlayerHub player) => Core.GameInput.Secondary;
     }
 
     /// <summary>
@@ -99,6 +101,9 @@ namespace PleaseDontDrown.Interaction
         public bool CanSecondary(PlayerHub player) => _secondary != null && isActiveAndEnabled && _secondary.CanSecondary(player);
 
         public string GetSecondaryPrompt(PlayerHub player) => CanSecondary(player) ? _secondary.GetSecondaryPrompt(player) : null;
+
+        public UnityEngine.InputSystem.InputAction SecondaryAction(PlayerHub player) =>
+            _secondary != null ? _secondary.SecondaryAction(player) : Core.GameInput.Secondary;
 
         public void InteractSecondary(PlayerHub player)
         {

@@ -157,6 +157,10 @@ namespace PleaseDontDrown.Rescue
         public float Condition01 => _condition.Value;
         public float Cpr01 => _cpr.Value;
         public CprStep NextCprStep => _cprStep.Value;
+        /// <summary>How far into the current CPR step (0 = none done yet) and how many it takes.</summary>
+        public int CprCount => _cprCount.Value;
+        public int CompressionsPerSet => _compressionsPerSet;
+        public int BreathsPerSet => _breathsPerSet;
         public bool IsAshore => _ashore.Value;
         public bool HasBeenRescued => _rescued.Value;
         public float ConditionSecondsLeft => _condition.Value * _conditionTotal.Value;
@@ -553,6 +557,14 @@ namespace PleaseDontDrown.Rescue
             };
         }
 
+        /// <summary>Each CPR step has its own button: pumps on Secondary, the kiss of life on Inspect (F), the slap on Primary.</summary>
+        public UnityEngine.InputSystem.InputAction SecondaryAction(PlayerHub player) => _flatline.Value ? GameInput.Secondary : KeyOf(_cprStep.Value);
+
+        public static UnityEngine.InputSystem.InputAction KeyOf(CprStep step) =>
+            step switch { CprStep.Breath => GameInput.Inspect, CprStep.Punch => GameInput.Primary, _ => GameInput.Secondary };
+
+        private static readonly string[] Counts = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+
         public void OnSecondary(PlayerHub player)
         {
             if (_flatline.Value)
@@ -583,6 +595,8 @@ namespace PleaseDontDrown.Rescue
                     break;
                 default:
                     _body.Pump();
+                    // Counted out loud over the chest, so everyone can see the compressions happening.
+                    FloatingText.Spawn(_body.ChestPoint + Vector3.up * 0.45f, Counts[Mathf.Clamp(_cprCount.Value, 0, Counts.Length - 1)], new Color(1f, 1f, 1f, 0.95f), 0.9f, 0.55f);
                     if (player != null) player.ShowPump(_body.ChestPoint);
                     break;
             }

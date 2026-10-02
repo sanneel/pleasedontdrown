@@ -710,9 +710,12 @@ namespace PleaseDontDrown.Rescue
             if (tilt.sqrMagnitude < 0.001f && transform.up.y < 0f)
                 tilt = transform.right; // an upside-down body needs a direction to start rolling
             float turn = Vector3.SignedAngle(transform.forward, _wadeDirection, Vector3.up) * Mathf.Deg2Rad;
-            _rb.AddTorque(tilt * 78f + Vector3.up * (turn * 8f) - _rb.angularVelocity * 14f, ForceMode.Acceleration);
+            _rb.AddTorque(tilt * 78f + Vector3.up * (turn * 22f) - _rb.angularVelocity * 14f, ForceMode.Acceleration);
 
-            Vector3 target = moving ? _wadeDirection * (_wading ? 1.1f : 1.35f) : Vector3.zero;
+            // They walk the way they face: turn toward the beach first, then set off (no shuffling off backwards or sideways).
+            Vector3 ahead = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
+            float go = Mathf.Clamp01((Vector3.Dot(ahead, _wadeDirection) - 0.3f) / 0.5f);
+            Vector3 target = moving ? _wadeDirection * ((_wading ? 1.1f : 1.35f) * go) : Vector3.zero;
             Vector3 horizontal = new(v.x, 0f, v.z);
             _rb.AddForce((target - horizontal) * 8f, ForceMode.Acceleration);
         }

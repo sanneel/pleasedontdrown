@@ -100,7 +100,7 @@ namespace PleaseDontDrown.Core
                 new Rebind("FORWARD", Move, 1), new Rebind("BACK", Move, 2), new Rebind("LEFT", Move, 3), new Rebind("RIGHT", Move, 4),
                 new Rebind("JUMP", Jump, 0), new Rebind("SPRINT", Sprint, 0), new Rebind("CROUCH", Crouch, 0), new Rebind("USE / RESCUE", Interact, 0),
                 new Rebind("PUNCH / FIRE", Primary, 0), new Rebind("CPR / AIM", Secondary, 0), new Rebind("DROP / THROW", Drop, 0), new Rebind("WAVE", Emote, 0),
-                new Rebind("RELOAD", Reload, 0), new Rebind("INSPECT", Inspect, 0), new Rebind("SKIN BACK", SkinPrev, 0), new Rebind("SKIN NEXT", SkinNext, 0)
+                new Rebind("RELOAD", Reload, 0), new Rebind("INSPECT / KISS OF LIFE", Inspect, 0)
             };
             _rebinding = null;
             IsRebinding = false;

@@ -1,4 +1,5 @@
 using PleaseDontDrown.Core;
+using PleaseDontDrown.Interaction;
 using PleaseDontDrown.Player;
 using PleaseDontDrown.Rescue;
 using UnityEngine;
@@ -33,6 +34,67 @@ namespace PleaseDontDrown.UI
             }
 
             DrawCarryHint(local);
+            DrawCpr(local);
+        }
+
+        // The CPR panel's words, made again only when the patient, the step or a key changes.
+        private VictimBrain _cprPatient;
+        private int _cprStamp = -1;
+        private readonly string[] _cprKeys = new string[2], _cprWhat = new string[2], _cprCount = new string[2];
+        private string _cprPercent;
+        private int _cprPercentShown = -1;
+
+        /// <summary>
+        /// Looking at someone who needs CPR: the steps side by side, each with its own button (pump the chest, then
+        /// the kiss of life for a woman or a slap for a man), the one to do now lit up, and how far along they are.
+        /// </summary>
+        private void DrawCpr(PlayerHub local)
+        {
+            Interactable target = local.Interactor != null ? local.Interactor.Current : null;
+            if (target == null || local.Interactor.CurrentSecondaryPrompt == null || !target.TryGetComponent(out VictimBrain v)) return;
+            if (v.State != VictimState.Unconscious || v.IsFlatlined) return;
+
+            CprStep now = v.NextCprStep, second = v.IsFemale ? CprStep.Breath : CprStep.Punch;
+            int stamp = System.HashCode.Combine((int)now, v.CprCount, GameInput.BindingsVersion);
+            if (v != _cprPatient || stamp != _cprStamp)
+            {
+                _cprPatient = v;
+                _cprStamp = stamp;
+                _cprKeys[0] = GameInput.KeyLabel(VictimBrain.KeyOf(CprStep.Compress));
+                _cprKeys[1] = GameInput.KeyLabel(VictimBrain.KeyOf(second));
+                _cprWhat[0] = "PUMP THE CHEST";
+                _cprWhat[1] = second == CprStep.Breath ? "KISS OF LIFE" : "SLAP AWAKE";
+                _cprCount[0] = $"{(now == CprStep.Compress ? v.CprCount : v.CompressionsPerSet)} / {v.CompressionsPerSet}";
+                int needed = second == CprStep.Breath ? v.BreathsPerSet : 1;
+                _cprCount[1] = $"{(now == CprStep.Compress ? 0 : v.CprCount)} / {needed}";
+            }
+            int percent = Mathf.RoundToInt(v.Cpr01 * 100f);
+            if (percent != _cprPercentShown)
+            {
+                _cprPercentShown = percent;
+                _cprPercent = $"REVIVING  {percent}%";
+            }
+
+            const float chip = 300f, gap = 16f, height = 86f;
+            // Low on the screen, over the hotbar: the patient stays in view.
+            float left = (Hud.Width - chip * 2f - gap) * 0.5f, top = Hud.HotbarTop - 64f - height - 52f;
+            for (int i = 0; i < 2; i++)
+            {
+                bool current = (i == 0) == (now == CprStep.Compress);
+                var box = new Rect(left + i * (chip + gap), top, chip, height);
+                float pulse = current ? 0.82f + 0.18f * Mathf.Sin(Time.unscaledTime * 7f) : 0f;
+                Hud.Fill(box, current ? new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, pulse) : new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.55f), 14f);
+                if (current) Hud.Frame(box, Color.white, 3f, 14f);
+                Color words = current ? Color.white : new Color(1f, 1f, 1f, 0.55f);
+                var key = new Rect(box.x + 12f, box.y + 13f, 84f, 60f);
+                Hud.Fill(key, new Color(0f, 0f, 0f, current ? 0.35f : 0.3f), 10f);
+                Hud.Label(key, _cprKeys[i], 28f, current ? Hud.Sand : words, heavy: true, shadow: false);
+                Hud.Label(new Rect(box.x + 108f, box.y + 10f, chip - 116f, 36f), _cprWhat[i], 23f, words, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                Hud.Label(new Rect(box.x + 108f, box.y + 44f, chip - 116f, 30f), _cprCount[i], 21f, words, TextAnchor.MiddleLeft, shadow: false);
+            }
+            var bar = new Rect(left, top + height + 12f, chip * 2f + gap, 14f);
+            Hud.Bar(bar, v.Cpr01, new Color(0.5f, 1f, 0.5f));
+            Hud.Label(new Rect(bar.x, bar.yMax + 4f, bar.width, 30f), _cprPercent, 21f, new Color(0.7f, 1f, 0.7f), heavy: true);
         }
 
         private void DrawMarker(Camera cam, PlayerHub local, VictimBrain v, VictimState state)

@@ -115,6 +115,14 @@ namespace PleaseDontDrown.Story
             bool teleported = npc.ServerTeleportedSince(Time.time - dt - 0.05f);
             if (!teleported && step > 14f * dt + 0.5f && npc.Ride == null) // (a punch knocks someone back at up to 10 m/s)
                 Report(npc, t, "popping", $"moved {step:F2} m in {dt:F2} s");
+            // Going one way while facing another (walking backwards or crabwise) for more than a moment.
+            if (!teleported && npc.Ride == null && npc.IsUpright && npc.IsMoving && step / dt > 0.5f)
+            {
+                Vector3 way = new Vector3(p.x - t.Last.x, 0f, p.z - t.Last.z).normalized;
+                Vector3 ahead = Vector3.ProjectOnPlane(npc.transform.forward, Vector3.up).normalized;
+                if (Vector3.Dot(way, ahead) < 0.3f)
+                    Lasting(npc, t, "sideways", $"moving {step / dt:F1} m/s at {Vector3.Angle(way, ahead):F0} degrees from where it faces (its target is {Vector3.Angle(Vector3.ProjectOnPlane(npc.MoveTarget - p, Vector3.up), ahead):F0} degrees off, {npc.PathInfo}; in the way: {InTheWay(npc, p)})", npc.IsSwimming ? 1.2f : 0.5f);
+            }
             t.Last = p;
 
             // Stuck on a route.
@@ -174,6 +182,19 @@ namespace PleaseDontDrown.Story
         }
 
         /// <summary>A problem only counts once it has lasted (pose blends and a wave passing are not problems).</summary>
+        /// <summary>What a character's body would run into over the next half metre of its route (as its own movement sweep sees it).</summary>
+        private static string InTheWay(StoryNpc npc, Vector3 p)
+        {
+            Vector3 dir = Vector3.ProjectOnPlane(npc.MoveTarget - p, Vector3.up).normalized;
+            if (dir == Vector3.zero) return "nowhere to go";
+            RaycastHit[] hits = Physics.CapsuleCastAll(p + Vector3.up * 0.73f, p + Vector3.up * 1.67f, 0.28f, dir, 0.5f, ~0, QueryTriggerInteraction.Ignore);
+            var names = new List<string>();
+            foreach (RaycastHit h in hits)
+                if (!h.collider.transform.IsChildOf(npc.transform))
+                    names.Add($"{h.collider.name} at {h.distance:F2} m{(h.collider.attachedRigidbody != null ? " (body)" : "")}");
+            return names.Count > 0 ? string.Join(", ", names) : "nothing";
+        }
+
         private void Lasting(StoryNpc npc, Track t, string kind, string detail, float seconds = 0.75f)
         {
             t.Seen.Add(kind);

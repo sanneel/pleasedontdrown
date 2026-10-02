@@ -229,6 +229,7 @@ namespace PleaseDontDrown.Player
         {
             _avatar.OnPump(chest);
             if (_arms != null) _arms.OnPump(chest);
+            if (IsOwner && Look != null) Look.KneelOver(chest, true);
         }
 
         /// <summary>The other CPR steps: a rescue breath at the mouth, or a punch to the face (every machine).</summary>
@@ -241,6 +242,8 @@ namespace PleaseDontDrown.Player
                 if (step == Rescue.CprStep.Punch) _arms.PlaySlap(point);
                 else _arms.Play(gesture, point);
             }
+            // We stay down beside them through the whole of CPR (the chest is 30 cm below the face, lying on the back).
+            if (IsOwner && Look != null) Look.KneelOver(point - Vector3.up * 0.05f, false);
             // Mouth-to-mouth in first person: our view goes right down to their lips and back.
             if (IsOwner && step == Rescue.CprStep.Breath && Look != null) Look.LeanIn(point, 1.1f);
         }

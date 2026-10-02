@@ -80,6 +80,7 @@ namespace PleaseDontDrown.Story
         private int _pathIndex;
         private NavMeshPath _navPath;
         private float _stuckTime;
+        private float _turnTime;
         private float _progressBest;       // closest it has come to the current waypoint...
         private float _progressSince;      // ...and when that last improved
         private int _replans;
@@ -564,7 +565,8 @@ namespace PleaseDontDrown.Story
                 to.y = 0f;
                 if (to.sqrMagnitude > 0.01f && Vector3.Angle(transform.forward, to) < 110f) yaw = Quaternion.LookRotation(to).eulerAngles.y;
             }
-            _lookYaw = Mathf.LerpAngle(_lookYaw, yaw, 1f - Mathf.Exp(-6f * Time.deltaTime));
+            // (On the move the body is drawn the way it is really turned, at once: the legs walk where the body faces.)
+            _lookYaw = Mathf.LerpAngle(_lookYaw, yaw, 1f - Mathf.Exp(-(flatSpeed > 0.3f ? 18f : 6f) * Time.deltaTime));
             float submerged = WaterSurface.Exists ? WaterSurface.HeightAt(transform.position) - transform.position.y : 0f;
             bool wasSwimming = _swimPose;
             _swimPose = _swimPose ? submerged > SwimAbove - 0.12f : submerged > SwimAbove; // no flicker on a wave
@@ -660,6 +662,13 @@ namespace PleaseDontDrown.Story
             if (!_moveTarget.HasValue && _facePoint.HasValue)
                 Face(_facePoint.Value - p, dt, 5f);
             Separate(dt);
+            // Shoved off course (two swimmers meeting, someone walking into them): they turn the way they are really
+            // going instead of sliding along sideways, then pick their route up again.
+            Vector3 went = transform.position - p;
+            went.y = 0f;
+            if (_moveTarget.HasValue && Upright(_pose.Value) && went.sqrMagnitude > 0.35f * 0.35f * dt * dt &&
+                Vector3.Dot(transform.forward, went.normalized) < 0.55f)
+                Face(went, dt, 12f);
             // Spawned in the air or into a dune: onto the ground. (Not someone placed on a seat: feet on a stool's footrest.)
             if (!_moveTarget.HasValue && _pose.Value != AvatarPose.SitChair) transform.position = Grounded(transform.position);
         }
@@ -715,6 +724,17 @@ namespace PleaseDontDrown.Story
             // (Not a swimmer: the end of a leg is only where they turn, and the next leg starts at once.)
             float speed = last && !IsSwimming ? Mathf.Min(_moveSpeed, 0.6f + distance * 1.5f) : _moveSpeed;
             Vector3 dir = Avoid(p, to / distance);
+            // People go the way they face: turned away from where the route leads (setting off, a sharp corner, pushed
+            // round by someone), they turn on the spot first and only pick up speed as they come round. Nobody slides
+            // off backwards or sideways. (A swimmer keeps some way on: they turn in an arc.)
+            // (Judged against the route itself, not the swerve round someone in the way: two people passing each
+            // other must not stop to re-aim every frame.)
+            Vector3 route = to / distance;
+            float facing = Vector3.Dot(transform.forward, route);
+            float go = Mathf.Clamp01((facing - 0.15f) / 0.6f);
+            bool turning = go < 0.25f;
+            _turnTime = turning ? _turnTime + dt : 0f;
+            speed *= IsSwimming ? Mathf.Lerp(0.3f, 1f, go) : go;
             Vector3 step = dir * Mathf.Min(distance, speed * dt);
             Vector3 moved = MoveChecked(p, step);
             Vector3 next = Grounded(moved);
@@ -734,11 +754,12 @@ namespace PleaseDontDrown.Story
                 after.y = 0f;
                 if (after.sqrMagnitude > 1e-4f) heading = Vector3.Lerp(after.normalized, step.normalized, distance);
             }
-            Face(heading, dt, 8f);
+            Face(turning ? route : heading, dt, turning ? 11f : 8f);
 
             // Pinned against something the path didn't know about (a player, a tourist, a parked jet ski): plan again,
             // then step aside, and only then give up (whoever sent it picks something else to do).
-            bool progressed = (new Vector2(moved.x - p.x, moved.z - p.z)).sqrMagnitude > step.sqrMagnitude * 0.09f;
+            // (Turning to set off isn't being stuck; turning for ever, pushed round and round by someone, is.)
+            bool progressed = (turning && _turnTime < 0.6f) || (new Vector2(moved.x - p.x, moved.z - p.z)).sqrMagnitude > step.sqrMagnitude * 0.09f;
             _stuckTime = progressed ? 0f : _stuckTime + dt;
             // Also stuck: moving but not getting any closer (pushed back and forth, circling a corner).
             if (distance < _progressBest - 0.25f)
@@ -949,8 +970,12 @@ namespace PleaseDontDrown.Story
         private void Face(Vector3 direction, float dt, float rate)
         {
             direction.y = 0f;
-            if (direction.sqrMagnitude < 1e-4f) return;
-            Quaternion want = Quaternion.LookRotation(direction);
+            // (Any length will do: a walker's step in one frame is a few millimetres at a high frame rate, and when
+            // steps that small were ignored here nobody turned toward where they were going: they walked off
+            // sideways or backwards.)
+            float length = direction.magnitude;
+            if (length < 1e-7f) return;
+            Quaternion want = Quaternion.LookRotation(direction / length);
             transform.rotation = Quaternion.Slerp(transform.rotation, want, 1f - Mathf.Exp(-rate * dt));
         }
 

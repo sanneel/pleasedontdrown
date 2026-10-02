@@ -28,6 +28,8 @@ namespace PleaseDontDrown.Player
         public string CurrentPrompt { get; private set; }
         /// <summary>Second action on the target (Secondary button), only while the hands are free.</summary>
         public string CurrentSecondaryPrompt { get; private set; }
+        /// <summary>The button the second action is on right now.</summary>
+        public UnityEngine.InputSystem.InputAction CurrentSecondaryAction { get; private set; }
 
         private void Update()
         {
@@ -46,13 +48,14 @@ namespace PleaseDontDrown.Player
             CurrentPrompt = _current != null ? _current.GetPrompt(_hub) : null;
             bool handsFree = _hub.Hands == null || _hub.Hands.HeldItem == null;
             CurrentSecondaryPrompt = _current != null && handsFree ? _current.GetSecondaryPrompt(_hub) : null;
+            CurrentSecondaryAction = CurrentSecondaryPrompt != null ? _current.SecondaryAction(_hub) : GameInput.Secondary;
 
             if (_current != null && GameInput.Interact.WasPressedThisFrame())
             {
                 _hub.Gesture(Avatars.AvatarGesture.Interact, TargetPoint(cam));
                 _current.Interact(_hub);
             }
-            else if (CurrentSecondaryPrompt != null && GameInput.Secondary.WasPressedThisFrame())
+            else if (CurrentSecondaryPrompt != null && CurrentSecondaryAction.WasPressedThisFrame())
                 _current.InteractSecondary(_hub);
         }
 
