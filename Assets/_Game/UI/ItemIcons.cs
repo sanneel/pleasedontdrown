@@ -7,7 +7,7 @@ namespace PleaseDontDrown.UI
 {
     /// <summary>
     /// Pictures of items for the hotbar (How to Fish's inventory icons): the item as it looks right now (its skin,
-    /// the parts fitted to it) rendered once, from the side, tilted up to the right, on a clear background.
+    /// the parts fitted to it) rendered once on a clear background: tools from the side, flat things from above.
     /// Icons are cached by look, so changing a skin or fitting a scope makes a new one.
     /// </summary>
     public sealed class ItemIcons : MonoBehaviour
@@ -124,12 +124,14 @@ namespace PleaseDontDrown.UI
                 renderer.receiveShadows = false;
                 any = true;
             }
-            copy.localRotation = Quaternion.Euler(0f, 0f, 32f) * Quaternion.Euler(0f, -90f, 0f);
-            foreach (Renderer r in copy.GetComponentsInChildren<Renderer>())
-            {
-                if (bounds.size == Vector3.zero) bounds = r.bounds;
-                else bounds.Encapsulate(r.bounds);
-            }
+            // Which way to show it: tools (guns, the knife) side on with the muzzle / blade to the right, tilted up;
+            // flat things (a phone, a wallet, the life ring) from above so their face shows; the rest from a corner.
+            Bounds shape = BoundsOf(copy);
+            Vector3 e = shape.extents;
+            if (item.GetComponent<Combat.Weapon>() != null || item.GetComponent<Combat.Melee>() != null) copy.localRotation = Quaternion.Euler(0f, 0f, 32f) * Quaternion.Euler(0f, -90f, 0f);
+            else if (e.y < 0.4f * Mathf.Max(e.x, e.z)) copy.localRotation = Quaternion.Euler(0f, 0f, 24f) * Quaternion.Euler(-48f, 0f, 0f) * Quaternion.Euler(0f, e.z > e.x ? 90f : 0f, 0f);
+            else copy.localRotation = Quaternion.Euler(-24f, 0f, 0f) * Quaternion.Euler(0f, 32f, 0f);
+            bounds = BoundsOf(copy);
 
             var target = new RenderTexture(Size, Size, 16, RenderTextureFormat.ARGB32) { name = "Icon_" + item.DisplayName, antiAliasing = 4 };
             if (any)
@@ -143,6 +145,17 @@ namespace PleaseDontDrown.UI
             }
             Destroy(copy.gameObject);
             return target;
+        }
+
+        private static Bounds BoundsOf(Transform copy)
+        {
+            Bounds bounds = default;
+            foreach (Renderer r in copy.GetComponentsInChildren<Renderer>())
+            {
+                if (bounds.size == Vector3.zero) bounds = r.bounds;
+                else bounds.Encapsulate(r.bounds);
+            }
+            return bounds;
         }
 
         private void OnDestroy()

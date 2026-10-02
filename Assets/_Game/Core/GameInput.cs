@@ -171,18 +171,49 @@ namespace PleaseDontDrown.Core
             _rebindEndFrame = Time.frameCount;
             if (changed)
             {
-                // Two actions on one key would both fire: whoever had the new key gets the old one.
-                Rebind target = Rebindable[index];
-                string now = target.Action.bindings[target.Binding].effectivePath;
-                for (int i = 0; i < Rebindable.Length; i++)
-                {
-                    Rebind other = Rebindable[i];
-                    if (i != index && other.Action.bindings[other.Binding].effectivePath == now)
-                        other.Action.ApplyBindingOverride(other.Binding, before);
-                }
+                GiveBack(index, before);
                 SaveBindings();
             }
             Apply();
+        }
+
+        // After every SubsystemRegistration reset (the console clears its commands in one of those).
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RegisterCommands()
+        {
+            DevCommands.Register("bind", "<n> <control>", "Give key n (0 = forward, 4 = jump...) a control, e.g. bind 4 <Keyboard>/j (tests; not saved).", args =>
+            {
+                if (args.Length < 2 || !int.TryParse(args[0], out int n)) throw new System.ArgumentException("bind <n> <control>");
+                SetBinding(n, args[1]);
+                DevCommands.Print($"{Rebindable[n].Label} is now {KeyLabel(Rebindable[n].Action, Rebindable[n].Binding)}");
+            });
+        }
+
+        /// <summary>Two actions on one key would both fire: whoever had <paramref name="index"/>'s new key gets its old one.</summary>
+        private static void GiveBack(int index, string before)
+        {
+            Rebind target = Rebindable[index];
+            string now = target.Action.bindings[target.Binding].effectivePath;
+            for (int i = 0; i < Rebindable.Length; i++)
+            {
+                Rebind other = Rebindable[i];
+                if (i != index && other.Action.bindings[other.Binding].effectivePath == now)
+                    other.Action.ApplyBindingOverride(other.Binding, before);
+            }
+        }
+
+        /// <summary>
+        /// Give key <paramref name="index"/> a control directly, e.g. "&lt;Keyboard&gt;/j" (the console's <c>bind</c>, for
+        /// tests: the options screen listens for a key press instead). Not saved: a test never touches the player's own keys.
+        /// </summary>
+        public static void SetBinding(int index, string path)
+        {
+            if (index < 0 || index >= Rebindable.Length) return;
+            Rebind target = Rebindable[index];
+            string before = target.Action.bindings[target.Binding].effectivePath;
+            target.Action.ApplyBindingOverride(target.Binding, path);
+            GiveBack(index, before);
+            BindingsVersion++;
         }
 
         /// <summary>Back to the keys the game ships with.</summary>

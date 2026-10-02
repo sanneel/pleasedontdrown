@@ -460,7 +460,7 @@ namespace PleaseDontDrown.Story
         private void SayObservers(string text, float seconds)
         {
             FloatingText.Spawn(HeadPosition + Vector3.up * 0.4f, text, SpeechColor, 0.75f, seconds);
-            OnSpeak(seconds * 0.8f, text, 0.75f);
+            OnSpeak(seconds * 0.8f, text, 0.5f); // beach chatter: a murmur next to the story's own lines
         }
 
         // ------------------------------------------------------------------ talking

@@ -83,6 +83,7 @@ namespace PleaseDontDrown.Audio
                 _calm.PlayScheduled(at);
                 _danger.PlayScheduled(at);
                 _playing = true;
+                Debug.Log($"[Music] loops ready ({_calm.clip.length:0.0} s each), music at {SoundSettings.Music:P0}");
             }
 
             float dt = Time.unscaledDeltaTime;

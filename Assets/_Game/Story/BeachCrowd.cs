@@ -771,6 +771,9 @@ namespace PleaseDontDrown.Story
                 foreach (Vector3 leg in legs)
                 {
                     Vector3 t = ClampToSwimArea(leg);
+                    // A leg that only fits by being squashed onto the area's edge ends where everyone else's squashed
+                    // legs end: swimmers pile up on that line. So does one that ends where somebody is already heading.
+                    if ((t - leg).sqrMagnitude > 2.5f * 2.5f || SpotTaken(m, t, 1.6f)) break;
                     if (!WaterSpotAt(ref t, SwimMin, SwimMax)) break;
                     if (VehicleNear(t, 6f)) break;
                     if (!StoryNpc.SwimLineClear(from, t) && !StoryNpc.SwimDetour(from, t, out _)) break;
@@ -803,6 +806,20 @@ namespace PleaseDontDrown.Story
                 m.SwimSpeed = keep;
                 return;
             }
+        }
+
+        /// <summary>Somebody else in the water is at this spot, or on their way to it.</summary>
+        private bool SpotTaken(Member me, Vector3 spot, float radius)
+        {
+            float limit = radius * radius;
+            foreach (Member o in _members)
+            {
+                if (o == me || o.Npc == null || !o.Npc.IsSwimming) continue;
+                Vector3 at = o.Npc.transform.position, to = o.Npc.MoveTarget;
+                if (new Vector2(at.x - spot.x, at.z - spot.z).sqrMagnitude < limit && !o.Npc.IsMoving) return true;
+                if (o.Npc.IsMoving && new Vector2(to.x - spot.x, to.z - spot.z).sqrMagnitude < limit) return true;
+            }
+            return false;
         }
 
         private bool InSwimArea(Vector3 p, float margin) =>
