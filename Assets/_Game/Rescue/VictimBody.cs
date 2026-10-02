@@ -89,6 +89,9 @@ namespace PleaseDontDrown.Rescue
         private float _breathAt = float.NegativeInfinity;
         private float _punchAt = float.NegativeInfinity;
         private float _punchSide = 1f;
+        private bool _punchLanded = true;
+        private GameObject _stump;
+        private float _nextBleed;
         private float _zapAt = float.NegativeInfinity;
         private float _layDownUntil = float.NegativeInfinity;
         private float _nextLyingScan;
@@ -185,13 +188,19 @@ namespace PleaseDontDrown.Rescue
             FloatingText.Spawn(HeadPosition + Vector3.up * 0.35f, "MMMPPPH", new Color(1f, 0.6f, 0.75f), 0.7f, 1.1f);
         }
 
-        /// <summary>Punched awake (men's CPR): the head snaps aside with a POW.</summary>
-        public void Punched()
+        /// <summary>How long after the press the hand lands (the swing: Player.FirstPersonArms.PlaySlap, the avatar's punch).</summary>
+        public const float SlapLands = 0.2f;
+
+        /// <summary>
+        /// Slapped awake (men's CPR): when the hand lands the head snaps away from it with a smack.
+        /// <paramref name="push"/> is the way the hand is travelling (world), zero for either side.
+        /// </summary>
+        public void Punched(Vector3 push = default)
         {
-            _punchAt = Time.time;
-            _punchSide = Random.value < 0.5f ? -1f : 1f;
-            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Bonk, 1f);
-            FloatingText.Spawn(HeadPosition + Vector3.up * 0.3f, "POW!", new Color(1f, 0.85f, 0.25f), 1.1f, 1f);
+            _punchAt = Time.time + SlapLands;
+            _punchLanded = false;
+            Transform head = _avatar != null && _avatar.IsBuilt ? _avatar[AvatarRig.Bone.Head] : null;
+            _punchSide = push != Vector3.zero && head != null ? (Vector3.Dot(head.right, push) < 0f ? 1f : -1f) : Random.value < 0.5f ? -1f : 1f;
         }
 
         /// <summary>Defibrillator shock: the whole body jumps.</summary>
@@ -380,7 +389,13 @@ namespace PleaseDontDrown.Rescue
 
             // Punched: the head snaps aside and wobbles back.
             float sincePunch = Time.time - _punchAt;
-            if (sincePunch < 0.6f)
+            if (sincePunch >= 0f && !_punchLanded)
+            {
+                _punchLanded = true;
+                if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Punch, 1f);
+                FloatingText.Spawn(HeadPosition + Vector3.up * 0.3f, "SLAP!", new Color(1f, 0.85f, 0.25f), 1.1f, 1f);
+            }
+            if (sincePunch >= 0f && sincePunch < 0.6f)
             {
                 float k = Mathf.Exp(-sincePunch * 7f) * Mathf.Cos(sincePunch * 22f);
                 _avatar[AvatarRig.Bone.Head].localRotation = _avatar.RestRotation(AvatarRig.Bone.Head) * Quaternion.Euler(0f, 55f * k * _punchSide, 20f * k * _punchSide);
@@ -390,9 +405,45 @@ namespace PleaseDontDrown.Rescue
             else
                 _avatar[AvatarRig.Bone.Head].localRotation = _avatar.RestRotation(AvatarRig.Bone.Head);
 
-            // Shark bite: the left leg is a short stump.
-            Transform thigh = _avatar[AvatarRig.Bone.ThighL];
-            thigh.localScale = _brain.HasLostLeg ? new Vector3(1f, 0.22f, 1f) : Vector3.one;
+            // Shark bite: the left leg is gone below the knee. The shin and foot shrink to nothing at the knee, where a
+            // raw stump shows instead, and it bleeds until the infirmary has seen to it.
+            bool lost = _brain.HasLostLeg;
+            _avatar[AvatarRig.Bone.ShinL].localScale = lost ? Vector3.one * 0.001f : Vector3.one;
+            if (lost && _stump == null) _stump = BuildStump();
+            if (_stump != null && _stump.activeSelf != lost) _stump.SetActive(lost);
+            if (lost && state is not (VictimState.Saved or VictimState.Lost) && Time.time >= _nextBleed)
+            {
+                _nextBleed = Time.time + 0.14f;
+                BloodFx.Bleed(_avatar[AvatarRig.Bone.ShinL].position);
+            }
+        }
+
+        /// <summary>What the shark left at the knee: torn flesh, ragged skin, the end of the bone.</summary>
+        private GameObject BuildStump()
+        {
+            float s = _avatar.Scale, r = 0.066f * s;
+            var kit = new AvatarMeshKit();
+            kit.SetBone(0, Matrix4x4.identity);
+            var flesh = new Color(0.55f, 0.04f, 0.05f);
+            var dark = new Color(0.33f, 0.02f, 0.03f);
+            kit.Ellipsoid(new Vector3(0f, 0.012f, 0f), new Vector3(r, 0.04f * s, r), flesh, null, 12, 6);
+            kit.Ellipsoid(new Vector3(0f, -0.012f * s, 0f), new Vector3(r * 0.8f, 0.03f * s, r * 0.8f), dark, null, 10, 6);
+            for (int i = 0; i < 7; i++) // ragged flaps hanging round the edge
+            {
+                float a = i * (Mathf.PI * 2f / 7f) + 0.3f;
+                float hang = (0.035f + 0.02f * ((i * 37) % 5) / 4f) * s;
+                kit.Ellipsoid(new Vector3(Mathf.Cos(a) * r * 0.86f, -hang * 0.6f, Mathf.Sin(a) * r * 0.86f), new Vector3(0.02f * s, hang, 0.011f * s), i % 2 == 0 ? flesh : dark,
+                    Quaternion.Euler(Mathf.Sin(a) * 14f, -a * Mathf.Rad2Deg, -Mathf.Cos(a) * 14f), 6, 4);
+            }
+            kit.Frustum(new Vector3(0f, -0.07f * s, 0f), 0.016f * s, 0.02f * s, 0.07f * s, new Color(0.93f, 0.9f, 0.82f), null, null, 8); // the bone
+            var stump = new GameObject("Stump");
+            stump.AddComponent<MeshFilter>().sharedMesh = kit.ToMesh("Stump", new[] { Matrix4x4.identity });
+            stump.AddComponent<MeshRenderer>().sharedMaterial = AvatarRig.SharedMaterial;
+            // On the thigh, at the knee (the shin bone's own place): it swings with the leg.
+            Transform shin = _avatar[AvatarRig.Bone.ShinL];
+            stump.transform.SetParent(_avatar[AvatarRig.Bone.ThighL], false);
+            stump.transform.localPosition = shin.localPosition;
+            return stump;
         }
 
         private void UpdateSquish()

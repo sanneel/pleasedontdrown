@@ -27,7 +27,7 @@ namespace PleaseDontDrown.Player
         private const float MaxReach = 0.85f;    // from the eye
         private const float IdlePitch = 5f;
 
-        private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave, Punch, Breath, Drive }
+        private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave, Punch, Breath, Drive, Slap }
 
         private sealed class Hand
         {
@@ -209,6 +209,21 @@ namespace PleaseDontDrown.Player
             _gesture = gesture;
             _gestureStart = Time.time;
             _reach = point;
+        }
+
+        private const float SlapWindUp = 0.1f, SlapTime = 0.46f;
+        private float _slapStart = -10f;
+        private Vector3 _slapPoint;
+
+        /// <summary>
+        /// An open-handed slap across a face at <paramref name="head"/> (waking a man during CPR): the right hand
+        /// comes up beside the view, swings across onto the cheek (landing Rescue.VictimBody.SlapLands after the
+        /// press, when the head snaps away) and carries on past it.
+        /// </summary>
+        public void PlaySlap(Vector3 head)
+        {
+            _slapStart = Time.time;
+            _slapPoint = head;
         }
 
         /// <summary>How long a punch takes: out to the target, then back (How to Fish's 1/10 s + 1/4 s).</summary>
@@ -428,7 +443,29 @@ namespace PleaseDontDrown.Player
             float sincePump = t - _lastPump;
             float sinceGesture = t - _gestureStart;
 
-            if (!usesGrip && !(motor != null && (motor.IsSwimming || motor.IsClimbing)) && BoxingPose(hand, cam, out palm, out rot, out pose))
+            float sinceSlap = t - _slapStart;
+            if (hand.Right && sinceSlap < SlapTime)
+            {
+                // Up beside the view, across onto the cheek, on past it.
+                state = State.Slap;
+                Vector3 across = Vector3.ProjectOnPlane(cam.right, Vector3.up).normalized;
+                Vector3 ready = cam.TransformPoint(new Vector3(0.4f, -0.05f, 0.36f));
+                Vector3 cheek = _slapPoint + across * 0.07f + Vector3.up * 0.02f;
+                Vector3 past = _slapPoint - across * 0.2f + Vector3.up * 0.04f;
+                float lands = Rescue.VictimBody.SlapLands;
+                if (sinceSlap < SlapWindUp) palm = ready;
+                else if (sinceSlap < lands)
+                {
+                    float u = (sinceSlap - SlapWindUp) / (lands - SlapWindUp);
+                    palm = Vector3.Lerp(ready, cheek, u * u); // speeding up into it
+                }
+                else palm = Vector3.Lerp(cheek, past, Mathf.Clamp01((sinceSlap - lands) / 0.1f));
+                Vector3 fingers = (cheek - cam.position).normalized;
+                rot = HandBones.Orient(fingers + across * -0.25f, -across, side);
+                pose = HandPose.Flat;
+                blend = 0.06f;
+            }
+            else if (!usesGrip && !(motor != null && (motor.IsSwimming || motor.IsClimbing)) && BoxingPose(hand, cam, out palm, out rot, out pose))
             {
                 // Boxing: the path itself is smooth, so only a short blend when the fists first come up.
                 state = State.Punch;
@@ -587,12 +624,13 @@ namespace PleaseDontDrown.Player
         private void Solve(Hand hand)
         {
             Vector3 eye = _camera.transform.position;
-            Vector3 palm = eye + Vector3.ClampMagnitude(hand.Palm - eye, MaxReach + 0.3f);
-            // Resting, swimming, holding things: never into a wall (reaching, pressing and punching do touch it).
             var state = (State)(hand.Key & 15);
+            // (A slap goes all the way to a face on the ground: the arm isn't drawn, so its length doesn't show.)
+            Vector3 palm = eye + Vector3.ClampMagnitude(hand.Palm - eye, state == State.Slap ? 1.9f : MaxReach + 0.3f);
+            // Resting, swimming, holding things: never into a wall (reaching, pressing and punching do touch it).
             // A gun pulls itself back from walls; its hands stay on it.
             bool onGun = state == State.Item && _rigidGrip;
-            if (state is not (State.Reach or State.Cpr or State.Punch or State.Breath) && !onGun) palm = KeepOutOfWalls(eye, palm);
+            if (state is not (State.Reach or State.Cpr or State.Punch or State.Breath or State.Slap) && !onGun) palm = KeepOutOfWalls(eye, palm);
             hand.Wrist.SetPositionAndRotation(palm - hand.Rot * hand.Bones.PalmContact, hand.Rot);
             hand.Bones.Pose(hand.Pose);
         }

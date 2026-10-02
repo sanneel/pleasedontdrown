@@ -530,7 +530,10 @@ namespace PleaseDontDrown.Editor
             {
                 // The usual skin colour in a band round the eye: the lid must not stand out from what is next to it.
                 Rect outer = Rect.MinMaxRect(eye.xMin - 0.015f, eye.yMin - 0.015f, eye.xMax + 0.015f, eye.yMax + 0.015f);
-                List<Sample> around = faceSkin.Where(s => outer.Contains(new Vector2(s.P.x, s.P.y)) && !eye.Contains(new Vector2(s.P.x, s.P.y))).ToList();
+                // A closed lid is the skin above the eye come down: that strip first (it is often a shade darker than the cheek).
+                Rect above = Rect.MinMaxRect(eye.xMin, eye.yMax + 0.001f, eye.xMax, eye.yMax + 0.012f);
+                List<Sample> around = faceSkin.Where(s => above.Contains(new Vector2(s.P.x, s.P.y))).ToList();
+                if (around.Count < 20) around = faceSkin.Where(s => outer.Contains(new Vector2(s.P.x, s.P.y)) && !eye.Contains(new Vector2(s.P.x, s.P.y))).ToList();
                 if (around.Count < 20) around = faceSkin.Where(s => Mathf.Abs(s.P.y - level) < 0.05f).ToList();
                 if (around.Count < 20) around = faceSkin;
                 var usual = new Color(Median(around.Select(s => s.C.r)), Median(around.Select(s => s.C.g)), Median(around.Select(s => s.C.b)));
@@ -566,10 +569,15 @@ namespace PleaseDontDrown.Editor
                             // Modelled lashes and eyeballs stand out from the face: the patch goes over whatever is in front.
                             if (d < 0.008f * 0.008f) front = Mathf.Max(front, s.P.z);
                         }
-                        extra.Vertices.Add(new Vector3(x, y, Mathf.Max(on.P.z, front) + lift));
+                        // In the middle it clears whatever stands out (the eyeball, modelled lashes); toward its rim it
+                        // comes down onto the face itself, so it reads as skin and not as a plate stuck on.
+                        float rim = Mathf.Pow(Mathf.Max(Mathf.Abs(u), Mathf.Abs(v)), 3f);
+                        float z = Mathf.Lerp(Mathf.Max(on.P.z, front), on.P.z, rim * 0.85f) + lift * Mathf.Lerp(1f, 0.25f, rim);
+                        extra.Vertices.Add(new Vector3(x, y, z));
                         // Lit like the face under it: mostly the way the face curves there, evened out so the bumps of
-                        // a modelled eye don't show as blotches.
-                        extra.Normals.Add((facing * 0.45f + (round.sqrMagnitude > 1e-6f ? round.normalized : facing) * 0.55f).normalized);
+                        // a modelled eye don't show as blotches, and rounded a little like a lid over an eyeball.
+                        Vector3 lit = facing * 0.45f + (round.sqrMagnitude > 1e-6f ? round.normalized : facing) * 0.55f;
+                        extra.Normals.Add((lit.normalized + new Vector3(u * 0.3f, v * 0.22f, 0f)).normalized);
                         extra.Uvs.Add(uv);
                         extra.Weights.Add(new BoneWeight { boneIndex0 = (int)bone, weight0 = 1f });
                     }
@@ -594,6 +602,8 @@ namespace PleaseDontDrown.Editor
                         }
                     for (int k = 0; k < depth.Length; k++)
                     {
+                        int i = k % (nx + 1), j = k / (nx + 1);
+                        if (i == 0 || i == nx || j == 0 || j == ny) continue; // the rim stays down on the face
                         Vector3 at = extra.Vertices[first + k];
                         extra.Vertices[first + k] = new Vector3(at.x, at.y, Mathf.Max(at.z, depth[k]));
                     }
@@ -610,9 +620,9 @@ namespace PleaseDontDrown.Editor
             Vector3 Lid(Rect eye, Bone bone)
             {
                 // A little bigger than the painted eye (an oval inside a box misses its corners).
-                float rx = eye.width * 0.5f * 1.22f + 0.002f, ry = eye.height * 0.5f * 1.25f + 0.002f;
+                float rx = eye.width * 0.5f * 1.16f + 0.0015f, ry = eye.height * 0.5f * 1.18f + 0.0015f;
                 Patch(eye.center, rx, ry, -1f, 1f, 0.004f, SkinRound(eye), bone);
-                Patch(eye.center, rx, ry, -1f, -0.74f, 0.006f, darkUv, bone);
+                Patch(eye.center, rx, ry, -1f, -0.84f, 0.006f, darkUv, bone); // the lashes: a thin dark line along the lid's edge
                 var hinge = new Vector2(eye.center.x, eye.center.y + ry);
                 return new Vector3(hinge.x, hinge.y, SurfaceZ(hinge));
             }

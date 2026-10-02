@@ -125,7 +125,7 @@ namespace PleaseDontDrown.Creatures
         private void BiteObservers(Vector3 at)
         {
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Crunch, 1f);
-            SplashFx.Spawn(new Vector3(at.x, WaterSurface.Exists ? WaterSurface.HeightAt(at) : at.y, at.z), 0.5f);
+            SplashFx.Spawn(new Vector3(at.x, WaterSurface.Exists ? WaterSurface.HeightAt(at) : at.y, at.z), 0.9f);
         }
 
         public bool ServerTakeHit(int damage, DamageKind kind, PlayerHub attacker, Vector3 point, Vector3 direction)

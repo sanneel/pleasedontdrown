@@ -548,7 +548,7 @@ namespace PleaseDontDrown.Rescue
             return _cprStep.Value switch
             {
                 CprStep.Breath => $"Mouth-to-mouth ({_cprCount.Value + 1}/{_breathsPerSet})  {progress}",
-                CprStep.Punch => $"Punch {Name} awake!  {progress}",
+                CprStep.Punch => $"Slap {Name} awake!  {progress}",
                 _ => $"Chest compressions ({_cprCount.Value + 1}/{_compressionsPerSet})  {progress}"
             };
         }
@@ -577,7 +577,8 @@ namespace PleaseDontDrown.Rescue
                     if (player != null) player.ShowCprAction(step, _body.MouthPoint);
                     break;
                 case CprStep.Punch:
-                    _body.Punched();
+                    // An open hand across the face, from the slapper's right to their left.
+                    _body.Punched(player != null && player.Head != null ? -player.Head.right : Vector3.zero);
                     if (player != null) player.ShowCprAction(step, _body.HeadPosition);
                     break;
                 default:
@@ -751,6 +752,7 @@ namespace PleaseDontDrown.Rescue
                     PlayerHud.ShowToast($"<color=#ff7060><b>{text}</b></color>", 6f);
                     break;
                 case VictimEvent.Bitten:
+                    BloodFx.Bite(_body.transform.position);
                     FloatingText.Spawn(above, "CHOMP!", new Color(1f, 0.3f, 0.25f), 1.6f, 2f);
                     PlayerHud.ShowToast($"<color=#ff7060><b>{text}</b></color>", 7f);
                     break;

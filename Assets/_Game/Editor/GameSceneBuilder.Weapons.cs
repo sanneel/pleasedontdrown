@@ -145,8 +145,9 @@ namespace PleaseDontDrown.Editor
                     DrawPosition = new Vector3(0.15f, -0.4f, -0.1f), DrawRotation = new Vector3(90f, 0f, 0f)
                 },
                 Tiers = new[] { ("Standard rounds", 24, 0), ("Hollow points", 28, 200), ("Armour piercing", 35, 400) },
-                Sights = new[] { ("Iron sights", "", "EyeIron", 0.36f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.36f, 60f, false, 150),
-                                 ("Scope", "SightScope", "SightScope/Eye", 0.14f, 15f, true, 250) },
+                // Comes with a short scope (2x): the first sight is the one a new gun wears. Iron sights and the red dot are at the shop.
+                Sights = new[] { ("Scope 2x", "SightScope", "SightScope/Eye", 0.14f, 34f, true, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.36f, 60f, false, 150),
+                                 ("Iron sights", "", "EyeIron", 0.36f, 60f, false, 0) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 200),
                                   ("Compensator", "BarrelCompensator", "BarrelCompensator/Muzzle", false, 0.55f, 0.9f, 150) }
@@ -243,8 +244,9 @@ namespace PleaseDontDrown.Editor
                     DrawPosition = new Vector3(0.2f, -0.5f, 0.3f), DrawRotation = new Vector3(90f, 90f, 0f)
                 },
                 Tiers = new[] { ("Standard rounds", 40, 0), ("Match rounds", 55, 250), ("Armour piercing", 70, 500) },
-                Sights = new[] { ("Iron sights", "", "EyeIron", 0.22f, 60f, false, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.24f, 60f, false, 150),
-                                 ("Scope", "SightScope", "SightScope/Eye", 0.12f, 15f, true, 350) },
+                // Comes with a scope (3x), like the sniper's but shorter; iron sights and the red dot are at the shop.
+                Sights = new[] { ("Scope 3x", "SightScope", "SightScope/Eye", 0.12f, 23f, true, 0), ("Red dot", "SightRedDot", "SightRedDot/Eye", 0.24f, 60f, false, 150),
+                                 ("Iron sights", "", "EyeIron", 0.22f, 60f, false, 0) },
                 Barrels = new[] { ("Standard barrel", "", "MuzzleStandard", false, 1f, 1f, 0),
                                   ("Suppressor", "BarrelSuppressor", "BarrelSuppressor/Muzzle", true, 0.9f, 0.85f, 250),
                                   ("Compensator", "BarrelCompensator", "BarrelCompensator/Muzzle", false, 0.55f, 0.9f, 200) }

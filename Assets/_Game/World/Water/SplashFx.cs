@@ -12,6 +12,9 @@ namespace PleaseDontDrown.World.Water
         [SerializeField] private Material _particleMaterial;
 
         private static SplashFx _instance;
+
+        /// <summary>The soft round particle (other effects tint it: blood).</summary>
+        public static Material ParticleMaterial => _instance != null ? _instance._particleMaterial : null;
         private ParticleSystem _system;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

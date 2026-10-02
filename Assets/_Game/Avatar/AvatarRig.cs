@@ -139,10 +139,13 @@ namespace PleaseDontDrown.Avatars
             {
                 // A painted face: the eyelids come down over the eyes, the open mouth grows over the lips.
                 if (!GeneratedBody.HasFace) return;
-                var lid = new Vector3(1f, Mathf.Clamp01((1f - eyes) * 1.12f), 1f);
+                // A lid half way down leaves half a painted eye staring out from under it, so these eyes are either
+                // open or shut (a blink is two frames).
+                var lid = eyes < 0.45f ? Vector3.one : Vector3.zero;
                 this[Bone.EyeL].localScale = lid;
                 this[Bone.EyeR].localScale = lid;
-                this[Bone.Mouth].localScale = new Vector3(1f, Mathf.Clamp01((mouth - 0.1f) * 1.6f), 1f);
+                float open = Mathf.Clamp01((mouth - 0.1f) * 1.6f);
+                this[Bone.Mouth].localScale = open > 0.02f ? new Vector3(1f, open, 1f) : Vector3.zero; // shut: nothing, not a dark line on the lips
                 return;
             }
             Vector3 eyeScale = new Vector3(1f, Mathf.Clamp(eyes, 0.08f, 1.6f), 1f);
