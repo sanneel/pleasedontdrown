@@ -223,7 +223,15 @@ namespace PleaseDontDrown.Editor
             };
             AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
             var go = new GameObject("ReviewAvatar");
-            go.transform.position = new Vector3(F(2), F(3), F(4));
+            // y "g": standing on whatever ground is there (slopes, steps).
+            float groundY = 0f;
+            if (p[3] == "g")
+            {
+                Physics.SyncTransforms();
+                if (Physics.Raycast(new Vector3(F(2), 60f, F(4)), Vector3.down, out RaycastHit ground, 200f, ~0, QueryTriggerInteraction.Ignore)) groundY = ground.point.y;
+                else Debug.LogWarning($"[Review] no ground under {p[2]}, {p[4]}");
+            }
+            go.transform.position = new Vector3(F(2), p[3] == "g" ? groundY : F(3), F(4));
             var rig = go.AddComponent<AvatarRig>();
             rig.Build(look);
             if (lookSpec[0] == "robber") Story.RobberBag.Wear(Story.RobberBag.Create(), rig); // as in the story
@@ -245,6 +253,7 @@ namespace PleaseDontDrown.Editor
             go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
             var m = new AvatarMotion { FacingYaw = yaw, Grounded = true };
             Vector3 chest = go.transform.position + Vector3.up * 1.2f;
+            if (p[3] == "g") Debug.Log($"[Review] avatar {p[1]} on the ground at y {groundY:0.00}");
             switch (pose)
             {
                 case "walk": m.Velocity = forward * 2.2f; break;
@@ -252,6 +261,7 @@ namespace PleaseDontDrown.Editor
                 case "crouch": m.Crouch = 1f; break;
                 case "jump": m.Grounded = false; m.Velocity = forward * 3f; break;
                 case "swim": m.Swimming = true; m.Velocity = forward * 3f; break;
+                case "breast": m.Swimming = true; m.Velocity = forward * 1.2f; animator.Breaststroke = true; break;
                 case "tread": m.Swimming = true; break;
                 case "dive": m.Swimming = true; m.Underwater = true; m.LookPitch = 35f; m.Velocity = forward * 2.5f; break;
                 case "hold":
@@ -266,6 +276,8 @@ namespace PleaseDontDrown.Editor
                     break;
                 case "charge": m.Charge = 1f; break;
                 case "eat": m.Eating = true; break;
+                case "kiss":
+                case "zap":
                 case "cpr": m.Cpr = true; m.CprPoint = go.transform.position + forward * 0.6f + Vector3.up * 0.2f; break;
                 case "down": m.Pose = AvatarPose.Down; m.Mood = AvatarMood.Hurt; break;
                 case "kneel": m.Pose = AvatarPose.Kneel; m.Mood = AvatarMood.Scared; break;
@@ -274,6 +286,8 @@ namespace PleaseDontDrown.Editor
                 case "seated": m.Seated = true; break;
                 case "sitchair": m.Pose = AvatarPose.SitChair; break;
                 case "happy": m.Mood = AvatarMood.Happy; m.Talking = true; break;
+                case "talk": m.Talking = true; animator.Lively = true; break;
+                case "blink": m.Mood = AvatarMood.Hurt; break; // eyes nearly shut
                 default: if (PoseByName(pose) is { } held) m.Pose = held; break;
             }
             animator.Motion = m;
@@ -304,14 +318,50 @@ namespace PleaseDontDrown.Editor
                     animator.Tick(1f / 30f);
                 }
             }
-            AvatarGesture gesture = pose switch { "throw" => AvatarGesture.Throw, "wave" => AvatarGesture.Wave, "interact" => AvatarGesture.Interact, _ => AvatarGesture.None };
+            // Idle habits, caught in the middle: scratch hips stretch shield wipe.
+            AvatarAnimator.IdleAct act = pose switch
+            {
+                "scratch" => AvatarAnimator.IdleAct.ScratchHead, "hips" => AvatarAnimator.IdleAct.HandsOnHips, "stretch" => AvatarAnimator.IdleAct.Stretch,
+                "shield" => AvatarAnimator.IdleAct.ShieldEyes, "wipe" => AvatarAnimator.IdleAct.WipeBrow, _ => AvatarAnimator.IdleAct.None
+            };
+            if (act != AvatarAnimator.IdleAct.None)
+            {
+                AvatarAnimator.TimeOverride = 110f;
+                animator.Play(act, 2.4f);
+                for (int i = 0; i < 36; i++)
+                {
+                    AvatarAnimator.TimeOverride = 110f + i / 30f;
+                    animator.Tick(1f / 30f);
+                }
+            }
+            AvatarGesture gesture = pose switch
+            {
+                "throw" => AvatarGesture.Throw, "wave" => AvatarGesture.Wave, "interact" => AvatarGesture.Interact, "punch" => AvatarGesture.Punch,
+                "kiss" => AvatarGesture.Breath, "zap" => AvatarGesture.Zap, "shoot" => AvatarGesture.Shoot, _ => AvatarGesture.None
+            };
             if (gesture != AvatarGesture.None)
             {
-                animator.Play(gesture);
-                AvatarAnimator.TimeOverride = 103f + (gesture == AvatarGesture.Wave ? 0.6f : 0.12f);
+                // Caught part-way through (the punch at full reach, the kiss with the lips down).
+                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Breath => 0.55f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, _ => 0.12f };
+                float now = AvatarAnimator.TimeOverride ?? 103f;
+                AvatarAnimator.TimeOverride = now;
+                Vector3 point = gesture switch
+                {
+                    AvatarGesture.Punch => go.transform.position + forward * 0.75f + Vector3.up * 1.45f,
+                    AvatarGesture.Breath => go.transform.position + forward * 0.62f + Vector3.up * 0.22f,
+                    AvatarGesture.Zap => go.transform.position + forward * 0.6f + Vector3.up * 0.2f,
+                    _ => Vector3.zero
+                };
+                animator.Play(gesture, point);
+                AvatarAnimator.TimeOverride = now + into;
                 animator.Tick(1f / 30f);
             }
             AvatarAnimator.TimeOverride = null;
+            if (pose == "fists")
+            {
+                rig.LeftHand?.Pose(HandPose.Fist);
+                rig.RightHand?.Pose(HandPose.Fist);
+            }
         }
 
         private static AvatarPose? PoseByName(string name) => name switch

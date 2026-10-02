@@ -548,7 +548,7 @@ namespace PleaseDontDrown.Story
                         // Carry on with the next leg almost at once (a swimmer turning at a buoy, not stopping).
                         if (m.Target.HasValue) RememberGoodSwimSpot(m.Target.Value);
                         m.SwimFails = 0;
-                        m.NextThink = Time.time + Range(0.15f, 0.7f);
+                        m.NextThink = Time.time; // the very next frame: no hanging in the water at each turn
                     }
                     else
                     {
@@ -645,11 +645,11 @@ namespace PleaseDontDrown.Story
 
             if (m.LegIndex < m.Legs.Count && StartLeg(m)) return;
 
-            if (!m.JustTreaded && m.SwimFails == 0 && _rng.NextDouble() < 0.3)
+            if (!m.JustTreaded && m.SwimFails == 0 && _rng.NextDouble() < 0.08)
             {
-                // A breather: tread water, look around, maybe say something.
+                // A breather, now and then and not for long: tread water, look around, maybe say something.
                 m.JustTreaded = true;
-                m.TreadUntil = Time.time + Mathf.Min(MaxTread, Range(3f, 9f));
+                m.TreadUntil = Time.time + Mathf.Min(MaxTread, Range(2f, 4f));
                 m.NextThink = Time.time + 1f;
                 if (_rng.NextDouble() < 0.2 && Near(p, 14f)) npc.ServerSay(SwimTalk[_rng.Next(SwimTalk.Length)]);
                 return;

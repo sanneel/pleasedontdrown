@@ -102,6 +102,14 @@ Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-port 7
 Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-port 7790 -pdd-join localhost -pdd-quit-after 15 -logFile Logs/client.log
 ```
 
+Story test: the game plays chapter 1 by itself (rescues, CPR, the thief, Lost & Found, the jet ski) and reports per beat.
+```powershell
+powershell -File Tools\test-story.ps1            # chapter 1, headless, about 2.5 minutes; exit code 0 = passed
+powershell -File Tools\test-story.ps1 -Client    # with a second copy joined as a client
+powershell -File Tools\test-story.ps1 -Shots     # also saves pictures to Builds\Win64\Screenshots\Autoplay
+```
+The last line of the host's log starts `[Autoplay] RESULT PASS` or `[Autoplay] RESULT FAIL` (which beat it got stuck in and why).
+
 Every connection shakes hands with its build version (`NetVersion`: app version + the stamp the scene builder writes).
 A client from a different build is refused with a clear message instead of failing on mismatched scene objects.
 
@@ -115,6 +123,11 @@ A client from a different build is refused with a clear message instead of faili
 | `-pdd-exec "<cmd>; <cmd>"` | Run console commands once the local player exists (`wait <sec>` pauses) |
 | `-pdd-noinput` | Ignore the real mouse/keyboard/gamepad (windowed automated tests; console commands still work) |
 | `-pdd-port <port>` | Local/LAN port (default 7770; tests use 7790) |
+| `-pdd-autoplay [beat]` | Host: play the story by itself up to the end of that beat (default 1.10), then quit with a result line |
+| `-pdd-autoshots` | With autoplay: save pictures as it goes (run without `-nographics`) |
+| `-pdd-timescale <x>` | With autoplay: run the clock faster (0.5 .. 4) |
+| `-pdd-npcwatch` | Host: log characters that get stuck, clip into walls or stand about too long |
+| `-pdd-nosave` / `-pdd-nostory` | Don't read or write the story save / no story at all |
 
 ## Layout
 `Assets/_Game/` game code (asmdef `PleaseDontDrown`) · `Assets/_Game/Editor/` editor tools · `Assets/ThirdParty/FishySteamworks/` vendored transport (BSD-2) · `Docs/` design.

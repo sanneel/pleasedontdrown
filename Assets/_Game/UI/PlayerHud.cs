@@ -28,9 +28,23 @@ namespace PleaseDontDrown.UI
         private float _heldSince;
         private float _staminaShown, _airShown;
         private float _lastRepaint;
+        // Lines of text that only change when what they describe does (not built again every frame).
+        private static readonly string[] SlotNumbers = BuildSlotNumbers();
+        private string _primary, _primaryLine, _secondary, _secondaryLine;
+        private bool _heldIsPerson, _hintsWithSkin;
+        private string _hints;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => _toasts.Clear();
+
+        private static string[] BuildSlotNumbers()
+        {
+            var numbers = new string[PlayerHands.SlotCount];
+            for (int i = 0; i < numbers.Length; i++) numbers[i] = (i + 1).ToString();
+            return numbers;
+        }
+
+        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
 
         /// <summary>Shows a short message to the local player only.</summary>
         public static void ShowToast(string text, float seconds = 4f)
@@ -41,17 +55,14 @@ namespace PleaseDontDrown.UI
 
         private void OnGUI()
         {
+            if (Event.current.type != EventType.Repaint) return; // nothing here takes input
             PlayerHub local = PlayerHub.Local;
             if (local == null || !GameInput.GameplayActive)
                 return;
 
             if (Combat.Weapon.LocalScoped) return; // the scope fills the screen
-            float dt = 0f;
-            if (Event.current.type == EventType.Repaint)
-            {
-                dt = Mathf.Min(0.1f, Time.unscaledTime - _lastRepaint);
-                _lastRepaint = Time.unscaledTime;
-            }
+            float dt = Mathf.Min(0.1f, Time.unscaledTime - _lastRepaint);
+            _lastRepaint = Time.unscaledTime;
             float cx = Hud.Width * 0.5f;
             float cy = Hud.Height * 0.5f;
 
@@ -71,11 +82,23 @@ namespace PleaseDontDrown.UI
                 float y = cy + 34f;
                 if (!string.IsNullOrEmpty(primary))
                 {
-                    Hud.Label(new Rect(cx - 500f, y, 1000f, 36f), $"{Key(GameInput.Interact)} {primary}", 26f, Color.white);
+                    if (primary != _primary)
+                    {
+                        _primary = primary;
+                        _primaryLine = $"{Key(GameInput.Interact)} {primary}";
+                    }
+                    Hud.Label(new Rect(cx - 500f, y, 1000f, 36f), _primaryLine, 26f, Color.white);
                     y += 36f;
                 }
                 if (!string.IsNullOrEmpty(secondary))
-                    Hud.Label(new Rect(cx - 500f, y, 1000f, 36f), $"{Key(GameInput.Secondary)} {secondary}", 26f, Color.white);
+                {
+                    if (secondary != _secondary)
+                    {
+                        _secondary = secondary;
+                        _secondaryLine = $"{Key(GameInput.Secondary)} {secondary}";
+                    }
+                    Hud.Label(new Rect(cx - 500f, y, 1000f, 36f), _secondaryLine, 26f, Color.white);
+                }
             }
 
             PlayerHands hands = local.Hands;
@@ -132,7 +155,7 @@ namespace PleaseDontDrown.UI
                     if (picture != null) Hud.Picture(inner, picture, active ? Color.white : new Color(1f, 1f, 1f, 0.8f));
                     else Hud.Label(new Rect(r.x + 6f, r.y + 24f, size - 12f, size - 30f), item.DisplayName, 15f, Color.white, TextAnchor.MiddleCenter, wrap: true);
                 }
-                Hud.Label(new Rect(r.x + 10f, r.y + 5f, 30f, 26f), (i + 1).ToString(), 20f, new Color(1f, 1f, 1f, active ? 1f : 0.7f), TextAnchor.UpperLeft, heavy: true);
+                Hud.Label(new Rect(r.x + 10f, r.y + 5f, 30f, 26f), SlotNumbers[i], 20f, new Color(1f, 1f, 1f, active ? 1f : 0.7f), TextAnchor.UpperLeft, heavy: true);
             }
         }
 
@@ -144,17 +167,27 @@ namespace PleaseDontDrown.UI
             {
                 _held = held;
                 _heldSince = Time.unscaledTime;
+                _heldIsPerson = held != null && held.GetComponent<Rescue.VictimBrain>() != null;
+                _hints = null;
             }
             if (held == null) return;
 
             float nameY = Hud.HotbarTop - 50f;
-            bool person = held.GetComponent<Rescue.VictimBrain>() != null; // RescueHud says what to do with them
-            if (!person)
+            if (!_heldIsPerson) // RescueHud says what to do with a person
             {
                 Hud.Label(new Rect(cx - 500f, nameY, 1000f, 40f), held.DisplayName, 30f, Color.white, heavy: true);
                 float hintAlpha = Mathf.Clamp01(HintSeconds - (Time.unscaledTime - _heldSince));
                 if (hintAlpha > 0f)
-                    Hud.Label(new Rect(cx - 800f, nameY - 32f, 1600f, 30f), Hints(held), 20f, new Color(1f, 1f, 1f, 0.9f * hintAlpha));
+                {
+                    // The skin keys join the line once the item's skins are known to be ours to change.
+                    bool withSkin = Items.ItemSkin.LocalHeld != null;
+                    if (_hints == null || withSkin != _hintsWithSkin)
+                    {
+                        _hints = Hints(held);
+                        _hintsWithSkin = withSkin;
+                    }
+                    Hud.Label(new Rect(cx - 800f, nameY - 32f, 1600f, 30f), _hints, 20f, new Color(1f, 1f, 1f, 0.9f * hintAlpha));
+                }
             }
 
             if (hands.IsEating || hands.EatProgress01 > 0.01f)

@@ -28,6 +28,8 @@ namespace PleaseDontDrown.UI
         private string _hoveredButton;
         private string _hoveredThisFrame;
 
+        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+
         private void OnEnable()
         {
             GameInput.ToggleMenu.performed += OnToggleMenu;
@@ -266,9 +268,9 @@ namespace PleaseDontDrown.UI
 
         // ------------------------------------------------------------------ options
 
-        private const float OptionsWidth = 620f, OptionsHeight = 300f;
+        private const float OptionsWidth = 620f, OptionsHeight = 378f;
 
-        /// <summary>Mouse sensitivity and field of view, each a slider with its number; they apply as you drag.</summary>
+        /// <summary>Mouse sensitivity, field of view and volume, each a slider with its number; they apply as you drag.</summary>
         private void DrawOptionsPanel(Rect panel)
         {
             Hud.Fill(panel, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.85f), 16f);
@@ -285,10 +287,16 @@ namespace PleaseDontDrown.UI
             changed = OptionRow(panel, ref y, "FIELD OF VIEW", fov, LookSettings.MinFov, LookSettings.MaxFov, Mathf.RoundToInt(fov).ToString());
             if (!Mathf.Approximately(changed, fov)) LookSettings.Fov = Mathf.Round(changed);
 
+            // Everything the game plays, as a percentage.
+            float volume = SoundSettings.Volume;
+            changed = OptionRow(panel, ref y, "VOLUME", volume, 0f, 1f, Mathf.RoundToInt(volume * 100f).ToString());
+            if (!Mathf.Approximately(changed, volume)) SoundSettings.Volume = Mathf.Round(changed * 20f) / 20f;
+
             if (Button(new Rect(panel.x + 28f, panel.yMax - 66f, 220f, 46f), "RESET", small: true))
             {
                 LookSettings.Sensitivity = LookSettings.DefaultSensitivity;
                 LookSettings.Fov = LookSettings.DefaultFov;
+                SoundSettings.Volume = SoundSettings.DefaultVolume;
                 PlayerPrefs.Save();
             }
         }

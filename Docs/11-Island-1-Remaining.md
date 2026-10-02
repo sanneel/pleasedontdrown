@@ -10,7 +10,7 @@ Almost nothing below has been played by a person: it was built and compiled, and
 
 | # | What | Why it's open |
 |---|---|---|
-| 1.1 | **One full run of chapter 1, solo**: beats 1.1 → 1.10 without the console | The beats were tested headless on 2026-09-28; the movement rebuild, guns, hands, new HUD and menu all came after and were never played |
+| 1.1 | **One full run of chapter 1, solo**: beats 1.1 → 1.10 without the console | The whole chapter is now played by an automated test (`Tools\test-story.ps1`, 2026-10-02: passes, about 270 game seconds). It teleports where a player walks or swims, so walking, swimming, aiming and the feel of it all still need a person |
 | 1.2 | **The same run with a friend over Steam** | The Steam friends path (PLAY, invite, join) has never been tried with a second real account |
 | 1.3 | **Feel tuning from that run**: walk / sprint / jump, throw, swim speed and stamina, mouse sensitivity, CPR timing, 20 s drowning timer, pay | All numbers are first guesses or How to Fish's; none were tuned by playing |
 | 1.4 | **Jet ski**: get on, ride to island 2, get off | Sit glitch and "can't move after getting off" were fixed on 2026-09-30 but not re-tested |
@@ -31,17 +31,17 @@ the lifeguard jet ski, the painted signs.
 | 2.6 | **Lost things**: wallet, phone, sunglasses, watch, evidence bag, jet ski keys (§6) | Primitives; these are what the hotbar pictures show |
 | 2.7 | **Inside the hut**: shelf, lost box, bar stool, radio (§2.2-2.8) | Optional, but it's the first place a player looks |
 | 2.8 | More tourist bases (swimmer, curvy, redhead, mom, grandpa, gym: §1.2-1.11) | Optional: 4 bases + recolours carry the island |
-| 2.9 | **Faces**: NPCs don't blink or move their mouths when they talk | Meshy's painted face; the game's eyes/mouth overlay isn't on them yet |
-| 2.10 | Fingers of NPCs don't bend; first-person hands were restyled by another session | Check both in game |
+| 2.9 | ~~Faces~~ done 2026-10-02: generated characters blink and open their mouths (eyelids and a mouth are added over the painted face when the body is baked, Editor/MeshyCharacters.cs) | Check in game: closed lids are flat skin-coloured ovals; fine for a blink, plain on a sleeping sunbather up close |
+| 2.10 | ~~Fingers of NPCs don't bend~~ done 2026-10-02: the four fingers curl as one mitten (the thumb stays stiff); first-person hands were restyled by another session | Check both in game |
 
 ## 3. Game pieces missing on the island
 
 | # | What | Notes |
 |---|---|---|
 | 3.1 | **Voices and music**: nobody speaks (Sandy, the thief, tourists are subtitles only), no music | Every other sound is in (procedural), including a synthesized "heeelp" cry |
-| 3.2 | **Options**: sensitivity + field of view are in (2026-10-02); still missing **volume**, key rebinding | |
-| 3.3 | **Failure**: a tourist you lose is simply replaced by another one; it costs nothing | Decide: lose pay, a count on the chapter card, or leave it light |
-| 3.4 | **Chapter end**: 1.10 ends when the jet ski reaches island 2, with no summary of the chapter (rescued / lost / money) | The design's "Rescue Report" card doesn't exist yet |
+| 3.2 | **Options**: sensitivity, field of view and a master **volume** slider are in (2026-10-02); still missing key rebinding | Volume is `AudioListener.volume` (Core/SoundSettings.cs). Separate music / effects / voice sliders need an Audio Mixer asset, which has to be made in the editor: wait until there is music or voice to balance (3.1) |
+| 3.3 | ~~Failure~~ done 2026-10-02: a tourist lost to the rival company costs the team $30 (the airlift bill, never more than the wallet holds) and is counted on the chapter's report card | Tune the amount by playing |
+| 3.4 | ~~Chapter end~~ done 2026-10-02: a report card (rescued, lost, lost things returned, earned, wallet) for 9 seconds when the jet ski reaches island 2, and again at the end of chapter 2 | `report` in the console shows it |
 | 3.5 | **Late joiner**: a friend joining mid-chapter isn't told the story so far and spawns at the start | Fine for island 1, noted |
 | 3.6 | **Guns on island 1**: guns exist (dev island armory) but chapter 1 gives none | Intended: the first weapon is bought on island 2. Decide if island 1 stays fists-only |
 | 3.7 | Menu/customizer polish: the character customizer and the shop / teleport panels still use the old small grey look | Not on the new HUD kit yet |

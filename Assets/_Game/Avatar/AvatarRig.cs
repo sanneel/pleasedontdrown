@@ -102,8 +102,11 @@ namespace PleaseDontDrown.Avatars
             this[Bone.ShoulderR].localRotation = Quaternion.Slerp(Quaternion.identity, this[Bone.UpperArmR].localRotation * _armUnbindR, 0.5f);
         }
 
-        /// <summary>Resets every bone to its rest pose.</summary>
-        public void ResetPose()
+        /// <summary>
+        /// Resets every bone to its rest pose. A caller that poses both hands itself afterwards passes
+        /// <paramref name="fingers"/> false and saves posing all thirty finger bones twice.
+        /// </summary>
+        public void ResetPose(bool fingers = true)
         {
             for (int i = 0; i < FingerStart; i++)
             {
@@ -112,6 +115,7 @@ namespace PleaseDontDrown.Avatars
                 _bones[i].localRotation = _restRotation[i];
                 _bones[i].localScale = Vector3.one;
             }
+            if (!fingers) return;
             // Fingers rest slightly curled (animators and ragdolls pose them over this).
             LeftHand?.Pose(HandPose.Relaxed);
             RightHand?.Pose(HandPose.Relaxed);
@@ -126,6 +130,16 @@ namespace PleaseDontDrown.Avatars
         public void SetExpression(float eyes, float mouth, float brows = 0f)
         {
             if (!_built) return;
+            if (GeneratedBody != null)
+            {
+                // A painted face: the eyelids come down over the eyes, the open mouth grows over the lips.
+                if (!GeneratedBody.HasFace) return;
+                var lid = new Vector3(1f, Mathf.Clamp01((1f - eyes) * 1.12f), 1f);
+                this[Bone.EyeL].localScale = lid;
+                this[Bone.EyeR].localScale = lid;
+                this[Bone.Mouth].localScale = new Vector3(1f, Mathf.Clamp01((mouth - 0.1f) * 1.6f), 1f);
+                return;
+            }
             Vector3 eyeScale = new Vector3(1f, Mathf.Clamp(eyes, 0.08f, 1.6f), 1f);
             this[Bone.EyeL].localScale = eyeScale;
             this[Bone.EyeR].localScale = eyeScale;
@@ -212,7 +226,8 @@ namespace PleaseDontDrown.Avatars
                 }
                 _bones[i].SetParent(parent.HasValue ? _bones[(int)parent.Value] : transform, false);
                 _restPosition[i] = generated != null && i < generated.RestPositions.Length ? generated.RestPositions[i] : localPosition * s;
-                _restRotation[i] = Quaternion.identity;
+                _restRotation[i] = generated == null ? Quaternion.identity
+                    : bone == Bone.HandL ? generated.HandRestL : bone == Bone.HandR ? generated.HandRestR : Quaternion.identity;
             }
 
             Make(Bone.Hips, null, new Vector3(0f, 0.92f, 0f));
@@ -245,11 +260,28 @@ namespace PleaseDontDrown.Avatars
             var rightFingers = new Transform[HandBones.BoneCount];
             System.Array.Copy(_bones, FingerStart, leftFingers, 0, HandBones.BoneCount);
             System.Array.Copy(_bones, FingerStart + HandBones.BoneCount, rightFingers, 0, HandBones.BoneCount);
-            LeftHand = new HandBones(_bones[(int)Bone.HandL], -1f, s * HandScale, leftFingers);
-            RightHand = new HandBones(_bones[(int)Bone.HandR], 1f, s * HandScale, rightFingers);
+            if (generated != null && generated.HasFingers)
+            {
+                // The finger bones run down the model's own fingers (measured when it was baked, in metres).
+                LeftHand = new HandBones(_bones[(int)Bone.HandL], -1f, 1f, leftFingers, FingerShape(generated.FingerBasesL, generated.FingerLengthsL));
+                RightHand = new HandBones(_bones[(int)Bone.HandR], 1f, 1f, rightFingers, FingerShape(generated.FingerBasesR, generated.FingerLengthsR));
+            }
+            else
+            {
+                LeftHand = new HandBones(_bones[(int)Bone.HandL], -1f, s * HandScale, leftFingers);
+                RightHand = new HandBones(_bones[(int)Bone.HandR], 1f, s * HandScale, rightFingers);
+            }
             System.Array.Copy(LeftHand.Bones, 0, _bones, FingerStart, HandBones.BoneCount);
             System.Array.Copy(RightHand.Bones, 0, _bones, FingerStart + HandBones.BoneCount, HandBones.BoneCount);
             ResetPose();
+        }
+
+        private static HandBones.Shape FingerShape(Vector3[] bases, float[] lengths)
+        {
+            var shape = new HandBones.Shape { Bases = bases, Lengths = lengths, ThumbTuck = 0f };
+            for (int f = 0; f < HandBones.Fingers; f++) shape.Directions[f] = Vector3.down;
+            shape.Palm = new Vector3(-0.02f, bases[2].y * 0.6f, 0f);
+            return shape;
         }
 
         /// <summary>A generated body: its mesh is already skinned to these bones (bone order and bind poses baked).</summary>

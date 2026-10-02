@@ -26,6 +26,7 @@ namespace PleaseDontDrown.Story
             public Vector3 Anchor;          // where it was when the "moving" timer started
             public float AnchorTime;
             public float LastMoved;
+            public NpcActivity Activity;
             public readonly Dictionary<string, float> Reported = new();
             public readonly Dictionary<string, float> Since = new();   // when a lasting-problem check first failed
             public readonly HashSet<string> Seen = new();
@@ -105,8 +106,14 @@ namespace PleaseDontDrown.Story
         {
             float step = Vector3.Distance(new Vector3(p.x, 0f, p.z), new Vector3(t.Last.x, 0f, t.Last.z));
             if (step > 0.02f) t.LastMoved = Time.time;
+            // Starting something new (back from a story scene, where standing still was the job): the clock starts again.
+            if (npc.Activity != t.Activity)
+            {
+                t.Activity = npc.Activity;
+                t.LastMoved = Time.time;
+            }
             bool teleported = npc.ServerTeleportedSince(Time.time - dt - 0.05f);
-            if (!teleported && step > 8f * dt + 0.3f && npc.Ride == null)
+            if (!teleported && step > 14f * dt + 0.5f && npc.Ride == null) // (a punch knocks someone back at up to 10 m/s)
                 Report(npc, t, "popping", $"moved {step:F2} m in {dt:F2} s");
             t.Last = p;
 

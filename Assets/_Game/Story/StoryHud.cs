@@ -16,11 +16,42 @@ namespace PleaseDontDrown.Story
         private static string _title, _subtitle;
         private static float _titleAt = -100f;
 
+        // Lines of text that only change when what they show does (not built again every frame).
+        private string _objective, _objectiveLine;
+        private int _objectiveProgress = -1, _objectiveGoal = -1;
+        private int _money = int.MinValue;
+        private string _moneyText;
+        private float _moneyWidth, _moneyScale;
+        private string _spoken, _spokenShown;
+        private int _spokenLength = -1;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
             _title = _subtitle = null;
             _titleAt = -100f;
+            _reportTitle = null;
+            _reportAt = -100f;
+        }
+
+        /// <summary>How long a chapter's report card stays up.</summary>
+        public const float ReportSeconds = 9f;
+
+        private static string _reportTitle;
+        private static readonly string[] ReportLabels = { "Tourists rescued", "Lost to the rival company", "Lost things returned", "Earned", "In the team's wallet" };
+        private static readonly string[] _reportValues = new string[5];
+        private static float _reportAt = -100f;
+
+        /// <summary>The end-of-chapter report card: what the team did, in the middle of the screen for a while.</summary>
+        public static void ShowReport(string title, int rescued, int lost, int returned, int earned, int money)
+        {
+            _reportTitle = title;
+            _reportValues[0] = rescued.ToString();
+            _reportValues[1] = lost.ToString();
+            _reportValues[2] = returned.ToString();
+            _reportValues[3] = "$" + earned;
+            _reportValues[4] = "$" + money;
+            _reportAt = Time.unscaledTime;
         }
 
         /// <summary>A big centred card for a few seconds ("CHAPTER 2").</summary>
@@ -31,8 +62,11 @@ namespace PleaseDontDrown.Story
             _titleAt = Time.unscaledTime;
         }
 
+        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+
         private void OnGUI()
         {
+            if (Event.current.type != EventType.Repaint) return; // nothing here takes input
             PlayerHub local = PlayerHub.Local;
             if (local == null || !GameInput.GameplayActive) return;
             Camera cam = local.Look != null ? local.Look.Camera : null;
@@ -45,6 +79,7 @@ namespace PleaseDontDrown.Story
             }
             DrawDialogue();
             DrawTitle();
+            DrawReport();
         }
 
         private void DrawObjective()
@@ -53,17 +88,28 @@ namespace PleaseDontDrown.Story
             if (story != null && !string.IsNullOrEmpty(story.Objective))
             {
                 Hud.Label(new Rect(30f, 22f, 900f, 28f), story.Chapter, 20f, new Color(1f, 0.85f, 0.5f), TextAnchor.MiddleLeft, heavy: true);
-                string progress = story.Goal > 0 ? $"  <color=#ffd24a>{story.Progress}/{story.Goal}</color>" : "";
-                Hud.Label(new Rect(30f, 52f, 820f, 80f), story.Objective + progress, 27f, Color.white, TextAnchor.UpperLeft, wrap: true);
+                if (story.Objective != _objective || story.Progress != _objectiveProgress || story.Goal != _objectiveGoal)
+                {
+                    _objective = story.Objective;
+                    _objectiveProgress = story.Progress;
+                    _objectiveGoal = story.Goal;
+                    _objectiveLine = story.Goal > 0 ? $"{_objective}  <color=#ffd24a>{story.Progress}/{story.Goal}</color>" : _objective;
+                }
+                Hud.Label(new Rect(30f, 52f, 820f, 80f), _objectiveLine, 27f, Color.white, TextAnchor.UpperLeft, wrap: true);
             }
             if (Economy.Instance != null)
             {
                 // Above the vitals squares.
-                string money = "$" + Economy.Money;
-                float width = Hud.TextWidth(money, 30f, true) + 36f;
-                var pill = new Rect(50f, Hud.Height - 25f - 64f - 14f - 46f, width, 46f);
+                if (Economy.Money != _money || !Mathf.Approximately(Hud.Scale, _moneyScale))
+                {
+                    _money = Economy.Money;
+                    _moneyScale = Hud.Scale;
+                    _moneyText = "$" + _money;
+                    _moneyWidth = Hud.TextWidth(_moneyText, 30f, true) + 36f;
+                }
+                var pill = new Rect(50f, Hud.Height - 25f - 64f - 14f - 46f, _moneyWidth, 46f);
                 Hud.Fill(pill, new Color(0f, 0f, 0f, 0.5f), 12f);
-                Hud.Label(pill, money, 30f, new Color(0.56f, 1f, 0.56f), heavy: true, shadow: false);
+                Hud.Label(pill, _moneyText, 30f, new Color(0.56f, 1f, 0.56f), heavy: true, shadow: false);
             }
         }
 
@@ -100,8 +146,10 @@ namespace PleaseDontDrown.Story
 
         private void DrawLostSparkles(Camera cam, PlayerHub local)
         {
-            foreach (Item item in Item.All)
+            var items = Item.All;
+            for (int i = 0; i < items.Count; i++)
             {
+                Item item = items[i];
                 if (item.IsHeld || !item.TryGetComponent(out LostItem lost)) continue;
                 float d = Vector3.Distance(local.transform.position, item.transform.position);
                 if (d > 14f) continue;
@@ -130,10 +178,40 @@ namespace PleaseDontDrown.Story
             Hud.Label(new Rect(box.x + 24f, box.y + 10f, w - 48f, 32f), speaker, 24f, l.Color, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             // Typewriter.
             int shown = Mathf.Clamp(Mathf.CeilToInt((Time.time - l.Start) * 55f), 0, l.Text.Length);
+            if (!ReferenceEquals(l.Text, _spoken) || shown != _spokenLength)
+            {
+                _spoken = l.Text;
+                _spokenLength = shown;
+                _spokenShown = shown >= l.Text.Length ? l.Text : l.Text.Substring(0, shown);
+            }
             GUIStyle style = Hud.Style(25f, TextAnchor.UpperLeft, wrap: true);
             style.richText = false; // spoken lines are shown as written
-            Hud.Label(new Rect(box.x + 24f, box.y + 44f, w - 48f, 76f), l.Text.Substring(0, shown), 25f, Color.white, TextAnchor.UpperLeft, wrap: true, shadow: false);
+            Hud.Label(new Rect(box.x + 24f, box.y + 44f, w - 48f, 76f), _spokenShown, 25f, Color.white, TextAnchor.UpperLeft, wrap: true, shadow: false);
             style.richText = true;
+        }
+
+        /// <summary>The chapter's report card: a dark panel, the title, one line per number (the lost count in red if any).</summary>
+        private void DrawReport()
+        {
+            float t = Time.unscaledTime - _reportAt;
+            if (_reportTitle == null || t > ReportSeconds) return;
+            float a = Mathf.Clamp01(t / 0.4f) * Mathf.Clamp01((ReportSeconds - t) / 0.8f);
+            const float width = 640f, row = 46f;
+            float height = 120f + ReportLabels.Length * row + 26f;
+            var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f - 40f, width, height);
+            Hud.Fill(panel, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.88f * a), 20f);
+            Hud.Label(new Rect(panel.x, panel.y + 22f, width, 64f), _reportTitle, 46f, new Color(1f, 0.92f, 0.6f, a), heavy: true, shadow: false);
+            float y = panel.y + 110f;
+            for (int i = 0; i < ReportLabels.Length; i++)
+            {
+                // Each line comes in a moment after the one above.
+                float shown = Mathf.Clamp01((t - 0.5f - i * 0.35f) / 0.3f) * a;
+                bool bad = i == 1 && _reportValues[1] != "0";
+                Color value = bad ? new Color(1f, 0.5f, 0.4f, shown) : i >= 3 ? new Color(0.56f, 1f, 0.56f, shown) : new Color(1f, 1f, 1f, shown);
+                Hud.Label(new Rect(panel.x + 48f, y, width - 96f, row), ReportLabels[i], 26f, new Color(1f, 1f, 1f, 0.85f * shown), TextAnchor.MiddleLeft, shadow: false);
+                Hud.Label(new Rect(panel.x + 48f, y, width - 96f, row), _reportValues[i], 30f, value, TextAnchor.MiddleRight, heavy: true, shadow: false);
+                y += row;
+            }
         }
 
         private void DrawTitle()

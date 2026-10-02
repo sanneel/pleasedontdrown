@@ -503,6 +503,8 @@ namespace PleaseDontDrown.Story
                 yield return new WaitForSeconds(0.25f);
             }
             NoMarker();
+            SetObjective("You made it to the hotel island");
+            yield return ChapterReport("CHAPTER 1 COMPLETE");
         }
 
         // ================================================================== chapter 2
@@ -727,6 +729,7 @@ namespace PleaseDontDrown.Story
             yield return Say(_sandy, "(on the radio) A jet ski, and now a pirate ship? Who ARE you?");
             SetChapter("End of chapter 2");
             SetObjective("To be continued...");
+            yield return ChapterReport("CHAPTER 2 COMPLETE");
             TitleObservers("TO BE CONTINUED", "Thanks for playing chapters 1 and 2");
         }
     }

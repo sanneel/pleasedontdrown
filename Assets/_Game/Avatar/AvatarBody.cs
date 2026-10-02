@@ -18,5 +18,18 @@ namespace PleaseDontDrown.Avatars
         public Vector3[] RestPositions;
         public float Scale = 1f;        // as AvatarRig.Scale: hip height / 0.92
         public float UpperArmLength, ForearmLength, HandLength, ThighLength, ShinLength, AnkleHeight, HipHeight, EyeHeight;
+
+        [Tooltip("Rest turn of each hand on its forearm. The hand bones are bound the way the game's own hands are " +
+                 "(fingers down -Y, thumb toward +Z, palm on -X right / +X left), whichever way the model holds them.")]
+        public Quaternion HandRestL = Quaternion.identity, HandRestR = Quaternion.identity;
+        [Tooltip("The model's fingers are skinned to the finger bones (one mitten of four fingers; the thumb stays on the hand).")]
+        public bool HasFingers;
+        [Tooltip("Where each finger starts, in hand space, as a right hand (thumb, index, middle, ring, pinky).")]
+        public Vector3[] FingerBasesL, FingerBasesR;
+        [Tooltip("Bone lengths, three per finger.")]
+        public float[] FingerLengthsL, FingerLengthsR;
+        [Tooltip("Eyelids on the eye bones and an open mouth on the mouth bone are part of the mesh: scaling those bones " +
+                 "up closes the eyes / opens the mouth over the painted face.")]
+        public bool HasFace;
     }
 }

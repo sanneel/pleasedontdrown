@@ -75,7 +75,11 @@ namespace PleaseDontDrown.UI
             if (_instance == this) _instance = null;
             DevCommands.Unregister("customize", this);
             if (_open) GameInput.PopUI();
-            if (_texture != null) _texture.Release();
+            if (_texture != null)
+            {
+                _texture.Release();
+                Destroy(_texture);
+            }
             if (_stage != null) Destroy(_stage);
         }
 

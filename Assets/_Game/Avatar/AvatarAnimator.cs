@@ -95,12 +95,78 @@ namespace PleaseDontDrown.Avatars
         private HandPose _poseL = HandPose.Relaxed, _poseR = HandPose.Relaxed;
         private float _blinkUntil;
 
+        // The blends above are eased (slow out of one pose, slow into the next); these run at a steady rate under them.
+        private float _swimRaw, _swimMoveRaw, _underRaw, _holdRaw, _eatRaw, _cprRaw, _climbRaw, _seatRaw, _downRaw, _kneelRaw,
+            _scaredRaw, _handsUpRaw, _lieRaw, _lieFrontRaw, _sitRaw, _chairRaw;
+        private float _upright;       // 1 standing or walking .. 0 in any sitting, lying or kneeling pose
+        private float _talk;
+
+        // Secondary motion: the body leans into speeding up and turning, sinks on landing, and swings back.
+        private Spring _leanForward, _leanSide, _turnLag, _landing;
+        private bool _wasAirborne;
+        private float _fallSpeed;
+
+        // Feet on the ground that is really there (slopes, steps): how far it is above the root under each foot.
+        private static readonly RaycastHit[] _groundHits = new RaycastHit[8];
+        private float _groundL, _groundR, _hipDrop, _groundWeight;
+        private Vector3 _normalL = Vector3.up, _normalR = Vector3.up;
+
+        // Standing about: looking around and small habits (see IdleAct).
+        private Variety _variety = Variety.None;
+        private IdleAct _act;
+        private float _actStart, _actLength, _nextAct = -1f, _actWeight;
+        private Vector2 _glance, _glanceTarget;
+        private float _nextGlance = -1f;
+        private float _hidden;        // seconds since the last pose, while nobody can see us
+        private float _slowSwim;      // seconds a swimmer has been (nearly) still
+
+        /// <summary>Things people do with their hands while they stand around.</summary>
+        public enum IdleAct : byte { None, ScratchHead, HandsOnHips, Stretch, ShieldEyes, WipeBrow }
+
+        private const float HiddenInterval = 0.25f;
+
+        /// <summary>
+        /// Characters nobody is looking at are only posed a few times a second (their joints stay roughly where they
+        /// are, for whatever reads them). For crowds; leave it off for players.
+        /// </summary>
+        public bool CullWhenHidden { get; set; }
+
+        /// <summary>Glances about and has small habits while standing idle (tourists, not players).</summary>
+        public bool Lively { get; set; }
+
+        /// <summary>
+        /// Swims breaststroke at the surface instead of the crawl: head up, both hands reaching out in front together
+        /// (holidaymakers; a lifeguard in a hurry crawls).
+        /// </summary>
+        public bool Breaststroke { get; set; }
+
+        /// <summary>
+        /// Gives this character its own way of moving (stride, arm swing, posture, rhythm), the same on every machine
+        /// for the same seed. 0 = the neutral walk.
+        /// </summary>
+        public int Seed
+        {
+            set
+            {
+                _variety = Variety.From(value);
+                _hidden = HiddenInterval * Variety.Unit(value, 7); // crowds don't all pose on the same frame
+            }
+        }
+
         public AvatarRig Rig
         {
             get => _rig;
             set => _rig = value;
         }
         public float BodyYaw => _bodyYaw;
+
+        /// <summary>Starts an idle habit now (review tools; in play they come up by themselves).</summary>
+        public void Play(IdleAct act, float seconds)
+        {
+            _act = act;
+            _actStart = Now;
+            _actLength = seconds;
+        }
 
         public void Play(AvatarGesture gesture) => Play(gesture, Vector3.zero);
 
@@ -122,14 +188,28 @@ namespace PleaseDontDrown.Avatars
         public static float? TimeOverride;
         private static float Now => TimeOverride ?? Time.time;
 
-        private void LateUpdate() => Tick(Mathf.Min(Time.deltaTime, 0.1f));
+        private void LateUpdate()
+        {
+            float dt = Mathf.Min(Time.deltaTime, 0.1f);
+            // (Batch runs draw nothing, so nothing is ever "visible": tests there keep the full rate.)
+            if (CullWhenHidden && !Application.isBatchMode && _rig != null && _rig.Renderer != null && !_rig.Renderer.isVisible)
+            {
+                _hidden += dt;
+                if (_hidden < HiddenInterval) return;
+                dt = _hidden;
+            }
+            _hidden = 0f;
+            Tick(dt);
+        }
 
         public void Tick(float dt)
         {
             if (_rig == null || !_rig.IsBuilt) return;
             _dt = dt;
             UpdateBlends(dt);
-            _rig.ResetPose();
+            UpdateIdle();
+            SampleGround(dt);
+            _rig.ResetPose(fingers: false); // PoseHands sets every finger bone
             PoseBody();
             PoseLegs();
             PoseArms();
@@ -144,12 +224,14 @@ namespace PleaseDontDrown.Avatars
         {
             AvatarMotion m = Motion;
             float k(float rate) => 1f - Mathf.Exp(-rate * dt);
+            Vector3 velocityBefore = _smoothVelocity;
             _smoothVelocity = Vector3.Lerp(_smoothVelocity, m.Velocity, k(10f));
             var flat = new Vector3(_smoothVelocity.x, 0f, _smoothVelocity.z);
             float speed = flat.magnitude;
 
             // The body follows the head: quickly while moving, in a little turn-in-place when looking far aside.
             if (!_yawInitialised) { _bodyYaw = m.FacingYaw; _yawInitialised = true; }
+            float yawBefore = _bodyYaw;
             float delta = Mathf.DeltaAngle(_bodyYaw, m.FacingYaw);
             bool moving = speed > 0.4f || m.Swimming || m.Holding;
             if (moving || Mathf.Abs(delta) > 55f) _turningInPlace = !moving;
@@ -161,28 +243,51 @@ namespace PleaseDontDrown.Avatars
             _move = Mathf.MoveTowards(_move, Mathf.InverseLerp(0.15f, 1.4f, speed) + (_turningInPlace ? 0.35f : 0f), dt * 4f);
             _move = Mathf.Clamp01(_move);
             _run = Mathf.MoveTowards(_run, Mathf.InverseLerp(4.8f, 7f, speed), dt * 3f);
-            _swim = Mathf.MoveTowards(_swim, m.Swimming ? 1f : 0f, dt * 3f);
+            _swim = Eased(ref _swimRaw, m.Swimming, 3f, dt);
             // Crawl while making way, tread water when (nearly) still; the gap between the two thresholds keeps a
             // slow swimmer, or one nudged sideways, from flickering between lying flat and standing up in the water.
-            _crawling = m.Swimming && (_crawling ? speed > 0.18f : speed > 0.35f);
-            _swimMove = Mathf.MoveTowards(_swimMove, _crawling ? 1f : 0f, dt * 2.5f);
-            _under = Mathf.MoveTowards(_under, m.Swimming && m.Underwater ? 1f : 0f, dt * 2.5f);
-            _air = Mathf.MoveTowards(_air, !m.Grounded && !m.Swimming && !m.Climbing ? 1f : 0f, dt * 7f);
+            // A swimmer who only stops for a moment (turning at the end of a length) glides on stretched out; it takes
+            // a second and a half of staying put before they come upright.
+            _slowSwim = speed > 0.18f ? 0f : _slowSwim + dt;
+            _crawling = m.Swimming && (_crawling ? _slowSwim < 1.5f : speed > 0.35f);
+            _swimMove = Eased(ref _swimMoveRaw, _crawling, 2.5f, dt);
+            _under = Eased(ref _underRaw, m.Swimming && m.Underwater, 2.5f, dt);
+            bool airborne = !m.Grounded && !m.Swimming && !m.Climbing;
+            _air = Mathf.MoveTowards(_air, airborne ? 1f : 0f, dt * 7f);
             _crouch = Mathf.Lerp(_crouch, m.Crouch, k(12f));
-            _hold = Mathf.MoveTowards(_hold, m.Holding ? 1f : 0f, dt * 6f);
+            _hold = Eased(ref _holdRaw, m.Holding, 6f, dt);
             _charge = Mathf.MoveTowards(_charge, m.Charge, dt * 8f);
-            _eat = Mathf.MoveTowards(_eat, m.Eating ? 1f : 0f, dt * 5f);
-            _cpr = Mathf.MoveTowards(_cpr, m.Cpr ? 1f : 0f, dt * 4f);
-            _climb = Mathf.MoveTowards(_climb, m.Climbing ? 1f : 0f, dt * 6f);
-            _seat = Mathf.MoveTowards(_seat, m.Seated ? 1f : 0f, dt * 6f);
-            _down = Mathf.MoveTowards(_down, m.Pose == AvatarPose.Down ? 1f : 0f, dt * 3.5f);
-            _kneel = Mathf.MoveTowards(_kneel, m.Pose == AvatarPose.Kneel ? 1f : 0f, dt * 4f);
-            _scared = Mathf.MoveTowards(_scared, m.Pose == AvatarPose.Scared ? 1f : 0f, dt * 5f);
-            _handsUp = Mathf.MoveTowards(_handsUp, m.Pose == AvatarPose.HandsUp ? 1f : 0f, dt * 5f);
-            _lie = Mathf.MoveTowards(_lie, m.Pose == AvatarPose.Lie ? 1f : 0f, dt * 2f);
-            _lieFront = Mathf.MoveTowards(_lieFront, m.Pose == AvatarPose.LieFront ? 1f : 0f, dt * 2f);
-            _sit = Mathf.MoveTowards(_sit, m.Pose == AvatarPose.Sit ? 1f : 0f, dt * 2.5f);
-            _chair = Mathf.MoveTowards(_chair, m.Pose == AvatarPose.SitChair ? 1f : 0f, dt * 3f);
+            _eat = Eased(ref _eatRaw, m.Eating, 5f, dt);
+            _cpr = Eased(ref _cprRaw, m.Cpr, 4f, dt);
+            _climb = Eased(ref _climbRaw, m.Climbing, 6f, dt);
+            _seat = Eased(ref _seatRaw, m.Seated, 6f, dt);
+            _down = Eased(ref _downRaw, m.Pose == AvatarPose.Down, 3.5f, dt);
+            _kneel = Eased(ref _kneelRaw, m.Pose == AvatarPose.Kneel, 4f, dt);
+            _scared = Eased(ref _scaredRaw, m.Pose == AvatarPose.Scared, 5f, dt);
+            _handsUp = Eased(ref _handsUpRaw, m.Pose == AvatarPose.HandsUp, 5f, dt);
+            _lie = Eased(ref _lieRaw, m.Pose == AvatarPose.Lie, 2f, dt);
+            _lieFront = Eased(ref _lieFrontRaw, m.Pose == AvatarPose.LieFront, 2f, dt);
+            _sit = Eased(ref _sitRaw, m.Pose == AvatarPose.Sit, 2.5f, dt);
+            _chair = Eased(ref _chairRaw, m.Pose == AvatarPose.SitChair, 3f, dt);
+            _upright = (1f - _cpr) * (1f - _kneel) * (1f - _down) * (1f - _sit) * (1f - _chair) * (1f - _lie) * (1f - _lieFront) * (1f - _seat);
+            _talk = Mathf.MoveTowards(_talk, m.Talking ? 1f : 0f, dt * 5f);
+
+            // Secondary motion. Speeding up tips the body into it and it swings back; a turn drags the chest behind;
+            // landing from a jump sinks the hips (the knees give, the feet stay planted) before they come back up.
+            float perSecond = dt > 1e-5f ? 1f / dt : 0f;
+            Vector3 push = transform.InverseTransformDirection((_smoothVelocity - velocityBefore) * perSecond);
+            _leanForward.Tick(Mathf.Clamp(push.z * 0.45f, -7f, 7f), 55f, 8f, dt);
+            _leanSide.Tick(Mathf.Clamp(-push.x * 0.45f, -7f, 7f), 55f, 8f, dt);
+            _turnLag.Tick(Mathf.Clamp(-Mathf.DeltaAngle(yawBefore, _bodyYaw) * perSecond * 0.035f, -14f, 14f), 45f, 7f, dt);
+            if (airborne) _fallSpeed = Mathf.Max(_fallSpeed, -m.Velocity.y);
+            else if (_wasAirborne)
+            {
+                _landing.Velocity -= Mathf.Clamp(_fallSpeed, 2f, 10f) * 0.2f * _rig.Scale;
+                _fallSpeed = 0f;
+            }
+            _wasAirborne = airborne;
+            _landing.Tick(0f, 110f, 13f, dt);
+            _landing.Value = Mathf.Max(_landing.Value, -0.22f * _rig.Scale);
 
             // One cycle = two steps; stride grows with speed so feet don't skate.
             float stride = StepLength;
@@ -191,6 +296,191 @@ namespace PleaseDontDrown.Avatars
             // body instead of churning in place; treading sculls at an easy fixed rate.
             float strokeRate = Mathf.Clamp(speed / 1.8f, 0.45f, 1.1f);
             _swimPhase = Mathf.Repeat(_swimPhase + dt * Mathf.Lerp(0.45f, strokeRate, _swimMove), 1f);
+        }
+
+        /// <summary>Moves a blend at a steady rate and returns it eased at both ends (no sudden start, no sudden stop).</summary>
+        private static float Eased(ref float raw, bool on, float rate, float dt)
+        {
+            raw = Mathf.MoveTowards(raw, on ? 1f : 0f, dt * rate);
+            return raw * raw * (3f - 2f * raw);
+        }
+
+        /// <summary>A damped spring on one number (it overshoots a little and settles).</summary>
+        private struct Spring
+        {
+            public float Value, Velocity;
+
+            public void Tick(float target, float stiffness, float damping, float dt)
+            {
+                if (dt <= 0f) return;
+                // Small steps: a pose that was skipped for a while (hidden characters) must not blow the spring up.
+                int steps = Mathf.Clamp(Mathf.CeilToInt(dt / 0.017f), 1, 16);
+                float h = dt / steps;
+                for (int i = 0; i < steps; i++)
+                {
+                    Velocity += ((target - Value) * stiffness - Velocity * damping) * h;
+                    Value += Velocity * h;
+                }
+            }
+        }
+
+        /// <summary>One character's own way of moving, so a crowd doesn't walk in step.</summary>
+        private struct Variety
+        {
+            public float Stride;      // step length (longer steps = slower cadence at the same speed)
+            public float Swing;       // arm swing
+            public float Bounce;      // up and down per step
+            public float Slouch;      // degrees the upper back leans forward (negative: chest out)
+            public float HeadTilt;    // degrees the head sits to one side
+            public float Spread;      // degrees the arms hang out from the body
+            public float BreatheRate;
+            public float SwayRate;    // shifting weight from foot to foot while standing
+            public float Phase;       // so idle rhythms are out of step with everyone else's
+
+            public static readonly Variety None = new() { Stride = 1f, Swing = 1f, Bounce = 1f, BreatheRate = 1.7f, SwayRate = 0.7f };
+
+            public static Variety From(int seed)
+            {
+                if (seed == 0) return None;
+                return new Variety
+                {
+                    Stride = Mathf.Lerp(0.9f, 1.1f, Unit(seed, 1)),
+                    Swing = Mathf.Lerp(0.7f, 1.35f, Unit(seed, 2)),
+                    Bounce = Mathf.Lerp(0.75f, 1.3f, Unit(seed, 3)),
+                    Slouch = Mathf.Lerp(-2.5f, 6f, Unit(seed, 4)),
+                    HeadTilt = Mathf.Lerp(-3.5f, 3.5f, Unit(seed, 5)),
+                    Spread = Mathf.Lerp(-1.5f, 5f, Unit(seed, 6)),
+                    BreatheRate = Mathf.Lerp(1.3f, 2.1f, Unit(seed, 8)),
+                    SwayRate = Mathf.Lerp(0.5f, 0.95f, Unit(seed, 9)),
+                    Phase = Unit(seed, 10) * 40f
+                };
+            }
+
+            /// <summary>A fixed number 0..1 for a seed and a slot (integer hash: no shared random state touched).</summary>
+            public static float Unit(int seed, int slot)
+            {
+                unchecked
+                {
+                    uint h = (uint)seed * 2654435761u + (uint)slot * 40503u;
+                    h ^= h >> 15;
+                    h *= 2246822519u;
+                    h ^= h >> 13;
+                    h *= 3266489917u;
+                    h ^= h >> 16;
+                    return (h & 0xFFFFFF) / (float)0x1000000;
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------ idle life
+
+        /// <summary>1 while standing still with nothing to do (the only time people fidget).</summary>
+        private float IdleWeight => (1f - _move) * (1f - _swim) * (1f - _air) * (1f - _crouch) * (1f - _hold) * (1f - _charge) *
+                                    (1f - _eat) * (1f - _climb) * (1f - _scared) * (1f - _handsUp) * _upright;
+
+        /// <summary>Picks when to glance somewhere else and when to start a habit.</summary>
+        private void UpdateIdle()
+        {
+            float now = Now;
+            float idle = IdleWeight;
+            bool free = idle > 0.95f && now - _gestureStart > 1.6f;
+
+            // Glances: now and then the head turns to something else for a moment.
+            if (_nextGlance < 0f) _nextGlance = now + Random.Range(1f, 6f);
+            if (now > _nextGlance)
+            {
+                bool away = _glanceTarget == Vector2.zero && Lively && free && !Motion.Talking;
+                _glanceTarget = away ? new Vector2(Random.Range(-38f, 38f), Random.Range(-6f, 9f)) : Vector2.zero;
+                _nextGlance = now + (away ? Random.Range(0.9f, 2.6f) : Random.Range(2.5f, 7f));
+            }
+            if (!free) _glanceTarget = Vector2.zero;
+            _glance = Vector2.Lerp(_glance, _glanceTarget, 1f - Mathf.Exp(-5f * _dt));
+
+            // Habits.
+            if (_nextAct < 0f) _nextAct = now + Random.Range(3f, 16f);
+            if (_act != IdleAct.None)
+            {
+                float t = now - _actStart;
+                if (t > _actLength || t < 0f) // (t < 0: a review tool rewound the clock)
+                {
+                    _act = IdleAct.None;
+                    _nextAct = now + Random.Range(7f, 20f);
+                }
+                float ease = Mathf.Clamp01(Mathf.Min(t, _actLength - t) / 0.45f);
+                _actWeight = ease * ease * (3f - 2f * ease) * idle;
+            }
+            else
+            {
+                _actWeight = 0f;
+                if (!Lively || !free || Motion.Talking || Motion.Mood is AvatarMood.Scared or AvatarMood.Hurt or AvatarMood.Angry)
+                    _nextAct = Mathf.Max(_nextAct, now + 2f);
+                else if (now > _nextAct)
+                {
+                    IdleAct act = (IdleAct)Random.Range(1, 6);
+                    Play(act, act switch
+                    {
+                        IdleAct.HandsOnHips => Random.Range(4f, 7f),
+                        IdleAct.ShieldEyes => Random.Range(3f, 4.5f),
+                        IdleAct.Stretch => 3.2f,
+                        IdleAct.WipeBrow => 1.9f,
+                        _ => 2.6f
+                    });
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------ ground
+
+        /// <summary>
+        /// Finds the ground under each foot. On a slope or a step one foot stands higher than the other: each foot goes
+        /// to its own height and the hips come down far enough for the lower one to reach.
+        /// </summary>
+        private void SampleGround(float dt)
+        {
+            _groundWeight = (1f - _swim) * (1f - _air) * (1f - _climb) * _upright;
+            float k = 1f - Mathf.Exp(-16f * dt);
+            float left = 0f, right = 0f;
+            Vector3 normalL = Vector3.up, normalR = Vector3.up;
+            if (_groundWeight > 0.02f)
+            {
+                GroundUnder(FootTarget(Bone.ThighL, 0f, -1f, out _), out left, out normalL);
+                GroundUnder(FootTarget(Bone.ThighR, 0.5f, 1f, out _), out right, out normalR);
+            }
+            _groundL = Mathf.Lerp(_groundL, left, k);
+            _groundR = Mathf.Lerp(_groundR, right, k);
+            _normalL = Vector3.Slerp(_normalL, normalL, k);
+            _normalR = Vector3.Slerp(_normalR, normalR, k);
+            _hipDrop = Mathf.Lerp(_hipDrop, Mathf.Min(0f, Mathf.Min(left, right)), 1f - Mathf.Exp(-10f * dt));
+        }
+
+        /// <summary>Height of solid ground above the root's level under a foot (root space x/z), and its slope.</summary>
+        private void GroundUnder(Vector3 local, out float height, out Vector3 normal)
+        {
+            height = 0f;
+            normal = Vector3.up;
+            float reach = 0.5f * _rig.Scale;
+            Vector3 at = transform.TransformPoint(new Vector3(local.x, 0f, local.z));
+            int count = Physics.RaycastNonAlloc(at + Vector3.up * reach, Vector3.down, _groundHits, reach * 2f, ~0, QueryTriggerInteraction.Ignore);
+            float best = float.NegativeInfinity;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = _groundHits[i];
+                // Only what stays put: not people, things lying about or vehicles (they all have bodies).
+                if (hit.collider.attachedRigidbody != null || hit.point.y <= best) continue;
+                best = hit.point.y;
+                normal = hit.normal;
+            }
+            if (float.IsNegativeInfinity(best)) return;
+            height = best - at.y;
+            // A foot out over an edge (a dock, a step too deep) hangs there; the body doesn't sink after it.
+            if (height < -0.3f * _rig.Scale)
+            {
+                height = 0f;
+                normal = Vector3.up;
+                return;
+            }
+            // A wall or a very steep bank isn't something to stand on at an angle.
+            if (normal.y < 0.75f) normal = Vector3.up;
         }
 
         private float GestureT(float duration) => Mathf.Clamp01((Now - _gestureStart) / duration);
@@ -206,26 +496,50 @@ namespace PleaseDontDrown.Avatars
         {
             float s = _rig.Scale;
             float land = 1f - _swim;
-            float stepBob = -Mathf.Abs(Wave(_phase)) * (0.025f + 0.035f * _run) * _move * land;
+            float standing = land * _upright;
+            float stepBob = -Mathf.Abs(Wave(_phase)) * (0.025f + 0.035f * _run) * _move * land * _variety.Bounce;
             float drop = _crouch * 0.32f * s * land + _cpr * 0.42f * s * land;
             float pumpDip = Mathf.Max(0f, 1f - (Now - _lastPump) / 0.25f) * 0.05f * s * _cpr;
-            float breathe = Mathf.Sin(Now * 1.7f) * 0.004f;
+            float breath = Mathf.Sin(Now * _variety.BreatheRate + _variety.Phase);
+            float breathe = breath * 0.004f;
+            // Standing still, the weight wanders from one foot to the other (the feet stay where they are).
+            float sway = Mathf.Sin(Now * _variety.SwayRate + _variety.Phase) * (1f - _move) * (1f - _crouch) * standing * (1f - _air);
 
             // Swimming: lie forward (crawl), stand up to tread water, follow the look direction underwater.
             float swimPitch = Mathf.Lerp(Mathf.Lerp(8f, 72f, _swimMove), Mathf.Clamp(90f + Motion.LookPitch, 10f, 170f) * _swimMove + 12f * (1f - _swimMove), _under);
             float lift = _swim * Mathf.Lerp(0.18f, 0.32f, _swimMove * (1f - _under)) * s;
-            float stroke = Wave(_swimPhase) * _swim * _swimMove * (1f - _under);
+            float crawl = _swim * _swimMove * (1f - _under) * (Breaststroke ? 0f : 1f);
+            if (Breaststroke)
+            {
+                // Breaststroke: not as flat as the crawl (the head stays out), and the chest comes up with each pull.
+                float flat = Mathf.Lerp(8f, 58f - 10f * BreastPull(_swimPhase, out _), _swimMove);
+                swimPitch = Mathf.Lerp(flat, Mathf.Clamp(90f + Motion.LookPitch, 10f, 170f) * _swimMove + 12f * (1f - _swimMove), _under);
+            }
+            float stroke = Wave(_swimPhase) * crawl;
             float swimBob = Mathf.Sin(_swimPhase * Mathf.PI * 4f) * 0.025f * s * _swim * _swimMove;
 
             Transform hips = B(Bone.Hips);
-            hips.localPosition = _rig.RestPosition(Bone.Hips) + new Vector3(0f, stepBob - drop - pumpDip + lift + breathe + swimBob + StandTall() * land, 0f);
-            float lean = (4f + 9f * _run) * _move * land + _crouch * 18f * land + _cpr * 34f + _air * -6f;
-            hips.localRotation = Quaternion.Euler(lean * 0.35f + swimPitch * _swim, Wave(_phase) * 4f * _move * land, stroke * 7f);
+            float grounded = (_hipDrop * _groundWeight + _landing.Value) * land;
+            hips.localPosition = _rig.RestPosition(Bone.Hips) +
+                                 new Vector3(sway * 0.03f * s, stepBob - drop - pumpDip + lift + breathe + swimBob + StandTall() * land + grounded, 0f);
+            float lean = (4f + 9f * _run) * _move * land + _crouch * 18f * land + _cpr * 34f + _air * -6f + _leanForward.Value * standing;
+            float tip = (_leanSide.Value + _turnLag.Value * 0.25f - sway * 2.2f) * standing;
+            // The crawl rolls the whole body round its long axis: the shoulder of the arm coming over is the high one.
+            Quaternion roll = Quaternion.AngleAxis(CrawlRoll * crawl, Vector3.up);
+            hips.localRotation = Quaternion.Euler(lean * 0.35f + swimPitch * _swim, Wave(_phase) * 4f * _move * land, stroke * 5f + tip) * roll;
 
-            B(Bone.Spine).localRotation = Quaternion.Euler(lean * 0.35f + Mathf.Sin(Now * 1.7f) * 1.2f, -Wave(_phase) * 5f * _move * land, -stroke * 2.5f);
+            B(Bone.Spine).localRotation = Quaternion.Euler(lean * 0.35f + breath * 1.2f + _variety.Slouch * standing, -Wave(_phase) * 5f * _move * land,
+                -stroke * 2.5f - tip * 0.6f);
             // The chest takes a share of looking around (before the arms, which hang off it).
-            B(Bone.Chest).localRotation = Quaternion.Euler(lean * 0.3f + LookPitch * 0.15f, -Wave(_phase) * 5f * _move * land + LookYaw * 0.25f, stroke * 1.5f);
+            B(Bone.Chest).localRotation = Quaternion.Euler(lean * 0.3f + LookPitch * 0.15f + _variety.Slouch * 0.5f * standing,
+                -Wave(_phase) * 5f * _move * land + LookYaw * 0.25f + _turnLag.Value * 0.5f * standing, stroke * 1.5f - tip * 0.3f);
         }
+
+        /// <summary>
+        /// Degrees the swimmer is rolled to the right (right shoulder up) at this point of the crawl: fully over to
+        /// one side in the middle of that arm's trip through the air, level in between.
+        /// </summary>
+        private float CrawlRoll => -22f * Mathf.Cos((_swimPhase - RecoveryShare * 0.5f) * Mathf.PI * 2f);
 
         /// <summary>
         /// How far to lift the hips so a planted leg is straight: the legs reach a bit further than the hips are high
@@ -238,12 +552,11 @@ namespace PleaseDontDrown.Avatars
             float height = _rig.RestPosition(Bone.Hips).y + _rig.RestPosition(Bone.ThighL).y - _rig.AnkleHeight;
             float half = StepLength * 0.25f * _move; // where the planted foot is, on average
             float straight = Mathf.Sqrt(Mathf.Max(0f, reach * reach - half * half));
-            float calm = (1f - _crouch) * (1f - _cpr) * (1f - _kneel) * (1f - _down) * (1f - _sit) * (1f - _chair) * (1f - _lie) * (1f - _lieFront) * (1f - _seat);
-            return Mathf.Clamp(straight - height, 0f, 0.08f * _rig.Scale) * calm;
+            return Mathf.Clamp(straight - height, 0f, 0.08f * _rig.Scale) * (1f - _crouch) * _upright;
         }
 
         /// <summary>One step (the body travels this far per half cycle), so planted feet stay put on the ground.</summary>
-        private float StepLength => Mathf.Lerp(0.62f, 1.05f, _run) * _rig.Scale;
+        private float StepLength => Mathf.Lerp(0.62f, 1.05f, _run) * _rig.Scale * _variety.Stride;
 
         private float LookYaw => Mathf.Clamp(Mathf.DeltaAngle(_bodyYaw, Motion.FacingYaw), -85f, 85f);
         private float LookPitch => Mathf.Clamp(Motion.LookPitch, -70f, 70f) * (1f - _under); // underwater the whole body aims
@@ -269,10 +582,13 @@ namespace PleaseDontDrown.Avatars
                 float bike = Mathf.Sin((_swimPhase + offset) * Mathf.PI * 2f);
                 float thighX = Mathf.Lerp(-35f * Mathf.Max(0f, bike) - 10f, flutter, _swimMove);
                 float kneeBend = Mathf.Lerp(40f + 40f * Mathf.Max(0f, bike), 12f + Mathf.Max(0f, -flutter) * 0.5f, _swimMove);
-                float frog = Mathf.Max(0f, Mathf.Sin(_swimPhase * Mathf.PI * 2f));
-                thighX = Mathf.Lerp(thighX, -30f * frog, _under);
-                kneeBend = Mathf.Lerp(kneeBend, 90f * frog + 5f, _under);
-                float spread = Mathf.Lerp(8f, 25f * frog, _under);
+                // Frog kick: the heels come up to the seat while the arms reach forward again, snap out and back, then
+                // the legs lie straight through the glide.
+                float frog = FrogKick(_swimPhase);
+                float frogs = Breaststroke ? Mathf.Max(_under, _swimMove) : _under; // breaststroke kicks like a frog on top too
+                thighX = Mathf.Lerp(thighX, -30f * frog, frogs);
+                kneeBend = Mathf.Lerp(kneeBend, 90f * frog + 5f, frogs);
+                float spread = Mathf.Lerp(8f, 25f * frog, frogs);
                 Quaternion swimThigh = Quaternion.Euler(thighX, 0f, spread * side);
                 thigh.localRotation = Quaternion.Slerp(thigh.localRotation, swimThigh, _swim);
                 shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kneeBend, 0f, 0f), _swim);
@@ -280,7 +596,31 @@ namespace PleaseDontDrown.Avatars
                 if (_swim > 0.99f) return;
             }
 
-            // Stepping: the foot is planted during stance and swings forward in an arc.
+            // Stepping: the foot is planted during stance and swings forward in an arc, on the ground that is there.
+            Vector3 target = FootTarget(thighBone, offset, side, out float roll);
+            bool leftFoot = side < 0f;
+            target.y += (leftFoot ? _groundL : _groundR) * _groundWeight;
+
+            Vector3 world = transform.TransformPoint(target);
+            Vector3 knee = transform.forward;
+            float weight = 1f - _swim;
+            IK.Solve(thigh, shin, _rig.ThighLength, _rig.ShinLength, world, knee, weight, true);
+
+            // Feet flat on the ground (toes point where the body faces, the sole lies along the slope), rolling a
+            // little while stepping.
+            Quaternion slope = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(Vector3.up, leftFoot ? _normalL : _normalR), _groundWeight);
+            Quaternion flat = slope * transform.rotation * Quaternion.Euler(-roll + _cpr * 70f, 0f, 0f);
+            foot.rotation = Quaternion.Slerp(foot.rotation, flat, weight);
+        }
+
+        /// <summary>
+        /// Where a foot belongs right now on level ground, in root space (the ankle), and how far it is rolled onto
+        /// the toes. Depends only on the walk cycle, not on the bones, so the ground can be looked up before posing.
+        /// </summary>
+        private Vector3 FootTarget(Bone thighBone, float offset, float side, out float roll)
+        {
+            float s = _rig.Scale;
+            float q = Mathf.Repeat(_phase + offset, 1f);
             Vector3 local = transform.InverseTransformDirection(new Vector3(_smoothVelocity.x, 0f, _smoothVelocity.z));
             Vector3 moveDir = local.sqrMagnitude > 0.01f ? local.normalized : Vector3.forward;
             // Planted, a foot slides back exactly as far as the body moves on in half a cycle (one step), so it
@@ -291,12 +631,14 @@ namespace PleaseDontDrown.Avatars
             {
                 along = Mathf.Lerp(0.5f, -0.5f, q / 0.5f) * stride;
                 lift = 0f;
+                roll = 0f;
             }
             else
             {
                 float t = (q - 0.5f) / 0.5f;
                 along = Mathf.Lerp(-0.5f, 0.5f, Mathf.SmoothStep(0f, 1f, t)) * stride;
-                lift = Mathf.Sin(t * Mathf.PI) * (0.1f + 0.1f * _run) * s * _move;
+                lift = Mathf.Sin(t * Mathf.PI) * (0.1f + 0.1f * _run) * s * _move * _variety.Bounce;
+                roll = Mathf.Sin(t * Mathf.PI) * 25f * _move;
             }
             Vector3 hipRest = _rig.RestPosition(Bone.Hips) + _rig.RestPosition(thighBone);
             float footWidth = Mathf.Abs(hipRest.x) * (1f + 0.15f * _crouch);
@@ -308,16 +650,15 @@ namespace PleaseDontDrown.Avatars
             target = Vector3.Lerp(target, new Vector3(footWidth * side, 0.3f * s, (side > 0 ? -0.05f : 0.1f) * s), _air);
             // Climbing out: dangle.
             target = Vector3.Lerp(target, new Vector3(footWidth * side, 0.05f * s, -0.05f * s), _climb);
+            return target;
+        }
 
-            Vector3 world = transform.TransformPoint(target);
-            Vector3 knee = transform.forward;
-            float weight = 1f - _swim;
-            IK.Solve(thigh, shin, _rig.ThighLength, _rig.ShinLength, world, knee, weight, true);
-
-            // Feet flat on the ground (toes point where the body faces), rolling a little while stepping.
-            float roll = q >= 0.5f ? Mathf.Sin((q - 0.5f) * 2f * Mathf.PI) * 25f * _move : 0f;
-            Quaternion flat = transform.rotation * Quaternion.Euler(-roll + _cpr * 70f, 0f, 0f);
-            foot.rotation = Quaternion.Slerp(foot.rotation, flat, weight);
+        /// <summary>0 legs straight .. 1 knees drawn right up, over a breaststroke cycle (see PoseSwimArm for the arms).</summary>
+        private static float FrogKick(float phase)
+        {
+            // Draw up slowly (0.55 .. 0.8), kick out fast (0.8 .. 0.95), glide the rest of the time.
+            if (phase < 0.55f || phase > 0.95f) return 0f;
+            return phase < 0.8f ? Mathf.SmoothStep(0f, 1f, (phase - 0.55f) / 0.25f) : 1f - Mathf.SmoothStep(0f, 1f, (phase - 0.8f) / 0.15f);
         }
 
         // ------------------------------------------------------------------ arms
@@ -325,8 +666,9 @@ namespace PleaseDontDrown.Avatars
         private void PoseArms()
         {
             float land = 1f - _swim;
-            float swing = (24f + 26f * _run) * _move * land;
+            float swing = (24f + 26f * _run) * _move * land * _variety.Swing;
             float elbow = Mathf.Lerp(12f, 85f, _run) * _move + 8f;
+            float drag = _leanForward.Value * 1.6f * land * _upright; // speeding up leaves the hands behind for a moment
             for (int i = 0; i < 2; i++)
             {
                 bool left = i == 0;
@@ -336,11 +678,12 @@ namespace PleaseDontDrown.Avatars
 
                 // Base: relaxed, counter-swinging with the legs.
                 float armSwing = (left ? -1f : 1f) * Mathf.Cos(_phase * Mathf.PI * 2f) * swing;
-                float idleSway = Mathf.Sin(Now * 1.1f + i) * 2f * (1f - _move);
-                float spread = 7f + 5f * _run + _air * 35f + _crouch * 6f;
+                float idleSway = Mathf.Sin(Now * 1.1f + i + _variety.Phase) * 2f * (1f - _move);
+                // (Landing throws the arms out for balance.)
+                float spread = 7f + 5f * _run + _air * 35f + _crouch * 6f + _variety.Spread - _landing.Value * 120f / _rig.Scale;
                 float raise = _air * 20f;
                 float back = 16f * _move * land; // hands trail a little: the swing centres behind the hip, not in front
-                upper.localRotation = Quaternion.Euler(-armSwing - raise + idleSway + back, 0f, spread * side);
+                upper.localRotation = Quaternion.Euler(-armSwing - raise + idleSway + back + drag, 0f, spread * side);
                 fore.localRotation = Quaternion.Euler(-elbow - _air * 25f, 0f, 0f);
 
                 PoseSwimArm(upper, fore, side, i);
@@ -354,7 +697,79 @@ namespace PleaseDontDrown.Avatars
 
             ArmIKLayers();
             GestureLayer();
+            IdleLayer();
             PoseHands();
+        }
+
+        /// <summary>
+        /// Habits of someone standing around: scratching the head, hands on the hips, a stretch, shading the eyes
+        /// to look out to sea, wiping the brow; and talking with the hands.
+        /// </summary>
+        private void IdleLayer()
+        {
+            float s = _rig.Scale;
+            Transform upperL = B(Bone.UpperArmL), foreL = B(Bone.ForearmL), upperR = B(Bone.UpperArmR), foreR = B(Bone.ForearmR);
+            float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+            Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
+
+            // Talking: the right hand comes up and beats time with the words (only someone standing with free hands).
+            float talking = _talk * IdleWeight * (1f - _actWeight) * (Lively ? 1f : 0f);
+            if (talking > 0.01f)
+            {
+                float beat = Mathf.Sin(Now * 5.2f + _variety.Phase) * 0.5f + Mathf.Sin(Now * 2.1f) * 0.5f;
+                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-22f + beat * 6f, 0f, 14f), talking * 0.85f);
+                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-78f + beat * 16f, 0f, 0f), talking * 0.85f);
+                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-30f - beat * 8f, 0f, 0f), talking * 0.5f);
+            }
+
+            float w = _actWeight;
+            if (w <= 0.01f) return;
+            float t = Mathf.Clamp01((Now - _actStart) / Mathf.Max(0.1f, _actLength));
+            Transform chest = B(Bone.Chest);
+            // Between the eyes (the head isn't turned yet this frame, but that barely moves this point).
+            Vector3 eyes = (B(Bone.EyeL).position + B(Bone.EyeR).position) * 0.5f;
+            switch (_act)
+            {
+                case IdleAct.ScratchHead:
+                {
+                    Vector3 spot = eyes + up * (0.13f * s) + right * (0.085f * s) - fwd * (0.13f * s) + up * (Mathf.Sin(Now * 19f) * 0.012f * s);
+                    IK.Solve(upperR, foreR, la, lb, spot, right + up * 0.5f - fwd * 0.3f, w, false);
+                    break;
+                }
+                case IdleAct.HandsOnHips:
+                {
+                    Vector3 hips = B(Bone.Hips).position + up * (0.07f * s);
+                    float out_ = Mathf.Abs(_rig.RestPosition(Bone.ThighL).x) + 0.13f * s;
+                    IK.Solve(upperL, foreL, la, lb, hips - right * out_ + fwd * (0.02f * s), -right - fwd * 0.7f, w, false);
+                    IK.Solve(upperR, foreR, la, lb, hips + right * out_ + fwd * (0.02f * s), right - fwd * 0.7f, w, false);
+                    break;
+                }
+                case IdleAct.Stretch:
+                {
+                    // Arms up and out, back arched, held, and down again.
+                    float reach = Mathf.Sin(t * Mathf.PI);
+                    B(Bone.Spine).localRotation *= Quaternion.Euler(-9f * w * reach, 0f, 0f);
+                    chest.localRotation *= Quaternion.Euler(-7f * w * reach, 0f, 0f);
+                    upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(-12f, 0f, -152f), w);
+                    foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-28f + 20f * reach, 0f, 0f), w);
+                    upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-12f, 0f, 152f), w);
+                    foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-28f + 20f * reach, 0f, 0f), w);
+                    break;
+                }
+                case IdleAct.ShieldEyes:
+                {
+                    Vector3 spot = eyes + up * (0.075f * s) + fwd * (0.035f * s) + right * (0.05f * s);
+                    IK.Solve(upperR, foreR, la, lb, spot, right + up * 0.25f, w, false);
+                    break;
+                }
+                case IdleAct.WipeBrow:
+                {
+                    // The back of the hand drawn across the forehead, from the far side to the near one.
+                    Vector3 spot = eyes + up * (0.085f * s) + fwd * (0.03f * s) + right * (Mathf.Lerp(-0.07f, 0.09f, Mathf.SmoothStep(0f, 1f, t)) * s);
+                    IK.Solve(upperR, foreR, la, lb, spot, right + up * 0.6f, w, false);
+                    break;
+                }
+            }
         }
 
         /// <summary>
@@ -400,6 +815,33 @@ namespace PleaseDontDrown.Avatars
                 else if (right && GestureActive(AvatarGesture.Interact, 0.4f))
                     pose = HandPose.Lerp(pose, HandPose.Point, Mathf.Sin(GestureT(0.4f) * Mathf.PI));
 
+                if (_actWeight > 0.01f)
+                {
+                    // Idle habits: a flat hand over the eyes, hands flat on the hips, fingers hooked to scratch.
+                    Vector3 across = transform.right;
+                    if (right && _act == IdleAct.ShieldEyes)
+                    {
+                        rotation = HandBones.Orient(-across + fwd * 0.35f, Vector3.down, side);
+                        weight = _actWeight;
+                        pose = HandPose.Lerp(pose, HandPose.Flat, _actWeight);
+                    }
+                    else if (right && _act == IdleAct.WipeBrow)
+                    {
+                        rotation = HandBones.Orient(-across + Vector3.up * 0.2f, fwd, side);
+                        weight = _actWeight;
+                    }
+                    else if (_act == IdleAct.HandsOnHips)
+                    {
+                        rotation = HandBones.Orient(fwd - Vector3.up * 0.9f, -across * side, side);
+                        weight = _actWeight;
+                        pose = HandPose.Lerp(pose, HandPose.BoxGrip, _actWeight);
+                    }
+                    else if (right && _act == IdleAct.ScratchHead)
+                        pose = HandPose.Lerp(pose, HandPose.Cup, _actWeight);
+                    else if (_act == IdleAct.Stretch)
+                        pose = HandPose.Lerp(pose, HandPose.Wave, _actWeight);
+                }
+
                 if (rotation.HasValue && weight > 0f)
                     hand.Hand.rotation = Quaternion.Slerp(hand.Hand.rotation, rotation.Value, weight);
                 if (right)
@@ -421,24 +863,54 @@ namespace PleaseDontDrown.Avatars
             // Crawl: each arm windmills, half a cycle apart. The body lies face down, so a positive swing (the arm's
             // "backwards" on land) carries the hand from the hip up over the back through the air, out ahead of the
             // head, then pulls it down under the chest back to the hip: recovery in the air, pull in the water.
-            float crawlAngle = Mathf.Repeat(_swimPhase + index * 0.5f, 1f) * 360f;
+            // The arm doesn't turn like a wheel: it comes over quickly and loose (elbow high), stretches out ahead and
+            // rests there a moment, then pulls back through the water, speeding up to the hip.
+            float crawlAngle = CrawlTurn(Mathf.Repeat(_swimPhase + index * 0.5f, 1f)) * 360f;
             Quaternion crawl = Quaternion.Euler(crawlAngle, 0f, 14f * side);
-            Quaternion crawlElbow = Quaternion.Euler(-Mathf.Lerp(10f, 60f, Mathf.Max(0f, Mathf.Sin(crawlAngle * Mathf.Deg2Rad))), 0f, 0f);
+            Quaternion crawlElbow = Quaternion.Euler(-Mathf.Lerp(8f, 78f, Mathf.Max(0f, Mathf.Sin(crawlAngle * Mathf.Deg2Rad))), 0f, 0f);
             // Treading water: sculling in front of the chest.
             float scull = Mathf.Sin(_swimPhase * Mathf.PI * 4f + index * Mathf.PI);
             Quaternion tread = Quaternion.Euler(-45f, scull * 25f * side, (40f + scull * 10f) * side);
             Quaternion treadElbow = Quaternion.Euler(-55f, 0f, 0f);
-            // Breaststroke underwater: reach ahead, sweep out and back.
-            float bs = Mathf.Repeat(_swimPhase, 1f);
-            float reach = bs < 0.5f ? Mathf.Lerp(-170f, -95f, bs / 0.5f) : Mathf.Lerp(-95f, -170f, (bs - 0.5f) / 0.5f);
-            float sweep = bs < 0.5f ? Mathf.Lerp(8f, 75f, bs / 0.5f) : Mathf.Lerp(75f, 8f, (bs - 0.5f) / 0.5f);
-            Quaternion breast = Quaternion.Euler(reach, 0f, sweep * side);
-            Quaternion breastElbow = Quaternion.Euler(bs < 0.5f ? -10f : -70f, 0f, 0f);
+            // Breaststroke underwater: glide with the arms stretched ahead, sweep out and back to the chest, then
+            // slide them forward again with the elbows tucked while the legs kick (see FrogKick).
+            float pull = BreastPull(_swimPhase, out bool recovering);
+            // (At the surface the body isn't flat, so stretched out ahead is less far round than when diving.)
+            float ahead = Mathf.Lerp(Breaststroke ? -146f : -170f, -170f, _under);
+            Quaternion breast = Quaternion.Euler(Mathf.Lerp(ahead, -95f, pull), 0f, Mathf.Lerp(8f, recovering ? 30f : 75f, pull) * side);
+            Quaternion breastElbow = Quaternion.Euler(-Mathf.Lerp(8f, recovering ? 95f : 35f, pull), 0f, 0f);
 
-            Quaternion armPose = Quaternion.Slerp(Quaternion.Slerp(tread, crawl, _swimMove), breast, _under);
-            Quaternion elbowPose = Quaternion.Slerp(Quaternion.Slerp(treadElbow, crawlElbow, _swimMove), breastElbow, _under);
+            Quaternion armPose = Quaternion.Slerp(Quaternion.Slerp(tread, Breaststroke ? breast : crawl, _swimMove), breast, _under);
+            Quaternion elbowPose = Quaternion.Slerp(Quaternion.Slerp(treadElbow, Breaststroke ? breastElbow : crawlElbow, _swimMove), breastElbow, _under);
             upper.localRotation = Quaternion.Slerp(upper.localRotation, armPose, _swim);
             fore.localRotation = Quaternion.Slerp(fore.localRotation, elbowPose, _swim);
+        }
+
+        /// <summary>
+        /// Breaststroke arms over one cycle: 0 = both stretched out ahead (the glide), 1 = swept out and back to the
+        /// shoulders (the end of the pull). <paramref name="recovering"/>: sliding forward again, elbows tucked in.
+        /// </summary>
+        private static float BreastPull(float phase, out bool recovering)
+        {
+            float bs = Mathf.Repeat(phase, 1f);
+            recovering = bs >= 0.55f;
+            return bs < 0.25f ? 0f : bs < 0.55f ? Mathf.SmoothStep(0f, 1f, (bs - 0.25f) / 0.3f) : 1f - Mathf.SmoothStep(0f, 1f, (bs - 0.55f) / 0.35f);
+        }
+
+        /// <summary>The share of a crawl cycle an arm spends in the air (the rest: reaching, then pulling).</summary>
+        private const float RecoveryShare = 0.36f;
+
+        /// <summary>
+        /// How far round its circle a crawling arm is (0 at the hip, 0.5 stretched out ahead, 1 back at the hip) at
+        /// a point of its cycle: over through the air in the first third, a short rest out in front, then the pull.
+        /// </summary>
+        private static float CrawlTurn(float phase)
+        {
+            const float rest = 0.12f, ahead = 0.54f; // rests while creeping from 0.5 to 0.54 of the circle
+            if (phase < RecoveryShare) return Mathf.SmoothStep(0f, 1f, phase / RecoveryShare) * 0.5f;
+            if (phase < RecoveryShare + rest) return Mathf.Lerp(0.5f, ahead, (phase - RecoveryShare) / rest);
+            float t = (phase - RecoveryShare - rest) / (1f - RecoveryShare - rest);
+            return Mathf.Lerp(ahead, 1f, t * (0.45f + 0.55f * t)); // starts easy, ends fast
         }
 
         /// <summary>Hands on things: held items, the mouth while eating, a chest during CPR, the wind-up of a throw.</summary>
@@ -540,8 +1012,9 @@ namespace PleaseDontDrown.Avatars
                 // Sitting astride: hips down onto the seat, thighs forward and apart, shins down to the footrests.
                 hips.localPosition = Vector3.Lerp(hips.localPosition, _rig.RestPosition(Bone.Hips) + new Vector3(0f, -0.4f * s, 0f), _seat);
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(8f, 0f, 0f), _seat);
-                foreach (bool left in new[] { true, false })
+                for (int leg = 0; leg < 2; leg++)
                 {
+                    bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-78f, 0f, 16f * side), _seat);
@@ -556,8 +1029,9 @@ namespace PleaseDontDrown.Avatars
                 float bob = Mathf.Sin(Now * 7f) * 0.03f * s;
                 hips.localPosition = Vector3.Lerp(hips.localPosition, _rig.RestPosition(Bone.Hips) + new Vector3(0f, -0.42f * s + bob, 0f), _kneel);
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(6f, 0f, 0f), _kneel);
-                foreach (bool left in new[] { true, false })
+                for (int leg = 0; leg < 2; leg++)
                 {
+                    bool left = leg == 0;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-8f, 0f, (left ? -1f : 1f) * 6f), _kneel);
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(95f, 0f, 0f), _kneel);
@@ -599,8 +1073,9 @@ namespace PleaseDontDrown.Avatars
                 foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-20f, 0f, 0f), _down);
                 upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(0f, 0f, 95f), _down);
                 foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-35f, 0f, 0f), _down);
-                foreach (bool left in new[] { true, false })
+                for (int leg = 0; leg < 2; leg++)
                 {
+                    bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(0f, 0f, 14f * side), _down);
@@ -633,8 +1108,9 @@ namespace PleaseDontDrown.Avatars
                 foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-125f, 0f, 0f), w);
                 upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(0f, 0f, 150f), w);
                 foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-125f, 0f, 0f), w);
-                foreach (bool left in new[] { true, false })
+                for (int leg = 0; leg < 2; leg++)
                 {
+                    bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     bool kneeUp = !left;
@@ -668,8 +1144,9 @@ namespace PleaseDontDrown.Avatars
                 foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-95f, 0f, 0f), w);
                 upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-150f, 0f, 18f), w);
                 foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-95f, 0f, 0f), w);
-                foreach (bool left in new[] { true, false })
+                for (int leg = 0; leg < 2; leg++)
                 {
+                    bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     float kick = 55f + 35f * Mathf.Sin(t * 1.6f + (left ? 0f : 2.2f)); // lazy feet in the air
@@ -690,8 +1167,9 @@ namespace PleaseDontDrown.Avatars
                 foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-55f, 0f, 0f), w);
                 upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-28f, 0f, 10f), w);
                 foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-55f, 0f, 0f), w);
-                foreach (bool left in new[] { true, false })
+                for (int leg = 0; leg < 2; leg++)
                 {
+                    bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-84f, 0f, 7f * side), w);
@@ -710,8 +1188,9 @@ namespace PleaseDontDrown.Avatars
                 foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
                 upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(38f, 0f, 16f), w);
                 foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
-                foreach (bool left in new[] { true, false })
+                for (int leg = 0; leg < 2; leg++)
                 {
+                    bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-80f, 0f, 9f * side), w);
@@ -814,12 +1293,25 @@ namespace PleaseDontDrown.Avatars
 
         private void PoseHead()
         {
-            float yaw = LookYaw;
-            float pitch = LookPitch;
-            // Lying forward to swim: the head tips back up to look where we're going.
-            float swimTilt = _swim * (1f - _under) * Mathf.Lerp(0f, -60f, _swimMove);
-            B(Bone.Neck).localRotation = Quaternion.Euler(pitch * 0.3f + swimTilt * 0.4f, yaw * 0.25f, 0f);
-            B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 15f, yaw * 0.5f, 0f);
+            float idle = IdleWeight;
+            float standing = (1f - _swim) * _upright;
+            // Looking somewhere else for a moment; nodding along while talking (in any pose).
+            float yaw = Mathf.Clamp(LookYaw + _glance.x * idle + Mathf.Sin(Now * 1.9f + _variety.Phase) * 4f * _talk, -85f, 85f);
+            float pitch = LookPitch + _glance.y * idle + (Mathf.Sin(Now * 6.5f + _variety.Phase) * 3f + Mathf.Sin(Now * 2.3f) * 2f) * _talk
+                          - _leanForward.Value * 0.5f * standing; // the head stays level while the body tips
+            if (_actWeight > 0.01f && _act == IdleAct.ShieldEyes)
+                yaw += Mathf.Sin((Now - _actStart) * 1.6f) * 24f * _actWeight; // scanning the sea
+            // Lying forward to swim: the head tips back up to look where we're going, stays level while the body
+            // rolls under it, and turns out to the right for air as that arm comes over.
+            float crawl = _swim * _swimMove * (1f - _under) * (Breaststroke ? 0f : 1f);
+            float swimTilt = _swim * (1f - _under) * Mathf.Lerp(0f, Breaststroke ? -52f : -60f, _swimMove);
+            float rightArm = Mathf.Repeat(_swimPhase + 0.5f, 1f);
+            float breath = !Breaststroke && rightArm < RecoveryShare ? Mathf.Sin(rightArm / RecoveryShare * Mathf.PI) : 0f;
+            swimTilt *= 1f - 0.55f * breath;
+            float turn = (-CrawlRoll * 0.75f + 62f * breath) * crawl;
+            float tilt = (_variety.HeadTilt + _leanSide.Value * -0.4f) * standing;
+            B(Bone.Neck).localRotation = Quaternion.Euler(pitch * 0.3f + swimTilt * 0.4f, yaw * 0.25f + turn * 0.4f, tilt * 0.4f);
+            B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 15f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
         }
 
         private void PoseFace()

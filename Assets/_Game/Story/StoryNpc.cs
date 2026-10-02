@@ -217,6 +217,15 @@ namespace PleaseDontDrown.Story
             _all.Add(this);
             _lastPosition = transform.position;
             _lookYaw = transform.eulerAngles.y;
+            if (_animator != null)
+            {
+                // Each tourist moves in their own way (the same on every machine), fidgets when idle, and is only
+                // posed now and then while nobody can see them.
+                _animator.Seed = ObjectId + 1;
+                _animator.Lively = true;
+                _animator.CullWhenHidden = true;
+                _animator.Breaststroke = true; // holidaymakers: heads up, hands out in front
+            }
         }
 
         public override void OnStopNetwork()
@@ -670,7 +679,8 @@ namespace PleaseDontDrown.Story
             }
 
             // Ease into the destination instead of stopping dead.
-            float speed = last ? Mathf.Min(_moveSpeed, 0.6f + distance * 1.5f) : _moveSpeed;
+            // (Not a swimmer: the end of a leg is only where they turn, and the next leg starts at once.)
+            float speed = last && !IsSwimming ? Mathf.Min(_moveSpeed, 0.6f + distance * 1.5f) : _moveSpeed;
             Vector3 dir = Avoid(p, to / distance);
             Vector3 step = dir * Mathf.Min(distance, speed * dt);
             Vector3 moved = MoveChecked(p, step);

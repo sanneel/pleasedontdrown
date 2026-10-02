@@ -116,6 +116,8 @@ namespace PleaseDontDrown.Story
         public int Goal => _goal.Value;
         public string BeatId => _beat.Value;
         public string MarkerLabel => _markerLabel.Value;
+        /// <summary>Where the jet ski ride of chapter 1 ends (tests steer at it).</summary>
+        public Vector3 Island2Arrival => _island2.Arrival != null ? _island2.Arrival.position : new Vector3(0f, 0f, -200f);
         /// <summary>Where the objective marker is (follows its target), or null.</summary>
         public Vector3? MarkerPosition
         {
@@ -135,7 +137,15 @@ namespace PleaseDontDrown.Story
         {
             public string Beat;
             public int Money;
+            public int Rescued, Lost, Returned, Earned; // this chapter so far (for its report card)
         }
+
+        // What the team did in the current chapter (host; saved with the beat).
+        private int _chapterRescued, _chapterLost, _chapterReturned, _chapterEarned;
+        private int _moneySeen;
+
+        /// <summary>Host (tests): tourists rescued / lost and lost things handed in during the current chapter.</summary>
+        public (int rescued, int lost, int returned, int earned) ChapterStats => (_chapterRescued, _chapterLost, _chapterReturned, _chapterEarned);
 
         private void Awake() => Instance = this;
 
@@ -188,8 +198,13 @@ namespace PleaseDontDrown.Story
                 int found = _beats.FindIndex(b => b.Id == save.Beat);
                 if (found >= 0) start = found;
                 if (Economy.Instance != null) Economy.Instance.ServerSet(save.Money);
+                _chapterRescued = save.Rescued;
+                _chapterLost = save.Lost;
+                _chapterReturned = save.Returned;
+                _chapterEarned = save.Earned;
                 Debug.Log($"[Story] continuing from beat {save.Beat} with ${save.Money}");
             }
+            _moneySeen = Economy.Money;
             StartAt(start);
         }
 
@@ -265,7 +280,11 @@ namespace PleaseDontDrown.Story
             if (NoSave) return;
             try
             {
-                var data = new SaveData { Beat = _beat.Value, Money = Economy.Money };
+                var data = new SaveData
+                {
+                    Beat = _beat.Value, Money = Economy.Money,
+                    Rescued = _chapterRescued, Lost = _chapterLost, Returned = _chapterReturned, Earned = _chapterEarned
+                };
                 string tmp = SavePath + ".tmp";
                 File.WriteAllText(tmp, JsonUtility.ToJson(data));
                 if (File.Exists(SavePath)) File.Delete(SavePath);
@@ -293,8 +312,32 @@ namespace PleaseDontDrown.Story
 
         private void OnMoneyChanged(int money)
         {
+            if (money > _moneySeen) _chapterEarned += money - _moneySeen; // what came in (spending isn't un-earning)
+            _moneySeen = money;
             if (_running) Save();
         }
+
+        private void ResetChapterStats()
+        {
+            _chapterRescued = _chapterLost = _chapterReturned = _chapterEarned = 0;
+            _moneySeen = Economy.Money;
+        }
+
+        /// <summary>
+        /// The report card at the end of a chapter, on everyone's screen: what the team did. Waits while it is up,
+        /// then starts counting afresh for the next chapter.
+        /// </summary>
+        private IEnumerator ChapterReport(string title)
+        {
+            Debug.Log($"[Story] {title}: rescued {_chapterRescued}, lost {_chapterLost}, returned {_chapterReturned}, earned ${_chapterEarned}");
+            ReportObservers(title, _chapterRescued, _chapterLost, _chapterReturned, _chapterEarned, Economy.Money);
+            yield return new WaitForSeconds(StoryHud.ReportSeconds);
+            ResetChapterStats();
+        }
+
+        [ObserversRpc]
+        private void ReportObservers(string title, int rescued, int lost, int returned, int earned, int money) =>
+            StoryHud.ShowReport(title, rescued, lost, returned, earned, money);
 
         // ------------------------------------------------------------------ events (host)
 
@@ -302,12 +345,20 @@ namespace PleaseDontDrown.Story
         {
             bool rescued = e is VictimEvent.Saved or VictimEvent.SelfRescue or VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized;
             if (rescued && victim.State != VictimState.Injured) _rescued.Add(victim);
+            // For the chapter's report card (someone pulled out and then revived is one rescue, not two).
+            if (e is VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized or VictimEvent.SelfRescue ||
+                (e == VictimEvent.Saved && victim.State == VictimState.Saved)) _chapterRescued++;
+            if (e == VictimEvent.Lost) _chapterLost++;
             // Tourists drop things now and then when they're pulled out (their wallet was in their trunks...).
             if (rescued && _island == _island1 && Random.value < 0.35f)
                 StartCoroutine(DropLostItemLater(victim.Name, victim.transform.position));
         }
 
-        private void OnHandedIn(LostAndFound.HandedIn info) => _handedIn.Add(info);
+        private void OnHandedIn(LostAndFound.HandedIn info)
+        {
+            _handedIn.Add(info);
+            _chapterReturned++;
+        }
         private void OnTalked(StoryNpc npc, PlayerHub by)
         {
             _talks.Add((npc, by));
@@ -436,6 +487,7 @@ namespace PleaseDontDrown.Story
             yield return new WaitForFixedUpdate();
             if (item != null && !item.Sync.Body.isKinematic)
             {
+                item.Sync.Body.maxDepenetrationVelocity = 3f; // pushed out of something gently, never shot out
                 item.Sync.Body.linearVelocity = velocity;
                 item.Sync.Body.angularVelocity = Random.insideUnitSphere * 6f;
             }
@@ -445,10 +497,15 @@ namespace PleaseDontDrown.Story
         private List<Item> Scatter(Vector3 from, params (string item, string owner, bool stolen)[] things)
         {
             var list = new List<Item>();
-            foreach (var t in things)
+            float turn = Random.Range(0f, 360f);
+            for (int n = 0; n < things.Length; n++)
             {
-                Vector2 r = Random.insideUnitCircle.normalized * Random.Range(1.2f, 2.4f);
-                Item item = SpawnItem(t.item, from + Vector3.up * 1.2f, new Vector3(r.x, 4.5f, r.y));
+                var t = things[n];
+                // Each thing starts on its own side, clear of whoever dropped them and of the others: three things
+                // made in one spot (inside a kneeling robber) shove each other apart hard enough to leave the island.
+                Vector3 side = Quaternion.Euler(0f, turn + n * 360f / things.Length, 0f) * Vector3.forward;
+                Vector2 r = new Vector2(side.x, side.z) * Random.Range(1.2f, 2.4f);
+                Item item = SpawnItem(t.item, from + side * 0.7f + Vector3.up * (1.3f + 0.15f * n), new Vector3(r.x, 4.5f, r.y));
                 if (item == null) continue;
                 if (item.TryGetComponent(out LostItem lost)) lost.ServerSetup(t.owner, t.stolen);
                 list.Add(item);
@@ -614,6 +671,8 @@ namespace PleaseDontDrown.Story
         {
             base.OnStartClient();
             DevCommands.Register("story", "[skip | goto <beat> | reset | off | list]", "Story mode: status, skip a beat, jump to one, start over.", StoryCommand, owner: this);
+            DevCommands.Register("report", "", "Show the end-of-chapter report card on this screen (to look at it).", _ =>
+                StoryHud.ShowReport("CHAPTER 1 COMPLETE", Mathf.Max(10, _chapterRescued), 1, 12, 1155, Economy.Money), owner: this);
             DevCommands.Register("robber", "", "Spawn a robber running around nearby (test).", _ => CheatServer("robber", 0), cheat: true, owner: this);
             DevCommands.Register("shark", "", "A shark bites the nearest tourist in the water (test).", _ => CheatServer("shark", 0), cheat: true, owner: this);
             DevCommands.Register("pirates", "", "Send the pirate boat (test).", _ => CheatServer("pirates", 0), cheat: true, owner: this);
@@ -670,7 +729,7 @@ namespace PleaseDontDrown.Story
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "story", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat" })
+            foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat" })
                 DevCommands.Unregister(c, this);
         }
 
@@ -733,6 +792,7 @@ namespace PleaseDontDrown.Story
                         break;
                     case "reset":
                         if (Economy.Instance != null) Economy.Instance.ServerSet(0);
+                        ResetChapterStats();
                         // Everyone back to the station beach for chapter 1.
                         if (Dev.DevIsland.Instance != null && Dev.DevIsland.Instance.Home != null)
                             TeleportObservers(Dev.DevIsland.Instance.Home.position);

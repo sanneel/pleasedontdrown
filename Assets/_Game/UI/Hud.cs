@@ -34,11 +34,15 @@ namespace PleaseDontDrown.UI
         private static readonly Dictionary<long, GUIStyle> _styles = new();
         private static readonly Dictionary<HudIcon, Texture2D> _icons = new();
         private static readonly Regex _colorTags = new("</?color[^>]*>", RegexOptions.Compiled);
+        // Shadow text for labels with colour tags, so the same label isn't stripped again every frame.
+        private const int PlainTextCap = 64;
+        private static readonly Dictionary<string, string> _plainText = new();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
             _styles.Clear();
+            _plainText.Clear();
             _icons.Clear();
             _heavy = _bold = null;
         }
@@ -51,7 +55,7 @@ namespace PleaseDontDrown.UI
         public static GUIStyle Style(float size, TextAnchor anchor = TextAnchor.MiddleCenter, bool heavy = false, bool wrap = false)
         {
             int px = Mathf.Max(8, Mathf.RoundToInt(size * Scale));
-            long key = px | ((long)anchor << 12) | (heavy ? 1L << 20 : 0L) | (wrap ? 1L << 21 : 0L);
+            long key = (uint)px | ((long)anchor << 12) | (heavy ? 1L << 20 : 0L) | (wrap ? 1L << 21 : 0L);
             if (_styles.TryGetValue(key, out GUIStyle style)) return style;
             if (_heavy == null) _heavy = Resources.Load<Font>("Fonts/Roboto-Black");
             if (_bold == null) _bold = Resources.Load<Font>("Fonts/Roboto-Bold");
@@ -69,17 +73,28 @@ namespace PleaseDontDrown.UI
         public static void Label(Rect sheet, string text, float size, Color color, TextAnchor anchor = TextAnchor.MiddleCenter,
             bool heavy = false, bool wrap = false, bool shadow = true)
         {
-            if (string.IsNullOrEmpty(text) || color.a <= 0.005f) return;
+            if (Event.current.type != EventType.Repaint || string.IsNullOrEmpty(text) || color.a <= 0.005f) return;
             GUIStyle style = Style(size, anchor, heavy, wrap);
             Rect r = Px(sheet);
             if (shadow)
             {
                 float d = Mathf.Max(1f, size * 0.07f * Scale);
                 style.normal.textColor = new Color(0f, 0f, 0f, 0.6f * color.a);
-                GUI.Label(new Rect(r.x + d, r.y + d, r.width, r.height), text.IndexOf("<color", System.StringComparison.Ordinal) >= 0 ? _colorTags.Replace(text, "") : text, style);
+                GUI.Label(new Rect(r.x + d, r.y + d, r.width, r.height), WithoutColorTags(text), style);
             }
             style.normal.textColor = color;
             GUI.Label(r, text, style);
+        }
+
+        /// <summary>The text with its colour tags taken out (a shadow is one colour). Remembers the last few.</summary>
+        private static string WithoutColorTags(string text)
+        {
+            if (text.IndexOf("<color", System.StringComparison.Ordinal) < 0) return text;
+            if (_plainText.TryGetValue(text, out string plain)) return plain;
+            if (_plainText.Count >= PlainTextCap) _plainText.Clear();
+            plain = _colorTags.Replace(text, "");
+            _plainText[text] = plain;
+            return plain;
         }
 
         public static float TextWidth(string text, float size, bool heavy = false) =>

@@ -29,6 +29,9 @@ namespace PleaseDontDrown.Player
         private Vector3 _cprPoint;
         private float _groundCheckAt;
         private bool _grounded = true;
+        private Vector3 _kneelShift;      // the body moved over to the tourist it is doing CPR on (the player stays put)
+        private Vector3 _bodyRest;
+        private bool _bodyRestKnown;
 
         public AvatarRig Rig => _rig;
         public AvatarAnimator Animator => _animator;
@@ -164,6 +167,7 @@ namespace PleaseDontDrown.Player
 
             m.Cpr = Time.time - _lastPumpTime < 1.3f && !m.Swimming;
             m.CprPoint = _cprPoint;
+            KneelBeside(m.Cpr && _cprPoint != Vector3.zero, position, dt);
 
             // On a vehicle: sitting, hands on the handlebars.
             Vehicles.Vehicle seat = Vehicles.Vehicle.SeatOf(_hub);
@@ -182,6 +186,33 @@ namespace PleaseDontDrown.Player
                 }
             }
             _animator.Motion = m;
+        }
+
+        /// <summary>
+        /// CPR is allowed from a couple of metres away, but hands pressing on thin air next to the tourist look wrong:
+        /// while it goes on, the body (not the player) kneels right beside the chest it is pressing.
+        /// </summary>
+        private void KneelBeside(bool kneeling, Vector3 position, float dt)
+        {
+            const float arm = 0.55f, most = 2.2f;
+            Transform body = _animator.transform;
+            if (body == transform) return; // the body is the player itself here: nothing to shift
+            if (!_bodyRestKnown)
+            {
+                _bodyRest = body.localPosition;
+                _bodyRestKnown = true;
+            }
+            Vector3 shift = Vector3.zero;
+            if (kneeling)
+            {
+                Vector3 to = _cprPoint - position;
+                to.y = 0f;
+                float distance = to.magnitude;
+                if (distance > arm) shift = to / distance * Mathf.Min(distance - arm, most);
+            }
+            _kneelShift = Vector3.Lerp(_kneelShift, shift, 1f - Mathf.Exp(-9f * dt));
+            if (_kneelShift.sqrMagnitude < 1e-6f && shift == Vector3.zero) _kneelShift = Vector3.zero;
+            body.position = transform.TransformPoint(_bodyRest) + _kneelShift;
         }
 
         private bool GroundBelow(Vector3 feet, float distance)

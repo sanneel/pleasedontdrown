@@ -21,8 +21,16 @@ namespace PleaseDontDrown.UI
         /// <summary>One of our bullets hit something that counts.</summary>
         public static void ShowHitMarker() => _hitAt = Time.unscaledTime;
 
+        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+
+        private void OnDestroy()
+        {
+            if (_scope != null) Destroy(_scope);
+        }
+
         private void OnGUI()
         {
+            if (Event.current.type != EventType.Repaint) return; // nothing here takes input
             Weapon gun = Weapon.Local;
             if (gun == null || !GameInput.GameplayActive) return;
             float cx = Screen.width * 0.5f, cy = Screen.height * 0.5f;
@@ -101,7 +109,7 @@ namespace PleaseDontDrown.UI
                     pixels[y * n + x] = new Color32(0, 0, 0, alpha);
                 }
             _scope.SetPixels32(pixels);
-            _scope.Apply();
+            _scope.Apply(false, true); // only ever drawn: no copy kept in memory
         }
 
         /// <summary>The gun's card, on the right at eye height.</summary>

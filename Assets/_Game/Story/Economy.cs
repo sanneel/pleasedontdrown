@@ -20,6 +20,8 @@ namespace PleaseDontDrown.Story
         [SerializeField] private int _payRevive = 80;
         [SerializeField] private int _payDefib = 150;
         [SerializeField] private int _payHospital = 200;
+        [Tooltip("What the rival company bills the team for every tourist it has to airlift (never more than the team has).")]
+        [SerializeField] private int _airliftBill = 30;
         [SerializeField] private AudioSource _audio;
 
         private readonly SyncVar<int> _money = new SyncVar<int>();
@@ -84,6 +86,14 @@ namespace PleaseDontDrown.Story
                 _ => 0
             };
             if (pay > 0) ServerAdd(pay, e == VictimEvent.Zapped ? "defibrillator" : e.ToString().ToLowerInvariant(), victim.Body.HeadPosition + Vector3.up);
+            // Lost to the rival company: they send the bill for the airlift.
+            if (e == VictimEvent.Lost && _airliftBill > 0 && _money.Value > 0)
+            {
+                int bill = Mathf.Min(_airliftBill, _money.Value);
+                ServerAdd(-bill, "airlift bill", victim.Body.HeadPosition + Vector3.up);
+                if (RescueService.Instance != null)
+                    RescueService.Instance.ServerAnnounce($"<color=#ff9080>The rival company bills you ${bill} for the airlift.</color>");
+            }
         }
 
         /// <summary>Host: earn money (shown where it happened).</summary>

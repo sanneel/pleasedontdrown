@@ -11,14 +11,19 @@ namespace PleaseDontDrown.UI
     /// </summary>
     public class RescueHud : MonoBehaviour
     {
+        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+
         private void OnGUI()
         {
+            if (Event.current.type != EventType.Repaint) return; // nothing here takes input
             PlayerHub local = PlayerHub.Local;
             Camera cam = local != null && local.Look != null ? local.Look.Camera : null;
             if (cam == null || !GameInput.GameplayActive)
                 return;
-            foreach (VictimBrain v in VictimBrain.All)
+            var victims = VictimBrain.All;
+            for (int i = 0; i < victims.Count; i++)
             {
+                VictimBrain v = victims[i];
                 VictimState state = v.State;
                 if (!state.NeedsHelp() && state != VictimState.Saved) continue;
                 if (v.Item.IsHeld && v.Item.Holder == local) continue; // it's in your arms
