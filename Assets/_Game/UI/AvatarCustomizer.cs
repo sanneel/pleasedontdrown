@@ -8,7 +8,7 @@ namespace PleaseDontDrown.UI
     /// <summary>
     /// "Customize your lifeguard": body, skin, hair, clothes, hat, glasses and extras, with a live 3D preview that
     /// you can spin by dragging. The look is saved locally and worn in every session (synced by PlayerHub).
-    /// IMGUI for the prototype, like the other menus.
+    /// Drawn with <see cref="Hud"/> on its 1080-high sheet, like the other menus.
     /// </summary>
     public class AvatarCustomizer : MonoBehaviour
     {
@@ -25,9 +25,6 @@ namespace PleaseDontDrown.UI
         private Camera _camera;
         private RenderTexture _texture;
         private float _orbit;
-        private Texture2D _white;
-        private GUIStyle _title, _label, _value, _button;
-        private Vector2 _scroll;
 
         /// <summary>The look this player wears (saved between sessions).</summary>
         public static AvatarLook LocalLook
@@ -67,6 +64,7 @@ namespace PleaseDontDrown.UI
         private void Awake()
         {
             _instance = this;
+            useGUILayout = false; // drawn with fixed boxes: no layout pass needed
             DevCommands.Register("customize", "", "Open the lifeguard customization panel.", _ => SetOpen(true), owner: this);
         }
 
@@ -130,7 +128,7 @@ namespace PleaseDontDrown.UI
             _animator.Rig = _rig;
             _animator.Motion = new AvatarMotion { FacingYaw = 0f, Grounded = true };
 
-            _texture = new RenderTexture(400, 520, 24) { name = "AvatarPreview", antiAliasing = 4 };
+            _texture = new RenderTexture(800, 1040, 24) { name = "AvatarPreview", antiAliasing = 4 }; // sharp at 4K too
             var camGo = new GameObject("PreviewCamera");
             camGo.transform.SetParent(_stage.transform, false);
             _camera = camGo.AddComponent<Camera>();
@@ -140,7 +138,6 @@ namespace PleaseDontDrown.UI
             _camera.fieldOfView = 30f;
             _camera.nearClipPlane = 0.1f;
             _camera.farClipPlane = 12f;
-            _white = Texture2D.whiteTexture;
         }
 
         private void LateUpdate()
@@ -154,133 +151,137 @@ namespace PleaseDontDrown.UI
 
         // ------------------------------------------------------------------ panel
 
+        private const float PanelWidth = 1300f, PanelHeight = 880f;
+        private const float RowHeight = 40f, LabelWidth = 196f, ChipSize = 28f, ChipGap = 5f;
+
         private void OnGUI()
         {
             if (!_open) return;
-            EnsureStyles();
-            float w = Mathf.Min(900f, Screen.width - 40f), h = Mathf.Min(600f, Screen.height - 40f);
-            var area = new Rect((Screen.width - w) * 0.5f, (Screen.height - h) * 0.5f, w, h);
-            GUI.Box(area, GUIContent.none);
-            GUI.Box(area, GUIContent.none);
-            GUILayout.BeginArea(new Rect(area.x + 14f, area.y + 10f, area.width - 28f, area.height - 20f));
-            GUILayout.Label("CUSTOMIZE YOUR LIFEGUARD", _title);
-            GUILayout.BeginHorizontal();
+            Hud.Dim();
+            // On a narrow window the whole panel shrinks to fit rather than running off the side.
+            float fit = Mathf.Min(1f, (Hud.Width - 40f) / PanelWidth);
+            Matrix4x4 before = GUI.matrix;
+            if (fit < 1f) GUIUtility.ScaleAroundPivot(new Vector2(fit, fit), new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
+            var panel = new Rect((Hud.Width - PanelWidth) * 0.5f, (Hud.Height - PanelHeight) * 0.5f, PanelWidth, PanelHeight);
+            Hud.Panel(panel, 0.92f);
+            Hud.Label(new Rect(panel.x + 36f, panel.y + 18f, 900f, 56f), "YOUR LIFEGUARD", 44f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
 
             // Preview (drag to spin).
-            float ph = h - 110f, pw = ph * 400f / 520f;
-            Rect preview = GUILayoutUtility.GetRect(pw, ph, GUILayout.Width(pw), GUILayout.Height(ph));
-            if (_texture != null) GUI.DrawTexture(preview, _texture, ScaleMode.ScaleToFit, false);
+            var preview = new Rect(panel.x + 36f, panel.y + 96f, 470f, 611f);
+            Hud.Fill(preview, new Color(0.55f, 0.8f, 0.95f), 16f);
+            if (_texture != null) Hud.Picture(preview, _texture, Color.white);
+            Hud.Label(new Rect(preview.x, preview.yMax + 6f, preview.width, 28f), "Drag to turn", 18f, new Color(1f, 1f, 1f, 0.6f), shadow: false);
             Event e = Event.current;
-            if (e.type == EventType.MouseDrag && preview.Contains(e.mousePosition))
+            if (e.type == EventType.MouseDrag && Hud.Hovered(preview))
             {
                 _orbit -= e.delta.x * 0.6f;
                 e.Use();
             }
-            GUILayout.Space(16f);
 
-            GUILayout.BeginVertical();
-            _scroll = GUILayout.BeginScrollView(_scroll);
             AvatarLook look = LocalLook;
             bool changed = false;
-            changed |= Row("Body", AvatarLook.BuildNames[look.Build], ref look.Build, 4);
-            changed |= Row("Figure", AvatarLook.FigureNames[look.Figure % 2], ref look.Figure, 2);
-            changed |= Row("Height", AvatarLook.HeightNames[look.Height], ref look.Height, 4);
-            changed |= ColorRow("Skin", ref look.Skin, AvatarLook.SkinTones);
-            changed |= EnumRow("Hair", ref look.Hair);
-            changed |= ColorRow("Hair colour", ref look.HairColor, AvatarLook.HairColors);
-            changed |= EnumRow("Top", ref look.Top);
-            changed |= ColorRow("Top colour", ref look.TopColor, AvatarLook.ClothColors);
-            changed |= EnumRow("Shorts", ref look.Bottom);
-            changed |= ColorRow("Shorts colour", ref look.BottomColor, AvatarLook.ClothColors);
-            changed |= EnumRow("Hat", ref look.Hat);
-            changed |= ColorRow("Hat colour", ref look.HatColor, AvatarLook.ClothColors);
-            changed |= EnumRow("Glasses", ref look.Glasses);
-            changed |= EnumRow("Facial hair", ref look.Face);
-            changed |= Toggle("Whistle", ref look.Extras, AvatarExtras.Whistle);
-            changed |= Toggle("Sunscreen nose", ref look.Extras, AvatarExtras.Sunscreen);
-            changed |= Toggle("Arm floaties", ref look.Extras, AvatarExtras.Floaties);
-            GUILayout.EndScrollView();
-            GUILayout.EndVertical();
-            GUILayout.EndHorizontal();
+            float x = panel.x + 540f, y = panel.y + 92f;
+            changed |= Row(x, ref y, "BODY", AvatarLook.BuildNames[look.Build], ref look.Build, 4);
+            changed |= Row(x, ref y, "FIGURE", AvatarLook.FigureNames[look.Figure % 2], ref look.Figure, 2);
+            changed |= Row(x, ref y, "HEIGHT", AvatarLook.HeightNames[look.Height], ref look.Height, 4);
+            changed |= ColorRow(x, ref y, "SKIN", ref look.Skin, AvatarLook.SkinTones);
+            changed |= EnumRow(x, ref y, "HAIR", ref look.Hair);
+            changed |= ColorRow(x, ref y, "HAIR COLOUR", ref look.HairColor, AvatarLook.HairColors);
+            changed |= EnumRow(x, ref y, "TOP", ref look.Top);
+            changed |= ColorRow(x, ref y, "TOP COLOUR", ref look.TopColor, AvatarLook.ClothColors);
+            changed |= EnumRow(x, ref y, "SHORTS", ref look.Bottom);
+            changed |= ColorRow(x, ref y, "SHORTS COLOUR", ref look.BottomColor, AvatarLook.ClothColors);
+            changed |= EnumRow(x, ref y, "HAT", ref look.Hat);
+            changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
+            changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
+            changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
+            changed |= Toggle(x, ref y, "WHISTLE", ref look.Extras, AvatarExtras.Whistle);
+            changed |= Toggle(x, ref y, "SUNSCREEN NOSE", ref look.Extras, AvatarExtras.Sunscreen);
+            changed |= Toggle(x, ref y, "ARM FLOATIES", ref look.Extras, AvatarExtras.Floaties);
 
-            GUILayout.Space(6f);
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Randomize", _button, GUILayout.Height(32f)))
+            float by = panel.yMax - 84f, bx = panel.x + 36f;
+            if (Hud.Button(new Rect(bx, by, 220f, 56f), "RANDOM", centred: true, small: true))
             {
                 look = AvatarLook.Random(new System.Random(Environment.TickCount));
                 changed = true;
             }
-            if (GUILayout.Button("Station uniform", _button, GUILayout.Height(32f)))
+            if (Hud.Button(new Rect(bx + 232f, by, 238f, 56f), "UNIFORM", centred: true, small: true))
             {
                 look = AvatarLook.Lifeguard;
                 changed = true;
             }
-            if (GUILayout.Button("Wave", _button, GUILayout.Height(32f)) && _animator != null)
+            if (Hud.Button(new Rect(bx + 510f, by, 160f, 56f), "WAVE", centred: true, small: true) && _animator != null)
                 _animator.Play(AvatarGesture.Wave);
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Done", _button, GUILayout.Width(140f), GUILayout.Height(32f)))
-                SetOpen(false);
-            GUILayout.EndHorizontal();
-            GUILayout.EndArea();
+            bool done = Hud.Button(new Rect(panel.xMax - 276f, by, 240f, 56f), "DONE", centred: true, primary: true);
+            GUI.matrix = before;
 
             if (changed) Set(look);
+            if (done) SetOpen(false);
         }
 
-        private bool Row(string label, string value, ref byte field, int count)
+        private static bool Row(float x, ref float y, string label, string value, ref byte field, int count)
         {
-            int dir = Arrows(label, value, null);
+            int dir = Arrows(x, ref y, label, value);
             if (dir == 0) return false;
             field = (byte)((field + dir + count) % count);
             return true;
         }
 
-        private bool EnumRow<T>(string label, ref T field) where T : Enum
+        private static bool EnumRow<T>(float x, ref float y, string label, ref T field) where T : Enum
         {
-            Array values = Enum.GetValues(typeof(T));
+            T[] values = EnumValues<T>.All;
             int index = Array.IndexOf(values, field);
-            int dir = Arrows(label, Nicify(field.ToString()), null);
+            int dir = Arrows(x, ref y, label, EnumValues<T>.Names[Mathf.Max(0, index)]);
             if (dir == 0) return false;
-            field = (T)values.GetValue((index + dir + values.Length) % values.Length);
+            field = values[(index + dir + values.Length) % values.Length];
             return true;
         }
 
-        private bool ColorRow(string label, ref byte field, Color[] palette)
+        /// <summary>The palette as chips to click: the one worn has a white frame.</summary>
+        private static bool ColorRow(float x, ref float y, string label, ref byte field, Color[] palette)
         {
-            int dir = Arrows(label, $"{field + 1} / {palette.Length}", palette[field % palette.Length]);
-            if (dir == 0) return false;
-            field = (byte)((field + dir + palette.Length) % palette.Length);
-            return true;
+            Hud.Label(new Rect(x, y, LabelWidth, RowHeight), label, 20f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            bool changed = false;
+            for (int i = 0; i < palette.Length; i++)
+            {
+                var chip = new Rect(x + LabelWidth + i * (ChipSize + ChipGap), y + (RowHeight - ChipSize) * 0.5f, ChipSize, ChipSize);
+                if (!Hud.Chip(chip, palette[i], i == field % palette.Length) || i == field) continue;
+                field = (byte)i;
+                changed = true;
+            }
+            y += RowHeight;
+            return changed;
         }
 
-        private bool Toggle(string label, ref AvatarExtras extras, AvatarExtras flag)
+        private static bool Toggle(float x, ref float y, string label, ref AvatarExtras extras, AvatarExtras flag)
         {
             bool on = (extras & flag) != 0;
-            int dir = Arrows(label, on ? "Yes" : "No", null);
-            if (dir == 0) return false;
-            extras ^= flag;
-            return true;
+            Hud.Label(new Rect(x, y, LabelWidth, RowHeight), label, 20f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            bool pressed = Hud.Button(new Rect(x + LabelWidth, y + 3f, 110f, RowHeight - 6f), on ? "YES" : "NO", centred: true, small: true, selected: on);
+            y += RowHeight;
+            if (pressed) extras ^= flag;
+            return pressed;
         }
 
         /// <summary>One "label  &lt;  value  &gt;" row. Returns -1, 0 or +1.</summary>
-        private int Arrows(string label, string value, Color? swatch)
+        private static int Arrows(float x, ref float y, string label, string value)
         {
+            const float arrow = 44f, wide = 300f;
             int dir = 0;
-            GUILayout.BeginHorizontal(GUILayout.Height(28f));
-            GUILayout.Label(label, _label, GUILayout.Width(130f));
-            if (GUILayout.Button("<", _button, GUILayout.Width(34f), GUILayout.Height(26f))) dir = -1;
-            Rect r = GUILayoutUtility.GetRect(170f, 26f, GUILayout.Width(170f));
-            if (swatch.HasValue)
-            {
-                Color c = GUI.color;
-                GUI.color = swatch.Value;
-                GUI.DrawTexture(new Rect(r.x + 6f, r.y + 4f, 40f, r.height - 8f), _white);
-                GUI.color = c;
-                GUI.Label(new Rect(r.x + 50f, r.y, r.width - 50f, r.height), value, _value);
-            }
-            else GUI.Label(r, value, _value);
-            if (GUILayout.Button(">", _button, GUILayout.Width(34f), GUILayout.Height(26f))) dir = 1;
-            GUILayout.EndHorizontal();
+            Hud.Label(new Rect(x, y, LabelWidth, RowHeight), label, 20f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            float bx = x + LabelWidth;
+            if (Hud.Button(new Rect(bx, y + 3f, arrow, RowHeight - 6f), "<", centred: true, small: true)) dir = -1;
+            Hud.Label(new Rect(bx + arrow, y, wide, RowHeight), value, 24f, Color.white, heavy: true, shadow: false);
+            if (Hud.Button(new Rect(bx + arrow + wide, y + 3f, arrow, RowHeight - 6f), ">", centred: true, small: true)) dir = 1;
+            y += RowHeight;
             return dir;
+        }
+
+        /// <summary>An enum's values and their names as shown ("CapBackwards" = "Cap backwards"), made once.</summary>
+        private static class EnumValues<T> where T : Enum
+        {
+            public static readonly T[] All = (T[])Enum.GetValues(typeof(T));
+            public static readonly string[] Names = Array.ConvertAll(All, v => Nicify(v.ToString()));
         }
 
         private static string Nicify(string name)
@@ -292,15 +293,6 @@ namespace PleaseDontDrown.UI
                 sb.Append(i > 0 ? char.ToLowerInvariant(name[i]) : name[i]);
             }
             return sb.ToString();
-        }
-
-        private void EnsureStyles()
-        {
-            if (_title != null) return;
-            _title = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold };
-            _label = new GUIStyle(GUI.skin.label) { fontSize = 15, alignment = TextAnchor.MiddleLeft };
-            _value = new GUIStyle(GUI.skin.label) { fontSize = 15, alignment = TextAnchor.MiddleCenter };
-            _button = new GUIStyle(GUI.skin.button) { fontSize = 15 };
         }
     }
 }

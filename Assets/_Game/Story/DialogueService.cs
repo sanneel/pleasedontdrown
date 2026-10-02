@@ -16,8 +16,8 @@ namespace PleaseDontDrown.Story
     }
 
     /// <summary>
-    /// Conversations: the host says a line (with who's speaking), every player sees it as a subtitle and the NPC's
-    /// mouth moves. Lines advance on their own after a reading time, so co-op players never wait on each other.
+    /// Conversations: the host says a line (with who's speaking), every player sees it as a subtitle, the NPC's
+    /// mouth moves and they babble it out loud (<see cref="Audio.SpeechVoice"/>). Lines advance on their own after a reading time, so co-op players never wait on each other.
     /// </summary>
     public class DialogueService : NetworkBehaviour
     {
@@ -69,7 +69,14 @@ namespace PleaseDontDrown.Story
             Current = line;
             _history.Add(line);
             if (_history.Count > 30) _history.RemoveAt(0);
-            if (npc != null) npc.OnSpeak(duration);
+            if (npc != null) npc.OnSpeak(duration, text);
+            else
+            {
+                // Nobody in the world to say it: the player's own line (in their own kind of voice), or a voice from nowhere.
+                bool mine = speaker == PlayerSpeaker;
+                bool feminine = mine && UI.AvatarCustomizer.LocalLook.Feminine;
+                Audio.SpeechVoice.Local.Speak(text, mine ? (feminine ? 2 : 1) : 0, mine ? 1f : 0.92f, 0.8f);
+            }
         }
 
         private void Update()

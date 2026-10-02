@@ -737,12 +737,14 @@ namespace PleaseDontDrown.Rescue
                     FloatingText.Spawn(above, "SAVED!", new Color(0.4f, 1f, 0.45f), 1.4f, 2f);
                     PlayerHud.ShowToast($"<color=#80ff80>{text}</color>", 5f);
                     _body.PlayCough();
+                    Audio.GameMusic.Play(Audio.Jingle.Saved);
                     break;
                 case VictimEvent.Revived:
                 case VictimEvent.Zapped:
                     FloatingText.Spawn(above, e == VictimEvent.Zapped ? "ZAP! REVIVED!" : "REVIVED!", new Color(0.4f, 1f, 0.45f), 1.4f, 2f);
                     PlayerHud.ShowToast($"<color=#80ff80>{text}</color>", 5f);
                     _body.PlayCough();
+                    Audio.GameMusic.Play(Audio.Jingle.Saved);
                     break;
                 case VictimEvent.Flatline:
                     FloatingText.Spawn(above, "NO PULSE", new Color(1f, 0.25f, 0.25f), 1.2f, 2f);
@@ -759,6 +761,7 @@ namespace PleaseDontDrown.Rescue
                 case VictimEvent.Lost:
                     FloatingText.Spawn(above, "LOST TO COMPETITION", new Color(1f, 0.3f, 0.25f), 1.1f, 2.5f);
                     PlayerHud.ShowToast($"<color=#ff7060>{text}</color>", 5f);
+                    Audio.GameMusic.Play(Audio.Jingle.Lost);
                     break;
             }
         }

@@ -95,8 +95,108 @@ namespace PleaseDontDrown.Core
             ToggleMenu.AddBinding("<Gamepad>/start");
             ToggleOverlay = _global.AddAction("ToggleOverlay", InputActionType.Button, "<Keyboard>/tab");
 
+            Rebindable = new[]
+            {
+                new Rebind("FORWARD", Move, 1), new Rebind("BACK", Move, 2), new Rebind("LEFT", Move, 3), new Rebind("RIGHT", Move, 4),
+                new Rebind("JUMP", Jump, 0), new Rebind("SPRINT", Sprint, 0), new Rebind("CROUCH", Crouch, 0), new Rebind("USE / RESCUE", Interact, 0),
+                new Rebind("PUNCH / FIRE", Primary, 0), new Rebind("CPR / AIM", Secondary, 0), new Rebind("DROP / THROW", Drop, 0), new Rebind("WAVE", Emote, 0),
+                new Rebind("RELOAD", Reload, 0), new Rebind("INSPECT", Inspect, 0), new Rebind("SKIN BACK", SkinPrev, 0), new Rebind("SKIN NEXT", SkinNext, 0)
+            };
+            _rebinding = null;
+            IsRebinding = false;
+            _rebindEndFrame = -1;
+            string saved = PlayerPrefs.GetString(BindingsKey, string.Empty);
+            if (!string.IsNullOrEmpty(saved)) _gameplay.LoadBindingOverridesFromJson(saved);
+            BindingsVersion++;
+
             _global.Enable();
             _gameplay.Enable();
+        }
+
+        // ------------------------------------------------------------------ the player's own keys
+
+        /// <summary>One key the player can change in OPTIONS: what it's called, and which binding of which action it is.</summary>
+        public readonly struct Rebind
+        {
+            public readonly string Label;
+            public readonly InputAction Action;
+            public readonly int Binding;
+
+            public Rebind(string label, InputAction action, int binding)
+            {
+                Label = label;
+                Action = action;
+                Binding = binding;
+            }
+        }
+
+        private const string BindingsKey = "pdd.input.bindings";
+        private static InputActionRebindingExtensions.RebindingOperation _rebinding;
+        private static int _rebindEndFrame = -1;
+
+        /// <summary>The keyboard and mouse keys that can be changed (gamepad buttons and the 1-6 slots stay as they are).</summary>
+        public static Rebind[] Rebindable { get; private set; }
+        /// <summary>Waiting for the player to press the new key.</summary>
+        public static bool IsRebinding { get; private set; }
+        /// <summary>The key press that ended (or cancelled) a rebind belongs to it: menus ignore Esc on that frame.</summary>
+        public static bool RebindJustEnded => Time.frameCount <= _rebindEndFrame + 1;
+        /// <summary>Goes up whenever a key changes (cached prompt texts compare it).</summary>
+        public static int BindingsVersion { get; private set; }
+
+        /// <summary>Wait for the next key or mouse button and make it <paramref name="index"/>'s key (Esc cancels).</summary>
+        public static void StartRebind(int index)
+        {
+            if (IsRebinding || index < 0 || index >= Rebindable.Length) return;
+            Rebind target = Rebindable[index];
+            string before = target.Action.bindings[target.Binding].effectivePath;
+            target.Action.Disable(); // an action can't be rebound while it's listening
+            IsRebinding = true;
+            _rebinding = target.Action.PerformInteractiveRebinding(target.Binding)
+                .WithControlsHavingToMatchPath("<Keyboard>")
+                .WithControlsHavingToMatchPath("<Mouse>")
+                .WithControlsExcluding("<Mouse>/position").WithControlsExcluding("<Mouse>/delta").WithControlsExcluding("<Mouse>/scroll")
+                .WithControlsExcluding("<Keyboard>/anyKey")
+                .WithCancelingThrough("<Keyboard>/escape")
+                .OnMatchWaitForAnother(0.05f)
+                .OnComplete(_ => EndRebind(index, before, true))
+                .OnCancel(_ => EndRebind(index, before, false));
+            _rebinding.Start();
+        }
+
+        private static void EndRebind(int index, string before, bool changed)
+        {
+            _rebinding?.Dispose();
+            _rebinding = null;
+            IsRebinding = false;
+            _rebindEndFrame = Time.frameCount;
+            if (changed)
+            {
+                // Two actions on one key would both fire: whoever had the new key gets the old one.
+                Rebind target = Rebindable[index];
+                string now = target.Action.bindings[target.Binding].effectivePath;
+                for (int i = 0; i < Rebindable.Length; i++)
+                {
+                    Rebind other = Rebindable[i];
+                    if (i != index && other.Action.bindings[other.Binding].effectivePath == now)
+                        other.Action.ApplyBindingOverride(other.Binding, before);
+                }
+                SaveBindings();
+            }
+            Apply();
+        }
+
+        /// <summary>Back to the keys the game ships with.</summary>
+        public static void ResetBindings()
+        {
+            _gameplay.RemoveAllBindingOverrides();
+            SaveBindings();
+        }
+
+        private static void SaveBindings()
+        {
+            PlayerPrefs.SetString(BindingsKey, _gameplay.SaveBindingOverridesAsJson());
+            PlayerPrefs.Save();
+            BindingsVersion++;
         }
 
         /// <summary>Call when a UI that needs the mouse opens. Must be paired with <see cref="PopUI"/>.</summary>
@@ -136,10 +236,10 @@ namespace PleaseDontDrown.Core
         /// Short key label for prompts, e.g. "E". Built from the binding path (the physical key), not the active
         /// keyboard layout: on non-English layouts the display string would otherwise show local letters (e.g. "ð" for G).
         /// </summary>
-        public static string KeyLabel(InputAction action)
+        public static string KeyLabel(InputAction action, int binding = 0)
         {
-            if (action == null || action.bindings.Count == 0) return "?";
-            string path = action.bindings[0].effectivePath;
+            if (action == null || binding >= action.bindings.Count) return "?";
+            string path = action.bindings[binding].effectivePath;
             int slash = path.LastIndexOf('/');
             string key = slash >= 0 ? path.Substring(slash + 1) : path;
             switch (key)
@@ -155,6 +255,12 @@ namespace PleaseDontDrown.Core
                 case "backquote": return "`";
                 case "enter": return "Enter";
                 case "tab": return "Tab";
+                case "forwardButton": return "Mouse 5";
+                case "backButton": return "Mouse 4";
+                case "upArrow": return "Up";
+                case "downArrow": return "Down";
+                case "leftArrow": return "Left";
+                case "rightArrow": return "Right";
             }
             return key.Length == 1 ? key.ToUpperInvariant() : char.ToUpperInvariant(key[0]) + key.Substring(1);
         }

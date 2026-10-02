@@ -36,6 +36,8 @@ namespace PleaseDontDrown.Player
         public static PlayerHub Local { get; private set; }
         public static IReadOnlyList<PlayerHub> All => _all;
         public static event Action<PlayerHub> LocalPlayerChanged;
+        /// <summary>Host: a player's body now exists (the host's own first, then each friend who joins).</summary>
+        public static event Action<PlayerHub> ServerJoined;
 
         public string DisplayName => string.IsNullOrEmpty(_displayName.Value) ? $"Lifeguard {OwnerId}" : _displayName.Value;
         public PlayerMotor Motor => _motor;
@@ -59,6 +61,7 @@ namespace PleaseDontDrown.Player
             _all.Clear();
             Local = null;
             LocalPlayerChanged = null;
+            ServerJoined = null;
             DevCommands.Register("players", "", "List connected players.", _ =>
             {
                 foreach (PlayerHub p in _all)
@@ -106,6 +109,12 @@ namespace PleaseDontDrown.Player
                 PlayerLook.ResetBodyRotation(transform);
                 _nameTag.gameObject.SetActive(true);
             }
+        }
+
+        public override void OnStartServer()
+        {
+            base.OnStartServer();
+            ServerJoined?.Invoke(this);
         }
 
         public override void OnStopServer()
@@ -288,8 +297,10 @@ namespace PleaseDontDrown.Player
             if (IsOwner) return;
             // Remote players: the name tag faces our camera.
             Camera cam = Camera.main;
-            if (cam != null && _nameTag.gameObject.activeSelf)
-                _nameTag.transform.rotation = cam.transform.rotation;
+            if (cam == null || !_nameTag.gameObject.activeSelf) return;
+            _nameTag.transform.rotation = cam.transform.rotation;
+            // Same size on screen up close (see StoryNpc's name tag).
+            _nameTag.transform.localScale = Vector3.one * Mathf.Clamp(Vector3.Distance(cam.transform.position, _nameTag.transform.position) / 8f, 0.22f, 1f);
         }
     }
 }

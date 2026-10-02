@@ -153,6 +153,7 @@ namespace PleaseDontDrown.Player
                 _scriptedInput = Vector2.up;
                 _scriptedSprint = args.Length > 1 && args[1] == "sprint";
             }, cheat: true, owner: this);
+            DevCommands.Register("jump", "", "Press jump on autopilot (automated tests).", _ => _lastJumpPressedTime = Time.time, cheat: true, owner: this);
             DevCommands.Register("contacts", "", "Toggle logging of what your body touches.", _ =>
             {
                 _logContacts = !_logContacts;
@@ -170,6 +171,7 @@ namespace PleaseDontDrown.Player
             DevCommands.Unregister("speed", this);
             DevCommands.Unregister("tp", this);
             DevCommands.Unregister("walk", this);
+            DevCommands.Unregister("jump", this);
             DevCommands.Unregister("knock", this);
             DevCommands.Unregister("contacts", this);
             UnregisterSwimCommands();

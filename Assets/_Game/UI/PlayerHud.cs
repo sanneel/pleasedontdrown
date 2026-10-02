@@ -33,6 +33,7 @@ namespace PleaseDontDrown.UI
         private string _primary, _primaryLine, _secondary, _secondaryLine;
         private bool _heldIsPerson, _hintsWithSkin;
         private string _hints;
+        private int _bindingsVersion = -1;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => _toasts.Clear();
@@ -66,6 +67,12 @@ namespace PleaseDontDrown.UI
             float cx = Hud.Width * 0.5f;
             float cy = Hud.Height * 0.5f;
 
+            if (_bindingsVersion != GameInput.BindingsVersion)
+            {
+                // A key was changed in OPTIONS: the cached lines name the old one.
+                _bindingsVersion = GameInput.BindingsVersion;
+                _primary = _secondary = _hints = null;
+            }
             string primary = local.Interactor.CurrentPrompt;
             string secondary = local.Interactor.CurrentSecondaryPrompt;
             bool hovering = !string.IsNullOrEmpty(primary) || !string.IsNullOrEmpty(secondary);

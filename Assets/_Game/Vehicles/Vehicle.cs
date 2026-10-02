@@ -258,7 +258,9 @@ namespace PleaseDontDrown.Vehicles
                     else hands.Drop();
                 }
                 local.Motor.SetSeat(this, Vector3.zero);
-                PlayerHud.ShowToast($"<b>W/S</b> throttle, <b>A/D</b> steer, <b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> to get off.", 5f);
+                GameInput.Rebind[] keys = GameInput.Rebindable; // forward, back, left, right come first
+                string Key(int i) => GameInput.KeyLabel(keys[i].Action, keys[i].Binding);
+                PlayerHud.ShowToast($"<b>{Key(0)}/{Key(1)}</b> throttle, <b>{Key(2)}/{Key(3)}</b> steer, <b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> to get off.", 5f);
             }
         }
 

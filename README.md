@@ -102,9 +102,10 @@ Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-port 7
 Builds/Win64/PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-port 7790 -pdd-join localhost -pdd-quit-after 15 -logFile Logs/client.log
 ```
 
-Story test: the game plays chapter 1 by itself (rescues, CPR, the thief, Lost & Found, the jet ski) and reports per beat.
+Story test: first the body is checked on the real motor (walk, sprint, jump, swim, dive, climb out), then the game plays
+chapter 1 by itself (rescues, CPR, the thief, Lost & Found, the jet ski) and reports per beat.
 ```powershell
-powershell -File Tools\test-story.ps1            # chapter 1, headless, about 2.5 minutes; exit code 0 = passed
+powershell -File Tools\test-story.ps1            # chapter 1, headless, about 3 minutes; exit code 0 = passed
 powershell -File Tools\test-story.ps1 -Client    # with a second copy joined as a client
 powershell -File Tools\test-story.ps1 -Shots     # also saves pictures to Builds\Win64\Screenshots\Autoplay
 ```
@@ -126,8 +127,18 @@ A client from a different build is refused with a clear message instead of faili
 | `-pdd-autoplay [beat]` | Host: play the story by itself up to the end of that beat (default 1.10), then quit with a result line |
 | `-pdd-autoshots` | With autoplay: save pictures as it goes (run without `-nographics`) |
 | `-pdd-timescale <x>` | With autoplay: run the clock faster (0.5 .. 4) |
+| `-pdd-movecheck` | Host (with `-pdd-nostory`): walk, sprint, jump, swim, dive and climb out on the dock, compare with the motor's numbers, quit with `[MoveCheck] RESULT PASS/FAIL` |
 | `-pdd-npcwatch` | Host: log characters that get stuck, clip into walls or stand about too long |
 | `-pdd-nosave` / `-pdd-nostory` | Don't read or write the story save / no story at all |
+
+Props and signs are made by scripts, not by hand (run them again after changing one):
+```bash
+"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup -P ArtSource/Tools/model_props.py -- Assets/_Game/Art/Props
+python ArtSource/Tools/make_signs.py
+```
+(`model_props.py` takes `--only crate,phone` and `--preview <absolute prefix>` to look at a prop before it goes in.)
+Music and voices are synthesized at run time (`Assets/_Game/Audio`); `Tools > PDD > Export music and voice preview`
+(or `-executeMethod PleaseDontDrown.Editor.AudioPreview.ExportMusicBatch`) writes them as WAVs to `Screenshots/Review/Audio`.
 
 ## Layout
 `Assets/_Game/` game code (asmdef `PleaseDontDrown`) · `Assets/_Game/Editor/` editor tools · `Assets/ThirdParty/FishySteamworks/` vendored transport (BSD-2) · `Docs/` design.

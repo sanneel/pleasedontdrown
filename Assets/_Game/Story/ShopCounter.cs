@@ -12,7 +12,7 @@ namespace PleaseDontDrown.Story
 {
     /// <summary>
     /// A counter that sells equipment from the shared wallet (the hotel reception sells guns). Interact opens a
-    /// small list; buying is checked by the host, and the item appears on the counter. Holding a gun, the list also
+    /// list (drawn with <see cref="Hud"/>); buying is checked by the host, and the item appears on the counter. Holding a gun, the list also
     /// offers parts for it (sights, barrels, laser, bigger magazine, better rounds), fitted on the spot.
     /// </summary>
     public class ShopCounter : NetworkBehaviour, IInteractionHandler
@@ -34,8 +34,15 @@ namespace PleaseDontDrown.Story
         [SerializeField] private bool _free;
 
         private bool _open;           // local window
-        private bool _pushedUI;
-        private GUIStyle _style, _header, _button;
+        private bool _pushedUI, _openedFromAfar;
+        // The window's words, kept between frames.
+        private string _titleUpper, _moneyText, _partsTitle;
+        private string[] _productNames, _productPrices;
+        private int _moneyShown, _partsFrame = -1;
+        private System.Collections.Generic.List<Combat.Weapon.PartOffer> _parts;
+        private Combat.Weapon _partsGun;
+
+        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
 
         /// <summary>Host: someone bought something.</summary>
         public static event Action<ShopCounter, PlayerHub, string> ServerPurchased;
@@ -66,6 +73,7 @@ namespace PleaseDontDrown.Story
             _open = open;
             if (open && !_pushedUI) { GameInput.PushUI(); _pushedUI = true; }
             if (!open && _pushedUI) { GameInput.PopUI(); _pushedUI = false; }
+            if (!open) _openedFromAfar = false;
         }
 
         private void OnDisable() => SetOpen(false);
@@ -74,61 +82,102 @@ namespace PleaseDontDrown.Story
         {
             if (!_open) return;
             PlayerHub local = PlayerHub.Local;
-            if (GameInput.ToggleMenu.WasPressedThisFrame() || local == null || (local.transform.position - transform.position).sqrMagnitude > 6f * 6f)
+            if (GameInput.ToggleMenu.WasPressedThisFrame() || local == null ||
+                (!_openedFromAfar && (local.transform.position - transform.position).sqrMagnitude > 6f * 6f))
                 SetOpen(false);
         }
+
+        private const float ProductsWidth = 700f, PartsWidth = 560f, ProductRow = 78f, PartRow = 54f;
 
         private void OnGUI()
         {
             if (!_open) return;
-            _style ??= new GUIStyle(GUI.skin.label) { fontSize = 16, richText = true, wordWrap = true, normal = { textColor = Color.white } };
-            _header ??= new GUIStyle(_style) { fontSize = 24, fontStyle = FontStyle.Bold };
-            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 16, richText = true };
             Combat.Weapon gun = HeldGun(PlayerHub.Local);
-            var parts = gun != null ? gun.Offers() : new System.Collections.Generic.List<Combat.Weapon.PartOffer>();
-            float w = 560f, h = 110f + _products.Length * 64f + (parts.Count > 0 ? 44f + parts.Count * 40f : 0f);
-            h = Mathf.Min(h, Screen.height - 40f);
-            var area = new Rect((Screen.width - w) * 0.5f, (Screen.height - h) * 0.5f, w, h);
-            GUI.color = new Color(0f, 0f, 0f, 0.85f);
-            GUI.DrawTexture(area, Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUILayout.BeginArea(new Rect(area.x + 18f, area.y + 14f, area.width - 36f, area.height - 28f));
-            GUILayout.Label($"{_title}   <color=#90ff90>${Economy.Money}</color>", _header);
-            GUILayout.Space(8f);
+            // What the held gun takes changes when a part is fitted, not every event: list it once a frame.
+            if (_partsFrame != Time.frameCount)
+            {
+                _partsFrame = Time.frameCount;
+                _parts = gun != null ? gun.Offers() : null;
+            }
+            int parts = _parts != null ? _parts.Count : 0;
+            if (_products.Length != _productNames?.Length) NameProducts();
+
+            Hud.Dim(0.45f);
+            float width = ProductsWidth + (parts > 0 ? PartsWidth : 0f);
+            float height = 104f + Mathf.Max(_products.Length * ProductRow, parts > 0 ? 50f + parts * PartRow : 0f) + 92f;
+            // A long list on a small window shrinks to fit instead of running off the screen.
+            float fit = Mathf.Min(1f, (Hud.Height - 40f) / height, (Hud.Width - 40f) / width);
+            Matrix4x4 before = GUI.matrix;
+            if (fit < 1f) GUIUtility.ScaleAroundPivot(new Vector2(fit, fit), new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
+            var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f, width, height);
+            Hud.Panel(panel, 0.92f);
+            Hud.Label(new Rect(panel.x + 32f, panel.y + 18f, width - 260f, 56f), _titleUpper ??= _title.ToUpperInvariant(), 40f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            if (!_free)
+            {
+                if (_moneyShown != Economy.Money || _moneyText == null)
+                {
+                    _moneyShown = Economy.Money;
+                    _moneyText = "$" + _moneyShown;
+                }
+                Hud.Label(new Rect(panel.xMax - 232f, panel.y + 18f, 200f, 56f), _moneyText, 40f, new Color(0.56f, 1f, 0.56f), TextAnchor.MiddleRight, heavy: true, shadow: false);
+            }
+
+            float x = panel.x + 32f, y = panel.y + 96f;
             for (int i = 0; i < _products.Length; i++)
             {
                 Product p = _products[i];
-                Item prefab = GameContent.Items != null ? GameContent.Items.Find(p.Item) : null;
-                GUILayout.BeginHorizontal();
-                GUILayout.Label($"<b>{(prefab != null ? prefab.DisplayName : p.Item)}</b>\n<size=13>{p.Blurb}</size>", _style, GUILayout.Width(330f));
+                Hud.Label(new Rect(x, y + 4f, ProductsWidth - 290f, 34f), _productNames[i], 26f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                Hud.Label(new Rect(x, y + 38f, ProductsWidth - 290f, 28f), p.Blurb, 18f, new Color(1f, 1f, 1f, 0.7f), TextAnchor.MiddleLeft, shadow: false);
                 bool afford = _free || Economy.Money >= p.Price;
                 GUI.enabled = afford;
-                if (GUILayout.Button(_free ? "Take" : afford ? $"Buy  ${p.Price}" : $"${p.Price}", _button, GUILayout.Height(44f)))
+                if (Hud.Button(new Rect(x + ProductsWidth - 264f, y + 10f, 200f, 52f), _free ? "TAKE" : _productPrices[i], centred: true, small: true))
                     BuyServer(i);
                 GUI.enabled = true;
-                GUILayout.EndHorizontal();
-                GUILayout.Space(6f);
+                y += ProductRow;
             }
-            if (parts.Count > 0)
+
+            if (parts > 0)
             {
-                GUILayout.Space(6f);
-                GUILayout.Label($"<b>For your {gun.DisplayName}</b>", _style);
-                foreach (Combat.Weapon.PartOffer part in parts)
+                float px = panel.x + ProductsWidth;
+                float py = panel.y + 96f;
+                Hud.Fill(new Rect(px - 16f, py, 2f, height - 96f - 100f), new Color(1f, 1f, 1f, 0.15f));
+                if (!ReferenceEquals(gun, _partsGun))
                 {
-                    GUILayout.BeginHorizontal();
-                    GUILayout.Label(part.Name, _style, GUILayout.Width(330f));
+                    _partsGun = gun;
+                    _partsTitle = "FOR YOUR " + gun.DisplayName.ToUpperInvariant();
+                }
+                Hud.Label(new Rect(px, py, PartsWidth - 32f, 40f), _partsTitle, 22f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                py += 50f;
+                for (int i = 0; i < parts; i++)
+                {
+                    Combat.Weapon.PartOffer part = _parts[i];
+                    Hud.Label(new Rect(px, py, PartsWidth - 230f, PartRow - 8f), part.Name, 22f, Color.white, TextAnchor.MiddleLeft, shadow: false);
                     bool afford = _free || Economy.Money >= part.Price;
                     GUI.enabled = afford && !part.Fitted;
-                    string label = part.Fitted ? "Fitted" : _free ? "Fit" : afford ? $"Fit  ${part.Price}" : $"${part.Price}";
-                    if (GUILayout.Button(label, _button, GUILayout.Height(32f)))
+                    string label = part.Fitted ? "FITTED" : _free ? "FIT" : "$" + part.Price;
+                    if (Hud.Button(new Rect(px + PartsWidth - 216f, py, 184f, PartRow - 10f), label, centred: true, small: true))
                         BuyPartServer(gun.NetworkObject, (byte)part.Kind, part.Index);
                     GUI.enabled = true;
-                    GUILayout.EndHorizontal();
+                    py += PartRow;
                 }
             }
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Close (Esc)", _button, GUILayout.Height(30f))) SetOpen(false);
-            GUILayout.EndArea();
+
+            bool close = Hud.Button(new Rect(panel.x + (width - 280f) * 0.5f, panel.yMax - 78f, 280f, 56f), "CLOSE", centred: true);
+            GUI.matrix = before;
+            if (close) SetOpen(false);
+        }
+
+        /// <summary>What each product is called and costs, as shown on its row (made once, not every frame).</summary>
+        private void NameProducts()
+        {
+            _productNames = new string[_products.Length];
+            _productPrices = new string[_products.Length];
+            for (int i = 0; i < _products.Length; i++)
+            {
+                Item prefab = GameContent.Items != null ? GameContent.Items.Find(_products[i].Item) : null;
+                _productNames[i] = prefab != null ? prefab.DisplayName : _products[i].Item;
+                _productPrices[i] = "BUY  $" + _products[i].Price;
+            }
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -224,6 +273,17 @@ namespace PleaseDontDrown.Story
         public override void OnStartClient()
         {
             base.OnStartClient();
+            DevCommands.Register("shop", "", "Open the nearest shop counter's window (to look at it in tests).", _ =>
+            {
+                PlayerHub me = PlayerHub.Local;
+                ShopCounter nearest = null;
+                foreach (ShopCounter counter in FindObjectsByType<ShopCounter>(FindObjectsSortMode.None))
+                    if (me != null && (nearest == null || (counter.transform.position - me.transform.position).sqrMagnitude < (nearest.transform.position - me.transform.position).sqrMagnitude))
+                        nearest = counter;
+                if (nearest == null) return;
+                nearest._openedFromAfar = true; // a test looking at the window: don't close it for standing too far away
+                nearest.SetOpen(true);
+            }, owner: this);
             DevCommands.Register("buy", "<n>", "Buy product n (1..) at the nearest open shop counter (automated tests).", args =>
             {
                 int n = Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) - 1;
@@ -236,6 +296,7 @@ namespace PleaseDontDrown.Story
         {
             base.OnStopClient();
             DevCommands.Unregister("buy", this);
+            DevCommands.Unregister("shop", this);
             SetOpen(false);
         }
     }

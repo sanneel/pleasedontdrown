@@ -45,6 +45,8 @@ namespace PleaseDontDrown.UI
             _plainText.Clear();
             _icons.Clear();
             _heavy = _bold = null;
+            _hoverId = 0;
+            _hoverFrame = -10;
         }
 
         public static Rect Px(Rect sheet) => new(sheet.x * Scale, sheet.y * Scale, sheet.width * Scale, sheet.height * Scale);
@@ -152,6 +154,118 @@ namespace PleaseDontDrown.UI
             }
             float inset = sheet.width * 0.16f;
             Picture(new Rect(sheet.x + inset, sheet.y + inset, sheet.width - inset * 2f, sheet.height - inset * 2f), Icon(icon), new Color(1f, 1f, 1f, 0.95f * alpha));
+        }
+
+        // ------------------------------------------------------------------ controls (menus and panels)
+
+        private static int _hoverId, _hoverFrame = -10;
+
+        /// <summary>A dark rounded panel for a menu page or a window.</summary>
+        public static void Panel(Rect sheet, float alpha = 0.85f) => Fill(sheet, new Color(Ink.r, Ink.g, Ink.b, alpha), 16f);
+
+        /// <summary>The whole screen darkened behind a window.</summary>
+        public static void Dim(float alpha = 0.66f) => Fill(new Rect(0f, 0f, Width, Height), new Color(Ink.r, Ink.g, Ink.b, alpha));
+
+        /// <summary>
+        /// A wide dark button with heavy white lettering. Under the mouse it gets a white frame and nudges right
+        /// (hover and click sounds included); <paramref name="primary"/> is the coral one you'd press first,
+        /// <paramref name="small"/> the teal one for a row inside a panel.
+        /// </summary>
+        public static bool Button(Rect r, string label, bool centred = false, bool primary = false, bool selected = false, bool small = false)
+        {
+            bool enabled = GUI.enabled;
+            bool hover = enabled && Hovered(r);
+            if (Event.current.type == EventType.Repaint)
+            {
+                Rect box = hover && !centred && !small ? new Rect(r.x + 8f, r.y, r.width, r.height) : r;
+                float radius = Mathf.Min(14f, r.height * 0.25f);
+                Color fill = primary ? new Color(Coral.r, Coral.g, Coral.b, hover ? 1f : 0.9f)
+                    : small ? new Color(Teal.r * 0.6f, Teal.g * 0.6f, Teal.b * 0.6f, hover ? 1f : 0.85f)
+                    : new Color(Ink.r, Ink.g, Ink.b, hover || selected ? 0.9f : 0.6f);
+                if (!enabled) fill.a *= 0.4f;
+                Fill(box, fill, radius);
+                if (hover || selected) Frame(box, Color.white, 3f, radius);
+                Color text = !enabled ? new Color(1f, 1f, 1f, 0.45f) : hover && !primary && !small ? Sand : Color.white;
+                Rect words = centred || small ? box : new Rect(box.x + 24f, box.y, box.width - 36f, box.height);
+                Label(words, label, small ? 22f : 30f, text, centred || small ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                if (hover) HoverSound(System.HashCode.Combine(label, Mathf.RoundToInt(r.x), Mathf.RoundToInt(r.y)));
+            }
+            bool pressed = GUI.Button(Px(r), GUIContent.none, GUIStyle.none);
+            if (pressed) Core.BeachAudio.PlayLocal(Core.BeachAudio.MenuSelect, 0.7f);
+            return pressed;
+        }
+
+        /// <summary>A colour to pick: a rounded chip, framed in white when it's the chosen one.</summary>
+        public static bool Chip(Rect r, Color color, bool selected)
+        {
+            if (Event.current.type == EventType.Repaint)
+            {
+                bool hover = Hovered(r);
+                Rect box = hover || selected ? new Rect(r.x - 2f, r.y - 2f, r.width + 4f, r.height + 4f) : r;
+                Fill(box, color, 8f);
+                if (selected) Frame(box, Color.white, 3f, 8f);
+                else if (hover) Frame(box, new Color(1f, 1f, 1f, 0.6f), 2f, 8f);
+                if (hover) HoverSound(System.HashCode.Combine(color, Mathf.RoundToInt(r.x), Mathf.RoundToInt(r.y)));
+            }
+            bool pressed = GUI.Button(Px(r), GUIContent.none, GUIStyle.none);
+            if (pressed) Core.BeachAudio.PlayLocal(Core.BeachAudio.MenuSelect, 0.7f);
+            return pressed;
+        }
+
+        /// <summary>One tick as the mouse comes onto a control (not while it stays there).</summary>
+        private static void HoverSound(int id)
+        {
+            if (_hoverId != id || Time.frameCount > _hoverFrame + 2) Core.BeachAudio.PlayLocal(Core.BeachAudio.MenuHover, 0.45f);
+            _hoverId = id;
+            _hoverFrame = Time.frameCount;
+        }
+
+        /// <summary>A rounded track with a coral fill and a white knob; click or drag anywhere along it.</summary>
+        public static float Slider(Rect r, float value, float min, float max)
+        {
+            const float knob = 26f, track = 10f;
+            int id = GUIUtility.GetControlID(FocusType.Passive);
+            Event e = Event.current;
+            Rect px = Px(r);
+            float FromMouse() => Mathf.Lerp(min, max, Mathf.InverseLerp(px.x + knob * 0.5f * Scale, px.xMax - knob * 0.5f * Scale, e.mousePosition.x));
+            switch (e.GetTypeForControl(id))
+            {
+                case EventType.MouseDown:
+                    if (e.button == 0 && px.Contains(e.mousePosition))
+                    {
+                        GUIUtility.hotControl = id;
+                        value = FromMouse();
+                        e.Use();
+                    }
+                    break;
+                case EventType.MouseDrag:
+                    if (GUIUtility.hotControl == id)
+                    {
+                        value = FromMouse();
+                        e.Use();
+                    }
+                    break;
+                case EventType.MouseUp:
+                    if (GUIUtility.hotControl == id)
+                    {
+                        GUIUtility.hotControl = 0;
+                        PlayerPrefs.Save();
+                        e.Use();
+                    }
+                    break;
+                case EventType.Repaint:
+                {
+                    float t = Mathf.InverseLerp(min, max, value);
+                    float cx = Mathf.Lerp(r.x + knob * 0.5f, r.xMax - knob * 0.5f, t), cy = r.y + r.height * 0.5f;
+                    bool active = GUIUtility.hotControl == id || Hovered(r);
+                    Fill(new Rect(r.x, cy - track * 0.5f, r.width, track), new Color(1f, 1f, 1f, 0.18f), track * 0.5f);
+                    Fill(new Rect(r.x, cy - track * 0.5f, cx - r.x, track), Coral, track * 0.5f);
+                    float size = active ? knob + 4f : knob;
+                    Fill(new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size), Color.white, size * 0.5f);
+                    break;
+                }
+            }
+            return value;
         }
 
         public static float EaseOutBack(float t)

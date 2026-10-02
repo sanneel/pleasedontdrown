@@ -52,6 +52,7 @@ namespace PleaseDontDrown.Story
             _reportValues[3] = "$" + earned;
             _reportValues[4] = "$" + money;
             _reportAt = Time.unscaledTime;
+            Audio.GameMusic.Play(Audio.Jingle.Chapter);
         }
 
         /// <summary>A big centred card for a few seconds ("CHAPTER 2").</summary>

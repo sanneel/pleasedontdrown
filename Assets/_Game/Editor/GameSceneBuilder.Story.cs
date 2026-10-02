@@ -82,12 +82,14 @@ namespace PleaseDontDrown.Editor
             {
                 Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.12f, 0.03f, 0.09f), leather);
                 Primitive(PrimitiveType.Cube, "Stitch", root, new Vector3(0f, 0.016f, 0f), new Vector3(0.1f, 0.004f, 0.07f), gold, keepCollider: false);
+                DressProp(root, "wallet");
             }, density: 0.6f, configure: go => Lost(go, 30));
 
             yield return BuildItem("Phone", "Phone", 0.2f, smallHold, new Vector3(-30f, 0f, 0f), 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.08f, 0.012f, 0.16f), black);
                 Primitive(PrimitiveType.Cube, "Screen", root, new Vector3(0f, 0.0065f, 0f), new Vector3(0.07f, 0.002f, 0.14f), screen, keepCollider: false);
+                DressProp(root, "phone");
             }, density: 1.4f, configure: go => Lost(go, 40)); // phones sink: dive for it
 
             yield return BuildItem("Sunglasses", "Sunglasses", 0.08f, smallHold, Vector3.zero, 1f, wood, root =>
@@ -95,18 +97,21 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Bridge", root, Vector3.zero, new Vector3(0.14f, 0.015f, 0.015f), pink);
                 foreach (float side in new[] { -1f, 1f })
                     Primitive(PrimitiveType.Sphere, "Lens", root, new Vector3(0.045f * side, -0.012f, 0f), new Vector3(0.055f, 0.04f, 0.012f), lens, keepCollider: false);
+                DressProp(root, "sunglasses", fitCollider: true);
             }, density: 0.8f, configure: go => Lost(go, 20));
 
             yield return BuildItem("Watch", "Watch", 0.12f, smallHold, Vector3.zero, 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cylinder, "Face", root, Vector3.zero, new Vector3(0.05f, 0.008f, 0.05f), gold);
                 Primitive(PrimitiveType.Cube, "Band", root, new Vector3(0f, -0.004f, 0f), new Vector3(0.025f, 0.006f, 0.16f), black, keepCollider: false);
+                DressProp(root, "watch", fitCollider: true);
             }, density: 1.6f, configure: go => Lost(go, 35));
 
             yield return BuildItem("Baggie", "Baggie", 0.05f, smallHold, Vector3.zero, 1f, wood, root =>
             {
                 Primitive(PrimitiveType.Cube, "Bag", root, Vector3.zero, new Vector3(0.09f, 0.025f, 0.07f), baggie);
                 Primitive(PrimitiveType.Cube, "Seal", root, new Vector3(0f, 0f, 0.036f), new Vector3(0.09f, 0.03f, 0.006f), red, keepCollider: false);
+                DressProp(root, "baggie");
             }, density: 0.3f, configure: go => Lost(go, 25, evidence: true));
 
             yield return BuildItem("JetSkiKeys", "Jet Ski Keys", 0.1f, smallHold, Vector3.zero, 1f, rubber, root =>
@@ -114,6 +119,7 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Float", root, Vector3.zero, new Vector3(0.05f, 0.03f, 0.1f), orange);
                 Primitive(PrimitiveType.Cube, "Key", root, new Vector3(0f, 0f, 0.09f), new Vector3(0.015f, 0.004f, 0.06f), steel, keepCollider: false);
                 Primitive(PrimitiveType.Cylinder, "Ring", root, new Vector3(0f, 0f, 0.055f), new Vector3(0.03f, 0.003f, 0.03f), steel, keepCollider: false);
+                DressProp(root, "jet_ski_keys");
             }, density: 0.3f, configure: go =>
             {
                 SetBool(go.GetComponent<Item>(), "_pocketable", true);
@@ -131,6 +137,7 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Cross2", root, new Vector3(0f, 0.061f, 0f), new Vector3(0.03f, 0.004f, 0.1f), red, keepCollider: false);
                 foreach (float side in new[] { -1f, 1f })
                     Primitive(PrimitiveType.Cylinder, "Paddle", root, new Vector3(0.12f * side, 0.075f, 0.09f), new Vector3(0.07f, 0.015f, 0.07f), black, keepCollider: false);
+                DressProp(root, "defibrillator");
             }, density: 0.7f, configure: go =>
             {
                 SetBool(go.GetComponent<Item>(), "_pocketable", true);
@@ -473,8 +480,12 @@ namespace PleaseDontDrown.Editor
                 towel.SetParent(root, false);
                 towel.SetPositionAndRotation(new Vector3(x, y + 0.012f, z), Quaternion.Euler(0f, yaw, 0f));
                 Material cloth = GetMaterial($"Towel{n % towelColors.Length}", towelColors[n % towelColors.Length]);
-                Primitive(PrimitiveType.Cube, "Cloth", towel, Vector3.zero, new Vector3(0.95f, 0.02f, 1.95f), cloth, keepCollider: false);
-                Primitive(PrimitiveType.Cube, "Stripe", towel, new Vector3(0f, 0.004f, -0.7f), new Vector3(0.95f, 0.02f, 0.18f), white, keepCollider: false);
+                // A modelled towel (a few wrinkles, a corner turned up, white bands) in this towel's colour; flat boxes without it.
+                if (PropModel("towel", towel, new Vector3(0f, -0.012f, 0f), yaw: n % 2 * 180f, repaint: new Dictionary<string, Material> { ["cloth"] = cloth, ["white"] = white }) == null)
+                {
+                    Primitive(PrimitiveType.Cube, "Cloth", towel, Vector3.zero, new Vector3(0.95f, 0.02f, 1.95f), cloth, keepCollider: false);
+                    Primitive(PrimitiveType.Cube, "Stripe", towel, new Vector3(0f, 0.004f, -0.7f), new Vector3(0.95f, 0.02f, 0.18f), white, keepCollider: false);
+                }
                 if (n % 2 == 0)
                 {
                     // Beach umbrella beside it: a pole you bump into, a canopy you don't.
@@ -577,9 +588,12 @@ namespace PleaseDontDrown.Editor
             // A bar stool: she sits up high with her feet on its footrest, head and shoulders in the window.
             const float barStool = 0.28f;
             var boothTop = new Vector3(east - 0.72f, floor + booth, windowZ);
-            Primitive(PrimitiveType.Cylinder, "StoolSeat", shack, boothTop + Vector3.up * (0.45f + barStool), new Vector3(0.38f, 0.03f, 0.38f), seat, keepCollider: false);
-            Primitive(PrimitiveType.Cylinder, "StoolLeg", shack, boothTop + Vector3.up * (0.45f + barStool) * 0.5f, new Vector3(0.07f, (0.45f + barStool) * 0.5f, 0.07f), wood, keepCollider: false);
-            Primitive(PrimitiveType.Cylinder, "StoolFootrest", shack, boothTop + Vector3.up * (barStool - 0.02f), new Vector3(0.32f, 0.02f, 0.32f), wood, keepCollider: false);
+            if (PropModel("stool", shack, boothTop, yaw: 15f) == null)
+            {
+                Primitive(PrimitiveType.Cylinder, "StoolSeat", shack, boothTop + Vector3.up * (0.45f + barStool), new Vector3(0.38f, 0.03f, 0.38f), seat, keepCollider: false);
+                Primitive(PrimitiveType.Cylinder, "StoolLeg", shack, boothTop + Vector3.up * (0.45f + barStool) * 0.5f, new Vector3(0.07f, (0.45f + barStool) * 0.5f, 0.07f), wood, keepCollider: false);
+                Primitive(PrimitiveType.Cylinder, "StoolFootrest", shack, boothTop + Vector3.up * (barStool - 0.02f), new Vector3(0.32f, 0.02f, 0.32f), wood, keepCollider: false);
+            }
             Vector3 stoolLocal = boothTop + Vector3.up * barStool; // her feet, on the footrest
             stool = shack.TransformPoint(stoolLocal);
             stoolYaw = shack.eulerAngles.y + 90f;

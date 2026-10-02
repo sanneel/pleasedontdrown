@@ -1,6 +1,7 @@
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Interaction;
 using PleaseDontDrown.Player;
+using PleaseDontDrown.UI;
 using UnityEngine;
 
 namespace PleaseDontDrown.Dev
@@ -15,7 +16,9 @@ namespace PleaseDontDrown.Dev
         [SerializeField] private Destination _here;
 
         private bool _open;
-        private GUIStyle _title, _button;
+        private string[] _names;
+
+        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
 
         public bool CanInteract(PlayerHub player) => DevIsland.Instance != null;
         public string GetPrompt(PlayerHub player) => "Travel to another island";
@@ -46,28 +49,26 @@ namespace PleaseDontDrown.Dev
         private void OnGUI()
         {
             if (!_open) return;
-            _title ??= new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
-            _button ??= new GUIStyle(GUI.skin.button) { fontSize = 18 };
-            var area = new Rect((Screen.width - 420f) * 0.5f, (Screen.height - 260f) * 0.5f, 420f, 260f);
-            GUI.color = new Color(0.12f, 0.07f, 0.2f, 0.9f);
-            GUI.DrawTexture(area, Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUILayout.BeginArea(new Rect(area.x + 20f, area.y + 14f, area.width - 40f, area.height - 28f));
-            GUILayout.Label("Travel to...", _title);
-            GUILayout.Space(8f);
+            const float width = 440f, row = 60f, gap = 10f;
+            int count = DevIsland.DestinationNames.Length; // the other islands + "stay here"
+            float height = 96f + count * (row + gap) + 14f;
+            Hud.Dim(0.45f);
+            var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f, width, height);
+            Hud.Panel(panel, 0.92f);
+            Hud.Label(new Rect(panel.x, panel.y + 18f, width, 56f), "TRAVEL TO", 40f, Color.white, heavy: true, shadow: false);
+            float y = panel.y + 96f;
             for (int i = 0; i < DevIsland.DestinationNames.Length; i++)
             {
                 if ((Destination)i == _here) continue;
-                if (GUILayout.Button(DevIsland.DestinationNames[i], _button, GUILayout.Height(44f)))
-                {
-                    SetOpen(false);
-                    DevIsland.Travel((Destination)i);
-                }
-                GUILayout.Space(4f);
+                _names ??= System.Array.ConvertAll(DevIsland.DestinationNames, n => n.ToUpperInvariant());
+                bool go = Hud.Button(new Rect(panel.x + 30f, y, width - 60f, row), _names[i], centred: true);
+                y += row + gap;
+                if (!go) continue;
+                SetOpen(false);
+                DevIsland.Travel((Destination)i);
+                return;
             }
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Stay here (Esc)", GUILayout.Height(28f))) SetOpen(false);
-            GUILayout.EndArea();
+            if (Hud.Button(new Rect(panel.x + 30f, y, width - 60f, row), "STAY HERE", centred: true, primary: true)) SetOpen(false);
         }
     }
 }

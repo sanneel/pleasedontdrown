@@ -27,6 +27,7 @@ namespace PleaseDontDrown.Dev
     /// as it goes (run without -nographics): through the player's eyes, of the player from outside, of the beach and
     /// of whoever is swimming, so the animations can be looked at afterwards.
     /// </summary>
+    [DefaultExecutionOrder(900)]
     public class StoryAutoplay : MonoBehaviour
     {
         private const float BeatLimit = 300f;       // game seconds one beat may take before the run counts as stuck
@@ -123,10 +124,13 @@ namespace PleaseDontDrown.Dev
                 {
                     _nextPeriodic = Time.time + 14f;
                     string stamp = $"{beat.Replace('.', '_')}_t{Time.time - started:000}";
-                    Shoot(stamp + "_eyes", Camera.main);
-                    ShootPlayer(stamp + "_me");
-                    ShootBeach(stamp + "_beach");
-                    ShootSwimmer(stamp + "_swimmer");
+                    Later(() =>
+                    {
+                        Shoot(stamp + "_eyes", Camera.main);
+                        ShootPlayer(stamp + "_me");
+                        ShootBeach(stamp + "_beach");
+                        ShootSwimmer(stamp + "_swimmer");
+                    });
                 }
                 if (Time.time - beatStart > BeatLimit)
                 {
@@ -252,6 +256,14 @@ namespace PleaseDontDrown.Dev
             return false;
         }
 
+        private static int CountCarried(PlayerHub me, string itemName)
+        {
+            int count = 0;
+            foreach (Item i in Item.All)
+                if (i.Holder == me && i.DisplayName == itemName) count++;
+            return count;
+        }
+
         private IEnumerator PickUp(PlayerHub me, Item item)
         {
             string itemName = item.DisplayName;
@@ -263,10 +275,12 @@ namespace PleaseDontDrown.Dev
             me.Motor.Teleport(stand);
             me.Look.LookAt(at);
             yield return new WaitForSeconds(0.4f);
+            // "grab" takes the nearest thing of that name, which may be this one's twin lying beside it: either counts.
+            int before = CountCarried(me, itemName);
             Exec($"grab {itemName.Substring(itemName.LastIndexOf(' ') + 1)}");
             float until = Time.time + 5f;
-            while (Time.time < until && item != null && !item.IsHeld) yield return null;
-            if (item != null && !item.IsHeld) Warn($"couldn't pick up the {itemName} at {item.transform.position:F1}");
+            while (Time.time < until && item != null && !item.IsHeld && CountCarried(me, itemName) <= before) yield return null;
+            if (item != null && !item.IsHeld && CountCarried(me, itemName) <= before) Warn($"couldn't pick up the {itemName} at {item.transform.position:F1}");
             yield return new WaitForSeconds(0.3f);
         }
 
@@ -418,8 +432,31 @@ namespace PleaseDontDrown.Dev
             _shotCounts.TryGetValue(tag, out int n);
             if (n >= most) return;
             _shotCounts[tag] = n + 1;
-            Shoot($"{tag}{n + 1}_eyes", Camera.main);
-            ShootPlayer($"{tag}{n + 1}_me");
+            string shot = $"{tag}{n + 1}";
+            Later(() =>
+            {
+                Shoot(shot + "_eyes", Camera.main);
+                ShootPlayer(shot + "_me");
+            });
+        }
+
+        private readonly List<Action> _pendingShots = new();
+
+        /// <summary>
+        /// Pictures are taken at the end of the frame (this script's LateUpdate runs after the others), so hands,
+        /// bodies and the camera are where this frame put them: a picture taken straight after a teleport showed the
+        /// first-person hands still at the old place.
+        /// </summary>
+        private void Later(Action shoot)
+        {
+            if (_shots) _pendingShots.Add(shoot);
+        }
+
+        private void LateUpdate()
+        {
+            if (_pendingShots.Count == 0) return;
+            foreach (Action shoot in _pendingShots) shoot();
+            _pendingShots.Clear();
         }
 
         private Camera ShotCamera(Vector3 from, Vector3 at)

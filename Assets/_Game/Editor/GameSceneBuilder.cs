@@ -352,6 +352,7 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Box", root, Vector3.zero, Vector3.one * 0.6f, crateWood);
                 Primitive(PrimitiveType.Cube, "BandTop", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
                 Primitive(PrimitiveType.Cube, "BandBottom", root, new Vector3(0f, -0.2f, 0f), new Vector3(0.62f, 0.07f, 0.62f), crateBand, keepCollider: false);
+                DressProp(root, "crate");
             }, density: 0.55f, waterDrag: 1.4f, configure: go => AddNavCarver(go, Vector3.zero, new Vector3(0.75f, 0f, 0.75f)));
 
             Item ball = BuildItem("BeachBall", "Beach Ball", 0.4f, new Vector3(0.1f, -0.34f, 0.72f), Vector3.zero, 1f, bouncy, root =>
@@ -360,6 +361,7 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cylinder, "Band", root, Vector3.zero, new Vector3(0.56f, 0.06f, 0.56f), white, keepCollider: false);
                 Primitive(PrimitiveType.Cylinder, "Band2", root, Vector3.zero, new Vector3(0.56f, 0.06f, 0.56f), yellow, keepCollider: false)
                     .transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                DressProp(root, "beach_ball");
             }, linearDamping: 0.5f, angularDamping: 0.9f, density: 0.1f, waterDrag: 0.8f, // rolls ~10-15 m after a sprint kick instead of forever
                 configure: go => SetBool(go.GetComponent<Item>(), "_pocketable", true));
 
@@ -380,6 +382,7 @@ namespace PleaseDontDrown.Editor
                     Primitive(PrimitiveType.Cube, "Tape", root, new Vector3(Mathf.Cos(rad) * 0.28f, 0f, Mathf.Sin(rad) * 0.28f),
                         new Vector3(0.165f, 0.165f, 0.06f), white, keepCollider: false).transform.localRotation = Quaternion.Euler(0f, -angle, 0f);
                 }
+                DressProp(root, "life_ring");
             }, linearDamping: 0.1f, angularDamping: 0.2f, density: 0.25f, waterDrag: 1.1f,
                 configure: go =>
                 {
@@ -399,6 +402,7 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.55f, 0.36f, 0.36f), blue);
                 Primitive(PrimitiveType.Cube, "Lid", root, new Vector3(0f, 0.2f, 0f), new Vector3(0.57f, 0.07f, 0.38f), white, keepCollider: false);
                 Primitive(PrimitiveType.Cube, "Handle", root, new Vector3(0f, 0.25f, 0f), new Vector3(0.3f, 0.04f, 0.05f), dark, keepCollider: false);
+                DressProp(root, "cooler");
             }, density: 0.4f, waterDrag: 1.2f, configure: go => AddNavCarver(go, Vector3.zero, new Vector3(0.7f, 0f, 0.5f)));
 
             Material husk = GetMaterial("Coconut", new Color(0.45f, 0.28f, 0.15f));
@@ -411,6 +415,7 @@ namespace PleaseDontDrown.Editor
                     float a = i * 120f * Mathf.Deg2Rad;
                     Primitive(PrimitiveType.Sphere, "Eye", root, new Vector3(Mathf.Cos(a) * 0.035f, 0.1f, Mathf.Sin(a) * 0.035f), Vector3.one * 0.03f, huskDark, keepCollider: false);
                 }
+                DressProp(root, "coconut");
             }, linearDamping: 0.1f, angularDamping: 0.4f, density: 0.55f, waterDrag: 1.0f, configure: go =>
             {
                 Item item = go.GetComponent<Item>();
@@ -726,14 +731,17 @@ namespace PleaseDontDrown.Editor
             for (float z = 2f; z >= -18f; z -= 4f)
                 foreach (float x in new[] { -1.1f, 1.1f })
                     Primitive(PrimitiveType.Cube, "Post", dock, new Vector3(x, -2.2f, z), new Vector3(0.22f, 4.8f, 0.22f), wood);
+            DressProp(dock, "dock"); // planks, beams and round posts over the same deck and post colliders
 
             // Rocks to swim to.
             GameObject rockA = Primitive(PrimitiveType.Sphere, "Rock", env, new Vector3(14f, -3.2f, -30f), new Vector3(7f, 5f, 6f), rock);
             rockA.transform.rotation = Quaternion.Euler(8f, 30f, -5f);
             TagSurface(rockA, SurfaceKind.Rock);
+            DressRock(rockA, 0f);
             GameObject rockB = Primitive(PrimitiveType.Sphere, "Rock", env, new Vector3(-20f, -4.5f, -44f), new Vector3(9f, 6f, 7f), rock);
             rockB.transform.rotation = Quaternion.Euler(-6f, 70f, 4f);
             TagSurface(rockB, SurfaceKind.Rock);
+            DressRock(rockB, 140f);
 
             // Swim-zone buoy line.
             var buoys = new GameObject("SwimZoneBuoys").transform;
@@ -741,11 +749,28 @@ namespace PleaseDontDrown.Editor
             for (int i = -4; i <= 4; i++)
             {
                 GameObject buoy = Primitive(PrimitiveType.Sphere, "Buoy", buoys, new Vector3(i * 6f, WaterLevel, -40f), Vector3.one * 0.5f, buoyYellow, keepCollider: false);
+                if (LoadProp("buoy") != null)
+                {
+                    // The modelled float is life size: an unscaled holder bobs, the model rides in it.
+                    Object.DestroyImmediate(buoy);
+                    buoy = new GameObject("Buoy");
+                    buoy.transform.SetParent(buoys, false);
+                    buoy.transform.localPosition = new Vector3(i * 6f, WaterLevel, -40f);
+                    PropModel("buoy", buoy.transform, yaw: i * 67f);
+                }
                 var bob = buoy.AddComponent<WaveBobber>();
                 var bobSo = new SerializedObject(bob);
                 Require(bobSo, "_heightOffset").floatValue = 0.1f;
                 bobSo.ApplyModifiedPropertiesWithoutUndo();
             }
+        }
+
+        /// <summary>The greybox ball stays as the rock's collider; the modelled boulder (1 m across, like Unity's sphere) takes its place to look at.</summary>
+        private static void DressRock(GameObject rock, float yaw)
+        {
+            if (PropModel("rock", rock.transform, yaw: yaw) == null) return;
+            Object.DestroyImmediate(rock.GetComponent<MeshRenderer>());
+            Object.DestroyImmediate(rock.GetComponent<MeshFilter>());
         }
 
         private const float WaterLevel = -0.35f;
@@ -940,10 +965,29 @@ namespace PleaseDontDrown.Editor
                     GetMaterial("White", new Color(0.95f, 0.95f, 0.95f)), keepCollider: false);
                 Primitive(PrimitiveType.Cube, "FirstAidCross2", shack, new Vector3(0.28f * k + 0.3f, 0.575f * k + 1.06f, -1.18f * k + 0.25f + 0.101f), new Vector3(0.04f, 0.12f, 0.01f),
                     GetMaterial("White", new Color(0.95f, 0.95f, 0.95f)), keepCollider: false);
+                if (LoadProp("shelf") != null)
+                {
+                    // The modelled shelf with a radio, the first-aid box and a box of lost things on it: the greybox
+                    // boards stay as its colliders, their looks (and the two greybox boxes) go.
+                    var shelfAt = new Vector3(0.28f * k, 0.575f * k, -1.18f * k + 0.25f);
+                    foreach (string part in new[] { "Shelf", "ShelfLegL", "ShelfLegR" })
+                    {
+                        Transform shelfPart = shack.Find(part);
+                        Object.DestroyImmediate(shelfPart.GetComponent<MeshRenderer>());
+                        Object.DestroyImmediate(shelfPart.GetComponent<MeshFilter>());
+                    }
+                    foreach (string part in new[] { "Radio", "FirstAid", "FirstAidCross", "FirstAidCross2" })
+                        Object.DestroyImmediate(shack.Find(part).gameObject);
+                    PropModel("shelf", shack, shelfAt);
+                    PropModel("radio", shack, shelfAt + new Vector3(-0.32f, 1.08f, -0.02f), yaw: -8f);
+                    PropModel("first_aid_kit", shack, shelfAt + new Vector3(0.3f, 1.06f, 0f), yaw: 6f);
+                    PropModel("lost_box", shack, shelfAt + new Vector3(0.1f, 0.44f, 0f), yaw: 4f);
+                }
             }
 
             TextMesh roofSign = WorldText(shack, "RoofSign", new Vector3(0f, 3.4f, -2.2f), "LIFEGUARD (probably)", 80, 0.06f, red.color);
             roofSign.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            bool paintedRoofSign = LoadProp("roof_sign") != null;
 
             // Shack light: bulb + point light, switched from a box on the front-left post.
             GameObject bulb = Primitive(PrimitiveType.Sphere, "Bulb", shack, new Vector3(0f, 2.55f, 0f), Vector3.one * 0.22f,
@@ -968,6 +1012,17 @@ namespace PleaseDontDrown.Editor
                 roofSign.transform.localPosition = new Vector3(0.12f * k, 2.55f * k + 0.35f, 0.65f * k + 0.45f);
                 roofSign.characterSize = 0.04f;
             }
+            if (paintedRoofSign)
+            {
+                // A painted plank sign where the engine text was (same place, same way round: its face is its local -z).
+                var plank = new GameObject("RoofSign").transform;
+                plank.SetParent(shack, false);
+                plank.localPosition = roofSign.transform.localPosition - new Vector3(0f, 0.1f, 0f); // its struts stand on the roof
+                plank.localRotation = roofSign.transform.localRotation;
+                Object.DestroyImmediate(roofSign.gameObject);
+                PropModel("roof_sign", plank);
+                SignPicture(plank, "Face", new Vector3(0f, 0.42f, -0.027f), 0f, new Vector2(2.4f, 0.5f), "roof_sign").transform.localRotation = Quaternion.Euler(0f, 0f, -1.5f);
+            }
             GameObject plate = Primitive(PrimitiveType.Cube, "Plate", lightSwitch.transform, Vector3.zero, new Vector3(0.16f, 0.24f, 0.06f), dark);
             lightSwitch.AddComponent<NetworkObject>();
             var toggle = lightSwitch.AddComponent<ToggleLight>();
@@ -991,8 +1046,17 @@ namespace PleaseDontDrown.Editor
             var stationBell = bellRoot.AddComponent<StationBell>();
             SetRef(stationBell, "_swingPivot", pivot);
             SetRef(stationBell, "_audio", SpatialAudio(bellRoot, 4f, 90f));
-            ConfigureInteractable(bellRoot.AddComponent<Interactable>(), new[] { bell.GetComponent<Collider>() },
-                new[] { bell.GetComponent<Renderer>(), clapper.GetComponent<Renderer>() }, 3f);
+            Renderer[] bellLooks = { bell.GetComponent<Renderer>(), clapper.GetComponent<Renderer>() };
+            if (LoadProp("bell") != null && LoadProp("bell_post") != null)
+            {
+                // Modelled post, iron arm and brass bell: the greybox post and bell stay as colliders only.
+                DressProp(bellRoot.transform, "bell_post");
+                Object.DestroyImmediate(clapper);
+                Object.DestroyImmediate(bell.GetComponent<MeshRenderer>());
+                Object.DestroyImmediate(bell.GetComponent<MeshFilter>());
+                bellLooks = PropRenderers(PropModel("bell", pivot).transform);
+            }
+            ConfigureInteractable(bellRoot.AddComponent<Interactable>(), new[] { bell.GetComponent<Collider>() }, bellLooks, 3f);
 
             // Sign by the path from the spawn area.
             var sign = new GameObject("WelcomeSign");
@@ -1001,7 +1065,14 @@ namespace PleaseDontDrown.Editor
             sign.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
             Primitive(PrimitiveType.Cube, "Post", sign.transform, new Vector3(0f, 0.8f, 0f), new Vector3(0.12f, 1.6f, 0.12f), wood);
             GameObject board = Primitive(PrimitiveType.Cube, "Board", sign.transform, new Vector3(0f, 1.75f, 0f), new Vector3(1.9f, 0.9f, 0.08f), GetMaterial("SignBoard", new Color(0.95f, 0.93f, 0.85f)));
-            WorldText(sign.transform, "Text", new Vector3(0f, 1.75f, -0.05f), "PLEASE DON'T DROWN\nLifeguard Station", 72, 0.028f, red.color);
+            Renderer[] signLooks = { board.GetComponent<Renderer>() };
+            if (DressProp(sign.transform, "sign_frame"))
+            {
+                // Two posts, a framed board and a painted face (ArtSource/Tools/make_signs.py) instead of engine text.
+                SignPicture(sign.transform, "Face", new Vector3(0f, 1.75f, -0.027f), 0f, new Vector2(1.84f, 0.84f), "welcome_sign");
+                signLooks = PropRenderers(sign.transform);
+            }
+            else WorldText(sign.transform, "Text", new Vector3(0f, 1.75f, -0.05f), "PLEASE DON'T DROWN\nLifeguard Station", 72, 0.028f, red.color);
             var readable = sign.AddComponent<ReadableSign>();
             var readableSo = new SerializedObject(readable);
             SerializedProperty lines = Require(readableSo, "_lines");
@@ -1015,7 +1086,7 @@ namespace PleaseDontDrown.Editor
             lines.arraySize = text.Length;
             for (int i = 0; i < text.Length; i++) lines.GetArrayElementAtIndex(i).stringValue = text[i];
             readableSo.ApplyModifiedPropertiesWithoutUndo();
-            ConfigureInteractable(sign.AddComponent<Interactable>(), new[] { board.GetComponent<Collider>() }, new[] { board.GetComponent<Renderer>() }, 3f);
+            ConfigureInteractable(sign.AddComponent<Interactable>(), new[] { board.GetComponent<Collider>() }, signLooks, 3f);
 
             // Lifeguard tower: door, window and ramp face the sea (run straight down the ramp into the water).
             var tower = new GameObject("Tower").transform;
@@ -1032,8 +1103,14 @@ namespace PleaseDontDrown.Editor
                 BuildDoor(tower, "TowerDoor", towerDoor, new Color(0.47f, 0.35f, 0.28f), new Color(0.93f, 0.93f, 0.9f), planks: false);
                 // A stool to sit on and watch the water.
                 float k = TowerScale, deck = 2.285f * k;
-                Primitive(PrimitiveType.Cylinder, "StoolSeat", tower, new Vector3(0.45f * TowerWiden, deck + 0.62f, -1.1f * k), new Vector3(0.38f, 0.03f, 0.38f), wood);
-                Primitive(PrimitiveType.Cylinder, "StoolLeg", tower, new Vector3(0.45f * TowerWiden, deck + 0.3f, -1.1f * k), new Vector3(0.08f, 0.3f, 0.08f), wood);
+                GameObject seat = Primitive(PrimitiveType.Cylinder, "StoolSeat", tower, new Vector3(0.45f * TowerWiden, deck + 0.62f, -1.1f * k), new Vector3(0.38f, 0.03f, 0.38f), wood);
+                GameObject leg = Primitive(PrimitiveType.Cylinder, "StoolLeg", tower, new Vector3(0.45f * TowerWiden, deck + 0.3f, -1.1f * k), new Vector3(0.08f, 0.3f, 0.08f), wood);
+                if (PropModel("stool", tower, new Vector3(0.45f * TowerWiden, deck, -1.1f * k), yaw: 20f, scale: 0.86f) != null)
+                    foreach (GameObject greybox in new[] { seat, leg })
+                    {
+                        Object.DestroyImmediate(greybox.GetComponent<MeshRenderer>());
+                        Object.DestroyImmediate(greybox.GetComponent<MeshFilter>());
+                    }
             }
         }
 
@@ -1131,10 +1208,19 @@ namespace PleaseDontDrown.Editor
             board.transform.rotation = Quaternion.Euler(0f, 135f, 0f); // text faces the spawn area
             Primitive(PrimitiveType.Cube, "Post", board.transform, new Vector3(0f, 0.75f, 0f), new Vector3(0.12f, 1.5f, 0.12f), wood);
             GameObject panel = Primitive(PrimitiveType.Cube, "Panel", board.transform, new Vector3(0f, 1.6f, 0f), new Vector3(1.5f, 0.8f, 0.08f), red);
-            TextMesh text = WorldText(board.transform, "Text", new Vector3(0f, 1.6f, -0.05f), "RESCUE DRILL\n<size=44>throws a tourist in the sea</size>", 72, 0.028f, Color.white);
-            text.richText = true;
+            Renderer[] looks = { panel.GetComponent<Renderer>() };
+            if (DressProp(board.transform, "drill_board"))
+            {
+                SignPicture(board.transform, "Face", new Vector3(0f, 1.6f, -0.027f), 0f, new Vector2(1.44f, 0.74f), "drill_board");
+                looks = PropRenderers(board.transform);
+            }
+            else
+            {
+                TextMesh text = WorldText(board.transform, "Text", new Vector3(0f, 1.6f, -0.05f), "RESCUE DRILL\n<size=44>throws a tourist in the sea</size>", 72, 0.028f, Color.white);
+                text.richText = true;
+            }
             board.AddComponent<DrillBoard>();
-            ConfigureInteractable(board.AddComponent<Interactable>(), new[] { panel.GetComponent<Collider>() }, new[] { panel.GetComponent<Renderer>() }, 3f);
+            ConfigureInteractable(board.AddComponent<Interactable>(), new[] { panel.GetComponent<Collider>() }, looks, 3f);
         }
 
         private static Transform[] BuildSpawnPoints()

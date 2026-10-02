@@ -157,7 +157,8 @@ namespace PleaseDontDrown.Story
                         else if (p.y > ground + 0.3f) Lasting(npc, t, "floating", $"feet {p.y - ground:F2} m above the ground");
                     }
                 }
-                Vector3 a = p + Vector3.up * 0.8f, b = p + Vector3.up * 1.5f; // above step height
+                // Above step height, up to the head; a swimmer's head is at the surface (the feet hang 1.4 m below it).
+                Vector3 a = p + Vector3.up * 0.8f, b = p + Vector3.up * (npc.IsSwimming ? 1.3f : 1.5f);
                 int n = Physics.OverlapCapsuleNonAlloc(a, b, 0.2f, _overlaps, ~0, QueryTriggerInteraction.Ignore);
                 for (int i = 0; i < n; i++)
                 {

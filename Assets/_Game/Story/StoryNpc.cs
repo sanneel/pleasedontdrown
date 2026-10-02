@@ -60,7 +60,7 @@ namespace PleaseDontDrown.Story
         private float _talkUntil;
         private float _lookYaw;
         private bool _swimPose;
-        private GameObject _bag;
+        private GameObject _bag, _disguise;
         private float _nextTalkRequest;
         private CapsuleCollider _bodyCollider;
         private SphereCollider _headCollider;
@@ -169,6 +169,7 @@ namespace PleaseDontDrown.Story
                 if (!string.IsNullOrEmpty(next)) gameObject.name = $"Npc_{next}";
             };
             _hasBag.OnChange += (_, next, _) => ShowBag(next);
+            _role.OnChange += (_, _, _) => ShowDisguise();
             _pose.OnChange += (_, next, _) => FitColliders(next);
             _bodyCollider = GetComponent<CapsuleCollider>();
             _headCollider = GetComponent<SphereCollider>();
@@ -202,11 +203,14 @@ namespace PleaseDontDrown.Story
                     if (_headCollider != null) _headCollider.center = new Vector3(0f, h - 0.1f, back);
                     break;
                 default:
+                    // In the water only the head is out: the body ends at the surface (feet hang SwimDepth below it),
+                    // so a swimmer passes under the dock without their collider sticking up through the deck.
+                    float tall = _swimPose ? 1.6f : 1.8f;
                     _bodyCollider.direction = 1;
-                    _bodyCollider.center = new Vector3(0f, 0.9f, 0f);
-                    _bodyCollider.height = 1.8f;
+                    _bodyCollider.center = new Vector3(0f, tall * 0.5f, 0f);
+                    _bodyCollider.height = tall;
                     _bodyCollider.radius = 0.32f;
-                    if (_headCollider != null) _headCollider.center = new Vector3(0f, 1.62f, 0f);
+                    if (_headCollider != null) _headCollider.center = new Vector3(0f, tall - 0.18f, 0f);
                     break;
             }
         }
@@ -441,7 +445,7 @@ namespace PleaseDontDrown.Story
         {
             FloatingText.Spawn(HeadPosition + Vector3.up * 0.4f, text, new Color(1f, 0.95f, 0.75f), 0.9f, 1.6f);
             if (cry && _audio != null) _audio.PlayOneShot(ProceduralAudio.Cry(_rig != null && _rig.Look.Feminine ? 3 : 1), 1f);
-            OnSpeak(0.8f);
+            OnSpeak(0.8f, cry ? null : text);
         }
 
         /// <summary>Host: say something (a speech line over the head; the mouth moves while it's up).</summary>
@@ -456,7 +460,7 @@ namespace PleaseDontDrown.Story
         private void SayObservers(string text, float seconds)
         {
             FloatingText.Spawn(HeadPosition + Vector3.up * 0.4f, text, SpeechColor, 0.75f, seconds);
-            OnSpeak(seconds * 0.8f);
+            OnSpeak(seconds * 0.8f, text, 0.75f);
         }
 
         // ------------------------------------------------------------------ talking
@@ -481,8 +485,23 @@ namespace PleaseDontDrown.Story
             ServerTalked?.Invoke(this, player);
         }
 
-        /// <summary>Every machine: mouth moves for a while (a dialogue line or a shout).</summary>
-        public void OnSpeak(float seconds) => _talkUntil = Mathf.Max(_talkUntil, Time.time + seconds);
+        /// <summary>Every machine: mouth moves for a while (a dialogue line or a shout), and <paramref name="text"/> is babbled out loud.</summary>
+        public void OnSpeak(float seconds, string text = null, float gain = 1f)
+        {
+            _talkUntil = Mathf.Max(_talkUntil, Time.time + seconds);
+            if (text == null || _audio == null) return;
+            // Each person has their own voice: the kind from who they are, the exact pitch from their id.
+            int id = ObjectId;
+            bool feminine = _rig != null && _rig.Look.Feminine;
+            (int register, float pitch) = _role.Value switch
+            {
+                NpcRole.Guide => (2, 1.03f),
+                NpcRole.Robber => (0, 0.88f),
+                NpcRole.Pirate => (0, 0.8f + (id % 5) * 0.03f),
+                _ => ((feminine ? 2 : 0) + (id & 1), 0.93f + (id * 7 % 15) * 0.01f)
+            };
+            Audio.SpeechVoice.On(gameObject, _audio).Speak(text, register, pitch, gain);
+        }
 
         // ------------------------------------------------------------------ damage (host)
 
@@ -547,8 +566,10 @@ namespace PleaseDontDrown.Story
             }
             _lookYaw = Mathf.LerpAngle(_lookYaw, yaw, 1f - Mathf.Exp(-6f * Time.deltaTime));
             float submerged = WaterSurface.Exists ? WaterSurface.HeightAt(transform.position) - transform.position.y : 0f;
+            bool wasSwimming = _swimPose;
             _swimPose = _swimPose ? submerged > SwimAbove - 0.12f : submerged > SwimAbove; // no flicker on a wave
             bool swimming = _swimPose;
+            if (swimming != wasSwimming) FitColliders(_pose.Value);
             _animator.Motion = new AvatarMotion
             {
                 Velocity = _pose.Value == AvatarPose.Normal || _pose.Value == AvatarPose.Scared ? _velocity : Vector3.zero,
@@ -571,12 +592,24 @@ namespace PleaseDontDrown.Story
             bool show = local != null && cam != null && (local.transform.position - transform.position).sqrMagnitude < 9f * 9f && !string.IsNullOrEmpty(_name.Value);
             if (_nameTag.gameObject.activeSelf != show) _nameTag.gameObject.SetActive(show);
             if (!show) return;
-            _nameTag.transform.position = HeadPosition + Vector3.up * 0.45f;
-            _nameTag.transform.rotation = cam.transform.rotation;
-            _nameTag.text = _maxHealth.Value > 0 && _health.Value > 0
-                ? $"{Name}  {new string('●', _health.Value)}{new string('○', Mathf.Max(0, _maxHealth.Value - _health.Value))}"
+            Vector3 at = HeadPosition + Vector3.up * 0.45f;
+            _nameTag.transform.SetPositionAndRotation(at, cam.transform.rotation);
+            // The same size on screen from arm's length out to a few metres (full size beyond that): a world-sized
+            // label is a billboard in your face when you stand next to someone.
+            _nameTag.transform.localScale = Vector3.one * Mathf.Clamp(Vector3.Distance(cam.transform.position, at) / TagFullSizeAt, 0.22f, 1f);
+            // The words only change with the name or a hit.
+            int health = _maxHealth.Value > 0 ? _health.Value : -1;
+            if (health == _tagHealth && ReferenceEquals(_tagName, _name.Value)) return;
+            _tagHealth = health;
+            _tagName = _name.Value;
+            _nameTag.text = health > 0
+                ? $"{Name}  {new string('●', health)}{new string('○', Mathf.Max(0, _maxHealth.Value - health))}"
                 : Name;
         }
+
+        private const float TagFullSizeAt = 8f;
+        private int _tagHealth = int.MinValue;
+        private string _tagName;
 
         public static PlayerHub NearestPlayer(Vector3 from, float range)
         {
@@ -954,6 +987,7 @@ namespace PleaseDontDrown.Story
             if (_rig.IsBuilt && _rig.Look.Equals(look)) return;
             _rig.Build(look);
             ShowBag(_hasBag.Value);
+            ShowDisguise();
         }
 
         /// <summary>The robber's backpack: a lumpy bag on his back (bursts open when he goes down).</summary>
@@ -968,6 +1002,14 @@ namespace PleaseDontDrown.Story
             if (_bag == null) _bag = RobberBag.Create();
             RobberBag.Wear(_bag, _rig);
             _bag.SetActive(true);
+        }
+
+        /// <summary>The thief looks like one: a black beanie and a bandana over his face, made to fit this body's head.</summary>
+        private void ShowDisguise()
+        {
+            bool wear = _role.Value == NpcRole.Robber && _rig != null && _rig.IsBuilt;
+            if (_disguise != null) Destroy(_disguise); // the head may have changed size with the look
+            _disguise = wear ? RobberDisguise.Create(_rig) : null;
         }
     }
 }

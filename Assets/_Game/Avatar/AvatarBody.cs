@@ -31,5 +31,7 @@ namespace PleaseDontDrown.Avatars
         [Tooltip("Eyelids on the eye bones and an open mouth on the mouth bone are part of the mesh: scaling those bones " +
                  "up closes the eyes / opens the mouth over the painted face.")]
         public bool HasFace;
+        [Tooltip("The head's size from the head bone: up to its top, out to its widest, forward to the face, back to the back of the skull (hair included).")]
+        public float HeadTop, HeadHalfWidth, HeadFront, HeadBack;
     }
 }

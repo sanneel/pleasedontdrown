@@ -100,3 +100,7 @@ MonoBehaviour:
   - 0.023329748
   - 0.01895542
   HasFace: 1
+  HeadTop: 0.3481456
+  HeadHalfWidth: 0.15205212
+  HeadFront: 0.19475138
+  HeadBack: 0.16516106

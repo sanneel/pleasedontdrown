@@ -200,8 +200,55 @@ def dev_signs():
         yield f'dev_range_{metres}', board_sign((512, 256), SAND, f'{metres} m', 130, seed=60 + metres, text_fill=NAVY, outline=CREAM)
 
 
+def painted_face(size, colour, seed):
+    """A flat painted board (no frame: the model has one) with brush-stroke variation."""
+    face = Image.new('RGBA', size, colour + (255,))
+    strokes = ImageChops.multiply(noise(size, seed, 10, 215, 255, stretch=12, blur=4), noise(size, seed + 1, 60, 225, 255, blur=20))
+    return Image.merge('RGBA', [ImageChops.multiply(ch, strokes) for ch in face.split()[:3]] + [face.split()[3]])
+
+
+def welcome_sign():
+    """The station's sign by the path: the game's name, what the place is, a wave along the bottom."""
+    size = (1840, 840)
+    img = painted_face(size, CREAM, 81)
+    d = ImageDraw.Draw(img)
+    # A band of sea along the bottom, with a second lighter wave behind it.
+    for colour, base, amp, phase in (((120, 205, 205), 668, 16, 0.0), (TEAL, 700, 20, 1.3)):
+        pts = [(x, base + amp * math.sin(x / 70.0 + phase)) for x in range(0, size[0] + 20, 20)]
+        d.polygon(pts + [(size[0], size[1]), (0, size[1])], fill=colour)
+    life_ring(img, (190, 300), 120)
+    life_ring(img, (size[0] - 190, 300), 120)
+    outlined_text(img, (size[0] / 2, 190), "PLEASE DON'T", font('Roboto-Black.ttf', 190), fill=NAVY, outline=CREAM, stroke=6)
+    outlined_text(img, (size[0] / 2, 390), 'DROWN', font('Roboto-Black.ttf', 250), fill=RED, outline=NAVY, stroke=12, shadow=(10, 12))
+    outlined_text(img, (size[0] / 2, 568), 'LIFEGUARD STATION', font('Roboto-Bold.ttf', 84), fill=NAVY, outline=CREAM, stroke=4)
+    outlined_text(img, (size[0] / 2, 770), 'est. yesterday', font('Roboto-Bold.ttf', 56), fill=CREAM, outline=NAVY, stroke=4)
+    return img.convert('RGB')
+
+
+def drill_board():
+    size = (1500, 800)
+    img = painted_face(size, RED, 91)
+    ImageDraw.Draw(img).rounded_rectangle([40, 40, size[0] - 40, size[1] - 40], 30, outline=CREAM, width=10)
+    life_ring(img, (size[0] / 2, 190), 105)
+    outlined_text(img, (size[0] / 2, 440), 'RESCUE DRILL', font('Roboto-Black.ttf', 190), fill=CREAM, outline=NAVY, stroke=12, shadow=(8, 10))
+    outlined_text(img, (size[0] / 2, 620), 'throws a tourist in the sea', font('Roboto-Bold.ttf', 78), fill=CREAM, outline=NAVY, stroke=5)
+    return img.convert('RGB')
+
+
+def roof_sign():
+    """Hand-painted on bare planks: the big word neat, the small one added later by someone honest."""
+    size = (2400, 500)
+    img = planks(size, 51, (196, 152, 98), (160, 118, 72)).convert('RGBA')
+    outlined_text(img, (size[0] * 0.4, 250), 'LIFEGUARD', font('Roboto-Black.ttf', 330), fill=RED, outline=NAVY, stroke=12, shadow=(8, 10))
+    outlined_text(img, (size[0] * 0.85, 330), '(probably)', font('Roboto-Bold.ttf', 120), fill=NAVY, outline=CREAM, stroke=4, angle=7)
+    return img.convert('RGB')
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
+    welcome_sign().save(os.path.join(OUT, 'welcome_sign.png'), optimize=True)
+    drill_board().save(os.path.join(OUT, 'drill_board.png'), optimize=True)
+    roof_sign().save(os.path.join(OUT, 'roof_sign.png'), optimize=True)
     lost_and_found_sign().save(os.path.join(OUT, 'lost_and_found_sign.png'), optimize=True)
     prices_board().save(os.path.join(OUT, 'lost_and_found_prices.png'), optimize=True)
     for name, img in dev_signs():

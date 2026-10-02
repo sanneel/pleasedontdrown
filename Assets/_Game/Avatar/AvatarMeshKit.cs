@@ -118,6 +118,17 @@ namespace PleaseDontDrown.Avatars
             Lathe(_profile, segments, Matrix4x4.TRS(center, rotation ?? Quaternion.identity, new Vector3(s.x, 1f, s.y)), color);
         }
 
+        /// <summary>
+        /// Any shape turned round local Y: <paramref name="profile"/> is (radius, y) points running down the outside
+        /// (a radius of 0 closes it), stretched to <paramref name="scale"/> across and front to back.
+        /// </summary>
+        public void Turned(IReadOnlyList<Vector2> profile, Vector3 center, Vector2 scale, Color color, Quaternion? rotation = null, int segments = 14)
+        {
+            _profile.Clear();
+            for (int i = 0; i < profile.Count; i++) _profile.Add(profile[i]);
+            Lathe(_profile, segments, Matrix4x4.TRS(center, rotation ?? Quaternion.identity, new Vector3(scale.x, 1f, scale.y)), color);
+        }
+
         public void Box(Vector3 center, Vector3 size, Color color, Quaternion? rotation = null)
         {
             Matrix4x4 m = _boneToMesh * Matrix4x4.TRS(center, rotation ?? Quaternion.identity, size);

@@ -812,6 +812,17 @@ namespace PleaseDontDrown.Editor
                 body.AnkleHeight = P(Bone.FootL).y;
                 body.HipHeight = P(Bone.Hips).y;
                 body.EyeHeight = P(Bone.Head).y + eyeY;
+                // The head's box (for things worn on it: the thief's beanie and bandana).
+                Vector3 headAt = P(Bone.Head);
+                body.HeadTop = headSize;
+                body.HeadHalfWidth = body.HeadFront = body.HeadBack = 0.01f;
+                foreach (Vector3 v in vertices)
+                {
+                    if (v.y < headAt.y + 0.03f) continue;
+                    body.HeadHalfWidth = Mathf.Max(body.HeadHalfWidth, Mathf.Abs(v.x - headAt.x));
+                    body.HeadFront = Mathf.Max(body.HeadFront, v.z - headAt.z);
+                    body.HeadBack = Mathf.Max(body.HeadBack, headAt.z - v.z);
+                }
 
                 // The face: eyelids and an open mouth over the painted ones (found in the texture).
                 var extra = new ExtraGeometry();

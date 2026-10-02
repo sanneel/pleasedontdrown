@@ -166,6 +166,7 @@ namespace PleaseDontDrown.Story
             StoryNpc.ServerDefeated += OnDefeated;
             ShopCounter.ServerPurchased += OnPurchased;
             Economy.ServerChanged += OnMoneyChanged;
+            PlayerHub.ServerJoined += OnPlayerJoined;
             StartCoroutine(Boot());
         }
 
@@ -178,6 +179,7 @@ namespace PleaseDontDrown.Story
             StoryNpc.ServerDefeated -= OnDefeated;
             ShopCounter.ServerPurchased -= OnPurchased;
             Economy.ServerChanged -= OnMoneyChanged;
+            PlayerHub.ServerJoined -= OnPlayerJoined;
         }
 
         private IEnumerator Boot()
@@ -636,6 +638,57 @@ namespace PleaseDontDrown.Story
         }
 
         // ------------------------------------------------------------------ players
+
+        /// <summary>A friend joined while the story is already going: tell them where it is, and put them with the team.</summary>
+        private void OnPlayerJoined(PlayerHub player)
+        {
+            if (!_running || _beatIndex < 0 || player.Owner == null || player.Owner.IsLocalClient) return;
+            // Not a coroutine of ours: StartAt stops those whenever the beat is changed by hand.
+            player.StartCoroutine(Welcome(player));
+        }
+
+        private IEnumerator Welcome(PlayerHub player)
+        {
+            yield return new WaitForSeconds(2.5f); // their copy has the scene and everyone in it by now
+            if (player == null || !_running || _beatIndex < 0 || _beatIndex >= _beats.Count) yield break;
+            Beat beat = _beats[_beatIndex];
+            bool second = beat.Id.StartsWith("2.");
+            // Next to a teammate who's standing on land; if they're all at sea, the island's own landing.
+            Vector3 at = second && _island2Spawn != null ? _island2Spawn.position : player.transform.position;
+            foreach (PlayerHub mate in PlayerHub.All)
+            {
+                if (mate == player || mate == null || !Shore.IsAshore(mate.transform.position)) continue;
+                Vector3 beside = mate.transform.position + mate.Head.right * 1.6f;
+                float ground = Shore.GroundHeightAt(beside + Vector3.up * 3f);
+                if (float.IsNaN(ground) || !Shore.IsAshore(beside)) continue;
+                at = new Vector3(beside.x, ground + 0.2f, beside.z);
+                break;
+            }
+            bool move = (at - player.transform.position).sqrMagnitude > 20f * 20f;
+            int inChapter = 0, done = 0;
+            for (int i = 0; i < _beats.Count; i++)
+            {
+                if (_beats[i].Id.StartsWith("2.") != second) continue;
+                inChapter++;
+                if (i < _beatIndex) done++;
+            }
+            string host = "the host";
+            foreach (PlayerHub p in PlayerHub.All)
+                if (p != null && p.Owner != null && p.Owner.IsLocalClient) host = p.DisplayName;
+            string recap = $"You joined <b>{host}</b>'s shift: part {done + 1} of {inChapter}, \"{beat.Title}\". " +
+                           $"So far this chapter: {_chapterRescued} rescued, {_chapterLost} lost, ${Economy.Money} in the team's wallet.";
+            Debug.Log($"[Story] {player.DisplayName} joined at beat {beat.Id}{(move ? " (moved to the team)" : "")}");
+            WelcomeTarget(player.Owner, second ? "CHAPTER 2" : "CHAPTER 1", beat.Title, recap, at, move);
+        }
+
+        [TargetRpc]
+        private void WelcomeTarget(NetworkConnection target, string chapter, string beatTitle, string recap, Vector3 position, bool move)
+        {
+            StoryHud.ShowTitle(chapter, "You joined at: " + beatTitle);
+            PlayerHud.ShowToast(recap, 9f);
+            PlayerHub local = PlayerHub.Local;
+            if (move && local != null && local.Motor != null && local.Motor.Seat == null) local.Motor.Teleport(position);
+        }
 
         [ObserversRpc]
         private void TeleportObservers(Vector3 position)

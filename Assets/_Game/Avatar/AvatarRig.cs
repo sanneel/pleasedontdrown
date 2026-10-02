@@ -57,6 +57,11 @@ namespace PleaseDontDrown.Avatars
         public float AnkleHeight { get; private set; }
         public float HipHeight { get; private set; }
         public float EyeHeight { get; private set; }
+        /// <summary>The head's size measured from the head bone (for hats and masks put on at run time).</summary>
+        public float HeadTop { get; private set; }
+        public float HeadHalfWidth { get; private set; }
+        public float HeadFront { get; private set; }
+        public float HeadBack { get; private set; }
         public SkinnedMeshRenderer Renderer => _renderer;
         public HandBones LeftHand { get; private set; }
         public HandBones RightHand { get; private set; }
@@ -204,9 +209,22 @@ namespace PleaseDontDrown.Avatars
             AnkleHeight = 0.08f * s;
             HipHeight = 0.92f * s;
             EyeHeight = 1.68f * s;
+            // The code-built head: an ellipsoid a little above and in front of the head bone (AvatarParts).
+            float hs = s * AvatarParts.HeadScale;
+            HeadTop = 0.298f * hs;
+            HeadHalfWidth = 0.148f * hs;
+            HeadFront = 0.162f * hs;
+            HeadBack = 0.138f * hs;
             AvatarBody generated = GeneratedBody;
             if (generated != null)
             {
+                if (generated.HeadTop > 0f)
+                {
+                    HeadTop = generated.HeadTop;
+                    HeadHalfWidth = generated.HeadHalfWidth;
+                    HeadFront = generated.HeadFront;
+                    HeadBack = generated.HeadBack;
+                }
                 UpperArmLength = generated.UpperArmLength;
                 ForearmLength = generated.ForearmLength;
                 HandLength = generated.HandLength;
