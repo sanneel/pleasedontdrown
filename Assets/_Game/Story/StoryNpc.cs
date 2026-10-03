@@ -513,7 +513,7 @@ namespace PleaseDontDrown.Story
             Vector3 push = new Vector3(direction.x, 0f, direction.z).normalized;
             _knock = push * (kind == DamageKind.Bullet ? 2f : 3.5f);
             _staggerUntil = Time.time + (kind == DamageKind.Bullet ? 0.35f : 0.6f);
-            HitObservers(point, _health.Value, kind == DamageKind.Bullet);
+            HitObservers(point, push, _health.Value, kind == DamageKind.Bullet);
             OnServerHit(attacker);
             if (_health.Value <= 0)
             {
@@ -527,8 +527,9 @@ namespace PleaseDontDrown.Story
         }
 
         [ObserversRpc]
-        private void HitObservers(Vector3 point, int healthLeft, bool bullet)
+        private void HitObservers(Vector3 point, Vector3 push, int healthLeft, bool bullet)
         {
+            if (_animator != null) _animator.Flinch(push);
             if (_audio != null) _audio.PlayOneShot(bullet ? ProceduralAudio.Bonk : ProceduralAudio.Punch, 1f);
             string text = healthLeft <= 0 ? "K.O.!" : bullet ? "OUCH!" : Random.value < 0.5f ? "OW!" : "OOF!";
             FloatingText.Spawn(HeadPosition + Vector3.up * 0.3f, text, new Color(1f, 0.6f, 0.3f), healthLeft <= 0 ? 1.4f : 0.9f, 1.2f);
@@ -554,6 +555,7 @@ namespace PleaseDontDrown.Story
         private void UpdateAnimation()
         {
             if (_animator == null || _rig == null || !_rig.IsBuilt) return;
+            UpdateDizzy();
             // Idle: turn the head (and eventually the body) toward the nearest player.
             float yaw = transform.eulerAngles.y;
             var flatSpeed = new Vector2(_velocity.x, _velocity.z).magnitude;
@@ -582,7 +584,8 @@ namespace PleaseDontDrown.Story
                 Pose = _pose.Value,
                 Mood = _mood.Value,
                 Talking = Time.time < _talkUntil,
-                Seated = false
+                Seated = false,
+                LookBack = _role.Value == NpcRole.Robber && _pose.Value == AvatarPose.Normal && !swimming
             };
         }
 
@@ -610,6 +613,46 @@ namespace PleaseDontDrown.Story
         }
 
         private const float TagFullSizeAt = 8f;
+
+        // Knocked out: three little stars circle the head.
+        private Transform[] _stars;
+
+        private void UpdateDizzy()
+        {
+            bool down = _pose.Value == AvatarPose.Down && _maxHealth.Value > 0 && _ride == null;
+            if (!down && _stars == null) return;
+            if (_stars == null)
+            {
+                _stars = new Transform[5];
+                Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                for (int i = 0; i < _stars.Length; i++)
+                {
+                    var go = new GameObject("DizzyStar");
+                    go.transform.SetParent(transform, false);
+                    var mesh = go.AddComponent<TextMesh>();
+                    mesh.font = font;
+                    go.GetComponent<MeshRenderer>().sharedMaterial = font.material;
+                    mesh.text = "*";
+                    mesh.fontSize = 96;
+                    mesh.characterSize = 0.035f;
+                    mesh.fontStyle = FontStyle.Bold;
+                    mesh.anchor = TextAnchor.MiddleCenter;
+                    mesh.color = new Color(1f, 0.88f, 0.25f);
+                    _stars[i] = go.transform;
+                }
+            }
+            Camera cam = Camera.main;
+            for (int i = 0; i < _stars.Length; i++)
+            {
+                Transform star = _stars[i];
+                if (star.gameObject.activeSelf != down) star.gameObject.SetActive(down);
+                if (!down) continue;
+                float a = Time.time * 2.6f + i * (Mathf.PI * 2f / _stars.Length);
+                Vector3 head = _rig != null && _rig.IsBuilt ? _rig[AvatarRig.Bone.Head].position : HeadPosition;
+                star.position = head + new Vector3(Mathf.Cos(a) * 0.32f, 0.3f + Mathf.Sin(a * 2f) * 0.04f, Mathf.Sin(a) * 0.32f);
+                if (cam != null) star.rotation = cam.transform.rotation;
+            }
+        }
         private int _tagHealth = int.MinValue;
         private string _tagName;
 
@@ -661,6 +704,9 @@ namespace PleaseDontDrown.Story
                 FollowPath(p, dt);
             if (!_moveTarget.HasValue && _facePoint.HasValue)
                 Face(_facePoint.Value - p, dt, 5f);
+            // Begging on the knees: to the face of whoever caught him, not to the sand behind him.
+            else if (!_moveTarget.HasValue && _pose.Value == AvatarPose.Kneel && NearestPlayer(8f) is { } catcher)
+                Face(catcher.transform.position - p, dt, 4f);
             Separate(dt);
             // Shoved off course (two swimmers meeting, someone walking into them): they turn the way they are really
             // going instead of sliding along sideways, then pick their route up again.
@@ -734,7 +780,10 @@ namespace PleaseDontDrown.Story
             float go = Mathf.Clamp01((facing - 0.15f) / 0.6f);
             bool turning = go < 0.25f;
             _turnTime = turning ? _turnTime + dt : 0f;
-            speed *= IsSwimming ? Mathf.Lerp(0.3f, 1f, go) : go;
+            // Someone running flat out (the robber dodging a lifeguard) swings round in a quick arc instead of stopping
+            // to turn on the spot each time he changes his mind.
+            bool sprinting = speed > 4f && !IsSwimming;
+            speed *= IsSwimming ? Mathf.Lerp(0.3f, 1f, go) : sprinting ? Mathf.Lerp(0.4f, 1f, go) : go;
             Vector3 step = dir * Mathf.Min(distance, speed * dt);
             Vector3 moved = MoveChecked(p, step);
             Vector3 next = Grounded(moved);
@@ -754,7 +803,7 @@ namespace PleaseDontDrown.Story
                 after.y = 0f;
                 if (after.sqrMagnitude > 1e-4f) heading = Vector3.Lerp(after.normalized, step.normalized, distance);
             }
-            Face(turning ? route : heading, dt, turning ? 11f : 8f);
+            Face(turning ? route : heading, dt, turning ? (sprinting ? 18f : 11f) : sprinting ? 12f : 8f);
 
             // Pinned against something the path didn't know about (a player, a tourist, a parked jet ski): plan again,
             // then step aside, and only then give up (whoever sent it picks something else to do).

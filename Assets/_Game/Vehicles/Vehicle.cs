@@ -51,6 +51,8 @@ namespace PleaseDontDrown.Vehicles
         private ItemSync _sync;
         private Rigidbody _rb;
         private Collider[] _colliders;
+        private BoxCollider _hull;
+        private readonly RaycastHit[] _overhead = new RaycastHit[8];
         private float _lastYaw;
         private float _throttle;
         private Vector3? _autopilotTarget;
@@ -89,6 +91,8 @@ namespace PleaseDontDrown.Vehicles
             _sync = GetComponent<ItemSync>();
             _rb = GetComponent<Rigidbody>();
             _colliders = GetComponentsInChildren<Collider>(true);
+            Transform hull = transform.Find("Hull");
+            _hull = hull != null ? hull.GetComponent<BoxCollider>() : null;
             _driver.OnChange += OnDriverChanged;
         }
 
@@ -494,9 +498,31 @@ namespace PleaseDontDrown.Vehicles
                 _rb.AddTorque(lean * _uprightStrength, ForceMode.Acceleration);
             }
 
+            // Wedged under a dock: the water lifts the hull against the planks and it sticks there. While something solid
+            // is right over it, press it down under the edge so the engine (or the waves) can take it out.
+            if (inWater && UnderSomething()) _rb.AddForce(Vector3.down * 7f, ForceMode.Acceleration);
+
             // Stay upright (it's a toy, not a simulator).
             Vector3 tilt = Vector3.Cross(transform.up, Vector3.up);
             _rb.AddTorque(tilt * _uprightStrength - new Vector3(_rb.angularVelocity.x, 0f, _rb.angularVelocity.z) * 3f, ForceMode.Acceleration);
+        }
+
+        /// <summary>Is there something fixed (a dock, a rock) just above the hull's top, at its nose, middle or tail?</summary>
+        private bool UnderSomething()
+        {
+            if (_hull == null) return false;
+            Transform t = _hull.transform;
+            for (int i = -1; i <= 1; i++)
+            {
+                Vector3 top = t.TransformPoint(_hull.center + new Vector3(0f, _hull.size.y * 0.5f, _hull.size.z * 0.4f * i));
+                int count = Physics.RaycastNonAlloc(top - transform.up * 0.05f, Vector3.up, _overhead, 0.35f, ~0, QueryTriggerInteraction.Ignore);
+                for (int h = 0; h < count; h++)
+                {
+                    Collider c = _overhead[h].collider;
+                    if (c.attachedRigidbody == null && !c.transform.IsChildOf(transform)) return true;
+                }
+            }
+            return false;
         }
 
         private static Vector3 Flat(Vector3 v)

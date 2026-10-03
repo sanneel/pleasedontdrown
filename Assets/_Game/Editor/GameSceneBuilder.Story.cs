@@ -34,11 +34,12 @@ namespace PleaseDontDrown.Editor
         private static readonly Vector3 KioskPosition = new(8.5f, 0f, 17.5f);
         private static readonly Vector3 RobberSpawn = new(-32f, 0f, 24f);
         private static readonly Vector3[] LostItemSpots = { new(6f, 0f, 3.5f), new(-6f, 0f, 3f), new(12f, 0f, 5f), new(-14f, 0f, 6f) };
-        private static readonly Vector3 JetSkiDock1 = new(-5.8f, 0f, -9f);
+        // Parked 2 m clear of the dock (the hull's top is level with the underside of the deck: closer, a wave could slip it under).
+        private static readonly Vector3 JetSkiDock1 = new(-4.6f, 0f, -9f);
         // Island 2 places (the hotel faces north, toward island 1).
         private static readonly Vector3 HotelCenter = new(20f, 0f, -244f);
         private static readonly Vector3 Dock2 = new(-2f, 0f, -210f);
-        private static readonly Vector3 JetSkiDock2 = new(0.4f, 0f, -203f);
+        private static readonly Vector3 JetSkiDock2 = new(1.6f, 0f, -203f);
         private static readonly Vector3 Island2Arrival = new(0f, 0f, -205f);
         private static readonly Vector3 Island2Spawn = new(20f, 0.3f, -231f);
         private static readonly Vector3 PirateLanding = new(-8f, 0f, -219f);

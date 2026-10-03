@@ -36,6 +36,7 @@ namespace PleaseDontDrown.Avatars
         public AvatarPose Pose;
         public AvatarMood Mood;
         public bool Talking;          // flap the mouth
+        public bool LookBack;         // running away: glances back over the shoulder now and then
     }
 
     /// <summary>
@@ -94,6 +95,14 @@ namespace PleaseDontDrown.Avatars
         private float _dt;
         private HandPose _poseL = HandPose.Relaxed, _poseR = HandPose.Relaxed;
         private float _blinkUntil;
+
+        // Reactions (story characters): flinching from a blow, falling when knocked out, glancing back while fleeing.
+        private float _flinchStart = -10f;
+        private Vector3 _flinchPush;
+        private float _flinchSide = 1f;
+        private float _downSince = -10f;
+        private bool _wasDown;
+        private float _lookBack, _lookBackRaw;
 
         // The blends above are eased (slow out of one pose, slow into the next); these run at a steady rate under them.
         private float _swimRaw, _swimMoveRaw, _underRaw, _holdRaw, _eatRaw, _cprRaw, _climbRaw, _seatRaw, _downRaw, _kneelRaw,
@@ -169,6 +178,18 @@ namespace PleaseDontDrown.Avatars
         }
 
         public void Play(AvatarGesture gesture) => Play(gesture, Vector3.zero);
+
+        /// <summary>
+        /// Hit: the body snaps away from the blow (<paramref name="push"/> = the way it travels, world), the head
+        /// whips round, the arms fly, and it all comes back over half a second.
+        /// </summary>
+        public void Flinch(Vector3 push)
+        {
+            push.y = 0f;
+            _flinchPush = push.sqrMagnitude > 1e-4f ? push.normalized : -transform.forward;
+            _flinchSide = Vector3.Dot(transform.right, _flinchPush) >= 0f ? 1f : -1f;
+            _flinchStart = Now;
+        }
 
         /// <param name="point">World target for aimed gestures (the face a punch lands on, the mouth for a rescue breath).</param>
         public void Play(AvatarGesture gesture, Vector3 point)
@@ -262,6 +283,9 @@ namespace PleaseDontDrown.Avatars
             _climb = Eased(ref _climbRaw, m.Climbing, 6f, dt);
             _seat = Eased(ref _seatRaw, m.Seated, 6f, dt);
             _down = Eased(ref _downRaw, m.Pose == AvatarPose.Down, 3.5f, dt);
+            if (m.Pose == AvatarPose.Down && !_wasDown) _downSince = Now;
+            _wasDown = m.Pose == AvatarPose.Down;
+            _lookBack = Eased(ref _lookBackRaw, m.LookBack && speed > 1.5f, 3f, dt);
             _kneel = Eased(ref _kneelRaw, m.Pose == AvatarPose.Kneel, 4f, dt);
             _scared = Eased(ref _scaredRaw, m.Pose == AvatarPose.Scared, 5f, dt);
             _handsUp = Eased(ref _handsUpRaw, m.Pose == AvatarPose.HandsUp, 5f, dt);
@@ -1025,7 +1049,10 @@ namespace PleaseDontDrown.Avatars
 
             if (_kneel > 0.01f)
             {
-                // On the knees, hands together in front of the chest: "please, please!"
+                // On the knees, hands together in front of the chest: "please, please!" Bowing again and again while
+                // looking up at whoever caught him.
+                float bow = 0.5f + 0.5f * Mathf.Sin(Now * 3.2f);
+                Turn(B(Bone.Spine), transform.right, (6f + 16f * bow) * _kneel);
                 float bob = Mathf.Sin(Now * 7f) * 0.03f * s;
                 hips.localPosition = Vector3.Lerp(hips.localPosition, _rig.RestPosition(Bone.Hips) + new Vector3(0f, -0.42f * s + bob, 0f), _kneel);
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(6f, 0f, 0f), _kneel);
@@ -1042,6 +1069,7 @@ namespace PleaseDontDrown.Avatars
                 IK.Solve(upperL, foreL, la, lb, hands - transform.right * 0.03f, -transform.up - transform.right, _kneel, false);
                 IK.Solve(upperR, foreR, la, lb, hands + transform.right * 0.03f, -transform.up + transform.right, _kneel, false);
                 B(Bone.Head).localRotation = Quaternion.Slerp(B(Bone.Head).localRotation, Quaternion.Euler(-18f, 0f, 0f), _kneel);
+                Turn(B(Bone.Head), transform.right, -(4f + 14f * bow) * _kneel);
             }
 
             if (_scared > 0.01f || _handsUp > 0.01f)
@@ -1086,6 +1114,74 @@ namespace PleaseDontDrown.Avatars
 
             BeachPoses(hips, upperL, foreL, upperR, foreR, s);
             AimedGestures(upperL, foreL, upperR, foreR);
+            PoseReactions(hips, upperL, upperR, s);
+        }
+
+        /// <summary>Turns a bone about a world axis, on top of the pose it already has (children go with it).</summary>
+        private static void Turn(Transform bone, Vector3 axis, float degrees)
+        {
+            if (Mathf.Abs(degrees) > 0.01f) bone.rotation = Quaternion.AngleAxis(degrees, axis) * bone.rotation;
+        }
+
+        /// <summary>
+        /// Laid over every other pose: the flinch from a blow, the knockout fall (arms thrown up, a bounce on landing,
+        /// then the head lolling dizzily) and the look back over the shoulder of someone running away.
+        /// </summary>
+        private void PoseReactions(Transform hips, Transform upperL, Transform upperR, float s)
+        {
+            Transform spine = B(Bone.Spine), chest = B(Bone.Chest), neck = B(Bone.Neck), head = B(Bone.Head);
+
+            // Fleeing: every couple of seconds a quick look back, over one shoulder then the other.
+            if (_lookBack > 0.01f)
+            {
+                const float cycle = 2.3f;
+                float u = Mathf.Repeat(Now + _variety.Phase, cycle);
+                float glance = u < 0.7f ? Mathf.Sin(u / 0.7f * Mathf.PI) : 0f;
+                glance = glance * glance * (3f - 2f * glance) * _lookBack;
+                float side = Mathf.Repeat(Mathf.Floor((Now + _variety.Phase) / cycle), 2f) < 1f ? 1f : -1f;
+                Turn(chest, Vector3.up, 28f * glance * side);
+                Turn(neck, Vector3.up, 32f * glance * side);
+                Turn(head, Vector3.up, 48f * glance * side);
+            }
+
+            // A blow: snap away from it, then come back (a little past, then settle).
+            float t = Now - _flinchStart;
+            if (t < 0.75f)
+            {
+                float w = t < 0.07f ? t / 0.07f : Mathf.Exp(-(t - 0.07f) * 7f) * Mathf.Cos((t - 0.07f) * 7f);
+                Vector3 axis = Vector3.Cross(Vector3.up, _flinchPush);
+                hips.position += _flinchPush * (0.14f * s * w);
+                Turn(hips, axis, 6f * w);
+                Turn(spine, axis, 14f * w);
+                Turn(chest, axis, 20f * w);
+                Turn(chest, Vector3.up, 22f * w * _flinchSide);
+                Turn(neck, axis, 14f * w);
+                Turn(head, axis, 30f * w);
+                Turn(head, Vector3.up, 38f * w * _flinchSide);
+                Turn(upperL, axis, -65f * w); // the arms fly the other way, left behind
+                Turn(upperR, axis, -65f * w);
+            }
+
+            if (_down > 0.01f)
+            {
+                float since = Now - _downSince;
+                // Going over: the arms fly up as the body drops...
+                if (since < 0.55f)
+                {
+                    float fling = Mathf.Sin(since / 0.55f * Mathf.PI);
+                    Turn(upperL, transform.right, -110f * fling);
+                    Turn(upperR, transform.right, -110f * fling);
+                }
+                // ...it lands with a bounce...
+                if (since > 0.3f && since < 0.62f) hips.position += Vector3.up * (Mathf.Sin((since - 0.3f) / 0.32f * Mathf.PI) * 0.07f * s * _down);
+                // ...and lies there seeing stars, the head rolling slowly side to side.
+                if (since > 0.8f)
+                {
+                    float dizzy = Mathf.Clamp01((since - 0.8f) * 2f) * _down;
+                    Vector3 along = (head.position - neck.position).normalized;
+                    Turn(head, along, Mathf.Sin(Now * 2.4f) * 30f * dizzy);
+                }
+            }
         }
 
         /// <summary>
