@@ -1115,6 +1115,25 @@ namespace PleaseDontDrown.Avatars
             BeachPoses(hips, upperL, foreL, upperR, foreR, s);
             AimedGestures(upperL, foreL, upperR, foreR);
             PoseReactions(hips, upperL, upperR, s);
+            KeepLegsAboveGround(hips, s);
+        }
+
+        /// <summary>
+        /// Going down onto the knees, the back or the bottom (and getting up again) the hips get there before the legs
+        /// have folded under them, so for a moment the legs would hang through the floor. If a knee or an ankle ends
+        /// up below the ground, the whole body is lifted just enough to keep it on top.
+        /// </summary>
+        private void KeepLegsAboveGround(Transform hips, float s)
+        {
+            float low = Mathf.Max(Mathf.Max(_down, _kneel), Mathf.Max(Mathf.Max(_lie, _lieFront), _sit));
+            if (low < 0.01f || _swim > 0.01f || _seat > 0.01f || !Motion.Grounded) return;
+            float floor = transform.position.y;
+            float margin = 0.05f * s; // half a leg's thickness
+            float lowest = float.MaxValue;
+            lowest = Mathf.Min(lowest, B(Bone.ShinL).position.y, B(Bone.ShinR).position.y);
+            lowest = Mathf.Min(lowest, B(Bone.FootL).position.y, B(Bone.FootR).position.y);
+            float below = floor + margin - lowest;
+            if (below > 0f) hips.position += Vector3.up * below;
         }
 
         /// <summary>Turns a bone about a world axis, on top of the pose it already has (children go with it).</summary>
