@@ -122,6 +122,18 @@ texture. The backpack is saved as `Resources/RobberBackpack.prefab` and worn by 
 code-built bag as the fallback). The umbrellas replace the grey-box ones beside every other beach towel, three
 colours in turn, each with a thin collider on the pole only.
 
-**The robber himself is not in**: the download (`ArtSource/Meshy/raw/robber_raw.glb`) stands with his hands in his
-pockets and his elbows out, so there are no free arms to rig (`prepare_character.py` stops at the arms). He needs a
-new picture with the arms away from the body (Docs/07, "Characters on the Free plan").
+**The robber (3 October 2026)**: the download (`ArtSource/Meshy/raw/robber_raw.glb`) stands with his hands in his
+pockets, so `ArtSource/Tools/robber_arms.py` (Blender) frees them first: it welds glTF's split UV seams, cuts each hand
+off just past the wrist together with the bit of pocket it was buried in, cuts the forearm loose where it rests on the
+trousers, swings both arms down into an A-pose, closes every hole in the colour of its side (skin or trouser) and
+gives him mitten hands painted with his own skin. Joint positions in the script were read off
+`ArtSource/Tools/ortho_grid.py` renders (orthographic front and both sides on a 5 cm grid).
+
+```
+blender -b --factory-startup -P ArtSource/Tools/robber_arms.py -- ArtSource/Meshy/raw/robber_raw.glb ArtSource/Meshy/raw/robber_apose.glb
+blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- ArtSource/Meshy/raw/robber_apose.glb Assets/_Game/Art/Characters/robber.glb --pick only --height 1.78
+```
+
+He is body `AvatarLook.Bodies.Robber` (`StoryDirector.RobberLook`). He keeps his painted face (`MeshyCharacters`
+skips the eyelids and mouth: his eyes are behind sunglasses) and wears no code-built beanie or face bandana (he has
+his own headband).

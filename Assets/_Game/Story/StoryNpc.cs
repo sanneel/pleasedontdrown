@@ -1081,7 +1081,8 @@ namespace PleaseDontDrown.Story
         /// <summary>The thief looks like one: a black beanie and a bandana over his face, made to fit this body's head.</summary>
         private void ShowDisguise()
         {
-            bool wear = _role.Value == NpcRole.Robber && _rig != null && _rig.IsBuilt;
+            // (His own model is already dressed for it: sunglasses and a headband.)
+            bool wear = _role.Value == NpcRole.Robber && _rig != null && _rig.IsBuilt && _rig.Look.Body != AvatarLook.Bodies.Robber;
             if (_disguise != null) Destroy(_disguise); // the head may have changed size with the look
             _disguise = wear ? RobberDisguise.Create(_rig) : null;
         }

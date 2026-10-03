@@ -68,6 +68,7 @@ namespace PleaseDontDrown.Avatars
             public const byte TouristSporty = 4;   // turquoise sports bikini
             public const byte TouristPurple = 5;   // purple bikini, curvy
             public const byte TouristBuddy = 6;    // sunburnt dad in flowery trunks
+            public const byte Robber = 7;          // the thief: his own model, hands taken out of his pockets (ArtSource/Tools/robber_arms.py)
 
             /// <summary>
             /// Look-alikes of the tourists (ArtSource/Tools/make_variants.py): other skin, hair, eyes, outfit colour, face

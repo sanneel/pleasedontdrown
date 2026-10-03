@@ -31,14 +31,14 @@ namespace PleaseDontDrown.Story
             Body = AvatarLook.Bodies.Variant(AvatarLook.Bodies.TouristSporty, 2) // generated model (own model later)
         };
 
-        // The robber and the pirates are generated models too (look-alikes of the only man model for now); the code-built
-        // fields are the fallback.
+        // The robber has his own model (sunglasses, headband, striped shirt); the pirates are look-alikes of the only
+        // man model for now. The code-built fields are the fallback.
         public static AvatarLook RobberLook => new()
         {
             Figure = 0, Build = 0, Height = 2, Skin = 2, Hair = HairStyle.Short, HairColor = 0,
             Top = TopStyle.TShirt, TopColor = 14, Bottom = BottomStyle.Trousers, BottomColor = 7,
             Hat = HatStyle.Bandana, HatColor = 14, Glasses = GlassesStyle.Sunglasses, Face = FacialHair.Stubble,
-            Body = AvatarLook.Bodies.Variant(AvatarLook.Bodies.TouristBuddy, 6)
+            Body = AvatarLook.Bodies.Robber
         };
 
         public static AvatarLook PirateLook(int i) => new()

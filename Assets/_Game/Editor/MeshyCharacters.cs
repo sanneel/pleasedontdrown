@@ -32,7 +32,11 @@ namespace PleaseDontDrown.Editor
             (AvatarLook.Bodies.TouristSporty, "Tourist (sporty)", "tourist_bikini_sporty"),
             (AvatarLook.Bodies.TouristPurple, "Tourist (purple bikini)", "tourist_bikini_purple"),
             (AvatarLook.Bodies.TouristBuddy, "Tourist (sunburnt dad)", "tourist_buddy"),
+            (AvatarLook.Bodies.Robber, "Robber", "robber"),
         };
+
+        /// <summary>Bodies that keep their painted face as it is: the robber's eyes are behind sunglasses (lids would blink on the lenses).</summary>
+        private static readonly HashSet<string> PaintedFaceOnly = new() { "robber" };
 
         private static readonly int BoneTotal = (int)Bone.Count + 2 * HandBones.BoneCount;
 
@@ -836,8 +840,10 @@ namespace PleaseDontDrown.Editor
 
                 // The face: eyelids and an open mouth over the painted ones (found in the texture).
                 var extra = new ExtraGeometry();
-                body.HasFace = BuildFace(file, source, vertices, normals, weights, skin.sharedMaterial, P(Bone.Head), extra,
-                    out Vector3 lidL, out Vector3 lidR, out Vector3 mouthAt, out float eyeLevel);
+                Vector3 lidL = default, lidR = default, mouthAt = default;
+                float eyeLevel = 0f;
+                body.HasFace = !PaintedFaceOnly.Contains(file) && BuildFace(file, source, vertices, normals, weights, skin.sharedMaterial, P(Bone.Head), extra,
+                    out lidL, out lidR, out mouthAt, out eyeLevel);
                 if (body.HasFace)
                 {
                     Set(Bone.EyeL, lidL - P(Bone.Head), lidL, Quaternion.identity);

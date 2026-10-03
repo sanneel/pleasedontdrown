@@ -237,7 +237,7 @@ namespace PleaseDontDrown.Editor
             if (lookSpec[0] == "robber")
             {
                 Story.RobberBag.Wear(Story.RobberBag.Create(), rig); // as in the story
-                Story.RobberDisguise.Create(rig);
+                if (look.Body != AvatarLook.Bodies.Robber) Story.RobberDisguise.Create(rig);
             }
             var animator = go.AddComponent<AvatarAnimator>();
             animator.Rig = rig;

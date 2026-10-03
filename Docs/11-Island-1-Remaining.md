@@ -38,7 +38,6 @@ they replace, so physics, hold poses and the story are unchanged. `GameSceneBuil
 
 | # | Still not final | Notes |
 |---|---|---|
-| 2.1 | **The thief's own body** | He wears a black beanie and a red bandana now (`Story/RobberDisguise.cs`, fitted to the head of whatever body he has) on a tourist look-alike. His own Meshy model needs a new download: the one in `ArtSource/Meshy/raw/robber_raw.glb` has its hands in its pockets and can't be rigged (generate from an A-pose picture) |
 | 2.2 | **Player lifeguard** in third person | Players are code-built avatars on purpose: that's what the CHARACTER screen changes. A generated lifeguard would lose the customizer |
 | 2.3 | **Wide tower** `tower_wide` (07 §2.5) | The current one is the Meshy tower stretched 1.5x sideways; needs a new download |
 | 2.4 | More tourist bases (swimmer, curvy, redhead, mom, grandpa, gym: 07 §1.2-1.11) | Optional: 4 bases + 40 recolours carry the island |
