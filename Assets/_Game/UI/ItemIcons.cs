@@ -21,6 +21,7 @@ namespace PleaseDontDrown.UI
         private readonly Queue<Item> _pending = new();
         private readonly HashSet<Item> _queued = new();
         private Camera _camera;
+        private Light _light;
         private Transform _stage;
 
         /// <summary>The item's icon, or null while it's still being made (asks for it).</summary>
@@ -94,12 +95,16 @@ namespace PleaseDontDrown.UI
                 _camera.cullingMask = 1 << Layer;
                 _camera.nearClipPlane = 0.01f;
                 _camera.farClipPlane = 20f;
-                var light = new GameObject("IconLight").AddComponent<Light>();
-                light.transform.SetParent(transform, false);
-                light.type = LightType.Directional;
-                light.cullingMask = 1 << Layer;
-                light.intensity = 1.1f;
-                light.transform.rotation = Quaternion.Euler(35f, -30f, 0f);
+                // Only on while an icon is being taken: a second sun left on lights the whole world too (Forward+
+                // ignores a light's culling mask), so the game got brighter the moment the first icon was made.
+                _light = new GameObject("IconLight").AddComponent<Light>();
+                _light.transform.SetParent(transform, false);
+                _light.type = LightType.Directional;
+                _light.cullingMask = 1 << Layer;
+                _light.intensity = 1.1f;
+                _light.shadows = LightShadows.None;
+                _light.transform.rotation = Quaternion.Euler(35f, -30f, 0f);
+                _light.enabled = false;
             }
 
             // A copy of what shows of the item: side on (the muzzle / blade to the right), tilted up.
@@ -140,7 +145,9 @@ namespace PleaseDontDrown.UI
                 _camera.orthographicSize = Mathf.Max(0.02f, extent);
                 _camera.transform.SetPositionAndRotation(bounds.center - Vector3.forward * 5f, Quaternion.identity);
                 _camera.targetTexture = target;
+                _light.enabled = true;
                 _camera.Render();
+                _light.enabled = false;
                 _camera.targetTexture = null;
             }
             Destroy(copy.gameObject);
