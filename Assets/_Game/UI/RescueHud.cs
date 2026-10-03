@@ -75,24 +75,26 @@ namespace PleaseDontDrown.UI
                 _cprPercent = $"REVIVING  {percent}%";
             }
 
-            const float chip = 300f, gap = 16f, height = 86f;
-            // Low on the screen, over the hotbar: the patient stays in view.
-            float left = (Hud.Width - chip * 2f - gap) * 0.5f, top = Hud.HotbarTop - 64f - height - 52f;
+            // On the right, half way down: clear of the dialogue box and the hotbar (bottom middle), the objective (top
+            // left) and the patient in the middle of the view.
+            const float chip = 330f, gap = 12f, height = 80f;
+            float left = Hud.Width - chip - 48f, top = Hud.Height * 0.5f - height - gap * 0.5f;
+            Hud.Label(new Rect(left, top - 40f, chip, 32f), "CPR", 24f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true);
             for (int i = 0; i < 2; i++)
             {
                 bool current = (i == 0) == (now == CprStep.Compress);
-                var box = new Rect(left + i * (chip + gap), top, chip, height);
+                var box = new Rect(left, top + i * (height + gap), chip, height);
                 float pulse = current ? 0.82f + 0.18f * Mathf.Sin(Time.unscaledTime * 7f) : 0f;
                 Hud.Fill(box, current ? new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, pulse) : new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.55f), 14f);
                 if (current) Hud.Frame(box, Color.white, 3f, 14f);
                 Color words = current ? Color.white : new Color(1f, 1f, 1f, 0.55f);
-                var key = new Rect(box.x + 12f, box.y + 13f, 84f, 60f);
+                var key = new Rect(box.x + 12f, box.y + 11f, 84f, 58f);
                 Hud.Fill(key, new Color(0f, 0f, 0f, current ? 0.35f : 0.3f), 10f);
                 Hud.Label(key, _cprKeys[i], 28f, current ? Hud.Sand : words, heavy: true, shadow: false);
-                Hud.Label(new Rect(box.x + 108f, box.y + 10f, chip - 116f, 36f), _cprWhat[i], 23f, words, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-                Hud.Label(new Rect(box.x + 108f, box.y + 44f, chip - 116f, 30f), _cprCount[i], 21f, words, TextAnchor.MiddleLeft, shadow: false);
+                Hud.Label(new Rect(box.x + 108f, box.y + 8f, chip - 116f, 36f), _cprWhat[i], 23f, words, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                Hud.Label(new Rect(box.x + 108f, box.y + 40f, chip - 116f, 30f), _cprCount[i], 21f, words, TextAnchor.MiddleLeft, shadow: false);
             }
-            var bar = new Rect(left, top + height + 12f, chip * 2f + gap, 14f);
+            var bar = new Rect(left, top + 2f * height + gap + 14f, chip, 14f);
             Hud.Bar(bar, v.Cpr01, new Color(0.5f, 1f, 0.5f));
             Hud.Label(new Rect(bar.x, bar.yMax + 4f, bar.width, 30f), _cprPercent, 21f, new Color(0.7f, 1f, 0.7f), heavy: true);
         }

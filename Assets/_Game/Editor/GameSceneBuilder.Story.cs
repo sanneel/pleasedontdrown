@@ -404,6 +404,19 @@ namespace PleaseDontDrown.Editor
                         size = new Vector3(under.size.x + 0.8f, 8f, under.size.z + 0.8f)
                     });
                 }
+                // Buildings the beach crowd walks round (NavKeepOut markers): their own area, which crowd routes avoid.
+                foreach (BoxCollider keepOut in Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None))
+                {
+                    if (keepOut.name != NavKeepOutName || !bounds.Intersects(keepOut.bounds)) continue;
+                    Transform t = keepOut.transform;
+                    sources.Add(new NavMeshBuildSource
+                    {
+                        shape = NavMeshBuildSourceShape.ModifierBox,
+                        area = StoryNpc.BuildingArea,
+                        transform = Matrix4x4.TRS(t.TransformPoint(keepOut.center), t.rotation, Vector3.one),
+                        size = Vector3.Scale(keepOut.size, t.lossyScale)
+                    });
+                }
                 NavMeshData data = UnityEngine.AI.NavMeshBuilder.BuildNavMeshData(settings, sources, bounds, Vector3.zero, Quaternion.identity);
                 data.name = $"NavMesh_{name}";
                 string path = $"{NavMeshDir}/{name}.asset";

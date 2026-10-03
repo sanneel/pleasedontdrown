@@ -25,6 +25,9 @@ PAINT = {  # sRGB, all matte
     "leather": (0.45, 0.27, 0.14), "leather_dark": (0.3, 0.17, 0.09), "stitch": (0.85, 0.72, 0.5), "cash": (0.45, 0.72, 0.42),
     "screen": (0.2, 0.5, 0.92), "screen_light": (0.62, 0.82, 1.0), "pink": (1.0, 0.45, 0.65), "lens": (0.1, 0.13, 0.18),
     "bag": (0.86, 0.9, 0.93), "powder": (0.98, 0.98, 0.96),
+    "siding": (0.93, 0.93, 0.9), "siding_warm": (0.9, 0.89, 0.85), "siding_shadow": (0.66, 0.68, 0.69), "trim_blue": (0.24, 0.45, 0.63),
+    "glass": (0.36, 0.6, 0.68), "roof_red": (0.8, 0.17, 0.14), "roof_red_dark": (0.56, 0.1, 0.09), "roof_orange": (0.9, 0.48, 0.2),
+    "roof_orange_dark": (0.66, 0.32, 0.13), "concrete": (0.64, 0.62, 0.58), "wood_old": (0.58, 0.5, 0.41),
     "husk": (0.47, 0.3, 0.17), "husk_dark": (0.22, 0.13, 0.08), "husk_light": (0.62, 0.45, 0.28),
     "rock": (0.52, 0.52, 0.54), "rock_dark": (0.36, 0.37, 0.4), "rock_light": (0.66, 0.65, 0.64), "moss": (0.35, 0.5, 0.3),
     "cloth": (0.9, 0.9, 0.9), "seat": (0.8, 0.3, 0.25), "cream": (0.96, 0.93, 0.84), "dial": (0.12, 0.2, 0.36),
@@ -719,13 +722,322 @@ def lost_box():
     lathe("Bottle", (0.13, 0.27, 0.08), [(0.0, 0), (0.03, 0), (0.03, 0.1), (0.012, 0.13), (0.012, 0.15), (0.0, 0.15)], "teal", seg=10, rot=(55, 30, 0))
     tube("Flop", [(-0.02, 0.26, -0.1), (0.02, 0.27, -0.06), (0.03, 0.26, -0.02)], 0.022, "pink", seg=6)
 
+# ======================================================================================== the buildings
+# The watch tower and the shack, modelled clean (boards, trims, glass, roofs) to the very sizes the scene builder's
+# colliders use (MeshyArt.Tower / MeshyArt.Shack at TowerScale 1.2 x widen 1.5, ShackScale 1.45), so they drop in
+# where the Meshy scans were: the door gaps, decks, floors, walls and stairs all line up with what you walk on.
+
+def _segments(span, cuts):
+    """span (a, b) minus the cut ranges: the pieces left, in order."""
+    pieces = [span]
+    for c0, c1 in cuts:
+        out = []
+        for a, b in pieces:
+            if c1 <= a or c0 >= b: out.append((a, b)); continue
+            if c0 > a: out.append((a, c0))
+            if c1 < b: out.append((c1, b))
+        pieces = out
+    return [(a, b) for a, b in pieces if b - a > 0.01]
+
+def _wall_box(name, axis, plane, along, y, thick, mat, out=0.0, bevel=0.004, tilt=0.0):
+    """A board in a wall: axis 'z' = the wall is a plane of constant z running along x, 'x' = constant x along z."""
+    (a, b), (y0, y1) = along, y
+    mid, length = (a + b) / 2, b - a
+    if axis == 'z':
+        return box(name, (mid, (y0 + y1) / 2, plane + out), (length, y1 - y0, thick), mat, rot=(0, 0, tilt), bevel=bevel)
+    return box(name, (plane + out, (y0 + y1) / 2, mid), (thick, y1 - y0, length), mat, rot=(tilt, 0, 0), bevel=bevel)
+
+def sided_wall(name, axis, plane, outward, span, y_range, openings, board_h, tones, core, rng, core_t=0.1, board_t=0.022,
+               gap=0.014, tilt=0.0, inner=None):
+    """A wall: a core slab with holes for the openings (a, b, y0, y1), lapped boards on the outside and, with inner,
+    boards of that colour on the inside too. outward = +1 / -1: which side of the plane is outside."""
+    y0, y1 = y_range
+    # Core: horizontal bands between the openings' tops and bottoms; in each band the span minus what's open there.
+    edges = sorted({y0, y1} | {min(max(o[2], y0), y1) for o in openings} | {min(max(o[3], y0), y1) for o in openings})
+    for i in range(len(edges) - 1):
+        ya, yb = edges[i], edges[i + 1]
+        if yb - ya < 0.005: continue
+        cuts = [(o[0], o[1]) for o in openings if o[2] <= ya + 1e-4 and o[3] >= yb - 1e-4]
+        for j, seg in enumerate(_segments(span, cuts)):
+            _wall_box(f"{name}Core{i}_{j}", axis, plane, seg, (ya, yb), core_t, core, bevel=0)  # (shows in the gaps between boards)
+    # Boards: rows up the wall, cut round the openings.
+    row, y = 0, y0
+    while y < y1 - 0.02:
+        top = min(y1, y + board_h)
+        cuts = [(o[0], o[1]) for o in openings if o[2] < top - 0.01 and o[3] > y + 0.01]
+        for j, seg in enumerate(_segments(span, cuts)):
+            _wall_box(f"{name}Board{row}_{j}", axis, plane, seg, (y + gap * 0.5, top - gap * 0.5), board_t, rng.choice(tones),
+                      out=outward * (core_t / 2 + board_t / 2), bevel=0.006, tilt=rng.uniform(-tilt, tilt))
+            if inner:  # boards on the inside too (a room you walk into has board walls, not a flat lining)
+                _wall_box(f"{name}InBoard{row}_{j}", axis, plane, seg, (y + gap * 0.5, top - gap * 0.5), 0.012, inner,
+                          out=-outward * (core_t / 2 + 0.016), bevel=0.004)
+        y = top; row += 1
+
+def window(name, axis, plane, outward, a, b, y0, y1, frame, glass, depth, sill=None, cross=True):
+    """Frame round an opening (both faces), a pane in the middle, glazing bars, a sill under it outside."""
+    f = 0.075
+    for side, (sa, sb, ya, yb) in {"L": (a - f, a, y0, y1), "R": (b, b + f, y0, y1), "B": (a - f, b + f, y0 - f, y0), "T": (a - f, b + f, y1, y1 + f)}.items():
+        _wall_box(f"{name}Frame{side}", axis, plane, (sa, sb), (ya, yb), depth, frame, bevel=0.008)
+    _wall_box(f"{name}Glass", axis, plane, (a, b), (y0, y1), 0.012, glass, bevel=0)
+    if cross:
+        m = (a + b) / 2; my = (y0 + y1) / 2
+        _wall_box(f"{name}BarV", axis, plane, (m - 0.02, m + 0.02), (y0, y1), 0.04, frame, bevel=0.004)
+        _wall_box(f"{name}BarH", axis, plane, (a, b), (my - 0.02, my + 0.02), 0.04, frame, bevel=0.004)
+    if sill:
+        _wall_box(f"{name}Sill", axis, plane, (a - f - 0.04, b + f + 0.04), (y0 - f - 0.05, y0 - f + 0.005), depth + 0.12, sill,
+                  out=outward * 0.04, bevel=0.008)
+
+def life_ring_at(name, centre, axis, radius=0.3, tube_r=0.075):
+    pts = circle(centre, radius, n=28, axis=axis)
+    ob = tube(name, pts, tube_r, "red", seg=10, closed=True)
+    c = Vector(centre)
+    def pick(p, n):
+        d = p - c
+        if axis == 'x': ang = math.degrees(math.atan2(d.y, d.z))
+        elif axis == 'z': ang = math.degrees(math.atan2(d.y, d.x))
+        else: ang = math.degrees(math.atan2(d.z, d.x))
+        return "white" if (ang + 360 + 22.5) % 90 < 45 else None
+    paint(ob, pick)
+    tube(name + "Rope", circle(centre, radius, n=28, axis=axis), tube_r * 0.18, "rope", seg=5, closed=True)
+
+def railing(name, a, b, fixed, along_x, y_floor, height, rng, post_every=1.0, colour="white"):
+    """Posts, a top rail and a middle rail from a to b along x (at z = fixed) or along z (at x = fixed)."""
+    n = max(1, round(abs(b - a) / post_every))
+    for i in range(n + 1):
+        t = a + (b - a) * i / n
+        p = (t, y_floor + height / 2, fixed) if along_x else (fixed, y_floor + height / 2, t)
+        box(f"{name}Post{i}", p, (0.08, height, 0.08), colour, bevel=0.01)
+    mid = (a + b) / 2; length = abs(b - a) + 0.08
+    for k, (yy, w, h) in enumerate(((y_floor + height, 0.1, 0.05), (y_floor + height * 0.5, 0.05, 0.05))):
+        c = (mid, yy, fixed) if along_x else (fixed, yy, mid)
+        s = (length, h, w) if along_x else (w, h, length)
+        box(f"{name}Rail{k}", c, s, colour, bevel=0.01)
+
+def stairs(name, x_mid, width, low, high, steps, tread, riser, stringer, rail=None, rail_h=0.9):
+    """A flight from low (y, z) up to high (y, z) along -z: stringers, a tread per step on the slope line, closed risers."""
+    (yl, zl), (yh, zh) = low, high
+    run = zl - zh
+    for i in range(1, steps + 1):
+        t = i / steps
+        y = yl + (yh - yl) * t
+        z = zl - run * t
+        depth = run / steps + 0.05
+        box(f"{name}Tread{i}", (x_mid, y - 0.025, z + depth / 2 - 0.02), (width - 0.08, 0.05, depth), tread, bevel=0.008)
+        rise = (yh - yl) / steps
+        box(f"{name}Riser{i}", (x_mid, y - 0.05 - rise / 2 + 0.01, z + depth - 0.04), (width - 0.12, rise - 0.03, 0.025), riser, bevel=0)
+    slope = math.atan2(yh - yl, run)
+    length = math.hypot(yh - yl, run)
+    for side in (-1, 1):
+        x = x_mid + side * (width / 2 - 0.03)
+        cy, cz = (yl + yh) / 2 - 0.12, (zl + zh) / 2 + 0.08
+        box(f"{name}Stringer{side}", (x, cy, cz), (0.06, 0.26, length + 0.2), stringer, rot=(math.degrees(slope), 0, 0), bevel=0.01)
+        if rail:
+            xr = x + side * 0.02
+            box(f"{name}PostLow{side}", (xr, yl + rail_h / 2 + 0.05, zl - 0.1), (0.08, rail_h + 0.1, 0.08), rail, bevel=0.01)
+            box(f"{name}PostHigh{side}", (xr, yh + rail_h / 2, zh + 0.05), (0.08, rail_h, 0.08), rail, bevel=0.01)
+            tube(f"{name}Hand{side}", [(xr, yl + rail_h + 0.08, zl - 0.1), (xr, yh + rail_h, zh + 0.05)], 0.035, rail, seg=8)
+
+@prop
+def watch_tower():
+    """The lifeguard watch tower (tower-local: the stairs come down toward +z, the sea): white stilts, a railed plank
+    deck at 2.74 m with life rings, a white board cabin with windows on every side and a red gable roof."""
+    rng = random.Random(7)
+    D = 2.742                          # deck top
+    xw, zf, zb = 2.718, 0.18, -2.88    # deck half width, front and back edges
+    cx0, cx1, cz0, cz1, E = -1.764, 1.728, -2.34, -0.24, 5.112   # cabin walls and eaves
+    door = (-1.26, -0.036, D, 5.01)
+    # Stilts with footings, beams under the deck, knee braces (all above head height).
+    for x in (-2.25, 2.25):
+        for z in (-2.64, -0.18):
+            box(f"Stilt{x}{z}", (x, (D - 0.2 - 0.3) / 2, z), (0.22, D - 0.2 + 0.3, 0.22), "white", bevel=0.02)
+            box(f"Foot{x}{z}", (x, 0.02, z), (0.38, 0.14, 0.38), "concrete", bevel=0.02)
+    for z in (-2.64, -0.18):
+        box(f"BeamX{z}", (0, D - 0.29, z), (4.94, 0.18, 0.16), "white", bevel=0.012)
+    for x in (-2.25, 2.25):
+        box(f"BeamZ{x}", (x, D - 0.29, -1.41), (0.16, 0.18, 2.86), "white", bevel=0.012)
+    for x in (-2.25, 2.25):
+        for z, dz in ((-2.64, 1), (-0.18, -1)):
+            box(f"KneeZ{x}{z}", (x, D - 0.62, z + dz * 0.3), (0.1, 0.1, 0.78), "white", rot=(dz * -45, 0, 0), bevel=0.01)
+        for z in (-2.64, -0.18):
+            dx = 1 if x < 0 else -1
+            box(f"KneeX{x}{z}", (x + dx * 0.3, D - 0.62, z), (0.78, 0.1, 0.1), "white", rot=(0, 0, dx * 45), bevel=0.01)
+    # Deck: joists, planks across, a white rim.
+    for x in (-1.6, -0.55, 0.55, 1.6):
+        box(f"Joist{x}", (x, D - 0.13, (zf + zb) / 2), (0.1, 0.16, zf - zb - 0.1), "wood_dark", bevel=0.01)
+    z = zf
+    i = 0
+    while z > zb + 0.01:
+        w = min(0.2, z - zb)
+        box(f"DeckPlank{i}", (0, D - 0.03, z - w / 2), (2 * xw - 0.04, 0.06, w - 0.014), rng.choice(["wood_light", "wood_light", "wood"]), bevel=0.008)
+        z -= w; i += 1
+    for zz in (zf, zb):
+        box(f"RimX{zz}", (0, D - 0.12, zz), (2 * xw + 0.06, 0.2, 0.06), "white", bevel=0.01)
+    for xx in (-xw, xw):
+        box(f"RimZ{xx}", (xx, D - 0.12, (zf + zb) / 2), (0.06, 0.2, zf - zb), "white", bevel=0.01)
+    # Railings round the deck (open at the top of the stairs) and a life ring on each side.
+    railing("RailFrontL", -xw + 0.04, -0.98, zf - 0.04, True, D, 1.0, rng)
+    railing("RailFrontR", 0.98, xw - 0.04, zf - 0.04, True, D, 1.0, rng)
+    railing("RailBack", -xw + 0.04, xw - 0.04, zb + 0.04, True, D, 1.0, rng)
+    railing("RailL", zb + 0.04, zf - 0.04, -xw + 0.04, False, D, 1.0, rng)
+    railing("RailR", zb + 0.04, zf - 0.04, xw - 0.04, False, D, 1.0, rng)
+    life_ring_at("RingL", (-xw - 0.05, D + 0.62, -1.35), 'x')
+    life_ring_at("RingR", (xw + 0.05, D + 0.62, -1.35), 'x')
+    # The cabin: board walls with a door gap and a window on each side.
+    win_y = (D + 0.95, D + 1.95)
+    tones = ["siding", "siding", "siding_warm"]
+    sided_wall("Front", 'z', cz1, 1, (cx0, cx1), (D, E), [door, (0.3, 1.35, *win_y)], 0.17, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("Back", 'z', cz0, -1, (cx0, cx1), (D, E), [(-0.6, 0.6, *win_y)], 0.17, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("Left", 'x', cx0, -1, (cz0, cz1), (D, E), [(-1.85, -0.75, *win_y)], 0.17, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("Right", 'x', cx1, 1, (cz0, cz1), (D, E), [(-1.85, -0.75, *win_y)], 0.17, tones, "siding_shadow", rng, inner="siding")
+    window("WinFront", 'z', cz1, 1, 0.3, 1.35, *win_y, "trim_blue", "glass", 0.2, sill="white")
+    window("WinBack", 'z', cz0, -1, -0.6, 0.6, *win_y, "trim_blue", "glass", 0.2, sill="white")
+    window("WinLeft", 'x', cx0, -1, -1.85, -0.75, *win_y, "trim_blue", "glass", 0.2, sill="white")
+    window("WinRight", 'x', cx1, 1, -1.85, -0.75, *win_y, "trim_blue", "glass", 0.2, sill="white")
+    for x in (cx0, cx1):
+        for z in (cz0, cz1):
+            box(f"Corner{x}{z}", (x, (D + E) / 2, z), (0.16, E - D, 0.16), "trim_blue", bevel=0.012)
+    box("Ceiling", ((cx0 + cx1) / 2, E - 0.02, (cz0 + cz1) / 2), (cx1 - cx0 - 0.1, 0.04, cz1 - cz0 - 0.1), "siding", bevel=0)
+    # Gable roof, ridge front to back.
+    xm, half, H, ov = (cx0 + cx1) / 2, (cx1 - cx0) / 2, 1.05, 0.34
+    ridge_y = E + H
+    for z in (cz0, cz1):  # gable ends
+        verts = [(cx0 - 0.08, E, z - 0.05), (cx1 + 0.08, E, z - 0.05), (xm, ridge_y, z - 0.05),
+                 (cx0 - 0.08, E, z + 0.05), (cx1 + 0.08, E, z + 0.05), (xm, ridge_y, z + 0.05)]
+        add(f"Gable{z}", verts, [(0, 1, 2), (3, 5, 4), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)], "siding")
+    for side in (-1, 1):
+        eave = Vector((xm + side * (half + ov), E - ov * H / half, 0))
+        top = Vector((xm, ridge_y, 0))
+        d = eave - top
+        ang = math.degrees(math.atan2(d.y, d.x))
+        normal = Vector((-d.y, d.x, 0)).normalized()
+        if normal.y < 0: normal = -normal
+        mid = (eave + top) / 2 + normal * 0.05
+        zlen = (cz1 - cz0) + 2 * ov
+        box(f"Roof{side}", (mid.x, mid.y, (cz0 + cz1) / 2), (d.length + 0.06, 0.1, zlen), "roof_red", rot=(0, 0, ang), bevel=0.02)
+        for zz in (cz0 - ov, cz1 + ov):  # rake boards
+            box(f"Rake{side}{zz}", (mid.x - normal.x * 0.06, mid.y - normal.y * 0.06, zz), (d.length + 0.06, 0.16, 0.06), "white", rot=(0, 0, ang), bevel=0.01)
+        box(f"Fascia{side}", (eave.x, eave.y - 0.06, (cz0 + cz1) / 2), (0.06, 0.18, zlen), "white", bevel=0.01)
+        # Courses: lines of overlapping sheets down the slope.
+        for k in range(1, 5):
+            p = top + d * (k / 5) + normal * 0.105
+            box(f"Course{side}{k}", (p.x, p.y, (cz0 + cz1) / 2), (0.05, 0.025, zlen - 0.02), "roof_red_dark", rot=(0, 0, ang), bevel=0)
+    box("RidgeCap", (xm, ridge_y + 0.08, (cz0 + cz1) / 2), (0.24, 0.1, (cz1 - cz0) + 2 * ov + 0.04), "roof_red_dark", bevel=0.03)
+    # A flag on the front gable.
+    tube("FlagPole", [(xm, ridge_y + 0.05, cz1 + ov - 0.1), (xm, ridge_y + 1.25, cz1 + ov - 0.1)], 0.025, "white", seg=8)
+    flag = []
+    for i in range(9):
+        u = i / 8
+        flag.append((xm + 0.04 + u * 0.75, ridge_y + 1.18, cz1 + ov - 0.1 + math.sin(u * 5) * 0.06))
+        flag.append((xm + 0.04 + u * 0.75, ridge_y + 0.78 + u * 0.04, cz1 + ov - 0.1 + math.sin(u * 5) * 0.06))
+    faces = [(2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2) for i in range(8)]
+    ob = add("Flag", flag, faces, "red")
+    paint(ob, lambda c, n: "yellow" if c.y < ridge_y + 0.98 else None)
+    mod = ob.modifiers.new("solid", 'SOLIDIFY'); mod.thickness = 0.015
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    # Stairs down to the sand: solid treads and risers between stringers, handrails on both sides.
+    stairs("Stairs", 0.0, 1.89, (0.04, 2.82), (D, 0.15), 14, "wood_light", "wood", "white", rail="white")
+    box("StairPad", (0, 0.03, 3.05), (2.1, 0.08, 0.5), "concrete", bevel=0.02)
+
+@prop
+def shack():
+    """Sandy's Lost & Found / the old lifeguard shack (shack-local; the doorway faces +z): a plank floor on blocks
+    0.83 m up, weathered board walls, a small blue window each side, an orange hip roof, front steps and a red flag."""
+    rng = random.Random(11)
+    F = 0.834
+    x0, x1, z0, z1, E = -1.0875, 1.885, -1.711, 0.9425, 3.6975
+    door = (-0.232, 0.58, F, 3.2625)
+    cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
+    # Base: corner blocks and middle blocks, a skirt of boards round it, the floor planks.
+    for x in (x0 + 0.1, cx, x1 - 0.1):
+        for z in (z0 + 0.1, cz, z1 - 0.1):
+            box(f"Block{x}{z}", (x, (F - 0.06) / 2 - 0.05, z), (0.24, F - 0.06 + 0.1, 0.24), "wood_dark", bevel=0.015)
+    for side, (axis, plane, out, span) in {"F": ('z', z1, 1, (x0, x1)), "B": ('z', z0, -1, (x0, x1)),
+                                         "L": ('x', x0, -1, (z0, z1)), "R": ('x', x1, 1, (z0, z1))}.items():
+        sided_wall(f"Skirt{side}", axis, plane - out * 0.06, out, span, (0.02, F - 0.06), [], 0.2, ["wood_dark", "wood_grey"], "wood_dark", rng,
+                   core_t=0.04, tilt=0.6)
+    z = z1
+    i = 0
+    while z > z0 + 0.01:
+        w = min(0.19, z - z0)
+        box(f"Floor{i}", (cx, F - 0.03, z - w / 2), (x1 - x0 + 0.06, 0.06, w - 0.012), rng.choice(["wood", "wood_light", "wood"]), bevel=0.008)
+        z -= w; i += 1
+    # Walls of weathered boards, a window each side of the hut (none at the back: the shelf stands there).
+    tones = ["wood_grey", "wood_grey", "wood", "wood_old"]
+    win_y = (F + 1.15, F + 1.8)
+    sided_wall("Front", 'z', z1, 1, (x0, x1), (F, E), [door, (-0.88, -0.5, *win_y)], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
+    sided_wall("Back", 'z', z0, -1, (x0, x1), (F, E), [], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
+    sided_wall("Left", 'x', x0, -1, (z0, z1), (F, E), [(-0.75, -0.1, *win_y)], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
+    sided_wall("Right", 'x', x1, 1, (z0, z1), (F, E), [(-0.75, -0.1, *win_y)], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
+    window("WinFront", 'z', z1, 1, -0.88, -0.5, *win_y, "wood_dark", "glass", 0.18, sill="wood_dark")
+    window("WinLeft", 'x', x0, -1, -0.75, -0.1, *win_y, "wood_dark", "glass", 0.18, sill="wood_dark")
+    window("WinRight", 'x', x1, 1, -0.75, -0.1, *win_y, "wood_dark", "glass", 0.18, sill="wood_dark")
+    for x in (x0, x1):
+        for z in (z0, z1):
+            box(f"Corner{x}{z}", (x, (F + E) / 2 + 0.02, z), (0.18, E - F + 0.04, 0.18), "wood_dark", bevel=0.02)
+    for side, (axis, plane, out, span) in {"F": ('z', z1, 1, (x0, x1)), "B": ('z', z0, -1, (x0, x1)),
+                                         "L": ('x', x0, -1, (z0, z1)), "R": ('x', x1, 1, (z0, z1))}.items():
+        _wall_box(f"TopPlate{side}", axis, plane, (span[0] - 0.09, span[1] + 0.09), (E - 0.12, E + 0.02), 0.2, "wood_dark", out=0.0, bevel=0.012)
+    box("Ceiling", (cx, E - 0.02, cz), (x1 - x0 - 0.1, 0.04, z1 - z0 - 0.1), "wood_light", bevel=0)
+    tube("LampCord", [(0.406, E - 0.02, -0.377), (0.406, 3.48, -0.377)], 0.008, "dark", seg=5)
+    lathe("LampShade", (0.406, 3.47, -0.377), [(0.0, 0.03), (0.05, 0.03), (0.13, -0.05), (0.12, -0.06), (0.0, -0.0)], "dark", seg=14)
+    # Hip roof: four sloping faces over an overhang, the ridge along x; courses of shingles, hip and ridge caps.
+    ov, slope = 0.42, 0.72
+    ex0, ex1, ez0, ez1 = x0 - ov, x1 + ov, z0 - ov, z1 + ov
+    ey = E - ov * slope + 0.02
+    half_d = (ez1 - ez0) / 2
+    half_ridge = max(0.05, ((ex1 - ex0) - (ez1 - ez0)) / 2)
+    ry = ey + half_d * slope
+    A, Bc, C, Dc = Vector((ex0, ey, ez0)), Vector((ex1, ey, ez0)), Vector((ex1, ey, ez1)), Vector((ex0, ey, ez1))
+    R1, R2 = Vector((cx - half_ridge, ry, cz)), Vector((cx + half_ridge, ry, cz))
+    roof = add("Roof", [A, Bc, C, Dc, R1, R2], [(3, 2, 5, 4), (1, 0, 4, 5), (0, 3, 4), (2, 1, 5)], "roof_orange")
+    mod = roof.modifiers.new("solid", 'SOLIDIFY'); mod.thickness = 0.09; mod.offset = -1
+    bpy.context.view_layer.objects.active = roof
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    lift = 0.03
+    def course(p, q, k):
+        tube(f"Course{k}", [p, q], 0.018, "roof_orange_dark", seg=5)
+    faces_lines = [((Dc, R1), (C, R2), Vector((0, 1, 1))), ((A, R1), (Bc, R2), Vector((0, 1, -1))),
+                   ((A, R1), (Dc, R1), Vector((-1, 1, 0))), ((Bc, R2), (C, R2), Vector((1, 1, 0)))]
+    k = 0
+    for (p0, p1), (q0, q1), n in faces_lines:
+        n = n.normalized()
+        for s in range(1, 6):
+            t = s / 6
+            p = p0 + (p1 - p0) * t + n * lift
+            q = q0 + (q1 - q0) * t + n * lift
+            if (p - q).length > 0.05: course(p, q, k)
+            k += 1
+    for e0, e1 in ((A, R1), (Dc, R1), (Bc, R2), (C, R2), (R1, R2)):
+        tube(f"Cap{k}", [e0 + Vector((0, 0.06, 0)), e1 + Vector((0, 0.06, 0))], 0.05, "wood_dark", seg=6); k += 1
+    for e0, e1 in ((A, Bc), (Bc, C), (C, Dc), (Dc, A)):
+        m = (e0 + e1) / 2
+        size = ((e1 - e0).length + 0.06, 0.14, 0.05) if abs(e1.x - e0.x) > 0.01 else (0.05, 0.14, (e1 - e0).length + 0.06)
+        box(f"Fascia{k}", (m.x, ey - 0.08, m.z), size, "wood_dark", bevel=0.01); k += 1
+    # Front steps up to the doorway.
+    stairs("Steps", 0.1015, 1.32, (0.0, 2.494), (F, z1 + 0.03), 4, "wood", "wood_dark", "wood_dark")
+    # The red flag on its pole, front left.
+    px, pz = x0 - 0.6, z1 + 0.55
+    tube("Pole", [(px, -0.2, pz), (px, 5.3, pz)], 0.045, "wood_dark", seg=8)
+    lathe("PoleTop", (px, 5.32, pz), arc_profile(0.06, -0.05, 0.05, 5), "wood_dark", seg=8)
+    flag = []
+    for i in range(10):
+        u = i / 9
+        wave = math.sin(u * 6.0) * 0.08 * u
+        flag.append((px + 0.05 + u * 1.0, 5.2 - u * 0.05, pz + wave))
+        flag.append((px + 0.05 + u * 1.0, 4.55 + u * 0.05, pz + wave))
+    ob = add("Flag", flag, [(2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2) for i in range(9)], "red")
+    mod = ob.modifiers.new("solid", 'SOLIDIFY'); mod.thickness = 0.015
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
 # ---------------------------------------------------------------------------------------- run
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 os.makedirs(a.out, exist_ok=True)
 only = [n for n in a.only.split(",") if n]
 FLAT = {"rock", "crate", "dock"}
-VIEWS = {"dock": (1.0, 0.9, 1.0), "drill_board": (0.5, 0.25, -1.0), "roof_sign": (0.5, 0.25, -1.0), "lost_box": (0.6, 1.0, -1.0), "towel": (0.3, 1.0, -0.6), "sunglasses": (0.7, 0.7, -1.0), "bell": (0.9, 0.2, -1.0), "sign_frame": (0.5, 0.25, -1.0), "radio": (-0.6, 0.5, 1.0),
+VIEWS = {"watch_tower": (0.9, 0.55, 1.0), "shack": (0.9, 0.55, 1.0), "dock": (1.0, 0.9, 1.0), "drill_board": (0.5, 0.25, -1.0), "roof_sign": (0.5, 0.25, -1.0), "lost_box": (0.6, 1.0, -1.0), "towel": (0.3, 1.0, -0.6), "sunglasses": (0.7, 0.7, -1.0), "bell": (0.9, 0.2, -1.0), "sign_frame": (0.5, 0.25, -1.0), "radio": (-0.6, 0.5, 1.0),
          "first_aid_kit": (-0.6, 0.6, 1.0), "defibrillator": (0.6, 1.0, -1.0), "phone": (0.5, 1.2, -0.8), "watch": (0.6, 1.2, -0.7), "wallet": (0.6, 1.0, -1.0)}
 for name, build in PROPS.items():
     if only and name not in only: continue

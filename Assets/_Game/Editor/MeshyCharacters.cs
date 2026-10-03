@@ -541,7 +541,9 @@ namespace PleaseDontDrown.Editor
                 if (around.Count < 20) around = faceSkin.Where(s => Mathf.Abs(s.P.y - level) < 0.05f).ToList();
                 if (around.Count < 20) around = faceSkin;
                 var usual = new Color(Median(around.Select(s => s.C.r)), Median(around.Select(s => s.C.g)), Median(around.Select(s => s.C.b)));
-                return around.OrderBy(s => Distance(s.C, usual)).First().Uv;
+                // A shade under the usual skin: a lid over an eyeball sits in the eye's shadow.
+                var lid = usual * 0.93f;
+                return around.OrderBy(s => Distance(s.C, lid)).First().Uv;
             }
             Rect both = Rect.MinMaxRect(eyeL.xMin, Mathf.Min(eyeL.yMin, eyeR.yMin), eyeR.xMax, Mathf.Max(eyeL.yMax, eyeR.yMax));
             Vector2 darkUv = samples.Where(s => both.Contains(new Vector2(s.P.x, s.P.y)) && !(s.P.x > eyeL.xMax && s.P.x < eyeR.xMin))
@@ -581,7 +583,10 @@ namespace PleaseDontDrown.Editor
                         // Lit like the face under it: mostly the way the face curves there, evened out so the bumps of
                         // a modelled eye don't show as blotches, and rounded a little like a lid over an eyeball.
                         Vector3 lit = facing * 0.45f + (round.sqrMagnitude > 1e-6f ? round.normalized : facing) * 0.55f;
-                        extra.Normals.Add((lit.normalized + new Vector3(u * 0.3f, v * 0.22f, 0f)).normalized);
+                        Vector3 lidNormal = (lit.normalized + new Vector3(u * 0.3f, v * 0.22f, 0f)).normalized;
+                        // Toward its rim it takes the face's own shading, so it doesn't stand out as a lighter disc.
+                        float edge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.45f, 1f, Mathf.Max(Mathf.Abs(u), Mathf.Abs(v))));
+                        extra.Normals.Add(Vector3.Slerp(lidNormal, on.N.sqrMagnitude > 1e-6f ? on.N.normalized : lidNormal, edge));
                         extra.Uvs.Add(uv);
                         extra.Weights.Add(new BoneWeight { boneIndex0 = (int)bone, weight0 = 1f });
                     }

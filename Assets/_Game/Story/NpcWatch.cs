@@ -27,6 +27,7 @@ namespace PleaseDontDrown.Story
             public float AnchorTime;
             public float LastMoved;
             public NpcActivity Activity;
+            public Vector3 LastWay;         // last sample's walking direction (for how sharply the walk bends)
             public readonly Dictionary<string, float> Reported = new();
             public readonly Dictionary<string, float> Since = new();   // when a lasting-problem check first failed
             public readonly HashSet<string> Seen = new();
@@ -34,6 +35,10 @@ namespace PleaseDontDrown.Story
 
         private readonly Dictionary<StoryNpc, Track> _tracks = new();
         private readonly Dictionary<string, int> _counts = new();
+        // How walking on land looks: the drawn body's angle off the way it is going (under 15, 15-30, 30-60, over 60
+        // degrees), and how much the walk bends (degrees of heading change per metre walked: under 10, 10-30, 30-90,
+        // over 90). Counted per quarter-second sample of every walker.
+        private readonly int[] _offAngle = new int[4], _bend = new int[4];
         private readonly Collider[] _overlaps = new Collider[16];
         private float _nextSample;
         private float _nextSummary;
@@ -122,7 +127,21 @@ namespace PleaseDontDrown.Story
                 Vector3 ahead = Vector3.ProjectOnPlane(npc.transform.forward, Vector3.up).normalized;
                 if (Vector3.Dot(way, ahead) < 0.3f)
                     Lasting(npc, t, "sideways", $"moving {step / dt:F1} m/s at {Vector3.Angle(way, ahead):F0} degrees from where it faces (its target is {Vector3.Angle(Vector3.ProjectOnPlane(npc.MoveTarget - p, Vector3.up), ahead):F0} degrees off, {npc.PathInfo}; in the way: {InTheWay(npc, p)})", npc.IsSwimming ? 1.2f : 0.5f);
+                if (!npc.IsSwimming)
+                {
+                    Vector3 drawn = Quaternion.Euler(0f, npc.DrawnYaw, 0f) * Vector3.forward;
+                    float off = Vector3.Angle(way, drawn);
+                    _offAngle[off < 15f ? 0 : off < 30f ? 1 : off < 60f ? 2 : 3]++;
+                    if (off >= 30f) Lasting(npc, t, "drawn-off", $"walking {step / dt:F1} m/s with the body turned {off:F0} degrees off ({npc.PathInfo})", 0.5f);
+                    if (t.LastWay != Vector3.zero)
+                    {
+                        float bend = Vector3.Angle(t.LastWay, way) / Mathf.Max(0.05f, step);
+                        _bend[bend < 10f ? 0 : bend < 30f ? 1 : bend < 90f ? 2 : 3]++;
+                    }
+                    t.LastWay = way;
+                }
             }
+            else t.LastWay = Vector3.zero;
             t.Last = p;
 
             // Stuck on a route.
@@ -227,6 +246,8 @@ namespace PleaseDontDrown.Story
             }
             var parts = new List<string>();
             foreach (var kv in _counts) parts.Add($"{kv.Key} {kv.Value}");
+            Debug.Log($"[NpcWatch] walking samples: body off its way <15/15-30/30-60/>60 deg = {_offAngle[0]}/{_offAngle[1]}/{_offAngle[2]}/{_offAngle[3]}; " +
+                      $"bend per metre <10/10-30/30-90/>90 deg = {_bend[0]}/{_bend[1]}/{_bend[2]}/{_bend[3]}");
             Debug.Log($"[NpcWatch] t={Time.time:F0}s characters {StoryNpc.All.Count} (upright {upright}, moving {moving}, swimming {swimming}, code-built {codeBuilt}); " +
                       $"problem samples: {(parts.Count == 0 ? "none" : string.Join(", ", parts))}");
         }

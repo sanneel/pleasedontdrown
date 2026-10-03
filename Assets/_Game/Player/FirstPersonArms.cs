@@ -486,7 +486,7 @@ namespace PleaseDontDrown.Player
             {
                 // CPR: palms flat on the chest, right hand on top, pressing on each pump.
                 state = State.Cpr;
-                float press = sincePump < 0.2f ? Mathf.Sin(sincePump / 0.2f * Mathf.PI) * 0.1f : 0f; // a push you can see
+                float press = sincePump < 0.18f ? Mathf.Sin(sincePump / 0.18f * Mathf.PI) * 0.06f : 0f;
                 palm = _pumpPoint + Vector3.up * ((hand.Right ? 0.035f : 0f) - press) + FrameRight * (side * 0.01f);
                 rot = HandBones.Orient(FrameForward, Vector3.down, side);
                 pose = HandPose.Flat;

@@ -269,6 +269,32 @@ skin = np.maximum(skin, burn * (1 - hair))
 d_skin = np.where(burn, np.minimum(d_skin, 12), d_skin)
 log(f'{int(burn.sum())} sunburn/blush texels joined the skin')
 
+
+def _morph(m, passes, pick):
+    """Min (erode) or max (dilate) over the 4 neighbours, passes times, on the full-size texture grid."""
+    g = m.reshape(TH, TW)
+    for _ in range(passes):
+        acc = g.copy()
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            acc = pick(acc, np.roll(g, (dy, dx), axis=(0, 1)))
+        g = acc
+    return g.reshape(-1)
+
+
+# Thin hair-coloured lines with no hair round them are not hair: they are the blended edges of skin pieces next to
+# hair pieces in the texture, and the eyeliner and lashes. Turned to the new hair colour they drew a bright outline
+# round every piece of the face (and orange eyeliner). They go with the skin instead (dark stays dark).
+hair_open = _morph(_morph(hair, 3, np.minimum), 3, np.maximum)
+thin = np.clip(hair - hair_open, 0.0, 1.0)
+hair = hair - thin
+skin = np.maximum(skin, thin)
+log(f'{int((thin > 0.5).sum())} thin edge/lash texels moved from the hair to the skin')
+# The rim of every skin piece (texels blended with the next piece) is skin too: only partly recoloured, it showed as a
+# light outline when the new skin is darker (and a dark one when lighter). Not the whites of the eyes.
+rim = _morph((skin > 0.6).astype(np.float64), 3, np.maximum) * (1 - hair) * (luminance(lin) < 0.5)
+log(f'{int(((rim > 0.5) & (skin < 0.6)).sum())} skin-rim texels made skin')
+skin = np.maximum(skin, rim)
+
 # Eyes: front of the face at eye height, not skin, not hair, not the white, not the lips.
 eye_zone = covered & (Pz > head_z + 0.3 * head_len) & (Pz < head_z + 0.62 * head_len) & (np.abs(Px) < 0.065) & \
     (Py < face_front_y + 0.035)

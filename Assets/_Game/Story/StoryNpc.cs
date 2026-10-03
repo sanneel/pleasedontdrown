@@ -125,6 +125,19 @@ namespace PleaseDontDrown.Story
         public bool IsMoving => _moveTarget.HasValue;
         public Vector3 MoveTarget => _moveTarget ?? transform.position;
         public bool IsUpright => Upright(_pose.Value);
+
+        /// <summary>The navmesh area under the station's buildings (Editor/GameSceneBuilder NavKeepOut).</summary>
+        public const int BuildingArea = 3;
+
+        /// <summary>
+        /// Host: keep out of the buildings (the beach crowd: a tourist's stroll doesn't go up the tower stairs or in
+        /// through the hut). Story characters leave it off: Sandy works in the hut.
+        /// </summary>
+        public bool StayOutOfBuildings { get; set; }
+
+        private int AreaMask => StayOutOfBuildings ? NavMesh.AllAreas & ~(1 << BuildingArea) : NavMesh.AllAreas;
+        /// <summary>Where the drawn body faces (degrees): it follows the character's turning with a little lag.</summary>
+        public float DrawnYaw => _animator != null ? _animator.BodyYaw : transform.eulerAngles.y;
         public Vehicle Ride => _ride;
         /// <summary>Host: what a beach tourist is doing (set by BeachCrowd).</summary>
         public NpcActivity Activity { get; set; }
@@ -327,9 +340,9 @@ namespace PleaseDontDrown.Story
                     return;
                 }
             }
-            if (NavMesh.SamplePosition(transform.position, out NavMeshHit from, 10f, NavMesh.AllAreas) &&
-                NavMesh.SamplePosition(target, out NavMeshHit to, 10f, NavMesh.AllAreas) &&
-                NavMesh.CalculatePath(from.position, to.position, NavMesh.AllAreas, _navPath) &&
+            if (NavMesh.SamplePosition(transform.position, out NavMeshHit from, 10f, AreaMask) &&
+                NavMesh.SamplePosition(target, out NavMeshHit to, 10f, AreaMask) &&
+                NavMesh.CalculatePath(from.position, to.position, AreaMask, _navPath) &&
                 _navPath.status != NavMeshPathStatus.PathInvalid)
             {
                 Vector3[] corners = _navPath.corners;
@@ -880,7 +893,7 @@ namespace PleaseDontDrown.Story
                     Vector3 dir = (side * sign + forward * 0.3f).normalized;
                     if (ObstacleAhead(p, dir, d, out _)) continue;
                     Vector3 detour = p + dir * d;
-                    if (NavMesh.SamplePosition(detour, out NavMeshHit hit, 0.6f, NavMesh.AllAreas)) detour = new Vector3(hit.position.x, detour.y, hit.position.z);
+                    if (NavMesh.SamplePosition(detour, out NavMeshHit hit, 0.6f, AreaMask)) detour = new Vector3(hit.position.x, detour.y, hit.position.z);
                     _path.Insert(Mathf.Min(_pathIndex, _path.Count), detour);
                     return;
                 }

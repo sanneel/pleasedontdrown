@@ -1119,14 +1119,15 @@ namespace PleaseDontDrown.Avatars
         }
 
         /// <summary>
-        /// Going down onto the knees, the back or the bottom (and getting up again) the hips get there before the legs
-        /// have folded under them, so for a moment the legs would hang through the floor. If a knee or an ankle ends
-        /// up below the ground, the whole body is lifted just enough to keep it on top.
+        /// Knocked down or going down onto the knees (and getting up again) the hips get there before the legs have
+        /// folded under them, so for a moment the legs would hang through the floor. If a knee or an ankle ends up below
+        /// the ground, the whole body is lifted just enough to keep it on top. (Not for sitting or lying on a towel:
+        /// there the heels rest on the sand on purpose, and lifting them sat people in the air.)
         /// </summary>
         private void KeepLegsAboveGround(Transform hips, float s)
         {
-            float low = Mathf.Max(Mathf.Max(_down, _kneel), Mathf.Max(Mathf.Max(_lie, _lieFront), _sit));
-            if (low < 0.01f || _swim > 0.01f || _seat > 0.01f || !Motion.Grounded) return;
+            float low = Mathf.Max(_down, _kneel);
+            if (low < 0.01f || _swim > 0.01f || _seat > 0.01f || _sit > 0.01f || _lie > 0.01f || _lieFront > 0.01f || !Motion.Grounded) return;
             float floor = transform.position.y;
             float margin = 0.05f * s; // half a leg's thickness
             float lowest = float.MaxValue;

@@ -949,6 +949,15 @@ namespace PleaseDontDrown.Editor
 
             // The Meshy shack, scaled up so a lifeguard fits through its door; walk in and switch the light on.
             bool meshyShack = MeshyArt.Shack(shack, ShackScale, out MeshyArt.DoorSpec shackDoor);
+            bool modelledShack = meshyShack && SwapForModel(shack, "station_rusty_Pivot", "shack");
+            if (modelledShack)
+            {
+                // The flag pole by the front corner is solid (people walked through it).
+                Collider(shack, "FlagPoleCollision", new Vector3(-1.6875f, 2.6f, 1.4925f), new Vector3(0.12f, 5.2f, 0.12f));
+            }
+            // Beach tourists walk round the hut and its alarm bell (Sandy, who runs her Lost & Found from it, still goes
+            // in). One zone for both: a gap between them was too narrow to walk through and caught people.
+            NavKeepOut(shack, new Vector3(1.0f, 1.5f, 0.0f), new Vector3(5.2f, 4f, 5.8f));
             if (meshyShack)
             {
                 // Sandy's Lost & Found now: the door is off its hinges, only the frame round the doorway stays.
@@ -1009,7 +1018,9 @@ namespace PleaseDontDrown.Editor
                 lightSwitch.transform.localPosition = new Vector3(0.95f * k, 0.575f * k + 1.3f, 0.65f * k - 0.1f);
                 bulb.transform.localPosition = new Vector3(0.28f * k, 2.55f * k - 0.3f, -0.26f * k);
                 lamp.range = 6f;
-                roofSign.transform.localPosition = new Vector3(0.12f * k, 2.55f * k + 0.35f, 0.65f * k + 0.45f);
+                roofSign.transform.localPosition = modelledShack
+                    ? new Vector3(0.12f * k, 2.55f * k + 0.3f, 0.65f * k + 0.05f) // standing on the front slope of the modelled roof
+                    : new Vector3(0.12f * k, 2.55f * k + 0.35f, 0.65f * k + 0.45f);
                 roofSign.characterSize = 0.04f;
             }
             if (paintedRoofSign)
@@ -1100,6 +1111,19 @@ namespace PleaseDontDrown.Editor
             Primitive(PrimitiveType.Cube, "Ramp", tower, new Vector3(0f, 1.5f, 2.6f), new Vector3(1f, 0.1f, 4f), wood).transform.localRotation = Quaternion.Euler(38f, 0f, 0f);
             if (MeshyArt.Tower(tower, TowerScale, TowerWiden, out MeshyArt.DoorSpec towerDoor))
             {
+                if (SwapForModel(tower, "tower_Pivot", "watch_tower"))
+                {
+                    // The modelled deck has railings: solid, so nobody walks off the edge (open at the top of the stairs).
+                    const float deckTop = 2.742f, xw = 2.678f, zf = 0.14f, zb = -2.84f;
+                    Collider(tower, "RailFrontL", new Vector3((-xw - 0.98f) * 0.5f, deckTop + 0.55f, zf), new Vector3(xw - 0.98f, 1.1f, 0.1f));
+                    Collider(tower, "RailFrontR", new Vector3((xw + 0.98f) * 0.5f, deckTop + 0.55f, zf), new Vector3(xw - 0.98f, 1.1f, 0.1f));
+                    Collider(tower, "RailBack", new Vector3(0f, deckTop + 0.55f, zb), new Vector3(2f * xw, 1.1f, 0.1f));
+                    Collider(tower, "RailLeft", new Vector3(-xw, deckTop + 0.55f, (zf + zb) * 0.5f), new Vector3(0.1f, 1.1f, zf - zb));
+                    Collider(tower, "RailRight", new Vector3(xw, deckTop + 0.55f, (zf + zb) * 0.5f), new Vector3(0.1f, 1.1f, zf - zb));
+                    foreach (float side in new[] { -1f, 1f })
+                        Collider(tower, "StairRail", new Vector3(side * 0.98f, 1.95f, 1.5f), new Vector3(0.08f, 1.1f, 3.7f), Quaternion.Euler(46f, 0f, 0f)); // along the flight, which climbs toward -z
+                }
+                NavKeepOut(tower, new Vector3(0f, 1.5f, 0.2f), new Vector3(6.2f, 4f, 7.2f));
                 BuildDoor(tower, "TowerDoor", towerDoor, new Color(0.47f, 0.35f, 0.28f), new Color(0.93f, 0.93f, 0.9f), planks: false);
                 // A stool to sit on and watch the water.
                 float k = TowerScale, deck = 2.285f * k;
@@ -1113,6 +1137,44 @@ namespace PleaseDontDrown.Editor
                     }
             }
         }
+
+        /// <summary>
+        /// Swaps a structure's Meshy scan (the pivot MeshyArt placed) for its modelled version from Art/Props, keeping
+        /// every collider, door and step MeshyArt made (the model is built to the same sizes). False: no model.
+        /// </summary>
+        private static bool SwapForModel(Transform structure, string scanPivot, string model)
+        {
+            if (LoadProp(model) == null) return false;
+            Transform scan = structure.Find(scanPivot);
+            if (scan != null) Object.DestroyImmediate(scan.gameObject);
+            PropModel(model, structure);
+            return true;
+        }
+
+        private static void Collider(Transform parent, string name, Vector3 centre, Vector3 size, Quaternion? rotation = null)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = centre;
+            go.transform.localRotation = rotation ?? Quaternion.identity;
+            go.AddComponent<BoxCollider>().size = size;
+        }
+
+        /// <summary>
+        /// A box (structure-local) the beach crowd's routes keep out of: BakeNavMeshes paints the navmesh under it a
+        /// separate area (StoryNpc.BuildingArea) that crowd tourists don't path through; story characters still may.
+        /// </summary>
+        private static void NavKeepOut(Transform parent, Vector3 centre, Vector3 size)
+        {
+            var go = new GameObject(NavKeepOutName);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = centre;
+            var box = go.AddComponent<BoxCollider>();
+            box.size = size;
+            box.isTrigger = true; // only a marker: nothing collides with it
+        }
+
+        private const string NavKeepOutName = "NavKeepOut";
 
         /// <summary>A palm you can shake for coconuts (Interact on the trunk).</summary>
         private static void MakeShakeable(GameObject palm)

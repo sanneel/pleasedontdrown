@@ -210,6 +210,7 @@ namespace PleaseDontDrown.Story
             Spawn(npc.gameObject);
             string displayName = VictimBrain.RandomName(female);
             npc.ServerSetup(displayName, NpcRole.Guest, look);
+            npc.StayOutOfBuildings = true; // the tower stairs and the hut aren't part of a stroll
             npc.ServerSetPose(pose);
             npc.ServerSetMood(activity == Activity.Sunbathe ? AvatarMood.Happy : AvatarMood.Neutral);
             npc.ServerSetTalkable(true, $"Chat with {displayName}");
