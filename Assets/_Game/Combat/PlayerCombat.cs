@@ -46,6 +46,7 @@ namespace PleaseDontDrown.Combat
             if (!IsOwner || !GameInput.GameplayActive || _hub.Motor == null || !_hub.Motor.enabled) return;
             if (IsDazed) return; // seeing stars: no punching
             if (_hub.Motor.Seat != null) return;
+            if (PlayerCarry.IsCarried(_hub) || PlayerCarry.CarriedBy(_hub) != null) return; // arms full of lifeguard (Primary throws them)
             if (_hub.Hands != null && _hub.Hands.HeldItem != null)
             {
                 _queued = false; // hands full: Primary uses the item

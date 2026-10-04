@@ -23,6 +23,8 @@ GameObject:
   - component: {fileID: 8335782968337767112}
   - component: {fileID: 8748436732980522936}
   - component: {fileID: 4001305862416589337}
+  - component: {fileID: 7414994991553436019}
+  - component: {fileID: 8259552054976012886}
   - component: {fileID: 1725149870259231495}
   - component: {fileID: 3312183532521263807}
   m_Layer: 0
@@ -516,6 +518,39 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &7414994991553436019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 665019184260466725}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c0d558b1d224994996b80823838098a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Player.PlayerCarry
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 3796914769783393310}
+  _networkObjectCache: {fileID: 0}
+  _hub: {fileID: 6590466689215046085}
+--- !u!114 &8259552054976012886
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 665019184260466725}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3bd027e1cc5509f4f81ee6edb4c02e2a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Interaction.Interactable
+  _colliders:
+  - {fileID: 604068858584113607}
+  _outlineRenderers:
+  - {fileID: 6118547956922520031}
+  _maxDistance: 2.6
 --- !u!114 &1725149870259231495
 MonoBehaviour:
   m_ObjectHideFlags: 0

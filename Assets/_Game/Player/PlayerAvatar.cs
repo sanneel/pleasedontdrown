@@ -195,7 +195,40 @@ namespace PleaseDontDrown.Player
                     m.Holding = m.TwoHanded = true;
                 }
             }
+            CarryPoses(ref m, position);
             _animator.Motion = m;
+        }
+
+        /// <summary>
+        /// Carrying another lifeguard (<see cref="PlayerCarry"/>): the carrier's arms scooped under them, and the
+        /// carried one lying back across those arms, head to the carrier's left, taking it easy.
+        /// </summary>
+        private void CarryPoses(ref AvatarMotion m, Vector3 position)
+        {
+            PlayerHub carrier = PlayerCarry.Of(_hub)?.Carrier;
+            if (carrier != null)
+            {
+                PlayerCarry.HoldPoint(carrier, out float yaw);
+                m.Pose = AvatarPose.Lie;
+                m.Mood = AvatarMood.Scared;
+                m.FacingYaw = yaw + 90f;
+                m.LookPitch = 0f;
+                m.Velocity = Vector3.zero;
+                m.Grounded = true;
+                m.Swimming = m.Underwater = m.Climbing = m.Sprinting = false;
+                m.Holding = m.TwoHanded = m.CarryingPerson = false;
+                return;
+            }
+            if (PlayerCarry.CarriedBy(_hub) == null) return;
+            Quaternion facing = Quaternion.Euler(0f, m.FacingYaw, 0f);
+            Vector3 forward = facing * Vector3.forward, right = facing * Vector3.right;
+            Vector3 chest = position + Vector3.up * 1.2f;
+            m.Holding = true;
+            m.TwoHanded = false;
+            m.CarryingPerson = true;
+            m.Charge = 0f;
+            m.GripLeft = new HandGrip(chest + forward * 0.55f - right * 0.3f - Vector3.up * 0.3f, forward, Vector3.up, HandPose.Carry);
+            m.GripRight = new HandGrip(chest + forward * 0.55f + right * 0.3f - Vector3.up * 0.35f, forward, Vector3.up, HandPose.Carry);
         }
 
         /// <summary>

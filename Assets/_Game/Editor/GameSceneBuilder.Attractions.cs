@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FishNet.Object;
 using PleaseDontDrown.Fun;
 using PleaseDontDrown.Interaction;
@@ -12,8 +13,9 @@ namespace PleaseDontDrown.Editor
 {
     /// <summary>
     /// Island 1's attractions (besides the hoop, the ring table and the hut in GameSceneBuilder.Fun.cs): two
-    /// trampolines, a human cannon that fires you out over the sea, a zipline from a tall platform to a post in the
-    /// sea, a diving board off the dock and an inflatable flamingo you can paddle about on (a Meshy model). Models: ArtSource/Tools/model_props.py and Art/Meshy/flamingo.glb.
+    /// trampolines, a human cannon on wheels that fires you (or a friend you carried over) out over the sea, a
+    /// diving board off the dock and an inflatable flamingo you can paddle about on (a Meshy model). (The zipline is
+    /// out for now.) Models: ArtSource/Tools/model_props.py and Art/Meshy/flamingo.glb.
     /// </summary>
     public static partial class GameSceneBuilder
     {
@@ -28,8 +30,7 @@ namespace PleaseDontDrown.Editor
         private static Vector3[] AttractionSpots() => new[]
         {
             new Vector3(TrampolineSpots[0].x, TrampolineSpots[0].z, 2.2f), new Vector3(TrampolineSpots[1].x, TrampolineSpots[1].z, 2.2f),
-            new Vector3(CannonSpot.x, CannonSpot.z, 2.2f), new Vector3(ZiplineTowerSpot.x, ZiplineTowerSpot.z, 2.5f),
-            new Vector3(ZiplineTowerSpot.x, ZiplineTowerSpot.z + 5f, 2f), new Vector3(HoopSpot.x, HoopSpot.z, 3f), new Vector3(HutSpot.x, HutSpot.z, 3f),
+            new Vector3(CannonSpot.x, CannonSpot.z, 2.6f), new Vector3(HoopSpot.x, HoopSpot.z, 3f), new Vector3(HutSpot.x, HutSpot.z, 3f),
             new Vector3(RingTableSpot.x, RingTableSpot.z, 1.8f)
         };
 
@@ -37,7 +38,7 @@ namespace PleaseDontDrown.Editor
         {
             foreach (Vector3 spot in TrampolineSpots) BuildTrampoline(parent, spot);
             BuildCannon(parent);
-            BuildZipline(parent);
+            // BuildZipline(parent); // taken out for now (2026-10-05); the code and models stay for when it comes back
             BuildDivingBoard(parent);
             BuildFlamingo(parent);
             BuildMoreAttractions(parent); // banana boat (GameSceneBuilder.Attractions2.cs)
@@ -71,23 +72,54 @@ namespace PleaseDontDrown.Editor
             root.SetParent(parent, false);
             root.position = Ground(CannonSpot);
             root.rotation = Quaternion.Euler(0f, 160f, 0f); // out over the sea
-            PropModel("human_cannon", root);
+            // The carriage turns on its wheels (the turret), the barrel tips on its trunnions.
+            var turret = new GameObject("Turret").transform;
+            turret.SetParent(root, false);
+            PropModel("human_cannon", turret);
             var body = new GameObject("Body");
-            body.transform.SetParent(root, false);
+            body.transform.SetParent(turret, false);
             var box = body.AddComponent<BoxCollider>();
-            box.center = new Vector3(0f, 0.7f, 0f);
-            box.size = new Vector3(1.2f, 1.4f, 2.0f);
+            box.center = new Vector3(0f, 0.7f, -0.1f);
+            box.size = new Vector3(1.3f, 1.4f, 2.0f);
+            var wheels = new List<Object>();
+            var radii = new List<float>();
+            foreach (float side in new[] { -1f, 1f })
+            foreach ((string model, Vector3 at, float radius) in new[] { ("cannon_wheel", new Vector3(0.68f, 0.48f, -0.5f), 0.48f), ("cannon_wheel_small", new Vector3(0.68f, 0.32f, 0.55f), 0.32f) })
+            {
+                var wheel = new GameObject("Wheel").transform;
+                wheel.SetParent(turret, false);
+                wheel.localPosition = new Vector3(at.x * side, at.y, at.z);
+                PropModel(model, wheel);
+                wheels.Add(wheel);
+                radii.Add(radius);
+            }
+            var barrel = new GameObject("Barrel").transform;
+            barrel.SetParent(turret, false);
+            barrel.localPosition = new Vector3(0f, 1.0f, 0f);
+            barrel.localRotation = Quaternion.Euler(-35f, 0f, 0f);
+            PropModel("cannon_barrel", barrel);
+            var barrelBody = new GameObject("BarrelBody");
+            barrelBody.transform.SetParent(barrel, false);
+            var barrelBox = barrelBody.AddComponent<BoxCollider>();
+            barrelBox.center = new Vector3(0f, 0f, 0.55f);
+            barrelBox.size = new Vector3(0.8f, 0.8f, 2.9f);
             var mouth = new GameObject("Mouth").transform;
-            mouth.SetParent(root, false);
-            float pitch = 35f * Mathf.Deg2Rad;
-            mouth.localPosition = new Vector3(0f, 1.0f, 0f) + new Vector3(0f, Mathf.Sin(pitch), Mathf.Cos(pitch)) * 2.0f;
-            mouth.localRotation = Quaternion.Euler(-35f, 0f, 0f);
+            mouth.SetParent(barrel, false);
+            mouth.localPosition = new Vector3(0f, 0f, 2.0f);
             root.gameObject.AddComponent<NetworkObject>();
             var cannon = root.gameObject.AddComponent<HumanCannon>();
+            SetRef(cannon, "_turret", turret);
+            SetRef(cannon, "_barrel", barrel);
+            SetRefs(cannon, "_wheels", wheels.ToArray());
+            SetField(cannon, "_wheelRadii", p =>
+            {
+                p.arraySize = radii.Count;
+                for (int i = 0; i < radii.Count; i++) p.GetArrayElementAtIndex(i).floatValue = radii[i];
+            });
             SetRef(cannon, "_mouth", mouth);
             SetField(cannon, "_power", p => p.floatValue = 28f); // ~25 m out: deep enough for a splash rating
             SetRef(cannon, "_audio", SpatialAudio(root.gameObject, 4f, 80f));
-            ConfigureInteractable(root.gameObject.AddComponent<Interactable>(), new Collider[] { box }, root.GetComponentsInChildren<Renderer>(), 3f);
+            ConfigureInteractable(root.gameObject.AddComponent<Interactable>(), new Collider[] { box, barrelBox }, root.GetComponentsInChildren<Renderer>(), 3f);
         }
 
         /// <summary>A wooden platform 4.5 m up with a ramp behind it, and the cable out to a post in the sea.</summary>

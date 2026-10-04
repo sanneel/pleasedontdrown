@@ -833,20 +833,43 @@ def trampoline():
 
 @prop
 def human_cannon():
-    """A circus cannon on a wooden carriage (local: the carriage's middle on the ground, the barrel aims along +z and
-    up 35 degrees; its pivot at (0, 1.0, 0), the mouth 2.0 m out along the barrel). Red barrel with yellow bands."""
+    """A circus cannon's wooden carriage (local: its middle on the ground, facing +z). The wheels (cannon_wheel,
+    cannon_wheel_small) and the barrel (cannon_barrel) are separate models, so the game can roll the wheels as the
+    cannon turns and tip the barrel up and down: big wheels at (+-0.62, 0.48, -0.5), small ones at (+-0.62, 0.32,
+    0.55), the barrel's pivot at (0, 1.0, 0)."""
     box("Carriage", (0, 0.55, -0.1), (1.0, 0.5, 1.8), "wood", bevel=0.03)
-    box("Cheek", (0, 0.95, 0.1), (1.1, 0.4, 0.8), "wood_dark", bevel=0.03)
     for side in (-1, 1):
-        lathe(f"Wheel{side}", (side * 0.62, 0.48, -0.5), [(0.0, -0.06), (0.48, -0.06), (0.48, 0.06), (0.0, 0.06)], "wood_dark", seg=20, axis='x')
-        lathe(f"Hub{side}", (side * 0.7, 0.48, -0.5), [(0.0, -0.03), (0.1, -0.03), (0.1, 0.03), (0.0, 0.03)], "yellow", seg=12, axis='x')
-        lathe(f"WheelF{side}", (side * 0.62, 0.32, 0.55), [(0.0, -0.05), (0.32, -0.05), (0.32, 0.05), (0.0, 0.05)], "wood_dark", seg=16, axis='x')
-    pitch = -35.0
-    lathe("Barrel", (0, 1.0, 0), [(0.0, -0.9), (0.42, -0.9), (0.42, -0.75), (0.36, -0.7), (0.32, 1.9), (0.4, 1.95), (0.4, 2.05), (0.3, 2.05), (0.28, 1.0), (0.0, 1.0)],
-          "red", seg=24, axis='y', rot=(90 + pitch, 0, 0))
+        box(f"Cheek{side}", (side * 0.42, 0.95, 0.0), (0.16, 0.5, 0.8), "wood_dark", bevel=0.03)
+        tube(f"Axle{side}", [(side * 0.45, 0.48, -0.5), (side * 0.6, 0.48, -0.5)], 0.05, "steel", seg=8)
+        tube(f"AxleF{side}", [(side * 0.45, 0.32, 0.55), (side * 0.6, 0.32, 0.55)], 0.04, "steel", seg=8)
+    box("Trail", (0, 0.32, -1.2), (0.35, 0.18, 0.7), "wood_dark", rot=(-12, 0, 0), bevel=0.02)
+
+def cannon_wheel_of(radius):
+    """A spoked cart wheel round the x axis (local: its hub at the origin)."""
+    rim = [(0, (radius - 0.04) * math.cos(k * math.pi / 12), (radius - 0.04) * math.sin(k * math.pi / 12)) for k in range(24)]
+    tube("Rim", rim, 0.045, "wood_dark", seg=8, closed=True)
+    lathe("Hub", (0, 0, 0), [(0.0, -0.08), (0.1, -0.08), (0.1, 0.08), (0.0, 0.08)], "yellow", seg=12, axis='x')
+    for k in range(6):
+        box(f"Spoke{k}", (0, 0, 0), (0.05, radius * 2 - 0.1, 0.05), "wood", rot=(k * 30, 0, 0), bevel=0.005)
+
+@prop
+def cannon_wheel():
+    cannon_wheel_of(0.48)
+
+@prop
+def cannon_wheel_small():
+    cannon_wheel_of(0.32)
+
+@prop
+def cannon_barrel():
+    """The human cannon's barrel (local: its pivot at the origin, the mouth 2.0 m out along +z, level). Red with
+    yellow bands, trunnions on the sides and a fuse at the back."""
+    lathe("Barrel", (0, 0, 0), [(0.0, -0.9), (0.42, -0.9), (0.42, -0.75), (0.36, -0.7), (0.32, 1.9), (0.4, 1.95), (0.4, 2.05), (0.3, 2.05), (0.28, 1.0), (0.0, 1.0)],
+          "red", seg=24, axis='y', rot=(90, 0, 0))
     for k, at in enumerate((-0.2, 0.6, 1.4)):
-        lathe(f"Band{k}", (0, 1.0, 0), [(0.37, at - 0.06), (0.39, at - 0.06), (0.39, at + 0.06), (0.37, at + 0.06)], "yellow", seg=24, axis='y', rot=(90 + pitch, 0, 0))
-    tube("Fuse", [(0, 1.0 + 0.4, -0.75), (0.05, 1.55, -0.95), (0.12, 1.6, -1.05)], 0.015, "rope_dark", seg=5)
+        lathe(f"Band{k}", (0, 0, 0), [(0.37, at - 0.06), (0.39, at - 0.06), (0.39, at + 0.06), (0.37, at + 0.06)], "yellow", seg=24, axis='y', rot=(90, 0, 0))
+    lathe("Trunnions", (0, 0, 0), [(0.0, -0.5), (0.08, -0.5), (0.08, 0.5), (0.0, 0.5)], "steel", seg=10, axis='x')
+    tube("Fuse", [(0, 0.38, -0.8), (0.05, 0.55, -1.0), (0.12, 0.6, -1.1)], 0.015, "rope_dark", seg=5)
 
 @prop
 def diving_board():
@@ -1236,7 +1259,7 @@ FLAT = {"rock", "crate", "dock"}
 VIEWS = {"watch_tower": (0.9, 0.55, 1.0), "shack": (0.9, 0.55, 1.0), "dock": (1.0, 0.9, 1.0), "drill_board": (0.5, 0.25, -1.0), "roof_sign": (0.5, 0.25, -1.0), "lost_box": (0.6, 1.0, -1.0), "towel": (0.3, 1.0, -0.6), "sunglasses": (0.7, 0.7, -1.0), "bell": (0.9, 0.2, -1.0), "sign_frame": (0.5, 0.25, -1.0), "radio": (-0.6, 0.5, 1.0),
          "first_aid_kit": (-0.6, 0.6, 1.0), "defibrillator": (0.6, 1.0, -1.0), "phone": (0.5, 1.2, -0.8), "watch": (0.6, 1.2, -0.7), "wallet": (0.6, 1.0, -1.0),
          "beach_hut": (0.8, 0.5, 1.0), "basketball_hoop": (0.9, 0.4, 1.0), "basketball": (0.6, 0.6, 1.0),
-         "trampoline": (0.9, 0.6, 1.0), "human_cannon": (1.0, 0.5, 0.6), "diving_board": (1.0, 0.5, 0.8),
+         "trampoline": (0.9, 0.6, 1.0), "human_cannon": (1.0, 0.5, 0.6), "cannon_barrel": (1.0, 0.5, 0.6), "cannon_wheel": (1.0, 0.2, 0.2), "diving_board": (1.0, 0.5, 0.8),
          "zipline_post": (1.0, 0.3, 1.0), "zipline_handle": (1.0, 0.3, 1.0),
          "banana_boat": (1.0, 0.5, 0.7)}
 for name, build in PROPS.items():

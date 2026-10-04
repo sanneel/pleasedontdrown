@@ -110,7 +110,14 @@ namespace PleaseDontDrown.Player
         }
 
         private bool Usable(Interactable candidate, float distance) =>
-            candidate != null && distance <= candidate.MaxDistance && (candidate.CanInteract(_hub) || candidate.CanSecondary(_hub));
+            candidate != null && distance <= candidate.MaxDistance && CarryAllows(candidate) && (candidate.CanInteract(_hub) || candidate.CanSecondary(_hub));
+
+        /// <summary>Carried, nothing; carrying somebody, only the human cannon (to load them in).</summary>
+        private bool CarryAllows(Interactable candidate)
+        {
+            if (PlayerCarry.IsCarried(_hub)) return false;
+            return PlayerCarry.CarriedBy(_hub) == null || candidate.GetComponent<Fun.HumanCannon>() != null;
+        }
 
         /// <summary>Nothing solid between the eye and the target (other than the target itself).</summary>
         private bool InPlainSight(Vector3 origin, Vector3 point, Interactable target)

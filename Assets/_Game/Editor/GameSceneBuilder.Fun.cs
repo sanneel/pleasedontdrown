@@ -47,7 +47,7 @@ namespace PleaseDontDrown.Editor
             BuildHoop(fun);
             BuildRingTable(fun);
             BuildBeachHut(fun);
-            BuildAttractions(fun); // trampolines, cannon, zipline, diving board, flamingo, banana boat
+            BuildAttractions(fun); // trampolines, cannon, diving board, flamingo, banana boat
         }
 
         private static Vector3 Ground(Vector3 p) => new(p.x, BeachHeight(p.x, p.z), p.z);

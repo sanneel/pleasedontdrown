@@ -65,19 +65,23 @@ namespace PleaseDontDrown.Editor
 
         public static void BuildPlayerBatch() => RunBatch(() =>
         {
+            // -pdd-out <exe>: build somewhere else (the usual exe can be locked while somebody plays it).
+            string[] cl = Environment.GetCommandLineArgs();
+            int outAt = Array.IndexOf(cl, "-pdd-out");
+            string exe = outAt >= 0 && outAt + 1 < cl.Length ? cl[outAt + 1] : BuildExe;
             Build();
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = new[] { ScenePath },
-                locationPathName = BuildExe,
+                locationPathName = exe,
                 target = BuildTarget.StandaloneWindows64,
                 options = BuildOptions.Development
             });
             if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
                 throw new Exception($"Player build {report.summary.result} with {report.summary.totalErrors} errors");
             // Steam needs the app id next to the exe when not launched through Steam.
-            File.Copy("steam_appid.txt", Path.Combine(Path.GetDirectoryName(BuildExe)!, "steam_appid.txt"), true);
-            Debug.Log($"[Build] Player: {BuildExe} ({report.summary.totalSize / (1024 * 1024)} MB)");
+            File.Copy("steam_appid.txt", Path.Combine(Path.GetDirectoryName(exe)!, "steam_appid.txt"), true);
+            Debug.Log($"[Build] Player: {exe} ({report.summary.totalSize / (1024 * 1024)} MB)");
         }, "PLAYER BUILD");
 
         private static void RunBatch(Action action, string label)
@@ -302,6 +306,11 @@ namespace PleaseDontDrown.Editor
             var combat = root.AddComponent<Combat.PlayerCombat>(); // punches, getting knocked about
             SetRef(combat, "_hub", hub);
             SetRef(combat, "_audio", SpatialAudio(root, 2f, 30f));
+
+            // Other lifeguards can pick you up (look at you, Interact) and throw you, or load you into the cannon.
+            var carry = root.AddComponent<PlayerCarry>();
+            SetRef(carry, "_hub", hub);
+            ConfigureInteractable(root.AddComponent<Interactable>(), new Collider[] { capsule }, new Renderer[] { avatarGo.GetComponent<SkinnedMeshRenderer>() }, 2.6f);
 
             var steps = root.AddComponent<PlayerFootsteps>(); // everyone's footsteps, on every machine
             SetRef(steps, "_hub", hub);
