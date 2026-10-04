@@ -32,7 +32,7 @@ namespace PleaseDontDrown.Core
             _surf.volume = Mathf.MoveTowards(_surf.volume, target, Time.unscaledDeltaTime * 0.15f);
             if (!active || Time.unscaledTime < _nextBird) return;
             _bird.pitch = UnityEngine.Random.Range(0.86f, 1.18f);
-            _bird.PlayOneShot(BeachAudio.Bird, UnityEngine.Random.Range(0.35f, 0.65f));
+            _bird.PlayOneShot(Audio.ParrotSounds.Squawk, UnityEngine.Random.Range(0.12f, 0.22f)); // distant parrots, not gulls
             _nextBird = Time.unscaledTime + UnityEngine.Random.Range(12f, 26f);
         }
     }

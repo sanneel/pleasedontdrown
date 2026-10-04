@@ -53,7 +53,7 @@ namespace PleaseDontDrown.Story
             "Have you seen my sunglasses?", "Could you rub some sunscreen on my back? ...No? OK.",
             "Ooh, a real lifeguard!", "I can't really swim, but I'm going in anyway!", "Shhh, I'm tanning.",
             "The water's lovely! You should come in!", "My husband went for a swim an hour ago...",
-            "Is that shark fin real or a costume?", "Five stars for this beach. Minus one for the seagulls."
+            "Is that shark fin real or a costume?", "Five stars for this beach. Minus one for the parrots."
         };
 
         private static readonly string[] SwimTalk =

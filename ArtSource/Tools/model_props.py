@@ -929,6 +929,33 @@ def banana_boat():
         return None
     paint(ob, pick)
 
+@prop
+def parrot():
+    """A cartoon macaw perched upright (local: its feet at the origin, beak toward +z, 0.6 m tall): a red body and
+    head, white cheeks, big googly eyes, a hooked yellow beak and a long blue-and-red tail hanging behind. The wings
+    are a separate model (parrot_wing) so the game can flap them: shoulders at (+-0.1, 0.3, -0.02)."""
+    blob("Body", (0, 0.24, -0.02), (0.11, 0.16, 0.12), "red", subdiv=3, rough=0.03, rot=(-15, 0, 0))
+    blob("Head", (0, 0.43, 0.05), (0.095, 0.095, 0.1), "red", subdiv=3, rough=0.02)
+    blob("Belly", (0, 0.2, 0.06), (0.08, 0.1, 0.06), "orange", subdiv=2, rough=0.03)
+    for side in (-1, 1):
+        blob(f"Cheek{side}", (side * 0.065, 0.42, 0.1), (0.03, 0.045, 0.04), "white", subdiv=2, rough=0.0)
+        blob(f"Eye{side}", (side * 0.07, 0.47, 0.11), (0.04, 0.04, 0.025), "white", subdiv=2, rough=0.0)
+        blob(f"Pupil{side}", (side * 0.078, 0.465, 0.132), (0.018, 0.018, 0.01), "black", subdiv=1, rough=0.0)
+        box(f"Foot{side}", (side * 0.045, 0.015, 0.03), (0.035, 0.03, 0.07), "dark", bevel=0.01)
+        box(f"Leg{side}", (side * 0.045, 0.06, 0.0), (0.03, 0.08, 0.03), "dark", bevel=0.01)
+    lathe("Beak", (0, 0.43, 0.13), [(0.045, 0.0), (0.04, 0.03), (0.025, 0.06), (0.0, 0.09)], "yellow", seg=12, axis='z', rot=(35, 0, 0))
+    lathe("BeakLow", (0, 0.4, 0.13), [(0.028, 0.0), (0.018, 0.03), (0.0, 0.045)], "dark", seg=10, axis='z', rot=(10, 0, 0))
+    box("TailBlue", (0, 0.04, -0.2), (0.07, 0.02, 0.38), "blue", rot=(-58, 0, 0), bevel=0.008)
+    box("TailRed", (0, 0.06, -0.17), (0.05, 0.022, 0.32), "red", rot=(-55, 0, 0), bevel=0.008)
+
+@prop
+def parrot_wing():
+    """One parrot wing (local: the shoulder at the origin, folded down the side and back along -z; the left wing,
+    mirror it for the right): blue on top with a yellow band and a green edge."""
+    blob("Wing", (0.02, -0.08, -0.07), (0.03, 0.1, 0.15), "blue", subdiv=2, rough=0.04, rot=(-25, 0, 0))
+    blob("Band", (0.035, -0.04, -0.02), (0.02, 0.06, 0.09), "yellow", subdiv=2, rough=0.02, rot=(-25, 0, 0))
+    blob("Tip", (0.015, -0.15, -0.19), (0.025, 0.05, 0.08), "green", subdiv=2, rough=0.03, rot=(-35, 0, 0))
+
 # The watch tower and the shack, modelled clean (boards, trims, glass, roofs) to the very sizes the scene builder's
 # colliders use (MeshyArt.Tower / MeshyArt.Shack at TowerScale 1.2 x widen 1.5, ShackScale 1.45), so they drop in
 # where the Meshy scans were: the door gaps, decks, floors, walls and stairs all line up with what you walk on.
@@ -1261,7 +1288,7 @@ VIEWS = {"watch_tower": (0.9, 0.55, 1.0), "shack": (0.9, 0.55, 1.0), "dock": (1.
          "beach_hut": (0.8, 0.5, 1.0), "basketball_hoop": (0.9, 0.4, 1.0), "basketball": (0.6, 0.6, 1.0),
          "trampoline": (0.9, 0.6, 1.0), "human_cannon": (1.0, 0.5, 0.6), "cannon_barrel": (1.0, 0.5, 0.6), "cannon_wheel": (1.0, 0.2, 0.2), "diving_board": (1.0, 0.5, 0.8),
          "zipline_post": (1.0, 0.3, 1.0), "zipline_handle": (1.0, 0.3, 1.0),
-         "banana_boat": (1.0, 0.5, 0.7)}
+         "banana_boat": (1.0, 0.5, 0.7), "parrot": (0.8, 0.35, 1.0), "parrot_wing": (1.0, 0.3, 0.3)}
 for name, build in PROPS.items():
     if only and name not in only: continue
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']: bpy.data.objects.remove(ob)

@@ -48,6 +48,7 @@ namespace PleaseDontDrown.Editor
             BuildRingTable(fun);
             BuildBeachHut(fun);
             BuildAttractions(fun); // trampolines, cannon, diving board, flamingo, banana boat
+            BuildParrots(env, fun); // instead of seagulls (GameSceneBuilder.Parrots.cs)
         }
 
         private static Vector3 Ground(Vector3 p) => new(p.x, BeachHeight(p.x, p.z), p.z);

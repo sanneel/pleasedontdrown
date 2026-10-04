@@ -71,9 +71,12 @@ namespace PleaseDontDrown.Avatars
         public void SetShadowsOnly(bool shadowsOnly)
         {
             _shadowsOnly = shadowsOnly;
+            // Every renderer in each part, children too: the googly eyes' pupils (and bits of hats and glasses) sit on
+            // child objects, and left visible they float in front of your own first-person camera.
             foreach (GameObject part in _parts)
-                if (part != null && part.TryGetComponent(out MeshRenderer r))
-                    r.shadowCastingMode = shadowsOnly ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+                if (part != null)
+                    foreach (Renderer r in part.GetComponentsInChildren<Renderer>(true))
+                        r.shadowCastingMode = shadowsOnly ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
         }
 
         private void Apply(AvatarRig rig, AvatarBody body, AvatarLook look)
