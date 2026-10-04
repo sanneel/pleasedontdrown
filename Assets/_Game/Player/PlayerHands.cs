@@ -254,6 +254,13 @@ namespace PleaseDontDrown.Player
                 spin = live ? body.angularVelocity : Vector3.zero;
                 if (charge > 0f)
                     velocity += AimTransform.forward * (charge * _maxThrowSpeed * item.ThrowStrength);
+                // A basketball thrown at a hoop goes on a proper arc (Fun.BasketballHoop.TryAssist).
+                if (charge > 0f && item.DisplayName == Fun.BasketballHoop.BallName && live &&
+                    Fun.BasketballHoop.TryAssist(body.position, AimTransform.forward, charge, body.linearDamping, out Vector3 shot))
+                {
+                    velocity = shot;
+                    spin = Vector3.Cross(new Vector3(shot.x, 0f, shot.z).normalized, Vector3.up) * 8f; // backspin
+                }
             }
 
             StopEating();

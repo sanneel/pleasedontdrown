@@ -779,9 +779,10 @@ namespace PleaseDontDrown.Editor
         private const string OceanShaderPath = "Assets/_Game/Data/Shaders/Ocean.shader";
 
         // The island: a rounded rectangle of sand whose long side (the station beach) faces the open sea toward -z.
-        private static readonly Vector2 IslandCenter = new(0f, 38f);
-        private static readonly Vector2 IslandHalfSize = new(80f, 34f);
-        private const float IslandCornerRadius = 28f;
+        // Island 1: 112 x 48 m (it was 160 x 68: lots of empty sand); the station beach's front edge is still z = 4.
+        private static readonly Vector2 IslandCenter = new(0f, 28f);
+        private static readonly Vector2 IslandHalfSize = new(56f, 24f);
+        private const float IslandCornerRadius = 14f;
         // Reaches far west for the dev island (and the sea round its 150 m range target).
         private const float TerrainMinX = -400f, TerrainMaxX = 160f, TerrainMinZ = -380f, TerrainMaxZ = 150f, TerrainStep = 2f;
 

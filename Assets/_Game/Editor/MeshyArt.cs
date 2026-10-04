@@ -66,8 +66,8 @@ namespace PleaseDontDrown.Editor
         public static readonly Vector2[] PalmSpots =
         {
             new(-13f, 12f), new(-18f, 21f), new(13f, 19f), new(23f, 11f), new(-26f, 8f), new(28f, 24f),
-            new(-40f, 16f), new(-52f, 31f), new(-34f, 44f), new(-12f, 52f), new(8f, 38f), new(20f, 58f),
-            new(44f, 20f), new(58f, 37f), new(40f, 47f), new(-64f, 18f)
+            new(-40f, 16f), new(-48f, 31f), new(-34f, 42f), new(-12f, 45f), new(8f, 38f), new(22f, 44f),
+            new(44f, 20f), new(48f, 34f), new(38f, 42f), new(-50f, 20f)
         };
 
         public static System.Collections.Generic.List<GameObject> Palms(Transform env, Func<float, float, float> groundHeight)

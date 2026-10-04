@@ -33,6 +33,9 @@ namespace PleaseDontDrown.Editor
             {
                 SetBool(go.GetComponent<Item>(), "_pocketable", true);
                 SetRef(go.AddComponent<BallSounds>(), "_audio", SpatialAudio(go, 1.5f, 30f));
+                // Continuous, not Continuous Speculative: speculative contacts ghost-bounced fast balls off the thin
+                // rim before they got there (long shots went in 1 time in 10). The rim is static, so Continuous sweeps it.
+                go.GetComponent<Rigidbody>().collisionDetectionMode = CollisionDetectionMode.Continuous;
             });
             yield return ball;
         }
@@ -44,6 +47,7 @@ namespace PleaseDontDrown.Editor
             BuildHoop(fun);
             BuildRingTable(fun);
             BuildBeachHut(fun);
+            BuildAttractions(fun); // trampolines, cannon, zipline, soccer goal, diving board, flamingo
         }
 
         private static Vector3 Ground(Vector3 p) => new(p.x, BeachHeight(p.x, p.z), p.z);

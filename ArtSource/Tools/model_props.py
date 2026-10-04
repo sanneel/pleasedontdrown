@@ -814,6 +814,86 @@ def basketball():
     paint(ob, pick)
 
 
+@prop
+def trampoline():
+    """A round beach trampoline 2.8 m across (local: centre of the ground under it): black mat 0.75 m up, blue padded
+    rim, six bent steel legs, and springs round the edge."""
+    R, H = 1.4, 0.75
+    lathe("Mat", (0, H, 0), [(0.0, 0.0), (R - 0.12, 0.0), (R - 0.12, -0.02), (0.0, -0.02)], "black", seg=32)
+    tube("Pad", circle((0, H + 0.02, 0), R, n=40), 0.09, "blue", seg=10, closed=True)
+    tube("Frame", circle((0, H - 0.06, 0), R, n=40), 0.035, "steel", seg=8, closed=True)
+    for i in range(6):
+        t = 2 * math.pi * i / 6
+        c, s = math.cos(t), math.sin(t)
+        tube(f"Leg{i}", [(c * R, H - 0.06, s * R), (c * (R + 0.05), 0.35, s * (R + 0.05)), (c * (R - 0.1), 0.02, s * (R - 0.1))], 0.03, "steel", seg=8)
+    for i in range(24):
+        t = 2 * math.pi * (i + 0.5) / 24
+        c, s = math.cos(t), math.sin(t)
+        tube(f"Spring{i}", [(c * (R - 0.12), H - 0.01, s * (R - 0.12)), (c * (R - 0.02), H - 0.04, s * (R - 0.02))], 0.012, "steel", seg=5)
+
+@prop
+def human_cannon():
+    """A circus cannon on a wooden carriage (local: the carriage's middle on the ground, the barrel aims along +z and
+    up 35 degrees; its pivot at (0, 1.0, 0), the mouth 2.0 m out along the barrel). Red barrel with yellow bands."""
+    box("Carriage", (0, 0.55, -0.1), (1.0, 0.5, 1.8), "wood", bevel=0.03)
+    box("Cheek", (0, 0.95, 0.1), (1.1, 0.4, 0.8), "wood_dark", bevel=0.03)
+    for side in (-1, 1):
+        lathe(f"Wheel{side}", (side * 0.62, 0.48, -0.5), [(0.0, -0.06), (0.48, -0.06), (0.48, 0.06), (0.0, 0.06)], "wood_dark", seg=20, axis='x')
+        lathe(f"Hub{side}", (side * 0.7, 0.48, -0.5), [(0.0, -0.03), (0.1, -0.03), (0.1, 0.03), (0.0, 0.03)], "yellow", seg=12, axis='x')
+        lathe(f"WheelF{side}", (side * 0.62, 0.32, 0.55), [(0.0, -0.05), (0.32, -0.05), (0.32, 0.05), (0.0, 0.05)], "wood_dark", seg=16, axis='x')
+    pitch = -35.0
+    lathe("Barrel", (0, 1.0, 0), [(0.0, -0.9), (0.42, -0.9), (0.42, -0.75), (0.36, -0.7), (0.32, 1.9), (0.4, 1.95), (0.4, 2.05), (0.3, 2.05), (0.28, 1.0), (0.0, 1.0)],
+          "red", seg=24, axis='y', rot=(90 + pitch, 0, 0))
+    for k, at in enumerate((-0.2, 0.6, 1.4)):
+        lathe(f"Band{k}", (0, 1.0, 0), [(0.37, at - 0.06), (0.39, at - 0.06), (0.39, at + 0.06), (0.37, at + 0.06)], "yellow", seg=24, axis='y', rot=(90 + pitch, 0, 0))
+    tube("Fuse", [(0, 1.0 + 0.4, -0.75), (0.05, 1.55, -0.95), (0.12, 1.6, -1.05)], 0.015, "rope_dark", seg=5)
+
+@prop
+def soccer_goal():
+    """A beach soccer goal 3 m wide and 1.6 m high (local: the goal line's middle on the ground, the mouth faces +z,
+    the net goes back 1.2 m)."""
+    W, H, D = 3.0, 1.6, 1.2
+    tube("Frame", [(-W / 2, 0, 0), (-W / 2, H, 0), (W / 2, H, 0), (W / 2, 0, 0)], 0.05, "white", seg=10)
+    tube("BackL", [(-W / 2, H, 0), (-W / 2, 0.0, -D)], 0.025, "white", seg=6)
+    tube("BackR", [(W / 2, H, 0), (W / 2, 0.0, -D)], 0.025, "white", seg=6)
+    tube("Ground", [(-W / 2, 0.02, -D), (W / 2, 0.02, -D)], 0.025, "white", seg=6)
+    for i in range(13):
+        x = -W / 2 + W * i / 12
+        tube(f"NetV{i}", [(x, H, 0), (x, 0.02, -D)], 0.006, "grey", seg=4)
+    for j in range(1, 7):
+        t = j / 7
+        tube(f"NetH{j}", [(-W / 2, H * (1 - t), -D * t), (W / 2, H * (1 - t), -D * t)], 0.006, "grey", seg=4)
+
+@prop
+def diving_board():
+    """A springboard (local: its foot at the origin on the dock, the board reaching 2.6 m out along +z, 0.45 m up):
+    a white board with a blue grip strip on a red fulcrum and a steel base."""
+    box("Base", (0, 0.12, 0.2), (0.6, 0.24, 0.6), "steel", bevel=0.02)
+    box("Fulcrum", (0, 0.3, 0.9), (0.55, 0.3, 0.2), "red", bevel=0.03)
+    box("Board", (0, 0.45, 1.3), (0.55, 0.07, 2.6), "white", bevel=0.02)
+    box("Grip", (0, 0.488, 1.6), (0.45, 0.01, 1.8), "blue", bevel=0)
+    for side in (-1, 1):
+        tube(f"Rail{side}", [(side * 0.32, 0.24, 0.0), (side * 0.32, 1.0, 0.0), (side * 0.32, 1.0, 0.5), (side * 0.32, 0.5, 0.75)], 0.025, "steel", seg=8)
+
+@prop
+def zipline_post():
+    """The zipline's far end: a tall post standing in the sea with a crossbar and a red-and-white float ring
+    (local: foot on the seabed at the origin; the cable's eye 6.5 m up)."""
+    tube("Post", [(0, 0, 0), (0, 7.0, 0)], 0.16, "wood_dark", seg=12)
+    box("Cross", (0, 6.5, 0), (1.2, 0.18, 0.18), "wood", bevel=0.02)
+    lathe("Eye", (0, 6.5, 0.2), [(0.08, -0.03), (0.13, -0.03), (0.13, 0.03), (0.08, 0.03)], "steel", seg=12, axis='z')
+    for k in range(6):
+        lathe(f"Stripe{k}", (0, 4.6 + k * 0.25, 0), [(0.17, 0), (0.19, 0), (0.19, 0.25), (0.17, 0.25)], "red" if k % 2 == 0 else "white", seg=12)
+
+@prop
+def zipline_handle():
+    """The trolley you hang from (local: the wheels on the cable at the origin, the bar 0.55 m below)."""
+    box("Trolley", (0, 0, 0), (0.12, 0.16, 0.3), "steel", bevel=0.02)
+    for z in (-0.09, 0.09):
+        lathe(f"Wheel{z}", (0, 0.05, z), [(0.0, -0.025), (0.06, -0.025), (0.06, 0.025), (0.0, 0.025)], "dark", seg=12, axis='x')
+    tube("Straps", [(-0.25, -0.55, 0), (0, -0.05, 0), (0.25, -0.55, 0)], 0.015, "yellow", seg=6)
+    tube("Bar", [(-0.3, -0.55, 0), (0.3, -0.55, 0)], 0.025, "black", seg=8)
+
 # The watch tower and the shack, modelled clean (boards, trims, glass, roofs) to the very sizes the scene builder's
 # colliders use (MeshyArt.Tower / MeshyArt.Shack at TowerScale 1.2 x widen 1.5, ShackScale 1.45), so they drop in
 # where the Meshy scans were: the door gaps, decks, floors, walls and stairs all line up with what you walk on.
@@ -1143,7 +1223,9 @@ only = [n for n in a.only.split(",") if n]
 FLAT = {"rock", "crate", "dock"}
 VIEWS = {"watch_tower": (0.9, 0.55, 1.0), "shack": (0.9, 0.55, 1.0), "dock": (1.0, 0.9, 1.0), "drill_board": (0.5, 0.25, -1.0), "roof_sign": (0.5, 0.25, -1.0), "lost_box": (0.6, 1.0, -1.0), "towel": (0.3, 1.0, -0.6), "sunglasses": (0.7, 0.7, -1.0), "bell": (0.9, 0.2, -1.0), "sign_frame": (0.5, 0.25, -1.0), "radio": (-0.6, 0.5, 1.0),
          "first_aid_kit": (-0.6, 0.6, 1.0), "defibrillator": (0.6, 1.0, -1.0), "phone": (0.5, 1.2, -0.8), "watch": (0.6, 1.2, -0.7), "wallet": (0.6, 1.0, -1.0),
-         "beach_hut": (0.8, 0.5, 1.0), "basketball_hoop": (0.9, 0.4, 1.0), "basketball": (0.6, 0.6, 1.0)}
+         "beach_hut": (0.8, 0.5, 1.0), "basketball_hoop": (0.9, 0.4, 1.0), "basketball": (0.6, 0.6, 1.0),
+         "trampoline": (0.9, 0.6, 1.0), "human_cannon": (1.0, 0.5, 0.6), "soccer_goal": (0.8, 0.5, 1.0), "diving_board": (1.0, 0.5, 0.8),
+         "zipline_post": (1.0, 0.3, 1.0), "zipline_handle": (1.0, 0.3, 1.0)}
 for name, build in PROPS.items():
     if only and name not in only: continue
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']: bpy.data.objects.remove(ob)

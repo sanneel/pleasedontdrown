@@ -268,7 +268,7 @@ namespace PleaseDontDrown.Story
             robber.ServerSetMood(AvatarMood.Scared);
             robber.ServerSetHealth(0, 0);
             robber.ServerFlee(false, _island1.LandArea);
-            robber.ServerMoveTo(new Vector3(-70f, 0f, 45f), run: true);
+            robber.ServerMoveTo(new Vector3(-44f, 0f, 40f), run: true); // off to the far corner of the island
             victim.ServerSetPose(AvatarPose.Normal);
             victim.ServerSetMood(AvatarMood.Happy);
             yield return Say(victim, "My wallet! Could you give it to Sandy at the Lost & Found? I'll pick it up there.");
@@ -469,7 +469,7 @@ namespace PleaseDontDrown.Story
             NoMarker();
             robber.ServerSetPose(AvatarPose.Normal);
             robber.ServerSetHealth(0, 0);
-            robber.ServerMoveTo(new Vector3(70f, 0f, 45f), run: true);
+            robber.ServerMoveTo(new Vector3(44f, 0f, 40f), run: true);
             robber.ServerShout("Thank you! You'll never see me again!", false);
             StartCoroutine(RemoveLater(robber, 12f));
             yield return new WaitForSeconds(1f);

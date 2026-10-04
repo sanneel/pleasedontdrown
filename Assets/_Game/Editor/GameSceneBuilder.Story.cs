@@ -447,6 +447,7 @@ namespace PleaseDontDrown.Editor
                 new(DevPadOnIsland1.x, DevPadOnIsland1.z, 3f)
             };
             foreach (Vector2 palm in MeshyArt.PalmSpots) list.Add(new Vector3(palm.x, palm.y, 1.8f));
+            list.AddRange(AttractionSpots()); // hoop, trampolines, cannon, zipline, goal... (GameSceneBuilder.Attractions.cs)
             return list;
         }
 
