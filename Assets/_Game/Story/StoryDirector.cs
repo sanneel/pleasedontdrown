@@ -99,6 +99,7 @@ namespace PleaseDontDrown.Story
         // What the beats wait for (host).
         private readonly HashSet<VictimBrain> _waveTourists = new();
         private readonly List<VictimBrain> _rescued = new();
+        private readonly Dictionary<VictimBrain, VictimEvent> _howRescued = new();
         private readonly List<LostAndFound.HandedIn> _handedIn = new();
         private readonly List<(StoryNpc npc, PlayerHub by)> _talks = new();
         private readonly List<StoryNpc> _defeated = new();
@@ -230,6 +231,7 @@ namespace PleaseDontDrown.Story
         private void StartAt(int index)
         {
             StopAllCoroutines(); // the beat and anything it started (waving, delayed lines...)
+            _hints = null;
             _waitingForTalk = false;
             foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
             if (_sandy != null && index > 0) StartCoroutine(SandyGoesHome()); // interrupted mid-walk: back to the kiosk
@@ -265,6 +267,7 @@ namespace PleaseDontDrown.Story
             _defeated.Clear();
             _purchases.Clear();
             _waveTourists.Clear();
+            _howRescued.Clear();
         }
 
         private void CleanupActors()
@@ -347,6 +350,7 @@ namespace PleaseDontDrown.Story
         {
             bool rescued = e is VictimEvent.Saved or VictimEvent.SelfRescue or VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized;
             if (rescued && victim.State != VictimState.Injured) _rescued.Add(victim);
+            if (rescued) _howRescued[victim] = e; // what they say afterwards depends on it (kissed, slapped, zapped...)
             // For the chapter's report card (someone pulled out and then revived is one rescue, not two).
             if (e is VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized or VictimEvent.SelfRescue ||
                 (e == VictimEvent.Saved && victim.State == VictimState.Saved)) _chapterRescued++;
@@ -593,39 +597,6 @@ namespace PleaseDontDrown.Story
             float ground = Shore.GroundHeightAt(p + Vector3.up * 5f);
             if (!float.IsNaN(ground)) p.y = ground;
             return p;
-        }
-
-        /// <summary>
-        /// Rescue <paramref name="count"/> tourists, one or two at a time. <paramref name="profileFor"/> decides each one
-        /// (0-based). Someone lost to the rival company is replaced; the count only goes up for rescues.
-        /// </summary>
-        private IEnumerator RescueWave(IslandSetup island, int count, string objective, Func<int, TouristProfile> profileFor, int atOnce = 1)
-        {
-            _island = island;
-            int done = 0, spawned = 0;
-            float nextSpawn = Time.time + 2f;
-            _rescued.Clear();
-            SetObjective(objective, 0, count);
-            while (done < count)
-            {
-                foreach (VictimBrain v in _rescued)
-                    if (_waveTourists.Remove(v)) done++;
-                _rescued.Clear();
-                _progress.Value = done;
-                if (done >= count) break;
-
-                // Lost to the rival company (or despawned): someone else will need saving instead.
-                _waveTourists.RemoveWhere(v => v == null || !v.IsSpawned || v.State == VictimState.Lost);
-                int active = _waveTourists.Count;
-                if (active < atOnce && done + active < count && Time.time >= nextSpawn)
-                {
-                    // The slot being filled decides the profile, so a lost woman is replaced by a woman.
-                    if (SpawnStoryTourist(island, profileFor(done + active)) != null) spawned++;
-                    nextSpawn = Time.time + _spawnGap;
-                }
-                yield return new WaitForSeconds(0.25f);
-            }
-            _progress.Value = count;
         }
 
         private TouristProfile Profile(IslandSetup island, int figure, bool silent = false, float flatline = -1f)

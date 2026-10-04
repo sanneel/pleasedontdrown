@@ -240,7 +240,23 @@ namespace PleaseDontDrown.Dev
                 }
             }
 
+            if (beat == "1.8") yield return WadeToFalseAlarm(me);
             if (beat == "1.10") yield return RideToIsland2(me);
+        }
+
+        /// <summary>The false alarm: walk up to whoever is screaming in the shallows (the marker is on them).</summary>
+        private IEnumerator WadeToFalseAlarm(PlayerHub me)
+        {
+            Vector3? marker = StoryDirector.Instance.MarkerPosition;
+            if (marker == null) yield break;
+            Vector3 at = marker.Value - Vector3.up * 2.1f;
+            Vector3 stand = at + Shoreward(at) * 1.6f;
+            float ground = Shore.GroundHeightAt(stand + Vector3.up * 3f);
+            if (!float.IsNaN(ground)) stand.y = ground + 0.2f;
+            me.Motor.Teleport(stand);
+            me.Look.LookAt(at + Vector3.up * 1.5f);
+            yield return new WaitForSeconds(1f);
+            Tagged("falsealarm", me);
         }
 
         private static string FirstWord(string name)

@@ -48,6 +48,8 @@ namespace PleaseDontDrown.Story
         public static event Action<ShopCounter, PlayerHub, string> ServerPurchased;
 
         public string Title => _title;
+        /// <summary>Where bought things are put down on the counter.</summary>
+        public Vector3 HandOverPoint => _spawnPoint != null ? _spawnPoint.position : transform.position + Vector3.up * 1.2f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => ServerPurchased = null;
@@ -251,7 +253,7 @@ namespace PleaseDontDrown.Story
                 Tell(buyer.Owner, $"Not enough money: the {prefab.DisplayName} costs ${product.Price} (you have ${Economy.Money}).");
                 return false;
             }
-            Vector3 at = _spawnPoint != null ? _spawnPoint.position : transform.position + Vector3.up * 1.2f;
+            Vector3 at = HandOverPoint;
             Item bought = Instantiate(prefab, at, Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
             Spawn(bought.gameObject);
             BoughtObservers(prefab.DisplayName, price, at);

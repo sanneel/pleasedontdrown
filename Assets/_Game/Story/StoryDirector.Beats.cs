@@ -57,21 +57,22 @@ namespace PleaseDontDrown.Story
         {
             _beats.Clear();
             void Add(string id, string title, System.Func<IEnumerator> run) => _beats.Add(new Beat { Id = id, Title = title, Run = run });
+            // Three rescues per island (1.2, 1.5, 1.6 and 2.3, 2.4, 2.5); the rest is the story and its jokes.
             Add("1.1", "Meet Sandy", MeetSandy);
-            Add("1.2", "First shift", FirstShift);
+            Add("1.2", "First rescue", FirstShift);
             Add("1.3", "The thief", Thief);
             Add("1.4", "Return the loot", ReturnLoot);
-            Add("1.5", "Three more", ThreeMen);
+            Add("1.5", "Another one", AnotherOne);
             Add("1.6", "The silent one", SilentOne);
             Add("1.7", "Drugs?", DrugReveal);
-            Add("1.8", "One more", OneMore);
+            Add("1.8", "False alarm", FalseAlarm);
             Add("1.9", "The thief again", ThiefAgain);
             Add("1.10", "Leave the island", LeaveIsland);
             Add("2.1", "Check in", CheckIn);
             Add("2.2", "Buy a weapon", BuyWeapon);
             Add("2.3", "Harder work", HarderWork);
             Add("2.4", "Shark!", SharkAttack);
-            Add("2.5", "Two more", TwoMore);
+            Add("2.5", "One more guest", OneMoreGuest);
             Add("2.6", "Pirates", Pirates);
             Add("2.7", "Your boat now", TheBoat);
         }
@@ -162,21 +163,24 @@ namespace PleaseDontDrown.Story
             }
         }
 
+        private int _firstFigure = -1;
+
         private IEnumerator FirstShift()
         {
             _island = _island1;
             NoMarker();
-            // Five tourists, three of them women: F, M, F, M, F. Sandy shouts tips the first time each thing happens.
-            Coroutine hints = StartCoroutine(GuideHints());
-            yield return RescueWave(_island1, 5, "Rescue tourists", i => Profile(_island1, i % 2 == 0 ? 1 : 0));
-            StopCoroutine(hints);
-            yield return Say(_sandy, "Five in one morning! Not bad, not bad at all.");
+            // One tourist, a man or a woman; the next rescue (1.5) is the other, so both kinds of CPR come up. Sandy
+            // shouts tips the first time each thing happens, through both.
+            _firstFigure = Random.Range(0, 2);
+            StartHints();
+            yield return GagRescue(_island1, PickGag(Island1Gags, _firstFigure), Profile(_island1, _firstFigure), _sandy, "(shouting) ", "Rescue the tourist");
+            yield return Say(_sandy, "(shouting) You did it! See? Nothing to it!");
         }
 
         /// <summary>Sandy is the guide: the first time each step of a rescue comes up, she shouts what to do.</summary>
         private IEnumerator GuideHints()
         {
-            bool spotted = false, towing = false, cpr = false, breath = false, punch = false, revived = false, found = false;
+            bool spotted = false, towing = false, cpr = false, breath = false, punch = false, found = false;
             while (true)
             {
                 foreach (VictimBrain v in VictimBrain.All)
@@ -199,17 +203,12 @@ namespace PleaseDontDrown.Story
                     else if (!breath && v.State == VictimState.Unconscious && v.NextCprStep == CprStep.Breath)
                     {
                         breath = true;
-                        StartCoroutine(Say(_sandy, "(shouting) Now give her air! Mouth-to-mouth! Right mouse!"));
+                        StartCoroutine(Say(_sandy, "(shouting) Now give her air! Mouth-to-mouth! Press F!"));
                     }
                     else if (!punch && v.State == VictimState.Unconscious && v.NextCprStep == CprStep.Punch)
                     {
                         punch = true;
-                        StartCoroutine(Say(_sandy, "(shouting) Men are tougher. Wake him up: punch him right in the face! Right mouse!"));
-                    }
-                    else if (!revived && v.State == VictimState.Saved)
-                    {
-                        revived = true;
-                        StartCoroutine(Say(_sandy, "(shouting) You did it! See? Nothing to it!"));
+                        StartCoroutine(Say(_sandy, "(shouting) Men are tougher. Slap him awake! Left mouse, right across the face!"));
                     }
                 }
                 if (!found)
@@ -328,9 +327,13 @@ namespace PleaseDontDrown.Story
             _sandy.ServerSetMood(AvatarMood.Neutral);
         }
 
-        private IEnumerator ThreeMen()
+        private IEnumerator AnotherOne()
         {
-            yield return RescueWave(_island1, 3, "Rescue tourists", _ => Profile(_island1, 0));
+            _island = _island1;
+            int figure = _firstFigure >= 0 ? 1 - _firstFigure : Random.Range(0, 2); // the one CPR the first rescue didn't need
+            StartHints();
+            yield return GagRescue(_island1, PickGag(Island1Gags, figure), Profile(_island1, figure), _sandy, "(shouting) ", "Rescue the tourist");
+            StopHints();
         }
 
         private IEnumerator SilentOne()
@@ -338,7 +341,7 @@ namespace PleaseDontDrown.Story
             _island = _island1;
             TouristProfile profile = Profile(_island1, 1, silent: true);
             profile.SecondsToUnconscious = 14f; // she's been going under for a while already
-            profile.Name = "Jenny";
+            profile.Name = Pick(new[] { "Jenny", "Tina", "Lola" });
             VictimBrain her = null;
             StoryNpc friend = null;
             _rescued.Clear();
@@ -402,7 +405,7 @@ namespace PleaseDontDrown.Story
                 friend.ServerKeepShouting(null, Vector3.zero);
                 friend.ServerSetPose(AvatarPose.Normal);
                 friend.ServerSetMood(AvatarMood.Happy);
-                friend.ServerShout("JENNY! Oh thank god!", false);
+                friend.ServerShout($"{her.Name.ToUpperInvariant()}! Oh thank god!", false);
             }
             _silentFriend = friend;
             _silentOne = her;
@@ -430,11 +433,6 @@ namespace PleaseDontDrown.Story
                 else StartCoroutine(RemoveLater(_silentFriend, 25f));
             }
             _silentFriend = null;
-        }
-
-        private IEnumerator OneMore()
-        {
-            yield return RescueWave(_island1, 1, "Rescue tourists", _ => Profile(_island1, 0));
         }
 
         private IEnumerator ThiefAgain()
@@ -536,21 +534,25 @@ namespace PleaseDontDrown.Story
             EnsureOnIsland2();
             if (_reception != null) _reception.ServerSetAvailable(true);
             _purchases.Clear();
-            float nextHelp = Time.time + 25f;
             Transform desk = _receptionDesk != null ? _receptionDesk : _receptionist.transform;
+            bool credit = false;
             while (!_purchases.Contains("Pistol"))
             {
                 int money = Economy.Money;
-                SetObjective(money >= _pistolPrice
-                    ? $"Buy the pistol at reception (${_pistolPrice})"
-                    : $"Buy the pistol at reception (${_pistolPrice}, you have ${money}: rescue guests to earn more)");
+                SetObjective($"Buy the pistol at reception (${_pistolPrice})");
                 Marker("Reception", desk.position + Vector3.up * 1.2f);
-                // Short on money: guests keep getting into trouble so you can earn it.
-                _waveTourists.RemoveWhere(v => v == null || !v.IsSpawned || !v.State.NeedsHelp());
-                if (money < _pistolPrice && _waveTourists.Count == 0 && Time.time > nextHelp)
+                // Short on money (three rescues an island don't always pay for it): no extra rescues to grind, Marisol
+                // takes whatever the team has once somebody comes to the desk.
+                if (!credit && money < _pistolPrice && StoryNpc.NearestPlayer(desk.position, 4f) != null)
                 {
-                    SpawnStoryTourist(_island2, Profile(_island2, -1, flatline: 0f));
-                    nextHelp = Time.time + 20f;
+                    credit = true;
+                    _receptionist.ServerSetMood(AvatarMood.Scared);
+                    yield return Say(_receptionist, money > 0 ? $"${money}? That's... that's all you have? Oh, honey." : "You have NOTHING? Not one dollar? Oh, honey.");
+                    _receptionist.ServerSetMood(AvatarMood.Neutral);
+                    yield return Say(_receptionist, "Fine. Take it. You'll pay me back in rescues. Don't tell the manager. ...I AM the manager. Don't tell me.");
+                    if (money > 0 && Economy.Instance != null) Economy.Instance.ServerSpend(money, "the pistol, on credit");
+                    SpawnItem("Pistol", _reception != null ? _reception.HandOverPoint : desk.position + Vector3.up * 1.2f);
+                    _purchases.Add("Pistol");
                 }
                 yield return new WaitForSeconds(0.3f);
             }
@@ -571,19 +573,25 @@ namespace PleaseDontDrown.Story
             _island = _island2;
             EnsureOnIsland2();
             TitleObservers("SHIFT STARTS", "Guests pass out in 10 seconds here");
-            // The second guest flatlines almost at once: that's what the defibrillator is for.
-            yield return RescueWave(_island2, 3, "Rescue hotel guests (they pass out in 10 s!)", i => Profile(_island2, i == 1 ? 1 : -1, flatline: i == 1 ? 3f : -1f));
+            // Out cold, this one flatlines almost at once: that's what the defibrillator is for.
+            _guestFigure = Random.Range(0, 2);
+            yield return GagRescue(_island2, PickGag(Island2Gags, _guestFigure), Profile(_island2, _guestFigure, flatline: 3f), _receptionist,
+                "(over the speaker) ", "Rescue the hotel guest (they pass out in 10 s!)");
         }
+
+        private int _guestFigure = -1;
 
         private IEnumerator SharkAttack()
         {
             _island = _island2;
             EnsureOnIsland2();
+            string bitten = Pick(new[] { "Todd", "Barry", "Duncan" });
             while (true)
             {
                 TouristProfile profile = Profile(_island2, 0);
                 profile.SecondsToUnconscious = 35f; // the bite is the problem, not the swimming
-                profile.Name = "Todd";
+                profile.Name = bitten;
+                profile.Shouts = "I'M FINE, IT'S A DOLPHIN!|THAT'S NOT A DOLPHIN!|WHY IS THE DOLPHIN SO BIG?!";
                 VictimBrain guest = SpawnStoryTourist(_island2, profile, 2f, 6f);
                 if (guest == null)
                 {
@@ -622,14 +630,17 @@ namespace PleaseDontDrown.Story
                 SetObjective("He didn't make it in time. The rival company's helicopter is circling...");
                 yield return new WaitForSeconds(4f);
             }
+            yield return Say(bitten, "My leg... Do you think the hotel will give me a refund? ...For the leg?", new Color(0.8f, 0.9f, 1f));
             yield return Say(_receptionist, "(over the speaker) A SHARK?! ...The pool is open, everybody! The pool is very nice!");
         }
 
-        private IEnumerator TwoMore()
+        private IEnumerator OneMoreGuest()
         {
             _island = _island2;
             EnsureOnIsland2();
-            yield return RescueWave(_island2, 2, "Rescue hotel guests", _ => Profile(_island2, -1));
+            int figure = _guestFigure >= 0 ? 1 - _guestFigure : Random.Range(0, 2);
+            yield return GagRescue(_island2, PickGag(Island2Gags, figure), Profile(_island2, figure), _receptionist,
+                "(over the speaker) ", "Rescue the hotel guest");
         }
 
         private IEnumerator Pirates()

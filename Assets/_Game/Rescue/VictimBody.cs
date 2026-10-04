@@ -316,7 +316,10 @@ namespace PleaseDontDrown.Rescue
             {
                 _nextCryAt = Time.time + Random.Range(2.8f, 5.5f);
                 if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Cry(_voice), 0.9f);
-                if (Random.value < 0.6f)
+                string[] own = _brain.Shouts; // story gags: their own thing to yell, read a bit longer
+                if (own.Length > 0 && Random.value < 0.85f)
+                    FloatingText.Spawn(HeadPosition + Vector3.up * 0.45f, own[Random.Range(0, own.Length)], new Color(1f, 0.95f, 0.8f), 0.75f, 2f);
+                else if (Random.value < 0.6f)
                     FloatingText.Spawn(HeadPosition + Vector3.up * 0.45f, state == VictimState.Panicking ? "HELP!!" : "help!",
                         new Color(1f, 0.95f, 0.8f), 0.7f, 1.1f);
             }

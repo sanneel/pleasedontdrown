@@ -43,6 +43,8 @@ namespace PleaseDontDrown.Rescue
         public string Name;
         [Tooltip("Packed AvatarLook to wear (a beach swimmer turning into this tourist). 0 = from the seed.")]
         public ulong Look;
+        [Tooltip("What they shout instead of 'help!' while in trouble, separated by '|' (story gags). Empty = 'help!'.")]
+        public string Shouts;
 
         public static TouristProfile Default => new() { Figure = -1, BleedSeconds = 60f };
     }
@@ -123,6 +125,8 @@ namespace PleaseDontDrown.Rescue
         private readonly SyncVar<bool> _flatline = new SyncVar<bool>();
         private readonly SyncVar<bool> _legLost = new SyncVar<bool>();
         private readonly SyncVar<float> _bleedLeft = new SyncVar<float>(0f, new SyncTypeSettings(0.25f));
+        private readonly SyncVar<string> _shouts = new SyncVar<string>();
+        private string[] _shoutLines = System.Array.Empty<string>();
 
         private Item _item;
         private VictimBody _body;
@@ -168,6 +172,8 @@ namespace PleaseDontDrown.Rescue
         public bool IsFlatlined => _flatline.Value;
         public bool HasLostLeg => _legLost.Value;
         public float BleedSecondsLeft => _bleedLeft.Value;
+        /// <summary>What they shout in trouble instead of "help!" (empty = the usual).</summary>
+        public string[] Shouts => _shoutLines;
         public bool IsFemale => Look.Feminine;
         public AvatarLook Look => _look.Value != 0 ? AvatarLook.Unpack(_look.Value) : AvatarLook.RandomTourist(_seed.Value);
         public Item Item => _item;
@@ -193,6 +199,8 @@ namespace PleaseDontDrown.Rescue
             _seed.OnChange += (_, _, _) => ApplyLook();
             _look.OnChange += (_, _, _) => ApplyLook();
             _state.OnChange += OnStateChanged;
+            _shouts.OnChange += (_, next, _) =>
+                _shoutLines = string.IsNullOrEmpty(next) ? System.Array.Empty<string>() : next.Split('|');
         }
 
         private void ApplyLook()
@@ -245,6 +253,7 @@ namespace PleaseDontDrown.Rescue
             _look.Value = look.Pack();
             _name.Value = !string.IsNullOrEmpty(profile.Name) ? profile.Name : !string.IsNullOrEmpty(displayName) ? displayName : RandomName(look.Feminine);
             _silent.Value = profile.Silent;
+            _shouts.Value = profile.Shouts ?? string.Empty;
             _drownSeconds = Mathf.Max(0f, profile.SecondsToUnconscious);
             _flatlineAfter = Mathf.Max(0f, profile.FlatlineAfter);
             _bleedSeconds = profile.BleedSeconds > 0f ? profile.BleedSeconds : 60f;

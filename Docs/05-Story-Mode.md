@@ -16,13 +16,13 @@ marker, and waits for its condition. Money is one shared team wallet. Everything
 | # | Beat | What the player does | Done when |
 |---|---|---|---|
 | 1.1 | **Meet Sandy** | You spawn and Sandy (about 50, blonde, coral shirt) walks over to you from her Lost & Found kiosk and explains the job: rescue tourists; they lose things; bring finds to Lost & Found and she pays. Then she goes back to her kiosk. | Dialogue ends |
-| 1.2 | **First shift** | Rescue **5 tourists**, who were swimming a moment ago. **3 of them are women** (bikinis). On island 1 everyone collapses once pulled out, so every rescue ends in CPR: women get compressions (the chest jiggles on each push) and **mouth-to-mouth**, men get compressions and a **punch in the face**. Sandy shouts a tip the first time each step comes up. Lost things turn up next to people's towels. | 5 rescued |
+| 1.2 | **First rescue** | Rescue **1 tourist** (a man or a woman, picked at random), who was swimming a moment ago and is now yelling their own silly reason for drowning (a [gag](#gags-three-rescues-an-island)). On island 1 everyone collapses once pulled out, so every rescue ends in CPR: women get compressions (the chest jiggles on each push) and **mouth-to-mouth**, men get compressions and a **slap in the face**. Sandy shouts a tip the first time each step comes up. Lost things turn up next to people's towels. | 1 rescued |
 | 1.3 | **The thief** | A robber grabs a sunbather's bag; she jumps up screaming "THIEF!". Catch him and punch him (3 hits): he drops **3 stolen items** and runs off (you let him go). | Robber beaten |
 | 1.4 | **Return the loot** | Bring the 3 stolen items to Lost & Found. Handing them in, Sandy says there's a robber on the island and gets scared. | 3 returned |
-| 1.5 | **Three more** | Rescue **3 men**. | 3 rescued |
-| 1.6 | **The silent one** | A woman sinks **without a sound** (no waving, no shouting); her friend swims over next to her yelling "HELP!". Swim out, bring her in, revive her (CPR + mouth-to-mouth). | Revived |
+| 1.5 | **Another one** | Rescue **1 tourist** of the other sex (so both kinds of CPR come up on island 1), with another gag. | 1 rescued |
+| 1.6 | **The silent one** | A woman (Jenny, Tina or Lola) sinks **without a sound** (no waving, no shouting); her friend swims over next to her yelling "HELP!". Swim out, bring her in, revive her (CPR + mouth-to-mouth). | Revived |
 | 1.7 | **Drugs?** | She says she blacked out after taking some pill a guy on the beach gave her. So there are **drugs** on the island. | Dialogue ends |
-| 1.8 | **One more** | Rescue 1 man. | 1 rescued |
+| 1.8 | **False alarm** | Somebody is screaming for help in the shallows... where the water is knee-deep (or a coin-sized crab has their toe, or seaweed touched their leg). Walk up to them: punchline, Sandy sighs from her hut. Not a rescue. | A lifeguard gets there |
 | 1.9 | **The thief again** | The robber is back. Chase him and **hit him 5 times**: he falls, his bag bursts open and **2-3 baggies** fall out. You say you'll have him arrested; he begs and offers his **jet ski keys** to be let go. Take the keys. | Keys picked up |
 | 1.10 | **Leave** | Take the jet ski at the dock (keys in your inventory) to the second island. | Jet ski reaches island 2 |
 
@@ -31,12 +31,47 @@ marker, and waits for its condition. Money is one shared team wallet. Everything
 | # | Beat | What the player does | Done when |
 |---|---|---|---|
 | 2.1 | **Check in** | Walk into the hotel and talk to reception (E). The receptionist: you'll rescue guests here, but you need a **weapon** because guests sometimes get attacked. | Dialogue ends |
-| 2.2 | **Buy a weapon** | Buy the pistol at reception with the money from island 1. (Short on money? Guests keep needing rescues until you can afford it.) | Pistol bought |
-| 2.3 | **Harder work** | Rescue **3 guests**. Difficulty is up: **10 s** to pass out (20 s on island 1). The hotel's first-aid station has a **defibrillator**. Someone who's been out too long **flatlines**: CPR no longer works, only the electric shock does, and it pays more. | 3 rescued |
-| 2.4 | **Shark!** | A shark **bites a guest's leg off**. Rush them to the hotel **infirmary** before they bleed out (60 s). | Delivered |
-| 2.5 | **Two more** | Rescue 2 guests. | 2 rescued |
+| 2.2 | **Buy a weapon** | Buy the pistol at reception with the money from island 1. (Short on money? No extra rescues: Marisol takes whatever the team has and gives you the pistol on credit.) | Pistol bought |
+| 2.3 | **Harder work** | Rescue **1 guest** (with a gag). Difficulty is up: **10 s** to pass out (20 s on island 1). The hotel's first-aid station has a **defibrillator**. Out cold, this guest **flatlines** after 3 s: CPR no longer works, only the electric shock does, and it pays more. | 1 rescued |
+| 2.4 | **Shark!** | A shark **bites a guest's leg off** (Todd, Barry or Duncan, who first thinks it's a dolphin). Rush them to the hotel **infirmary** before they bleed out (60 s). | Delivered |
+| 2.5 | **One more guest** | Rescue **1 guest** of the other sex than in 2.3, with another gag. | 1 rescued |
 | 2.6 | **Pirates** | A pirate boat lands 4 pirates who attack the hotel. Kill them (pistol or fists). | All pirates down |
 | 2.7 | **Your boat now** | The pirate boat is yours. Get on it and leave. *To be continued...* | On the boat |
+
+### Gags: three rescues an island
+
+The story is the same every time; only **three rescues per island** (1.2, 1.5, 1.6 / 2.3, 2.4, 2.5) and each one is a
+little scene, so the game is about the story and its jokes rather than grinding rescues. A little is random per
+playthrough: man or woman (the second rescue of an island is the other sex), which gag from a short list (never the same
+twice in a run), which swimmer, where. Code: `Story/StoryDirector.Gags.cs`.
+
+* **What they yell** instead of "help!" (`TouristProfile.Shouts`, synced by `VictimBrain`, shown by `VictimBody`).
+* **The guide's comment** once they're out there (Sandy shouting on island 1, Marisol over the speaker on island 2),
+  said when nobody else is talking.
+* **What they say once saved**: first by how they were brought back (kissed: "Did you just... KISS me?!", slapped:
+  "OW! Who SLAPPED me?!", zapped: "I SAW A LIGHT! ...Oh. It's the sun.", pulled out awake), then their own punchline.
+  Some leave a lost thing in the shallows (the influencer's phone).
+
+| Island 1 (Sandy) | Who | Yells | Punchline |
+|---|---|---|---|
+| hotdogs | man | "I ATE THREE HOT DOGS!" | "...Is the hot dog stand still open?" |
+| influencer | either | "LIKE AND SUBSCRIBE!" | "Where's my PHONE?!" (drops it) |
+| flamingo | woman | "PRINCESS POPPED!" | "I'm signing up for swimming lessons." |
+| olympian | man | "I SWAM IN THE OLYMPICS!" | "Not a word about this." |
+| waver | either | "HI! HELLO, BEACH!" | "I WAS waving. And then I wasn't." |
+| sunscreen | woman | "I'M SO SLIPPERY!" | "SPF 100. I regret nothing." |
+
+| Island 2 (Marisol) | Who | Yells | Punchline |
+|---|---|---|---|
+| vip | either | "DO YOU KNOW WHO I AM?!" | "One-star review. For the ocean." |
+| mojito | either | "SAVE THE MOJITO!" | "The mojito made it." |
+| ring | woman | "I DROPPED MY RING!" | "Don't tell my husband." |
+| snorkel | man | "MY SNORKEL'S FULL!" | "A fish looked at me like I was the stupid one." |
+| influencer | either | "LIKE AND SUBSCRIBE!" | "Where's my PHONE?!" |
+
+**False alarm** (1.8): one of three, at random: knee-deep water ("You're standing up." / "In my defence, it's VERY
+wet."), a tiny crab ("It's a very STRONG coin."), seaweed ("Seaweed with INTENT."). The screamer is somebody who was
+wading (lent by the beach crowd) and goes back to wading after.
 
 ---
 
@@ -91,7 +126,7 @@ marker, and waits for its condition. Money is one shared team wallet. Everything
 | Stolen item returned | 30 |
 | Baggie handed in as evidence | 25 |
 | Pirate taken down | 50 |
-| Pistol (costs) | -250 |
+| Pistol (costs) | -250 (or whatever the team has, on credit) |
 
 ---
 
