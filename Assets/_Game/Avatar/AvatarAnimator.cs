@@ -4,7 +4,7 @@ using Bone = PleaseDontDrown.Avatars.AvatarRig.Bone;
 namespace PleaseDontDrown.Avatars
 {
     /// <summary>One-off moves that play over whatever the body is doing.</summary>
-    public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot }
+    public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot, JumpShot }
 
     /// <summary>Whole-body poses held for a while (story characters, knockouts).</summary>
     public enum AvatarPose : byte { Normal, Down, Kneel, Scared, HandsUp, Lie, LieFront, Sit, SitChair }
@@ -33,6 +33,9 @@ namespace PleaseDontDrown.Avatars
         public bool Cpr;
         public Vector3 CprPoint;      // world, the chest being pressed
         public bool Seated;           // on a vehicle seat (hands come from the grips)
+        public bool Straddle;         // seated astride a fat seat (a banana boat): knees well apart, feet back down its sides
+        public bool Flying;           // shot through the air (a cannon, a throw, flung off the banana): superman, arms out ahead
+        public bool StarJump;         // bounced high (a trampoline): arms and legs flung out in a star
         public AvatarPose Pose;
         public AvatarMood Mood;
         public bool Talking;          // flap the mouth
@@ -78,6 +81,7 @@ namespace PleaseDontDrown.Avatars
         private float _cpr;
         private float _climb;
         private float _seat;
+        private float _fly, _flyRaw, _star, _starRaw;
         private float _down;
         private float _kneel;
         private float _scared;
@@ -282,6 +286,8 @@ namespace PleaseDontDrown.Avatars
             _cpr = Eased(ref _cprRaw, m.Cpr, 4f, dt);
             _climb = Eased(ref _climbRaw, m.Climbing, 6f, dt);
             _seat = Eased(ref _seatRaw, m.Seated, 6f, dt);
+            _fly = Eased(ref _flyRaw, m.Flying, 5f, dt);
+            _star = Eased(ref _starRaw, m.StarJump && !m.Flying, 7f, dt);
             _down = Eased(ref _downRaw, m.Pose == AvatarPose.Down, 3.5f, dt);
             if (m.Pose == AvatarPose.Down && !_wasDown) _downSince = Now;
             _wasDown = m.Pose == AvatarPose.Down;
@@ -1003,6 +1009,21 @@ namespace PleaseDontDrown.Avatars
                 upperR.localRotation = Quaternion.Slerp(upperR.localRotation, arm, w);
                 foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-Mathf.Lerp(80f, 5f, e), 0f, 0f), w);
             }
+            else if (GestureActive(AvatarGesture.JumpShot, 0.8f))
+            {
+                // A basketball jump shot: both hands up over the forehead (the guide hand on the side of the ball),
+                // the shooting arm pushes up and out until the elbow is straight, the wrist flicks over ("hand in the
+                // cookie jar"), and the arms hang there in the follow-through a moment before dropping.
+                Transform upperL = B(Bone.UpperArmL), foreL = B(Bone.ForearmL), handR = B(Bone.HandR);
+                float t = GestureT(0.8f);
+                float w = t < 0.7f ? Mathf.Clamp01(t / 0.08f) : 1f - (t - 0.7f) / 0.3f;
+                float push = Mathf.SmoothStep(0f, 1f, t / 0.3f);
+                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(Mathf.Lerp(-135f, -158f, push), 0f, 6f), w);
+                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-Mathf.Lerp(85f, 6f, push), 0f, 0f), w);
+                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(Mathf.Lerp(-130f, -115f, push), 0f, -14f), w);
+                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-Mathf.Lerp(80f, 40f, push), 0f, 0f), w);
+                if (handR != null) handR.localRotation *= Quaternion.Euler(Mathf.Lerp(-35f, 55f, push) * w, 0f, 0f); // the flick
+            }
             else if (GestureActive(AvatarGesture.Interact, 0.4f))
             {
                 float t = GestureT(0.4f);
@@ -1041,10 +1062,57 @@ namespace PleaseDontDrown.Avatars
                     bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
-                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-78f, 0f, 16f * side), _seat);
-                    shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(84f, 0f, 0f), _seat);
-                    foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(-6f, 0f, 0f), _seat);
+                    // Astride something fat (a banana): knees wide round it, shins back down its sides like a rider's.
+                    Quaternion thighPose = Motion.Straddle ? Quaternion.Euler(-58f, 14f * side, 38f * side) : Quaternion.Euler(-78f, 0f, 16f * side);
+                    Quaternion shinPose = Quaternion.Euler(Motion.Straddle ? 100f : 84f, 0f, Motion.Straddle ? -18f * side : 0f);
+                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, thighPose, _seat);
+                    shin.localRotation = Quaternion.Slerp(shin.localRotation, shinPose, _seat);
+                    foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(Motion.Straddle ? 20f : -6f, 0f, 0f), _seat);
                 }
+            }
+
+            if (_fly > 0.01f)
+            {
+                // Superman: the body lies along the flight, arms stretched out ahead (fists), legs together behind,
+                // the cape we don't have flapping in our imagination.
+                float w = _fly;
+                hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(72f, 0f, Mathf.Sin(Now * 9f) * 4f), w);
+                B(Bone.Neck).localRotation = Quaternion.Slerp(B(Bone.Neck).localRotation, Quaternion.Euler(-45f, 0f, 0f), w);
+                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(-172f, 0f, -8f), w);
+                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
+                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-172f, 0f, 8f), w);
+                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
+                for (int leg = 0; leg < 2; leg++)
+                {
+                    bool left = leg == 0;
+                    float side = left ? -1f : 1f;
+                    Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
+                    float kick = Mathf.Sin(Now * 14f + leg * Mathf.PI) * 8f; // a little flutter
+                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(6f + kick, 0f, 3f * side), w);
+                    shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(12f, 0f, 0f), w);
+                    foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(40f, 0f, 0f), w);
+                }
+                _rig.LeftHand?.Pose(HandPose.Fist);
+                _rig.RightHand?.Pose(HandPose.Fist);
+            }
+            else if (_star > 0.01f)
+            {
+                // A star jump at the top of a bounce: arms up and out, legs apart, a big grin.
+                float w = _star;
+                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(0f, 0f, -135f), w);
+                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-8f, 0f, 0f), w);
+                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(0f, 0f, 135f), w);
+                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-8f, 0f, 0f), w);
+                for (int leg = 0; leg < 2; leg++)
+                {
+                    bool left = leg == 0;
+                    float side = left ? -1f : 1f;
+                    Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR);
+                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-6f, 0f, 28f * side), w);
+                    shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(10f, 0f, 0f), w);
+                }
+                _rig.LeftHand?.Pose(HandPose.Wave);
+                _rig.RightHand?.Pose(HandPose.Wave);
             }
 
             if (_kneel > 0.01f)
@@ -1373,36 +1441,46 @@ namespace PleaseDontDrown.Avatars
         private Vector3 MouthPoint => B(Bone.Head).TransformPoint(new Vector3(0f, 0.035f, 0.12f) * _rig.Scale);
 
         /// <summary>
-        /// Lips on lips: the upper body pivots at the hips toward the other mouth, the face turns down to meet it
-        /// (tipped sideways, the way people kiss), then the hips slide the last bit so the mouths touch. The legs are
-        /// posed again afterwards, so the knees stay planted on the sand.
+        /// Lips on lips, kneeling: the knees and hips stay where the kneel put them; the back curls down (spine, then
+        /// chest, then neck, each turning a share of the way so the mouth heads for theirs, a few passes), the face
+        /// turns down to meet theirs tipped sideways the way people kiss, and only the last few centimetres are made
+        /// up by leaning the hips in. One hand cradles the forehead, the other lifts the chin.
         /// </summary>
         private void Kiss(Vector3 lips, float w, Transform upperL, Transform foreL, Transform upperR, Transform foreR, float la, float lb)
         {
             if (w <= 0.001f) return;
             Transform hips = B(Bone.Hips), head = B(Bone.Head);
             Vector3 fwd = transform.forward, right = transform.right;
-            Vector3 target = lips + Vector3.up * 0.015f;
+            Vector3 target = lips + Vector3.up * 0.02f;
+            Vector3 along = Vector3.ProjectOnPlane(target - hips.position, Vector3.up);
+            along = along.sqrMagnitude > 1e-4f ? along.normalized : fwd;
 
-            // 1. Swing the upper body round the hips so the mouth heads for theirs.
-            Vector3 pivot = hips.position;
-            Quaternion swing = Quaternion.FromToRotation(MouthPoint - pivot, target - pivot);
-            hips.rotation = Quaternion.Slerp(Quaternion.identity, swing, w) * hips.rotation;
-            // 2. Face down onto theirs, tilted sideways a little.
-            Vector3 along = Vector3.ProjectOnPlane(target - pivot, Vector3.up);
-            if (along.sqrMagnitude < 1e-4f) along = fwd;
-            Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along.normalized * 0.25f, along.normalized) * Quaternion.Euler(0f, 0f, 24f);
-            B(Bone.Neck).rotation = Quaternion.Slerp(B(Bone.Neck).rotation, faceDown, w * 0.5f);
-            head.rotation = Quaternion.Slerp(head.rotation, faceDown, w);
-            // 3. Close the last gap by moving the whole upper body (not far: we're kneeling right next to them).
-            Vector3 gap = Vector3.ClampMagnitude(target - MouthPoint, 0.6f * _rig.Scale);
-            hips.position += gap * w;
-            PoseLegs(); // knees back down where they were
+            // 1. Curl the back down toward their face: spine, chest and neck share the bend (CCD, a few passes).
+            Transform[] chain = { B(Bone.Spine), B(Bone.Chest), B(Bone.Neck) };
+            float[] share = { 0.45f, 0.55f, 0.35f };
+            for (int pass = 0; pass < 4; pass++)
+                for (int i = 0; i < chain.Length; i++)
+                {
+                    Transform bone = chain[i];
+                    Vector3 toMouth = MouthPoint - bone.position, toLips = target - bone.position;
+                    if (toMouth.sqrMagnitude < 1e-6f || toLips.sqrMagnitude < 1e-6f) continue;
+                    Quaternion bend = Quaternion.FromToRotation(toMouth, toLips);
+                    bone.rotation = Quaternion.Slerp(Quaternion.identity, bend, share[i] * w) * bone.rotation;
+                }
+            // 2. Face down onto theirs, tilted sideways a little, eyes shut (the face code does the eyes).
+            Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along * 0.35f, along) * Quaternion.Euler(0f, 0f, 22f);
+            head.rotation = Quaternion.Slerp(head.rotation, faceDown, w * 0.85f);
+            // 3. Whatever is still missing: lean the hips in a little (never more than a hand's width), knees stay.
+            Vector3 gap = target - MouthPoint;
+            if (gap.sqrMagnitude > 1e-6f)
+            {
+                hips.position += Vector3.ClampMagnitude(gap, 0.18f * _rig.Scale) * w;
+                PoseLegs();
+            }
 
             // Hands: one on the forehead, one under the chin.
-            Vector3 over = Vector3.ProjectOnPlane(along, Vector3.up).normalized;
-            IK.Solve(upperL, foreL, la, lb, lips + over * 0.12f + Vector3.up * 0.06f - right * 0.04f, -fwd - right, w, false);
-            IK.Solve(upperR, foreR, la, lb, lips - over * 0.07f + Vector3.up * 0.01f + right * 0.03f, -fwd + right, w, false);
+            IK.Solve(upperL, foreL, la, lb, lips + along * 0.13f + Vector3.up * 0.07f - right * 0.05f, -fwd - right, w, false);
+            IK.Solve(upperR, foreR, la, lb, lips - along * 0.08f + Vector3.up * 0.02f + right * 0.04f, -fwd + right, w, false);
         }
 
         // ------------------------------------------------------------------ head & face

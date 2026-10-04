@@ -76,6 +76,7 @@ namespace PleaseDontDrown.Player
                     _remoteCharging = false;
                     return;
                 case AvatarGesture.Throw:
+                case AvatarGesture.JumpShot:
                     _remoteCharging = false;
                     break;
                 case AvatarGesture.EatStart:
@@ -175,12 +176,20 @@ namespace PleaseDontDrown.Player
                 m.Mood = AvatarMood.Hurt;
             }
 
+            // In the air: shot out of the cannon or thrown (fast, flying superman) or bounced high (a star jump).
+            if (!m.Grounded && !m.Swimming && !m.Climbing)
+            {
+                Vector3 v = _velocity;
+                m.Flying = new Vector2(v.x, v.z).magnitude > 8.5f && v.magnitude > 10f;
+                m.StarJump = !m.Flying && v.y > 4.5f;
+            }
+
             m.Cpr = Time.time - _lastPumpTime < 1.3f && !m.Swimming;
             m.CprPoint = _cprPoint;
             KneelBeside(m.Cpr && _cprPoint != Vector3.zero, position, dt);
 
             // On a vehicle: sitting, hands on the handlebars.
-            Vehicles.Vehicle seat = Vehicles.Vehicle.SeatOf(_hub);
+            Vehicles.Vehicle seat = Vehicles.Vehicle.RideOf(_hub);
             if (seat != null)
             {
                 m.Seated = true;
@@ -188,7 +197,8 @@ namespace PleaseDontDrown.Player
                 m.Swimming = m.Underwater = false;
                 m.Grounded = true;
                 m.Velocity = Vector3.zero; // no walking legs
-                if (!m.Holding && seat.GetHandlebars(out HandGrip left, out HandGrip right))
+                m.Straddle = seat.Straddle;
+                if (!m.Holding && seat.GetGrips(_hub, out HandGrip left, out HandGrip right))
                 {
                     m.GripLeft = left;
                     m.GripRight = right;
@@ -196,6 +206,12 @@ namespace PleaseDontDrown.Player
                 }
             }
             CarryPoses(ref m, position);
+            // Led by the hand to the beach hut: our hand in hers.
+            if (!m.Holding && Story.LoveHut.HandHold(_hub.transform, out Story.LoveHut.HandGripPoint hold))
+            {
+                m.Holding = true;
+                m.GripRight = new HandGrip(hold.Point, hold.Toward, Vector3.Cross(Vector3.up, hold.Toward), HandPose.LooseFist);
+            }
             _animator.Motion = m;
         }
 

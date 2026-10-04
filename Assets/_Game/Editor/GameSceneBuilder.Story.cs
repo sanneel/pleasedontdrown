@@ -848,9 +848,17 @@ namespace PleaseDontDrown.Editor
             Transform gripL = P("GripLeft", new Vector3(-0.3f, 0.86f, 0.5f), Quaternion.LookRotation(Vector3.forward, Vector3.up));
             Transform gripR = P("GripRight", new Vector3(0.3f, 0.86f, 0.5f), Quaternion.LookRotation(Vector3.forward, Vector3.up));
             Transform thrust = P("Thrust", new Vector3(0f, -0.05f, -1.35f), Quaternion.identity);
+            // A back seat for a second lifeguard: hands on the driver's waist (palms in).
+            Transform back = P("BackSeat", new Vector3(0f, 0.72f, -0.82f), Quaternion.identity);
+            P("GripLeft", Vector3.zero, Quaternion.identity).SetParent(back, false);
+            back.Find("GripLeft").SetLocalPositionAndRotation(new Vector3(-0.17f, 0.27f, 0.42f), Quaternion.LookRotation(Vector3.forward, Vector3.left));
+            P("GripRight", Vector3.zero, Quaternion.identity).SetParent(back, false);
+            back.Find("GripRight").SetLocalPositionAndRotation(new Vector3(0.17f, 0.27f, 0.42f), Quaternion.LookRotation(Vector3.forward, Vector3.right));
             DressJetSki(root);
-            return FinishVehicle(root, displayName, key, seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.32f,
+            Vehicle ski = FinishVehicle(root, displayName, key, seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.32f,
                 thrustForce: 11f, maxSpeed: 17f, turnRate: 1.7f);
+            SetRefs(ski, "_backSeats", new Object[] { back });
+            return ski;
         }
 
         /// <summary>The pirates' boat (theirs until chapter 2.7): hull, deck, cabin, wheel, mast and a black flag.</summary>

@@ -600,6 +600,14 @@ namespace PleaseDontDrown.Story
                 Seated = false,
                 LookBack = _role.Value == NpcRole.Robber && _pose.Value == AvatarPose.Normal && !swimming
             };
+            // Leading a lifeguard by the hand (the beach hut gag): her right hand back in his.
+            if (LoveHut.HandHold(transform, out LoveHut.HandGripPoint hold))
+            {
+                AvatarMotion m = _animator.Motion;
+                m.Holding = true;
+                m.GripRight = new HandGrip(hold.Point, hold.Toward, -transform.right, HandPose.LooseFist);
+                _animator.Motion = m;
+            }
         }
 
         private void UpdateNameTag()

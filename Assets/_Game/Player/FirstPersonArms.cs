@@ -505,7 +505,7 @@ namespace PleaseDontDrown.Player
                 else if (_gesture == AvatarGesture.Zap && sinceGesture < 0.5f)
                     palm += (cam.forward * 0.18f - cam.up * 0.08f) * Mathf.Sin(sinceGesture / 0.5f * Mathf.PI);
             }
-            else if (Vehicles.Vehicle.SeatOf(_hub) is { } vehicle && vehicle.GetHandlebars(out HandGrip barL, out HandGrip barR))
+            else if (Vehicles.Vehicle.RideOf(_hub) is { } vehicle && vehicle.GetGrips(_hub, out HandGrip barL, out HandGrip barR))
             {
                 // Driving: both hands on the handlebars.
                 state = State.Drive;
@@ -526,7 +526,7 @@ namespace PleaseDontDrown.Player
                 pose = HandPose.Point;
                 blend = 0.1f;
             }
-            else if (hand.Right && _gesture == AvatarGesture.Throw && sinceGesture < 0.35f)
+            else if (hand.Right && (_gesture == AvatarGesture.Throw || _gesture == AvatarGesture.JumpShot) && sinceGesture < 0.35f)
             {
                 // Follow-through after letting go.
                 state = State.FollowThrough;

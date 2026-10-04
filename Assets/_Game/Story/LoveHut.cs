@@ -35,10 +35,16 @@ namespace PleaseDontDrown.Story
         private Vector3 _wobbleScale;
         private float _wobbleUntil;
 
+        // Everyone: who is leading whom by the hand right now (both bodies show it).
+        private static Transform _handLeader;
+        private static PlayerHub _handHero;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
             _leader = null;
+            _handLeader = null;
+            _handHero = null;
             _dark = _darkTarget = 0f;
         }
 
@@ -61,7 +67,43 @@ namespace PleaseDontDrown.Story
 
         [Server] public void ServerDoor(bool open) => _door.ServerSet(open, _outside.position);
 
-        [Server] public void ServerLead(PlayerHub who, StoryNpc by) => LeadTarget(who.Owner, by != null ? by.NetworkObject : null);
+        [Server]
+        public void ServerLead(PlayerHub who, StoryNpc by)
+        {
+            LeadTarget(who.Owner, by != null ? by.NetworkObject : null);
+            HandsObservers(who != null ? who.NetworkObject : null, by != null ? by.NetworkObject : null);
+        }
+
+        [ObserversRpc(BufferLast = true)]
+        private void HandsObservers(NetworkObject hero, NetworkObject leader)
+        {
+            _handHero = hero != null && leader != null ? hero.GetComponent<PlayerHub>() : null;
+            _handLeader = _handHero != null ? leader.transform : null;
+        }
+
+        /// <summary>
+        /// Hand in hand: where the two hands meet, for the leader (her hand reaching back) and the lifeguard being led
+        /// (reaching forward to it). False when nobody is being led, or for anyone else.
+        /// </summary>
+        public static bool HandHold(Transform body, out HandGripPoint grip)
+        {
+            grip = default;
+            if (_handLeader == null || _handHero == null || body == null || (body != _handLeader && body != _handHero.transform)) return false;
+            Transform her = _handLeader, him = _handHero.transform;
+            Vector3 herHand = her.position + her.right * 0.32f - her.forward * 0.28f + Vector3.up * 0.92f; // reaching back, low
+            Vector3 hisHand = him.position + Vector3.up * 0.95f + Vector3.ProjectOnPlane(her.position - him.position, Vector3.up).normalized * 0.4f;
+            Vector3 meet = Vector3.Lerp(herHand, hisHand, 0.5f);
+            if ((meet - body.position).sqrMagnitude > 1.6f * 1.6f) return false; // too far apart to hold hands (catching up)
+            Vector3 toOther = Vector3.ProjectOnPlane((body == her ? him.position : her.position) - body.position, Vector3.up);
+            grip = new HandGripPoint { Point = meet, Toward = toOther.sqrMagnitude > 1e-4f ? toOther.normalized : body.forward };
+            return true;
+        }
+
+        public struct HandGripPoint
+        {
+            public Vector3 Point;
+            public Vector3 Toward;
+        }
 
         [Server] public void ServerPut(PlayerHub who, Vector3 position, Vector3 lookAt) => PutTarget(who.Owner, position, lookAt);
 
@@ -75,7 +117,9 @@ namespace PleaseDontDrown.Story
         private void LeadTarget(NetworkConnection target, NetworkObject leader)
         {
             _leader = leader != null ? leader.transform : null;
-            if (_leader != null) PlayerHud.ShowToast("She's holding your hand... and she isn't letting go.", 3f);
+            if (_leader == null) return;
+            PlayerHud.ShowToast("She's holding your hand... and she isn't letting go.", 3f);
+            PlayerHub.Local?.Look?.LookAt(_leader.position + Vector3.up * 1.4f); // once, to see who's got you; then look about freely
         }
 
         [TargetRpc]
@@ -94,20 +138,21 @@ namespace PleaseDontDrown.Story
         {
             PlayerHub me = PlayerHub.Local;
             if (_leader == null || me == null || me.Motor == null || me.Motor.Seat != null) return;
-            // Dragged along by the hand: a step behind her and to her right, no say in the matter.
+            // Dragged along by the hand: a step behind her and to her right, no say in where the feet go. Pulled by
+            // velocity (smooth, the camera doesn't judder) and the head is free: look wherever you like.
             Vector3 target = _leader.position - _leader.forward * 0.95f + _leader.right * 0.35f;
             Vector3 at = me.transform.position;
             Vector3 to = target - at;
             to.y = 0f;
-            float step = Mathf.Min(to.magnitude, 3.2f * Time.fixedDeltaTime);
-            if (step > 0.002f)
+            if (to.magnitude > 4f)
             {
-                Vector3 next = at + to.normalized * step;
-                next.y = Mathf.Max(at.y, _leader.position.y);
-                me.Motor.Teleport(next);
+                me.Motor.Teleport(new Vector3(target.x, Mathf.Max(at.y, _leader.position.y), target.z)); // fell far behind (a snag)
+                return;
             }
-            me.Motor.Stun(0.2f);
-            me.Look.LookAt(_leader.position + Vector3.up * 1.4f);
+            Vector3 pull = Vector3.ClampMagnitude(to * 4f, 3.4f);
+            float climb = _leader.position.y - at.y; // up her steps
+            if (climb > 0.04f) pull.y = Mathf.Min(climb * 8f, 3f);
+            me.Motor.Drag(pull);
         }
 
         // ------------------------------------------------------------------ everyone: the wobble and the noises

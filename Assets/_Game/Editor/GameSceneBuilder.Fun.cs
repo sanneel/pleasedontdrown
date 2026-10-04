@@ -31,8 +31,39 @@ namespace PleaseDontDrown.Editor
                 DressProp(root, "basketball");
             }, linearDamping: 0.08f, angularDamping: 0.3f, density: 0.3f, waterDrag: 0.8f, configure: go =>
             {
-                SetBool(go.GetComponent<Item>(), "_pocketable", true);
-                SetRef(go.AddComponent<BallSounds>(), "_audio", SpatialAudio(go, 1.5f, 30f));
+                var item = go.GetComponent<Item>();
+                SetBool(item, "_pocketable", true);
+                AudioSource ballAudio = SpatialAudio(go, 1.5f, 30f);
+                SetRef(go.AddComponent<BallSounds>(), "_audio", ballAudio);
+                // How you really hold a basketball: the shooting hand behind and under it, fingers spread up its
+                // back; the guide hand on its side. (Item space: +z away from you, as held.)
+                Transform Grip(string n, Vector3 outward, Vector3 fingersRough)
+                {
+                    var g = new GameObject(n).transform;
+                    g.SetParent(go.transform, false);
+                    Vector3 o = outward.normalized;
+                    g.localPosition = o * 0.125f;
+                    g.localRotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(fingersRough, o).normalized, o); // palm (-up) on the ball
+                    return g;
+                }
+                SetRef(item, "_gripRight", Grip("GripRight", new Vector3(0.3f, -0.45f, -0.84f), new Vector3(0f, 1f, 0.35f)));
+                SetRef(item, "_gripLeft", Grip("GripLeft", new Vector3(-1f, 0.12f, -0.1f), new Vector3(0f, 0.7f, 1f)));
+                SetField(item, "_gripPose", p =>
+                {
+                    p.FindPropertyRelative("Index").floatValue = p.FindPropertyRelative("Middle").floatValue =
+                        p.FindPropertyRelative("Ring").floatValue = p.FindPropertyRelative("Pinky").floatValue = 0.28f;
+                    p.FindPropertyRelative("Thumb").floatValue = 0.2f;
+                    p.FindPropertyRelative("Spread").floatValue = 0.55f;
+                });
+                // Dribbling while you walk or run with it (the look of it; the ball in your hands stays put).
+                Transform model = go.transform.Find("Model_basketball");
+                if (model != null)
+                {
+                    var dribble = go.AddComponent<BasketballDribble>();
+                    SetRef(dribble, "_item", item);
+                    SetRef(dribble, "_visual", model);
+                    SetRef(dribble, "_audio", ballAudio);
+                }
                 // Continuous, not Continuous Speculative: speculative contacts ghost-bounced fast balls off the thin
                 // rim before they got there (long shots went in 1 time in 10). The rim is static, so Continuous sweeps it.
                 go.GetComponent<Rigidbody>().collisionDetectionMode = CollisionDetectionMode.Continuous;

@@ -275,7 +275,14 @@ namespace PleaseDontDrown.Player
             BeachAudio.PlayLocal(charge >= 0f ? BeachAudio.Throw : BeachAudio.Drop, 0.6f);
             Invalidate();
             ResetHoldState();
-            if (charge >= 0f) _hub.Gesture(AvatarGesture.Throw);
+            bool jumpShot = charge > 0f && item.DisplayName == Fun.BasketballHoop.BallName;
+            if (jumpShot)
+            {
+                // A basketball: a jump shot. Both arms go up and the shooter hops as the ball leaves the hands.
+                _hub.Gesture(AvatarGesture.JumpShot);
+                if (_hub.Motor != null && _hub.Motor.IsGrounded && !_hub.Motor.IsSwimming) _hub.Motor.AddImpulse(Vector3.up * 3.4f);
+            }
+            else if (charge >= 0f) _hub.Gesture(AvatarGesture.Throw);
             else if (_chargeAnnounced) _hub.Gesture(AvatarGesture.ChargeEnd);
             _chargeAnnounced = false;
         }

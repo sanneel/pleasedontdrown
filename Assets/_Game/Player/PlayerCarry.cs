@@ -108,7 +108,7 @@ namespace PleaseDontDrown.Player
         // ------------------------------------------------------------------ picking somebody up (the carrier's machine)
 
         public bool CanInteract(PlayerHub player) =>
-            player != null && player != _hub && Carrier == null && CarriedBy(_hub) == null && Vehicles.Vehicle.SeatOf(_hub) == null
+            player != null && player != _hub && Carrier == null && CarriedBy(_hub) == null && Vehicles.Vehicle.RideOf(_hub) == null
             && player.Motor != null && player.Motor.Seat == null && !IsCarried(player) && CarriedBy(player) == null
             && (player.Hands == null || player.Hands.HeldItem == null);
 
@@ -299,7 +299,7 @@ namespace PleaseDontDrown.Player
         {
             if (ReferenceEquals(_carrier.Value, null)) return;
             PlayerHub carrier = Carrier;
-            if (carrier == null || !carrier.IsSpawned || Time.time - _carriedSince > MaxCarry || Vehicles.Vehicle.SeatOf(carrier) != null)
+            if (carrier == null || !carrier.IsSpawned || Time.time - _carriedSince > MaxCarry || Vehicles.Vehicle.RideOf(carrier) != null)
             {
                 if (carrier == null) { _carrier.Value = null; LetGoTarget(Owner, transform.position + Vector3.up * 0.5f, Vector3.zero); }
                 else ServerLetGo(Vector3.up * 2f, null);

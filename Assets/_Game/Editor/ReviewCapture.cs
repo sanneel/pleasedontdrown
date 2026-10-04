@@ -306,6 +306,10 @@ namespace PleaseDontDrown.Editor
                 case "scared": m.Pose = AvatarPose.Scared; m.Mood = AvatarMood.Scared; break;
                 case "handsup": m.Pose = AvatarPose.HandsUp; break;
                 case "seated": m.Seated = true; break;
+                case "straddle": m.Seated = true; m.Straddle = true; break;
+                case "fly": m.Flying = true; m.Grounded = false; m.Velocity = forward * 14f; break;
+                case "star": m.StarJump = true; m.Grounded = false; m.Velocity = Vector3.up * 6f; break;
+                case "jumpshot": m.Grounded = false; break;
                 case "sitchair": m.Pose = AvatarPose.SitChair; break;
                 case "happy": m.Mood = AvatarMood.Happy; m.Talking = true; break;
                 case "talk": m.Talking = true; animator.Lively = true; break;
@@ -359,12 +363,13 @@ namespace PleaseDontDrown.Editor
             AvatarGesture gesture = pose switch
             {
                 "throw" => AvatarGesture.Throw, "wave" => AvatarGesture.Wave, "interact" => AvatarGesture.Interact, "punch" => AvatarGesture.Punch,
-                "kiss" => AvatarGesture.Breath, "zap" => AvatarGesture.Zap, "shoot" => AvatarGesture.Shoot, _ => AvatarGesture.None
+                "kiss" => AvatarGesture.Breath, "zap" => AvatarGesture.Zap, "shoot" => AvatarGesture.Shoot, "jumpshot" => AvatarGesture.JumpShot,
+                _ => AvatarGesture.None
             };
             if (gesture != AvatarGesture.None)
             {
                 // Caught part-way through (the punch at full reach, the kiss with the lips down).
-                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Breath => 0.55f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, _ => 0.12f };
+                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Breath => 0.55f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, AvatarGesture.JumpShot => 0.3f, _ => 0.12f };
                 float now = AvatarAnimator.TimeOverride ?? 103f;
                 AvatarAnimator.TimeOverride = now;
                 Vector3 point = gesture switch

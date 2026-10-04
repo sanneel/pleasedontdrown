@@ -250,7 +250,7 @@ namespace PleaseDontDrown.Player
         {
             Vehicles.Vehicle seat = Seat;
             PlayerHub me = _hub != null ? _hub : (_hub = GetComponent<PlayerHub>());
-            bool valid = seat != null && seat.isActiveAndEnabled && seat.IsSpawned && (me == null || seat.Driver == me || seat.Driver == null && Time.time - _seatedAt < 1f);
+            bool valid = seat != null && seat.isActiveAndEnabled && seat.IsSpawned && (me == null || seat.Driver == me || seat.IsAboard(me) || seat.Driver == null && Time.time - _seatedAt < 1f);
             if (valid)
             {
                 _seatLostSince = float.PositiveInfinity;

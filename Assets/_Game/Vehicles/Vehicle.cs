@@ -31,6 +31,10 @@ namespace PleaseDontDrown.Vehicles
         [SerializeField] private Transform _gripLeft;
         [SerializeField] private Transform _gripRight;
         [SerializeField] private Transform _thrustPoint;
+        [Tooltip("Back seats for riders (hips; forward = the vehicle's forward). Children GripLeft / GripRight: their hands.")]
+        [SerializeField] private Transform[] _backSeats;
+        [Tooltip("Riders sit astride (legs either side): a banana, a jet ski's back seat.")]
+        [SerializeField] private bool _straddle;
         [Tooltip("Needed in the driver's inventory to start it (item display name). Empty = no key.")]
         [SerializeField] private string _keyItem = "";
         [Header("Driving")]
@@ -45,6 +49,8 @@ namespace PleaseDontDrown.Vehicles
         private static readonly List<Vehicle> _all = new();
 
         private readonly SyncVar<PlayerHub> _driver = new SyncVar<PlayerHub>();
+        private readonly SyncVar<PlayerHub> _rider1 = new SyncVar<PlayerHub>();
+        private readonly SyncVar<PlayerHub> _rider2 = new SyncVar<PlayerHub>();
         private readonly SyncVar<bool> _locked = new SyncVar<bool>();
         private readonly SyncVar<string> _lockedReason = new SyncVar<string>();
 
@@ -79,6 +85,54 @@ namespace PleaseDontDrown.Vehicles
             return null;
         }
 
+        /// <summary>The vehicle this player is on, driving or on a back seat.</summary>
+        public static Vehicle RideOf(PlayerHub player)
+        {
+            if (player == null) return null;
+            foreach (Vehicle v in _all)
+                if (v.SeatIndexOf(player) >= 0) return v;
+            return null;
+        }
+
+        public int BackSeatCount => _backSeats == null ? 0 : Mathf.Min(_backSeats.Length, 2);
+        public bool Straddle => _straddle;
+
+        /// <summary>Who sits on back seat <paramref name="i"/> (0 or 1).</summary>
+        public PlayerHub Rider(int i) => i == 0 ? _rider1.Value : i == 1 ? _rider2.Value : null;
+
+        private SyncVar<PlayerHub> RiderVar(int i) => i == 0 ? _rider1 : _rider2;
+
+        /// <summary>0 driving, 1.. a back seat, -1 not on it.</summary>
+        public int SeatIndexOf(PlayerHub player)
+        {
+            if (player == null) return -1;
+            if (_driver.Value == player) return 0;
+            for (int i = 0; i < BackSeatCount; i++)
+                if (Rider(i) == player) return i + 1;
+            return -1;
+        }
+
+        public bool IsAboard(PlayerHub player) => SeatIndexOf(player) >= 0;
+
+        /// <summary>Everyone on it: the driver first, then the riders.</summary>
+        public List<PlayerHub> Aboard()
+        {
+            var list = new List<PlayerHub>();
+            if (_driver.Value != null) list.Add(_driver.Value);
+            for (int i = 0; i < BackSeatCount; i++)
+                if (Rider(i) != null) list.Add(Rider(i));
+            return list;
+        }
+
+        private Transform SeatTransform(int index) => index <= 0 ? (_seat != null ? _seat : transform) : _backSeats[index - 1];
+
+        private int FreeBackSeat()
+        {
+            for (int i = 0; i < BackSeatCount; i++)
+                if (Rider(i) == null) return i;
+            return -1;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
@@ -94,6 +148,8 @@ namespace PleaseDontDrown.Vehicles
             Transform hull = transform.Find("Hull");
             _hull = hull != null ? hull.GetComponent<BoxCollider>() : null;
             _driver.OnChange += OnDriverChanged;
+            _rider1.OnChange += (prev, next, asServer) => OnRiderChanged(prev, next, asServer, 1);
+            _rider2.OnChange += (prev, next, asServer) => OnRiderChanged(prev, next, asServer, 2);
         }
 
         public override void OnStartNetwork()
@@ -111,11 +167,13 @@ namespace PleaseDontDrown.Vehicles
 
         // ------------------------------------------------------------------ getting on and off
 
-        public bool CanInteract(PlayerHub player) => _driver.Value == null || _driver.Value == player;
+        public bool CanInteract(PlayerHub player) => _driver.Value == null || IsAboard(player) || FreeBackSeat() >= 0 && !_locked.Value;
 
         public string GetPrompt(PlayerHub player)
         {
-            if (_driver.Value == player) return $"Get off the {_displayName}";
+            if (IsAboard(player)) return $"Get off the {_displayName}";
+            if (_driver.Value != null && FreeBackSeat() >= 0)
+                return _thrust > 0f ? $"Hop on the back of the {_displayName}" : $"Ride the {_displayName} (seat {FreeBackSeat() + 2})";
             if (_locked.Value) return string.IsNullOrEmpty(_lockedReason.Value) ? $"{_displayName} (locked)" : _lockedReason.Value;
             if (!string.IsNullOrEmpty(_keyItem) && !HasKey(player)) return $"{_displayName}: needs the {_keyItem.ToLowerInvariant()}";
             return _thrust > 0f ? $"Drive the {_displayName}" : $"Ride the {_displayName}"; // towed things (the banana boat) are ridden
@@ -123,12 +181,13 @@ namespace PleaseDontDrown.Vehicles
 
         public void OnInteract(PlayerHub player)
         {
-            if (_driver.Value == player)
+            if (IsAboard(player))
             {
                 ExitServer();
                 return;
             }
-            if (_locked.Value || (!string.IsNullOrEmpty(_keyItem) && !HasKey(player)))
+            bool backSeat = _driver.Value != null;
+            if (_locked.Value || (!backSeat && !string.IsNullOrEmpty(_keyItem) && !HasKey(player)))
             {
                 PlayerHud.ShowToast(GetPrompt(player), 2.5f);
                 return;
@@ -140,7 +199,39 @@ namespace PleaseDontDrown.Vehicles
             }
             if (Time.time < _nextEnterRequest) return;
             _nextEnterRequest = Time.time + 0.5f;
-            EnterServer(player);
+            if (backSeat) EnterBackServer(player);
+            else EnterServer(player);
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void EnterBackServer(PlayerHub player, NetworkConnection caller = null)
+        {
+            if (player == null || player.Owner != caller || _locked.Value || RideOf(player) != null) return;
+            if ((player.transform.position - transform.position).sqrMagnitude > 6f * 6f) return;
+            int seat = FreeBackSeat();
+            if (seat < 0) return;
+            RiderVar(seat).Value = player;
+            Debug.Log($"[Vehicle] {player.DisplayName} rides on the back of the {_displayName} (seat {seat + 2})");
+        }
+
+        /// <summary>Host: one rider (not the driver) gets off.</summary>
+        [Server]
+        public void ServerKickRider(PlayerHub rider)
+        {
+            for (int i = 0; i < BackSeatCount; i++)
+                if (rider != null && Rider(i) == rider)
+                {
+                    Debug.Log($"[Vehicle] {rider.DisplayName} got off the back of the {_displayName}");
+                    RiderVar(i).Value = null;
+                }
+        }
+
+        /// <summary>Host: everybody off (the driver and the riders).</summary>
+        [Server]
+        public void ServerKickAll()
+        {
+            for (int i = 0; i < BackSeatCount; i++) RiderVar(i).Value = null;
+            ServerKickDriver();
         }
 
         private bool HasKey(PlayerHub player)
@@ -169,8 +260,13 @@ namespace PleaseDontDrown.Vehicles
         private void ExitServer(NetworkConnection caller = null)
         {
             PlayerHub driver = _driver.Value;
-            if (driver == null || driver.Owner != caller) return;
-            ServerKickDriver();
+            if (driver != null && driver.Owner == caller)
+            {
+                ServerKickDriver();
+                return;
+            }
+            for (int i = 0; i < BackSeatCount; i++)
+                if (Rider(i) != null && Rider(i).Owner == caller) ServerKickRider(Rider(i));
         }
 
         /// <summary>
@@ -204,14 +300,14 @@ namespace PleaseDontDrown.Vehicles
         {
             _locked.Value = locked;
             _lockedReason.Value = reason ?? string.Empty;
-            if (locked) ServerKickDriver();
+            if (locked) ServerKickAll();
         }
 
         /// <summary>Host: drive to a point by itself (pirates arriving). Null stops.</summary>
         [Server]
         public void ServerAutopilot(Vector3? target, float speed = 8f)
         {
-            if (target.HasValue) ServerKickDriver(); // nobody rides along on autopilot
+            if (target.HasValue) ServerKickAll(); // nobody rides along on autopilot
             _autopilotTarget = target;
             _autopilotSpeed = speed;
             if (target.HasValue && Owner.IsValid) RemoveOwnership();
@@ -221,7 +317,7 @@ namespace PleaseDontDrown.Vehicles
         [Server]
         public void ServerPlace(Vector3 position, float yaw)
         {
-            ServerKickDriver();
+            ServerKickAll();
             if (Owner.IsValid) RemoveOwnership();
             _rb.position = position;
             _rb.rotation = Quaternion.Euler(0f, yaw, 0f);
@@ -240,16 +336,8 @@ namespace PleaseDontDrown.Vehicles
             _lastYaw = transform.eulerAngles.y;
 
             PlayerHub local = PlayerHub.Local;
-            if (local != null && prev == local && local.Motor != null && local.Motor.Seat == this)
-            {
-                // Off beside the hull, drifting with it a little and a small push away, so we don't start in its path.
-                Vector3 feet = ExitPosition();
-                Vector3 away = Vector3.ProjectOnPlane(feet - transform.position, Vector3.up);
-                Vector3 drift = _rb != null && !_rb.isKinematic ? Vector3.ProjectOnPlane(_rb.linearVelocity, Vector3.up) * 0.3f : Vector3.zero;
-                Vector3 push = away.sqrMagnitude > 1e-4f ? away.normalized * 1.2f : Vector3.zero;
-                local.Motor.SetSeat(null, feet, drift + push);
-                PlayerHud.ShowToast($"Off the {_displayName}.", 1.5f);
-            }
+            if (local != null && prev == local && local.Motor != null && local.Motor.Seat == this && !IsAboard(local))
+                LocalGetOff(local, SeatTransform(0));
             if (local != null && next == local)
             {
                 // Both hands on the handlebars: whatever small thing we held goes in a pocket; if every pocket is
@@ -268,6 +356,41 @@ namespace PleaseDontDrown.Vehicles
             }
         }
 
+        /// <summary>Off beside the hull, drifting with it a little and a small push away, so we don't start in its path.</summary>
+        private void LocalGetOff(PlayerHub local, Transform seat)
+        {
+            Vector3 feet = ExitPosition(seat);
+            Vector3 away = Vector3.ProjectOnPlane(feet - transform.position, Vector3.up);
+            Vector3 drift = _rb != null && !_rb.isKinematic ? Vector3.ProjectOnPlane(_rb.linearVelocity, Vector3.up) * 0.3f : Vector3.zero;
+            Vector3 push = away.sqrMagnitude > 1e-4f ? away.normalized * 1.2f : Vector3.zero;
+            local.Motor.SetSeat(null, feet, drift + push);
+            PlayerHud.ShowToast($"Off the {_displayName}.", 1.5f);
+        }
+
+        /// <summary>A back seat changed hands: the same as the driver's seat, without the driving.</summary>
+        private void OnRiderChanged(PlayerHub prev, PlayerHub next, bool asServer, int seat)
+        {
+            if (asServer && IsClientStarted) return;
+            if (prev != null && prev != next && !IsAboard(prev)) StartCoroutine(RestoreCollisionWhenClear(prev));
+            SetIgnore(next, true);
+            PlayerHub local = PlayerHub.Local;
+            if (local != null && prev == local && local.Motor != null && local.Motor.Seat == this && !IsAboard(local))
+                LocalGetOff(local, SeatTransform(seat));
+            if (local != null && next == local)
+            {
+                PlayerHands hands = local.Hands;
+                if (hands != null && hands.HeldItem != null && hands.HeldItem.Pocketable)
+                {
+                    int free = hands.FirstFreeSlot();
+                    if (free >= 0) hands.SelectSlot(free);
+                    else hands.Drop();
+                }
+                local.Motor.SetSeat(this, Vector3.zero);
+                _lastYaw = transform.eulerAngles.y;
+                PlayerHud.ShowToast($"Hold on tight! <b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> to get off.", 4f);
+            }
+        }
+
         private readonly HashSet<PlayerHub> _ghosts = new();
 
         /// <summary>
@@ -279,13 +402,13 @@ namespace PleaseDontDrown.Vehicles
             float clearFor = 0f;
             float started = Time.time;
             var wait = new WaitForSeconds(0.2f);
-            while (player != null && _driver.Value != player && Time.time - started < 8f)
+            while (player != null && !IsAboard(player) && Time.time - started < 8f)
             {
                 clearFor = TouchesHull(player) ? 0f : clearFor + 0.2f;
                 if (clearFor >= 0.5f) break;
                 yield return wait;
             }
-            if (player != null && _driver.Value != player) SetIgnore(player, false);
+            if (player != null && !IsAboard(player)) SetIgnore(player, false);
         }
 
         private bool TouchesHull(PlayerHub player)
@@ -313,7 +436,7 @@ namespace PleaseDontDrown.Vehicles
             player != null && !_ghosts.Contains(player) && _driver.Value == null && Speed < 0.8f;
 
         /// <summary>Where to put someone who has to get off right now (their seat vanished): a free spot beside it.</summary>
-        public Vector3 SafeExitPosition() => ExitPosition();
+        public Vector3 SafeExitPosition() => ExitPosition(SeatTransform(0));
 
         private readonly Collider[] _exitOverlaps = new Collider[32];
 
@@ -322,9 +445,8 @@ namespace PleaseDontDrown.Vehicles
         /// other side, behind, in front, then further out all round, whichever is free first, so nobody ends up
         /// inside the dock, a rock or a hull. Our own body, whatever we carry and this vehicle's riders don't count.
         /// </summary>
-        private Vector3 ExitPosition()
+        private Vector3 ExitPosition(Transform seat)
         {
-            Transform seat = _seat != null ? _seat : transform;
             Vector3 right = Vector3.ProjectOnPlane(seat.right, Vector3.up).normalized;
             Vector3 forward = Vector3.ProjectOnPlane(seat.forward, Vector3.up).normalized;
             Vector3 start = seat.position + Vector3.up * 0.2f;
@@ -373,6 +495,23 @@ namespace PleaseDontDrown.Vehicles
             return true;
         }
 
+        /// <summary>
+        /// Where this player's hands go: the handlebars for the driver, a back seat's own grips (the banana's handles,
+        /// the driver's waist on a jet ski) for a rider.
+        /// </summary>
+        public bool GetGrips(PlayerHub player, out HandGrip left, out HandGrip right)
+        {
+            int index = SeatIndexOf(player);
+            if (index <= 0) return GetHandlebars(out left, out right);
+            left = right = default;
+            Transform seat = SeatTransform(index);
+            Transform gl = seat.Find("GripLeft"), gr = seat.Find("GripRight");
+            if (gl == null || gr == null) return false;
+            left = new HandGrip(gl.position, gl.forward, -gl.up, HandPose.LooseFist);
+            right = new HandGrip(gr.position, gr.forward, -gr.up, HandPose.LooseFist);
+            return true;
+        }
+
         /// <summary>World handlebar grips (fingers forward over the bar, palms down).</summary>
         public bool GetHandlebars(out HandGrip left, out HandGrip right)
         {
@@ -396,15 +535,16 @@ namespace PleaseDontDrown.Vehicles
         /// </summary>
         private void GlueDriver(bool turnView)
         {
-            PlayerHub driver = _driver.Value;
             float yaw = transform.eulerAngles.y;
-            if (driver != null)
+            for (int index = 0; index <= BackSeatCount; index++)
             {
-                Vector3 feet = DriverFeetPosition;
-                driver.transform.position = feet;
-                if (driver.TryGetComponent(out Rigidbody body) && body.isKinematic) body.position = feet;
-                if (turnView && driver == PlayerHub.Local && driver.Look != null)
-                    driver.Look.AddYaw(Mathf.DeltaAngle(_lastYaw, yaw)); // the view turns with the vehicle
+                PlayerHub rider = index == 0 ? _driver.Value : Rider(index - 1);
+                if (rider == null) continue;
+                Vector3 feet = SeatTransform(index).position - Vector3.up * 0.5f;
+                rider.transform.position = feet;
+                if (rider.TryGetComponent(out Rigidbody body) && body.isKinematic) body.position = feet;
+                if (turnView && rider == PlayerHub.Local && rider.Look != null)
+                    rider.Look.AddYaw(Mathf.DeltaAngle(_lastYaw, yaw)); // the view turns with the vehicle
             }
             if (turnView) _lastYaw = yaw;
         }
@@ -567,6 +707,19 @@ namespace PleaseDontDrown.Vehicles
             // The driver left the game: free the seat.
             if (IsServerInitialized && !ReferenceEquals(driver, null) && (driver == null || !driver.IsSpawned))
                 _driver.Value = null;
+            for (int i = 0; IsServerInitialized && i < BackSeatCount; i++)
+            {
+                PlayerHub rider = Rider(i);
+                if (!ReferenceEquals(rider, null) && (rider == null || !rider.IsSpawned)) RiderVar(i).Value = null;
+            }
+            // A rider: Interact always means "get off" too.
+            PlayerHub me = PlayerHub.Local;
+            if (me != null && me != driver && SeatIndexOf(me) > 0 && GameInput.GameplayActive && GameInput.Interact.WasPressedThisFrame()
+                && Time.time > _nextEnterRequest)
+            {
+                _nextEnterRequest = Time.time + 0.5f;
+                ExitServer();
+            }
             // Our driver: Interact always means "get off" (whatever the crosshair is on).
             if (driver != null && driver == PlayerHub.Local && GameInput.GameplayActive && GameInput.Interact.WasPressedThisFrame()
                 && Time.time > _nextEnterRequest) // not the same press that just got us on

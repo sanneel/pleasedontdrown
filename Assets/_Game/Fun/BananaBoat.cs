@@ -90,16 +90,22 @@ namespace PleaseDontDrown.Fun
             _lastPos = p;
             _lastYaw = yaw;
 
-            // Too sharp a turn too fast: the banana rider goes flying.
-            PlayerHub rider = _vehicle != null ? _vehicle.Driver : null;
-            if (rider != null && _speed > FlingSpeed && Mathf.Abs(_yawRate) > FlingTurn && Time.time > _nextFling)
+            // Too sharp a turn too fast: everyone on the banana goes flying (the back riders furthest: they're
+            // on the end of the whip).
+            var riders = _vehicle != null ? _vehicle.Aboard() : null;
+            if (riders != null && riders.Count > 0 && _speed > FlingSpeed && Mathf.Abs(_yawRate) > FlingTurn && Time.time > _nextFling)
             {
                 _nextFling = Time.time + 4f;
                 Vector3 outward = -transform.right * Mathf.Sign(_yawRate);
-                _vehicle.ServerKickDriver();
-                FlingTarget(rider.Owner, outward * 6f + Vector3.up * 5f);
-                FlungObservers(rider.DisplayName, p + Vector3.up);
-                Debug.Log($"[Banana] {rider.DisplayName} flung off at {_speed:F1} m/s, turning {_yawRate:F0} deg/s");
+                for (int i = 0; i < riders.Count; i++)
+                {
+                    PlayerHub rider = riders[i];
+                    if (rider == _vehicle.Driver) _vehicle.ServerKickDriver();
+                    else _vehicle.ServerKickRider(rider);
+                    FlingTarget(rider.Owner, outward * (6f + i * 1.5f) + Vector3.up * (5f + i));
+                    FlungObservers(rider.DisplayName, p + Vector3.up);
+                    Debug.Log($"[Banana] {rider.DisplayName} flung off at {_speed:F1} m/s, turning {_yawRate:F0} deg/s");
+                }
             }
 
             if (Time.time < _nextThink) return;

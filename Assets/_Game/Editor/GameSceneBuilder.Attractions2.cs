@@ -52,10 +52,23 @@ namespace PleaseDontDrown.Editor
                 tr.localPosition = p;
                 return tr;
             }
-            Transform seat = P("Seat", new Vector3(0f, 0.72f, 1.2f));
-            Transform gripL = P("GripLeft", new Vector3(-0.14f, 0.82f, 1.55f));
-            Transform gripR = P("GripRight", new Vector3(0.14f, 0.82f, 1.55f));
-            gripL.localRotation = gripR.localRotation = Quaternion.LookRotation(Vector3.up, Vector3.back);
+            // Three seats in a row, each with the model's handle in front of it (fists round it, from above).
+            // (Seat = where the hips' seat point goes; at 0.72 the riders sank into the tube up to the chest.)
+            Transform seat = P("Seat", new Vector3(0f, 1.05f, 0.85f));
+            Transform gripL = P("GripLeft", new Vector3(-0.12f, 0.8f, 1.2f));
+            Transform gripR = P("GripRight", new Vector3(0.12f, 0.8f, 1.2f));
+            gripL.localRotation = gripR.localRotation = Quaternion.identity; // like handlebars: fingers forward over the bar, palms down
+            var backSeats = new List<Object>();
+            foreach (float z in new[] { -0.15f, -1.15f })
+            {
+                Transform back = P("BackSeat", new Vector3(0f, 1.05f, z));
+                Transform l = P("GripLeft", Vector3.zero), r = P("GripRight", Vector3.zero);
+                l.SetParent(back, false);
+                r.SetParent(back, false);
+                l.SetLocalPositionAndRotation(new Vector3(-0.12f, -0.25f, 0.35f), Quaternion.identity); // on the handle
+                r.SetLocalPositionAndRotation(new Vector3(0.12f, -0.25f, 0.35f), Quaternion.identity);
+                backSeats.Add(back);
+            }
             Transform thrust = P("Thrust", new Vector3(0f, 0f, -2f));
             Transform nose = P("Nose", new Vector3(0f, 0.75f, 2.45f));
             GameObject model = PropModel("banana_boat", root.transform);
@@ -66,6 +79,8 @@ namespace PleaseDontDrown.Editor
             }
             Vehicle vehicle = FinishVehicle(root, "Banana Boat", "", seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.15f,
                 thrustForce: 0f, maxSpeed: 1f, turnRate: 0f); // (max speed must not be 0: Vehicle divides by it)
+            SetRefs(vehicle, "_backSeats", backSeats.ToArray());
+            SetBool(vehicle, "_straddle", true);
             Object engine = new SerializedObject(vehicle).FindProperty("_engineAudio").objectReferenceValue;
             SetRef(vehicle, "_engineAudio", null);
             if (engine != null) Object.DestroyImmediate(engine);
