@@ -906,60 +906,6 @@ def banana_boat():
         return None
     paint(ob, pick)
 
-@prop
-def high_striker():
-    """The strongman game (local: the pad in front at z +0.5, the pole up the back): a red-and-white base with a
-    padded striking target, a 5 m pole painted in bands from WIMP to LEGEND, a brass bell on top, a dial by the pad.
-    The puck (striker_puck) and the dial's needle (striker_needle) are separate models."""
-    box("Base", (0, 0.15, 0.1), (1.2, 0.3, 1.4), "red", bevel=0.03)
-    box("Step", (0, 0.32, 0.55), (0.9, 0.06, 0.5), "white", bevel=0.01)
-    lathe("Pad", (0, 0.42, 0.55), [(0.0, 0.08), (0.3, 0.08), (0.32, 0.0), (0.0, 0.0)], "black", seg=20)
-    lathe("PadTop", (0, 0.5, 0.55), [(0.0, 0.02), (0.22, 0.02), (0.24, 0.0), (0.0, 0.0)], "red", seg=20)
-    tube("Lever", [(0, 0.36, 0.3), (0, 0.4, -0.2)], 0.04, "steel", seg=8)
-    bands = ["blue", "teal", "green", "yellow", "orange", "red"]
-    for k, mat in enumerate(bands):
-        box(f"Band{k}", (0, 0.4 + k * 0.78 + 0.39, -0.2), (0.22, 0.78, 0.12), mat, bevel=0.01)
-    box("Rail", (0, 2.75, -0.13), (0.06, 4.7, 0.04), "steel", bevel=0.005)
-    box("Top", (0, 5.15, -0.2), (0.4, 0.12, 0.3), "wood_dark", bevel=0.02)
-    lathe("Bell", (0, 5.21, -0.2), [(0.0, 0.32), (0.08, 0.3), (0.14, 0.15), (0.2, 0.0), (0.0, 0.0)], "brass", seg=20)
-    # The dial on a post beside the pad.
-    tube("DialPost", [(0.75, 0.0, 0.6), (0.75, 1.3, 0.6)], 0.04, "steel", seg=8)
-    lathe("Dial", (0.75, 1.45, 0.62), [(0.0, -0.02), (0.28, -0.02), (0.28, 0.02), (0.0, 0.02)], "white", seg=24, axis='z')
-    lathe("DialRim", (0.75, 1.45, 0.62), [(0.27, -0.035), (0.3, -0.035), (0.3, 0.035), (0.27, 0.035)], "red", seg=24, axis='z')
-    box("DialRed", (0.75 + 0.15, 1.58, 0.645), (0.08, 0.04, 0.005), "red", rot=(0, 0, -50), bevel=0)
-
-@prop
-def striker_puck():
-    """The puck that shoots up the strongman's pole (local: centred on the rail)."""
-    box("Puck", (0, 0, 0), (0.3, 0.16, 0.16), "red", bevel=0.03)
-    lathe("Star", (0, 0, 0.085), [(0.0, 0.0), (0.06, 0.0), (0.06, 0.01), (0.0, 0.01)], "yellow", seg=5, axis='z')
-
-@prop
-def striker_needle():
-    """The dial's needle (local: its pivot at the origin, pointing up +y)."""
-    box("Needle", (0, 0.11, 0.0), (0.03, 0.22, 0.01), "black", bevel=0)
-    lathe("Pin", (0, 0, 0.005), [(0.0, 0.0), (0.03, 0.0), (0.03, 0.01), (0.0, 0.01)], "red", seg=10, axis='z')
-
-@prop
-def coconut_shy():
-    """A coconut shy stall (local: the counter's front at z +0.4, the posts at the back): a striped awning on
-    four poles, a counter, three posts topped with cups at z -1.6 (cup tops 1.35 m up), a sack backdrop."""
-    for x in (-1.5, 1.5):
-        for z in (0.45, -2.2):
-            tube(f"Pole{x}{z}", [(x, 0, z), (x, 2.5, z)], 0.05, "wood_dark", seg=8)
-    for k in range(8):
-        x = -1.6 + k * 0.4
-        box(f"Awning{k}", (x + 0.2, 2.55, -0.9), (0.4, 0.05, 3.0), "red" if k % 2 == 0 else "white", rot=(-8, 0, 0), bevel=0.005)
-    box("Counter", (0, 0.95, 0.4), (3.1, 0.08, 0.5), "wood", bevel=0.02)
-    box("CounterFront", (0, 0.48, 0.62), (3.1, 0.9, 0.06), "red", bevel=0.01)
-    for k in range(5):
-        box(f"Stripe{k}", (-1.2 + k * 0.6, 0.48, 0.655), (0.25, 0.9, 0.01), "white", bevel=0)
-    box("Backdrop", (0, 1.3, -2.25), (3.1, 2.2, 0.05), "rope", bevel=0.01)
-    for k, x in enumerate((-0.9, 0.0, 0.9)):
-        tube(f"Post{k}", [(x, 0, -1.6), (x, 1.3, -1.6)], 0.05, "wood_dark", seg=8)
-        lathe(f"Cup{k}", (x, 1.3, -1.6), [(0.0, 0.0), (0.07, 0.0), (0.09, 0.05), (0.08, 0.05), (0.06, 0.01), (0.0, 0.01)], "steel", seg=12)
-    box("Sign", (0, 2.3, 0.47), (1.4, 0.35, 0.04), "yellow", bevel=0.01)
-
 # The watch tower and the shack, modelled clean (boards, trims, glass, roofs) to the very sizes the scene builder's
 # colliders use (MeshyArt.Tower / MeshyArt.Shack at TowerScale 1.2 x widen 1.5, ShackScale 1.45), so they drop in
 # where the Meshy scans were: the door gaps, decks, floors, walls and stairs all line up with what you walk on.
@@ -1292,7 +1238,7 @@ VIEWS = {"watch_tower": (0.9, 0.55, 1.0), "shack": (0.9, 0.55, 1.0), "dock": (1.
          "beach_hut": (0.8, 0.5, 1.0), "basketball_hoop": (0.9, 0.4, 1.0), "basketball": (0.6, 0.6, 1.0),
          "trampoline": (0.9, 0.6, 1.0), "human_cannon": (1.0, 0.5, 0.6), "diving_board": (1.0, 0.5, 0.8),
          "zipline_post": (1.0, 0.3, 1.0), "zipline_handle": (1.0, 0.3, 1.0),
-         "banana_boat": (1.0, 0.5, 0.7), "high_striker": (1.0, 0.4, 1.0), "coconut_shy": (0.8, 0.5, 1.0)}
+         "banana_boat": (1.0, 0.5, 0.7)}
 for name, build in PROPS.items():
     if only and name not in only: continue
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']: bpy.data.objects.remove(ob)

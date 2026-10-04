@@ -448,7 +448,6 @@ namespace PleaseDontDrown.Editor
             };
             foreach (Vector2 palm in MeshyArt.PalmSpots) list.Add(new Vector3(palm.x, palm.y, 1.8f));
             list.AddRange(AttractionSpots()); // hoop, trampolines, cannon, zipline, goal... (GameSceneBuilder.Attractions.cs)
-            list.AddRange(MoreAttractionSpots()); // slide, strongman, coconut shy
             return list;
         }
 

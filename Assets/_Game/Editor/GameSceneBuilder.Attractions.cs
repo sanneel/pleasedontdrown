@@ -40,7 +40,7 @@ namespace PleaseDontDrown.Editor
             BuildZipline(parent);
             BuildDivingBoard(parent);
             BuildFlamingo(parent);
-            BuildMoreAttractions(parent); // slide, banana boat, strongman, coconut shy (GameSceneBuilder.Attractions2.cs)
+            BuildMoreAttractions(parent); // banana boat (GameSceneBuilder.Attractions2.cs)
         }
 
         private static void BuildTrampoline(Transform parent, Vector3 at)
