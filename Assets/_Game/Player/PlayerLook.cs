@@ -66,6 +66,9 @@ namespace PleaseDontDrown.Player
         public Vector3 BobPosition => _bob;
         /// <summary>How quickly the strafe roll settles (held guns level out at the same pace).</summary>
         public float RollSmoothTime => _rollSmoothTime;
+        /// <summary>Extra camera roll (degrees) and drop (metres) on top of everything else: knocked flat, seeing stars.</summary>
+        public float ExtraRoll { get; set; }
+        public float ExtraDrop { get; set; }
         /// <summary>Current field of view relative to the base one (mouse sensitivity follows it).</summary>
         public float ZoomSensitivity => _fov > 1f ? _fov / Mathf.Max(1f, BaseFov) : 1f;
 
@@ -257,8 +260,8 @@ namespace PleaseDontDrown.Player
             float settle = Mathf.Clamp(_seatEyeY - headY, -0.15f, 0.15f);
             _seatEyeY = headY + settle;
 
-            _camera.transform.localPosition = _delayedBob + _head.InverseTransformVector(Vector3.up * settle);
-            _camera.transform.localRotation = Quaternion.Euler(_fallTilt, 0f, _roll);
+            _camera.transform.localPosition = _delayedBob + _head.InverseTransformVector(Vector3.up * (settle - ExtraDrop));
+            _camera.transform.localRotation = Quaternion.Euler(_fallTilt, 0f, _roll + ExtraRoll);
 
             // Leaning in (mouth-to-mouth): the eye comes down over their face (they lie on their back, face up) to just
             // above the lips, looking down at them, head tipped a little, then back up.

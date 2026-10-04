@@ -67,6 +67,10 @@ namespace PleaseDontDrown.World
         [ServerRpc(RequireOwnership = false)]
         private void SetServer(sbyte state) => _state.Value = (sbyte)Mathf.Clamp(state, -1, 1);
 
+        /// <summary>Host: open (swinging away from <paramref name="awayFrom"/>) or shut, by the story rather than a player.</summary>
+        [Server]
+        public void ServerSet(bool open, Vector3 awayFrom) => _state.Value = open ? SideAwayFrom(awayFrom) : (sbyte)0;
+
         private void OnStateChanged(sbyte prev, sbyte next, bool asServer)
         {
             if (!asServer || !IsClientStarted) PlaySound(next != 0); // once per machine

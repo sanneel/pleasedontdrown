@@ -141,6 +141,10 @@ namespace PleaseDontDrown.Items
 
         /// <summary>Holder as seen on this machine: our own prediction wins until the host answers.</summary>
         public PlayerHub Holder => _releasePending ? null : _predictedHolder != null ? _predictedHolder : _holder.Value;
+        /// <summary>Who let go of it last, when and from where (every machine): thrown rings and balls credit them.</summary>
+        public PlayerHub LastHolder { get; private set; }
+        public float ReleasedAt { get; private set; } = float.NegativeInfinity;
+        public Vector3 ReleasedFrom { get; private set; }
         public bool IsHeld => Holder != null;
 
         /// <summary>The host agreed this player holds it and we own its physics, so it can be thrown.</summary>
@@ -335,6 +339,12 @@ namespace PleaseDontDrown.Items
         private void OnHolderChanged(PlayerHub prev, PlayerHub next, bool asServer)
         {
             PlayerHub shownBefore = _predictedHolder != null ? _predictedHolder : prev;
+            if (prev != null && next == null)
+            {
+                LastHolder = prev;
+                ReleasedAt = Time.time;
+                ReleasedFrom = prev.transform.position;
+            }
             if (next == null) _releasePending = false;
             if (next != null)
             {

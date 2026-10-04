@@ -264,6 +264,7 @@ namespace PleaseDontDrown.Player
                 LastThrowCharge = charge;
             }
             item.Release(_hub, velocity, spin);
+            if (charge > 0f) Fun.ThrownImpact.Arm(item, _hub); // whoever it hits gets bonked
             BeachAudio.PlayLocal(charge >= 0f ? BeachAudio.Throw : BeachAudio.Drop, 0.6f);
             Invalidate();
             ResetHoldState();

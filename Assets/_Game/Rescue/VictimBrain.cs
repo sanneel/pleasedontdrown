@@ -496,6 +496,17 @@ namespace PleaseDontDrown.Rescue
         {
             // Credit whoever brought them in (holding them now, or let go of them moments ago).
             PlayerHub rescuer = held ? _item.Holder : Time.time - _lastHeldTime < 8f ? _lastHolder : null;
+            // Kicked in on a thrown ring: whoever threw it saved them.
+            bool byRing = false;
+            if (rescuer == null && _body.HeldFloat != null)
+            {
+                Item ring = _body.HeldFloat.Item;
+                if (ring.LastHolder != null && Time.time - ring.ReleasedAt < 120f)
+                {
+                    rescuer = ring.LastHolder;
+                    byRing = true;
+                }
+            }
             string took = _troubleSince >= 0f ? FormatTime(Time.time - _troubleSince) : "?";
             _panic.Value = 0f;
             if (_legLost.Value)
@@ -514,7 +525,7 @@ namespace PleaseDontDrown.Rescue
             if (held) _item.ServerForceDrop(); // put down in the shallows
             if (rescuer != null)
             {
-                SetState(VictimState.Saved, VictimEvent.Saved, $"{Name} was saved by {rescuer.DisplayName}! ({took})", rescuer);
+                SetState(VictimState.Saved, VictimEvent.Saved, byRing ? $"{Name} rode {rescuer.DisplayName}'s ring all the way in! ({took})" : $"{Name} was saved by {rescuer.DisplayName}! ({took})", rescuer);
                 Debug.Log($"[Victim] {Name} saved by {rescuer.DisplayName} after {took}");
             }
             else

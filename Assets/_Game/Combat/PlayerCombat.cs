@@ -20,7 +20,7 @@ namespace PleaseDontDrown.Combat
     /// The next punch can go as soon as the last fist has landed, so a quick one-two is quick; a press while a fist
     /// is still on its way is kept and thrown the moment it can be.
     /// </summary>
-    public class PlayerCombat : NetworkBehaviour
+    public partial class PlayerCombat : NetworkBehaviour
     {
         [SerializeField] private PlayerHub _hub;
         [SerializeField] private AudioSource _audio;
@@ -42,7 +42,9 @@ namespace PleaseDontDrown.Combat
 
         private void Update()
         {
+            UpdateFun();
             if (!IsOwner || !GameInput.GameplayActive || _hub.Motor == null || !_hub.Motor.enabled) return;
+            if (IsDazed) return; // seeing stars: no punching
             if (_hub.Motor.Seat != null) return;
             if (_hub.Hands != null && _hub.Hands.HeldItem != null)
             {
@@ -196,7 +198,10 @@ namespace PleaseDontDrown.Combat
             _lastServerPunch = Time.time;
             Vector3 flat = new Vector3(dir.x, 0f, dir.z).normalized;
             if (other.TryGetComponent(out PlayerCombat combat))
+            {
                 combat.ServerKnockback(flat * _shove + Vector3.up * 2.5f, _hub.DisplayName);
+                ServerCountCombo(other, combat); // the third quick one knocks them flat
+            }
             PunchFxObservers(other.transform.position + Vector3.up * 1.4f, false);
         }
 

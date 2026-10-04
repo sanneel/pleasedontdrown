@@ -63,6 +63,11 @@ namespace PleaseDontDrown.Avatars
             funny.enabled = false;
         }
 
+        private float _dizzyUntil = float.NegativeInfinity;
+
+        /// <summary>Seeing stars: the pupils roll round and round for this long.</summary>
+        public void Dizzy(float seconds) => _dizzyUntil = Time.time + seconds;
+
         public void SetShadowsOnly(bool shadowsOnly)
         {
             _shadowsOnly = shadowsOnly;
@@ -129,8 +134,9 @@ namespace PleaseDontDrown.Avatars
             if (!Mathf.Approximately(_headScale, 1f)) _rig[AvatarRig.Bone.Head].localScale = Vector3.one * _headScale;
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             if (dt <= 0f) return;
+            bool dizzy = Time.time < _dizzyUntil;
             foreach (GooglyEye eye in _eyes)
-                if (eye.Root != null) eye.Step(dt);
+                if (eye.Root != null) eye.Step(dt, dizzy);
         }
 
         private void OnDestroy()
@@ -267,8 +273,17 @@ namespace PleaseDontDrown.Avatars
                 return mesh;
             }
 
-            public void Step(float dt)
+            public void Step(float dt, bool dizzy = false)
             {
+                if (dizzy)
+                {
+                    // Round and round, both eyes the same way.
+                    float a = Time.time * 11f;
+                    _offset = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 0.85f;
+                    _velocity = Vector2.zero;
+                    Place();
+                    return;
+                }
                 Vector3 position = _transform.position;
                 if (!_primed)
                 {

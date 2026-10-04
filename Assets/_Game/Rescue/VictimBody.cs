@@ -107,6 +107,7 @@ namespace PleaseDontDrown.Rescue
         public bool IsBuilt => _avatar != null && _avatar.IsBuilt;
         /// <summary>The float (life ring...) this person is holding onto, if any. Found on every machine.</summary>
         public Floatable HeldFloat { get; private set; }
+        private static readonly string[] PaddleShouts = { "KICK! KICK! KICK!", "I'M COMING!", "I LOVE THIS RING!", "GO GO GO!", "BEST THROW EVER!" };
 
         private void Awake()
         {
@@ -311,6 +312,12 @@ namespace PleaseDontDrown.Rescue
             if (!state.IsStruggling() || _item.IsHeld || _brain.IsSilent)
                 return; // the silent ones just slip under
 
+            // On a thrown ring, kicking for the beach.
+            if (HeldFloat != null && Time.time >= _nextCryAt)
+            {
+                _nextCryAt = Time.time + Random.Range(2.5f, 4.5f);
+                FloatingText.Spawn(HeadPosition + Vector3.up * 0.45f, PaddleShouts[Random.Range(0, PaddleShouts.Length)], new Color(0.8f, 1f, 0.85f), 0.75f, 1.8f);
+            }
             // Calling for help (only with the head out of the water).
             if (!headUnder && state != VictimState.Drowning && Time.time >= _nextCryAt && HeldFloat == null)
             {
@@ -618,7 +625,14 @@ namespace PleaseDontDrown.Rescue
 
             if (HeldFloat != null)
             {
-                // Hang on to the ring: drift to it and stay there.
+                // Hang on to the ring and kick for the beach: the ring goes first, they stay with it.
+                Rigidbody ring = HeldFloat.Item.Sync.Body;
+                if (ring != null && !ring.isKinematic)
+                {
+                    Vector3 rv = ring.linearVelocity;
+                    rv.y = 0f;
+                    ring.AddForce(Vector3.ClampMagnitude((ShoreDirection(p) * PaddleSpeed - rv) * 1.5f, 4f), ForceMode.Acceleration);
+                }
                 Vector3 to = HeldFloat.transform.position - p;
                 to.y = 0f;
                 float distance = to.magnitude;
@@ -636,6 +650,42 @@ namespace PleaseDontDrown.Rescue
                 _rb.AddForce(shove * 10f, ForceMode.Acceleration);
                 _rb.AddTorque(Vector3.up * ((Mathf.PerlinNoise(t * 1.3f, 9.7f) - 0.5f) * 12f), ForceMode.Acceleration);
             }
+        }
+
+        private const float PaddleSpeed = 1.3f;
+        private Vector3 _shoreDirection = Vector3.forward;
+        private readonly RaycastHit[] _shoreHits = new RaycastHit[8];
+        private float _nextShoreScan;
+
+        /// <summary>Which way the nearest beach is from out here: the direction where the water gets shallow soonest.</summary>
+        private Vector3 ShoreDirection(Vector3 p)
+        {
+            if (Time.time < _nextShoreScan) return _shoreDirection;
+            _nextShoreScan = Time.time + 1f;
+            float best = float.MaxValue;
+            // Look across the top of the water: docks, posts, boats and rocks in the way don't count as "the beach".
+            Vector3 eye = new Vector3(p.x, WaterSurface.Exists ? WaterSurface.HeightAt(p) + 0.3f : p.y + 0.5f, p.z);
+            Rigidbody ring = HeldFloat != null ? HeldFloat.Item.Sync.Body : null;
+            for (int i = 0; i < 16; i++)
+            {
+                Vector3 d = Quaternion.Euler(0f, i * 22.5f, 0f) * Vector3.forward;
+                float depth = 0f;
+                for (int k = 1; k <= 3; k++) depth += Shore.WaterDepthAt(p + d * (k * 5f) + Vector3.up * 2f);
+                int hits = Physics.SphereCastNonAlloc(eye, 0.45f, d, _shoreHits, 6f, ~0, QueryTriggerInteraction.Ignore);
+                for (int h = 0; h < hits; h++)
+                {
+                    Collider c = _shoreHits[h].collider;
+                    if (_shoreHits[h].normal.y > 0.5f || _shoreHits[h].distance <= 0.01f || c.attachedRigidbody == ring || c.GetComponentInParent<VictimBody>() == this) continue; // sand sloping up is the way out
+                    depth += 50f; // something upright in the way
+                    break;
+                }
+                if (depth < best)
+                {
+                    best = depth;
+                    _shoreDirection = d;
+                }
+            }
+            return _shoreDirection;
         }
 
         private void UpdateDunk(VictimState state)

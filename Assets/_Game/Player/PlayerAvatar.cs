@@ -43,6 +43,8 @@ namespace PleaseDontDrown.Player
             _lastPosition = transform.position;
         }
 
+        private Combat.PlayerCombat _combat;
+
         public void ApplyLook(AvatarLook look)
         {
             if (_rig.IsBuilt && _rig.Look.Equals(look)) return;
@@ -163,6 +165,14 @@ namespace PleaseDontDrown.Player
                     m.Eating = _remoteEating;
                 }
                 if (m.Eating) m.Holding = false; // the eating layer puts the hand at the mouth
+            }
+
+            // Knocked flat (three punches, a coconut to the head): down on the sand for everyone to see.
+            if (_combat == null) _combat = _hub.GetComponent<Combat.PlayerCombat>();
+            if (_combat != null && _combat.IsDazed && !m.Swimming)
+            {
+                m.Pose = AvatarPose.Down;
+                m.Mood = AvatarMood.Hurt;
             }
 
             m.Cpr = Time.time - _lastPumpTime < 1.3f && !m.Swimming;

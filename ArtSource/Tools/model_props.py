@@ -723,6 +723,97 @@ def lost_box():
     tube("Flop", [(-0.02, 0.26, -0.1), (0.02, 0.27, -0.06), (0.03, 0.26, -0.02)], 0.022, "pink", seg=6)
 
 # ======================================================================================== the buildings
+# ======================================================================================== island 1 fun
+
+@prop
+def beach_hut():
+    """Island 1's little beach hut (hut-local: floor centre at the origin, the doorway faces +z): a plank deck,
+    candy-striped board walls (pink and white), a red gable roof, a heart on the front gable. The doorway is
+    0.9 x 2.1 m from x -0.45; the scene builder hangs a real door in it."""
+    rng = random.Random(5)
+    H0, H1, W = 0.15, 2.55, 1.3
+    box("Deck", (0, H0 / 2, 0), (2 * W + 0.3, H0, 2 * W + 0.3), "wood", bevel=0.015)
+    for i, z in enumerate((-W, W)):
+        for j, x in enumerate((-W, W)):
+            box(f"Post{i}{j}", (x, (H0 + H1) / 2, z), (0.12, H1 - H0 + 0.05, 0.12), "white", bevel=0.01)
+    def boards(name, axis, plane, out, door=None):
+        n = 13
+        for k in range(n):
+            a = -W + 2 * W * k / n
+            b = a + 2 * W / n
+            mat = "pink" if k % 2 == 0 else "white"
+            if door and b > door[0] and a < door[1]:
+                _wall_box(f"{name}{k}Top", axis, plane, (a, b), (door[2], H1), 0.07, mat, bevel=0.004)
+                continue
+            _wall_box(f"{name}{k}", axis, plane, (a, b), (H0, H1), 0.07, mat, bevel=0.004)
+    boards("Front", 'z', W, 1, door=(-0.45, 0.45, H0 + 2.1))
+    boards("Back", 'z', -W, -1)
+    boards("Left", 'x', -W, -1)
+    boards("Right", 'x', W, 1)
+    # Gable roof along x: two slabs, the ridge over the middle; triangle gables front and back.
+    rise, over = 0.75, 0.28
+    slope = math.degrees(math.atan2(rise, W))
+    half = math.hypot(W, rise) + over
+    for side in (1, -1):
+        box(f"Roof{side}", (0, H1 + rise / 2 - 0.02, side * (W / 2 + over / 2 * 0.0)), (2 * W + 0.5, 0.07, half), "roof_red",
+            rot=(side * slope, 0, 0), bevel=0.01)
+    for side in (1, -1):
+        zf = side * W
+        t = 0.05
+        add(f"Gable{side}", [(-W, H1, zf + t), (W, H1, zf + t), (0, H1 + rise, zf + t), (-W, H1, zf - t), (W, H1, zf - t), (0, H1 + rise, zf - t)],
+            [(0, 1, 2), (5, 4, 3), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)], "white")
+    box("Ridge", (0, H1 + rise + 0.03, 0), (2 * W + 0.55, 0.08, 0.1), "roof_red_dark", bevel=0.01)
+    # A big red heart on the front gable.
+    hy, hz = H1 + 0.32, W + 0.07
+    lathe("HeartL", (-0.085, hy, hz), [(0.0, -0.03), (0.11, -0.03), (0.11, 0.03), (0.0, 0.03)], "red", seg=18, axis='z')
+    lathe("HeartR", (0.085, hy, hz), [(0.0, -0.03), (0.11, -0.03), (0.11, 0.03), (0.0, 0.03)], "red", seg=18, axis='z')
+    box("HeartTip", (0, hy - 0.085, hz), (0.19, 0.19, 0.06), "red", rot=(0, 0, 45), bevel=0.01)
+    # Two steps up to the deck and a little doormat.
+    box("Step", (0, 0.05, W + 0.32), (1.1, 0.1, 0.3), "wood_dark", bevel=0.01)
+    box("Mat", (0, H0 + 0.005, W - 0.35), (0.8, 0.01, 0.45), "pink", bevel=0)
+
+@prop
+def basketball_hoop():
+    """A beach basketball hoop (hoop-local: the pole's foot at z -1.0, the backboard's face at z 0 facing +z, the
+    rim's centre at (0, 3.05, 0.38), 0.23 m across its middle). The net is its own model (basketball_net)."""
+    box("Base", (0, 0.15, -1.0), (0.7, 0.3, 0.7), "concrete", bevel=0.03)
+    tube("Pole", [(0, 0.2, -1.0), (0, 3.6, -1.0)], 0.07, "blue_dark", seg=12)
+    tube("Arm", [(0, 3.45, -1.0), (0, 3.45, -0.12)], 0.05, "blue_dark", seg=10)
+    tube("Brace", [(0, 2.8, -1.0), (0, 3.3, -0.12)], 0.035, "blue_dark", seg=8)
+    box("Board", (0, 3.43, -0.03), (1.8, 1.05, 0.05), "white", bevel=0.01)
+    for name, centre, size in (("FrameT", (0, 3.94, 0.0), (1.8, 0.05, 0.02)), ("FrameB", (0, 2.92, 0.0), (1.8, 0.05, 0.02)),
+                               ("FrameL", (-0.88, 3.43, 0.0), (0.05, 1.05, 0.02)), ("FrameR", (0.88, 3.43, 0.0), (0.05, 1.05, 0.02)),
+                               ("BoxT", (0, 3.48, 0.0), (0.6, 0.04, 0.02)), ("BoxB", (0, 3.08, 0.0), (0.6, 0.04, 0.02)),
+                               ("BoxL", (-0.28, 3.28, 0.0), (0.04, 0.44, 0.02)), ("BoxR", (0.28, 3.28, 0.0), (0.04, 0.44, 0.02))):
+        box(name, centre, size, "red", bevel=0.004)
+    tube("Rim", circle((0, 3.05, 0.38), 0.23, n=28), 0.012, "orange", seg=8, closed=True)
+    box("RimBracket", (0, 3.03, 0.07), (0.18, 0.05, 0.14), "orange", bevel=0.005)
+
+@prop
+def basketball_net():
+    """The net under the rim (net-local: the rim's centre at the origin), white cord narrowing to a smaller ring."""
+    top = circle((0, 0, 0), 0.225, n=12)
+    bottom = circle((0, -0.42, 0), 0.14, n=12)
+    for i in range(12):
+        tube(f"CordA{i}", [top[i], bottom[(i + 1) % 12]], 0.005, "white", seg=4)
+        tube(f"CordB{i}", [top[(i + 1) % 12], bottom[i]], 0.005, "white", seg=4)
+    tube("Hem", circle((0, -0.42, 0), 0.14, n=16), 0.006, "white", seg=4, closed=True)
+    tube("Mid", circle((0, -0.21, 0), 0.185, n=16), 0.005, "white", seg=4, closed=True)
+
+@prop
+def basketball():
+    """A 0.24 m basketball: orange with the black seams (two great circles and the two curved ones)."""
+    seg, rings, r = 48, 28, 0.12
+    prof = [(math.sin(math.pi * i / rings) * r, -math.cos(math.pi * i / rings) * r) for i in range(rings + 1)]
+    ob = lathe("Ball", (0, 0, 0), prof, "orange", seg=seg, turn=0.0)
+    def pick(c, n):
+        u = c.normalized() if c.length > 1e-6 else c
+        if abs(u.x) < 0.07 or abs(u.y) < 0.07: return "black"
+        if abs(abs(u.z) - 0.62) < 0.07: return "black"
+        return None
+    paint(ob, pick)
+
+
 # The watch tower and the shack, modelled clean (boards, trims, glass, roofs) to the very sizes the scene builder's
 # colliders use (MeshyArt.Tower / MeshyArt.Shack at TowerScale 1.2 x widen 1.5, ShackScale 1.45), so they drop in
 # where the Meshy scans were: the door gaps, decks, floors, walls and stairs all line up with what you walk on.
@@ -778,8 +869,9 @@ def window(name, axis, plane, outward, a, b, y0, y1, frame, glass, depth, sill=N
     f = 0.075
     for side, (sa, sb, ya, yb) in {"L": (a - f, a, y0, y1), "R": (b, b + f, y0, y1), "B": (a - f, b + f, y0 - f, y0), "T": (a - f, b + f, y1, y1 + f)}.items():
         _wall_box(f"{name}Frame{side}", axis, plane, (sa, sb), (ya, yb), depth, frame, bevel=0.008)
-    _wall_box(f"{name}Glass", axis, plane, (a, b), (y0, y1), 0.012, glass, bevel=0)
-    if cross:
+    if glass:  # None = an open hatch
+        _wall_box(f"{name}Glass", axis, plane, (a, b), (y0, y1), 0.012, glass, bevel=0)
+    if cross and glass:
         m = (a + b) / 2; my = (y0 + y1) / 2
         _wall_box(f"{name}BarV", axis, plane, (m - 0.02, m + 0.02), (y0, y1), 0.04, frame, bevel=0.004)
         _wall_box(f"{name}BarH", axis, plane, (a, b), (my - 0.02, my + 0.02), 0.04, frame, bevel=0.004)
@@ -968,10 +1060,22 @@ def shack():
     sided_wall("Front", 'z', z1, 1, (x0, x1), (F, E), [door, (-0.88, -0.5, *win_y)], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
     sided_wall("Back", 'z', z0, -1, (x0, x1), (F, E), [], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
     sided_wall("Left", 'x', x0, -1, (z0, z1), (F, E), [(-0.75, -0.1, *win_y)], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
-    sided_wall("Right", 'x', x1, 1, (z0, z1), (F, E), [(-0.75, -0.1, *win_y)], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
+    # East side: Sandy's Lost & Found hatch, open (no glass), wide and tall enough to see her on her stool behind
+    # the counter (the scene builder lays the counter plank on its sill at 1.9 m).
+    hatch = (-1.05, 0.2, F + 1.07, F + 2.3)
+    sided_wall("Right", 'x', x1, 1, (z0, z1), (F, E), [hatch], 0.24, tones, "wood_dark", rng, tilt=0.5, inner="wood_old")
     window("WinFront", 'z', z1, 1, -0.88, -0.5, *win_y, "wood_dark", "glass", 0.18, sill="wood_dark")
     window("WinLeft", 'x', x0, -1, -0.75, -0.1, *win_y, "wood_dark", "glass", 0.18, sill="wood_dark")
-    window("WinRight", 'x', x1, 1, -0.75, -0.1, *win_y, "wood_dark", "glass", 0.18, sill="wood_dark")
+    window("WinRight", 'x', x1, 1, hatch[0], hatch[1], hatch[2], hatch[3], "wood_dark", None, 0.18)
+    # Its shutter, hinged at the top and propped open outward on two sticks: a little awning over the counter.
+    sh_len = hatch[3] - hatch[2] + 0.1
+    tilt = math.radians(62)
+    hy = hatch[3] + 0.075
+    cxs = x1 + 0.1 + math.sin(tilt) * sh_len / 2
+    cys = hy - math.cos(tilt) * sh_len / 2
+    box("HatchShutter", (cxs, cys, (hatch[0] + hatch[1]) / 2), (0.05, sh_len, hatch[1] - hatch[0] + 0.16), "wood_grey", rot=(0, 0, 62), bevel=0.01)
+    for zz in (hatch[0] + 0.06, hatch[1] - 0.06):
+        tube(f"HatchProp{zz}", [(x1 + 0.12, hatch[2] - 0.02, zz), (x1 + 0.1 + math.sin(tilt) * sh_len * 0.95, hy - math.cos(tilt) * sh_len * 0.95, zz)], 0.018, "wood_dark", seg=6)
     for x in (x0, x1):
         for z in (z0, z1):
             box(f"Corner{x}{z}", (x, (F + E) / 2 + 0.02, z), (0.18, E - F + 0.04, 0.18), "wood_dark", bevel=0.02)
@@ -1038,7 +1142,8 @@ os.makedirs(a.out, exist_ok=True)
 only = [n for n in a.only.split(",") if n]
 FLAT = {"rock", "crate", "dock"}
 VIEWS = {"watch_tower": (0.9, 0.55, 1.0), "shack": (0.9, 0.55, 1.0), "dock": (1.0, 0.9, 1.0), "drill_board": (0.5, 0.25, -1.0), "roof_sign": (0.5, 0.25, -1.0), "lost_box": (0.6, 1.0, -1.0), "towel": (0.3, 1.0, -0.6), "sunglasses": (0.7, 0.7, -1.0), "bell": (0.9, 0.2, -1.0), "sign_frame": (0.5, 0.25, -1.0), "radio": (-0.6, 0.5, 1.0),
-         "first_aid_kit": (-0.6, 0.6, 1.0), "defibrillator": (0.6, 1.0, -1.0), "phone": (0.5, 1.2, -0.8), "watch": (0.6, 1.2, -0.7), "wallet": (0.6, 1.0, -1.0)}
+         "first_aid_kit": (-0.6, 0.6, 1.0), "defibrillator": (0.6, 1.0, -1.0), "phone": (0.5, 1.2, -0.8), "watch": (0.6, 1.2, -0.7), "wallet": (0.6, 1.0, -1.0),
+         "beach_hut": (0.8, 0.5, 1.0), "basketball_hoop": (0.9, 0.4, 1.0), "basketball": (0.6, 0.6, 1.0)}
 for name, build in PROPS.items():
     if only and name not in only: continue
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']: bpy.data.objects.remove(ob)

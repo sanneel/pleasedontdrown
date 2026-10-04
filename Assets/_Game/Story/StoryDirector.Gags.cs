@@ -266,6 +266,8 @@ namespace PleaseDontDrown.Story
             if (v == null) yield break;
             _howRescued.TryGetValue(v, out VictimEvent how);
             _howRescued.Remove(v);
+            _heroOf.TryGetValue(v, out PlayerHub hero);
+            _heroOf.Remove(v);
             string name = v.Name;
             Color color = VoiceColor(v);
             string[] first = how switch
@@ -284,6 +286,89 @@ namespace PleaseDontDrown.Story
                 Item item = SpawnItem(gag.Drop, p);
                 if (item != null && item.TryGetComponent(out LostItem lost)) lost.ServerSetup(name, false);
             }
+            // Brought back with the kiss of life on island 1: she has other plans for her hero.
+            if (how == VictimEvent.Revived && v != null && v.IsSpawned && v.IsFemale && _island == _island1 && hero != null && LoveHut.Instance != null)
+                yield return LoveHutScene(v, hero);
+        }
+
+        private static readonly string[] HutInvites =
+        {
+            "My hero... Come with me. I want to thank you. PROPERLY.",
+            "You saved my life. Come, come, I have to show you something. In the hut.",
+            "Those lips... I mean, that CPR! Come with me, quick!"
+        };
+        private static readonly string[] HutGoodbyes = { "Call me!", "Best. Rescue. EVER.", "Same time tomorrow? I'll drown at three." };
+
+        /// <summary>
+        /// The beach hut gag: she gets up, takes her hero by the hand and walks them into the hut. The door shuts, the
+        /// hut wobbles and squeaks (nothing is shown), Sandy pretends she saw nothing, and out they come.
+        /// </summary>
+        private IEnumerator LoveHutScene(VictimBrain v, PlayerHub hero)
+        {
+            LoveHut hut = LoveHut.Instance;
+            string name = v.Name;
+            AvatarLook look = v.Look;
+            Color voice = VoiceColor(v);
+            Vector3 at = v.transform.position;
+            Vector3 face = hero.transform.position - at;
+            face.y = 0f;
+            Despawn(v.gameObject); // up she gets: the floppy tourist becomes a walking one
+            StoryNpc her = SpawnNpc(name, NpcRole.Guest, look, at, face.sqrMagnitude > 0.01f ? Quaternion.LookRotation(face).eulerAngles.y : 0f);
+            her.ServerSetMood(AvatarMood.Happy);
+            her.ServerFace(hero.transform.position);
+            yield return Say(her, Pick(HutInvites));
+            Debug.Log($"[Story] {name} leads {hero.DisplayName} to the hut");
+
+            // Hand in hand to the door (the lifeguard has no say in it).
+            hut.ServerLead(hero, her);
+            her.ServerFace(null);
+            her.ServerMoveTo(hut.Outside.position, 1.7f);
+            float giveUp = Time.time + 45f;
+            while (her != null && Time.time < giveUp && (her.transform.position - hut.Outside.position).sqrMagnitude > 1.2f * 1.2f)
+                yield return new WaitForSeconds(0.25f);
+            if (her == null || hero == null)
+            {
+                if (hero != null) hut.ServerLead(hero, null);
+                yield break;
+            }
+            her.ServerStop();
+            hut.ServerDoor(true);
+            yield return new WaitForSeconds(0.9f);
+            hut.ServerLead(hero, null);
+            her.ServerTeleport(hut.Inside.position, hut.Inside.eulerAngles.y, keepExact: true);
+            hut.ServerPut(hero, hut.Inside.position + hut.Inside.right * 0.6f, hut.Inside.position + Vector3.up * 1.4f);
+            hut.ServerDark(hero, true);
+            yield return new WaitForSeconds(0.7f);
+            hut.ServerDoor(false);
+
+            // Meanwhile, outside...
+            const float seconds = 10f;
+            hut.ServerRockAndRoll(seconds);
+            yield return new WaitForSeconds(3.5f);
+            StartCoroutine(Say(_sandy, "(shouting) I didn't see anything! I didn't see ANYTHING!"));
+            yield return new WaitForSeconds(seconds - 3.5f);
+
+            // Out they come.
+            hut.ServerDoor(true);
+            yield return new WaitForSeconds(0.6f);
+            Vector3 front = hut.Outside.position;
+            Vector3 away = -hut.Outside.forward;
+            if (hero != null)
+            {
+                hut.ServerPut(hero, front + hut.Outside.right * 0.7f, front + away * 4f + Vector3.up * 1.5f);
+                hut.ServerDark(hero, false);
+            }
+            if (her != null)
+            {
+                her.ServerTeleport(front - hut.Outside.right * 0.6f, Quaternion.LookRotation(away).eulerAngles.y);
+                yield return new WaitForSeconds(0.8f);
+                yield return Say(name, Pick(HutGoodbyes), voice);
+                if (Economy.Instance != null) Economy.Instance.ServerAdd(25, "a tip from " + name, her.transform.position);
+                her.ServerMoveTo(front - hut.Outside.right * 18f); // off along the beach, humming (not into the sea)
+                StartCoroutine(RemoveLater(her, 25f));
+            }
+            yield return new WaitForSeconds(1f);
+            hut.ServerDoor(false);
         }
 
         // ------------------------------------------------------------------ island 1: the false alarm

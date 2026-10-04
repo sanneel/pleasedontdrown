@@ -436,6 +436,7 @@ namespace PleaseDontDrown.Editor
             }
             var items = new List<Object> { crate, ball, ring, cooler, coconut, tourist };
             items.AddRange(BuildStoryItems(torus));
+            items.AddRange(BuildFunItems()); // basketball (GameSceneBuilder.Fun.cs)
             SetRefs(catalog, "_items", items.ToArray());
             EditorUtility.SetDirty(catalog);
             return catalog;
@@ -618,7 +619,7 @@ namespace PleaseDontDrown.Editor
             Place("Crate", new Vector3(-4.6f, 0.3f, 9.8f), -12f);
             Place("Beach Ball", new Vector3(4.5f, 0.3f, 14f));
             Place("Life Ring", new Vector3(0.9f, 1.05f, 9.3f)); // inside the shack
-            Place("Life Ring", new Vector3(15.5f, 0.1f, 5f), 30f);
+            Place("Life Ring", new Vector3(9.5f, 0.1f, 3.5f), 30f);
             Place("Cooler", new Vector3(-2.2f, 0.4f, 11.2f), 15f);
             // Already floating in the sea.
             Place("Crate", new Vector3(4f, 0.5f, -14f), 35f);
@@ -660,6 +661,7 @@ namespace PleaseDontDrown.Editor
             PlaceItems(catalog);
             BuildDrillBoard(env);
             BuildStoryWorld(env);
+            BuildIsland1Fun(env); // hoop, ring table, beach hut (GameSceneBuilder.Fun.cs)
             BuildDevIsland(env); // guns, range, test buttons, the model gallery (GameSceneBuilder.DevIsland.cs)
             Transform[] spawns = BuildSpawnPoints();
 

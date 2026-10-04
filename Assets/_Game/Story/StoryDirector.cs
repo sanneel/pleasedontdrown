@@ -100,6 +100,7 @@ namespace PleaseDontDrown.Story
         private readonly HashSet<VictimBrain> _waveTourists = new();
         private readonly List<VictimBrain> _rescued = new();
         private readonly Dictionary<VictimBrain, VictimEvent> _howRescued = new();
+        private readonly Dictionary<VictimBrain, PlayerHub> _heroOf = new();
         private readonly List<LostAndFound.HandedIn> _handedIn = new();
         private readonly List<(StoryNpc npc, PlayerHub by)> _talks = new();
         private readonly List<StoryNpc> _defeated = new();
@@ -268,6 +269,7 @@ namespace PleaseDontDrown.Story
             _purchases.Clear();
             _waveTourists.Clear();
             _howRescued.Clear();
+            _heroOf.Clear();
         }
 
         private void CleanupActors()
@@ -351,6 +353,7 @@ namespace PleaseDontDrown.Story
             bool rescued = e is VictimEvent.Saved or VictimEvent.SelfRescue or VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized;
             if (rescued && victim.State != VictimState.Injured) _rescued.Add(victim);
             if (rescued) _howRescued[victim] = e; // what they say afterwards depends on it (kissed, slapped, zapped...)
+            if (rescued && credit != null) _heroOf[victim] = credit;
             // For the chapter's report card (someone pulled out and then revived is one rescue, not two).
             if (e is VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized or VictimEvent.SelfRescue ||
                 (e == VictimEvent.Saved && victim.State == VictimState.Saved)) _chapterRescued++;
