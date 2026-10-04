@@ -118,7 +118,7 @@ namespace PleaseDontDrown.Vehicles
             if (_driver.Value == player) return $"Get off the {_displayName}";
             if (_locked.Value) return string.IsNullOrEmpty(_lockedReason.Value) ? $"{_displayName} (locked)" : _lockedReason.Value;
             if (!string.IsNullOrEmpty(_keyItem) && !HasKey(player)) return $"{_displayName}: needs the {_keyItem.ToLowerInvariant()}";
-            return $"Drive the {_displayName}";
+            return _thrust > 0f ? $"Drive the {_displayName}" : $"Ride the {_displayName}"; // towed things (the banana boat) are ridden
         }
 
         public void OnInteract(PlayerHub player)

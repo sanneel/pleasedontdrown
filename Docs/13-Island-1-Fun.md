@@ -14,7 +14,9 @@ Things to do on island 1 besides the three story rescues (2026-10-04). Positions
 | **Trampolines** | Two by the station (-20, 14) and (-24.5, 18.5): hop onto the frame and you bounce about 3 m up, again and again; loose things bounce too. | `Fun/BouncePad.cs` |
 | **Human cannon** | East of the tower: Interact to climb in, the fuse fizzes, BOOM, and you fly about 20 m out to sea (and get a cannonball rating when you land). | `Fun/HumanCannon.cs` |
 | **Zipline** | A 4.5 m platform with a ramp at (35, 7); grab the handle under the gantry and whizz 37 m out to a post in the sea, let go into deep water. | `Fun/Zipline.cs` |
-| **Beach soccer** | A goal at (-37, 12) facing along the beach, a beach ball kept in front of it; kick, punch or throw it in: GOOOOAL! | `Fun/SoccerGoal.cs` |
+| **Banana boat** | Towed by the lifeguards' own jet ski (no keys, parked in front of the banana's nose; sit on it and the banana hitches on). One lifeguard drives, another rides the banana; a sharp turn at speed flings the banana rider into the sea. (Only that jet ski tows: the robber's one is the story's ride to the hotel island.) | `Fun/BananaBoat.cs` |
+| **Strongman** | Punch the pad while the dial's needle swings (the same needle on every machine, network clock): the puck flies up as high as the needle stood; 96+ rings the bell. | `Fun/Strongman.cs` |
+| **Coconut shy** | Beside the basketball court: three coconuts on posts, three balls on the counter; knock them all off and "the coconut is yours". The host gives the knock (thrown balls fly on the thrower's machine). | `Fun/CoconutShy.cs` |
 | **Diving board** | Off the side of the dock near its end, over deep water: step onto the springy tip. | `BouncePad` |
 | **Flamingo float** | A Meshy model (text to 3D, Meshy 6 Lite + texture, CC BY 4.0): a slow paddling ride, no keys, near the dock. | `GameSceneBuilder.Attractions.cs` BuildFlamingo |
 
@@ -32,6 +34,8 @@ Sounds for all of it are made in code: `Audio/FunSounds.cs`.
 Physics (from the Unity physics-3d-collision skill): the ball is Continuous (swept against the static rim) with a bouncy material (combine
 Maximum); the rim is 16 static capsules and the backboard a box; scoring is a sweep of the ball's path through the
 rim's plane each physics step on the host, not a trigger (callbacks only fire where a body is simulated).
+
+Removed on request: the water slide and the soccer goal.
 
 Tested by code: `dunk` scores a swish; a thrown ring brought a tourist in round the dock and credited the thrower; the
 island 1 story (with the hut scene in beat 1.2 or 1.5) passes with a client. Not tested: punches between two real

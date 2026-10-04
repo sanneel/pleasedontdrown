@@ -38,6 +38,7 @@ namespace PleaseDontDrown.Editor
                 go.GetComponent<Rigidbody>().collisionDetectionMode = CollisionDetectionMode.Continuous;
             });
             yield return ball;
+            yield return BuildShyBall(); // the coconut shy's balls (GameSceneBuilder.Attractions2.cs)
         }
 
         private static void BuildIsland1Fun(Transform env)
@@ -47,7 +48,7 @@ namespace PleaseDontDrown.Editor
             BuildHoop(fun);
             BuildRingTable(fun);
             BuildBeachHut(fun);
-            BuildAttractions(fun); // trampolines, cannon, zipline, soccer goal, diving board, flamingo
+            BuildAttractions(fun); // trampolines, cannon, zipline, diving board, flamingo, banana boat, strongman, coconut shy
         }
 
         private static Vector3 Ground(Vector3 p) => new(p.x, BeachHeight(p.x, p.z), p.z);

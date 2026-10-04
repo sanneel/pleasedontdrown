@@ -13,8 +13,7 @@ namespace PleaseDontDrown.Editor
     /// <summary>
     /// Island 1's attractions (besides the hoop, the ring table and the hut in GameSceneBuilder.Fun.cs): two
     /// trampolines, a human cannon that fires you out over the sea, a zipline from a tall platform to a post in the
-    /// sea, a beach soccer goal, a diving board at the end of the dock and an inflatable flamingo you can paddle about
-    /// on (a Meshy model). Models: ArtSource/Tools/model_props.py and Art/Meshy/flamingo.glb.
+    /// sea, a diving board off the dock and an inflatable flamingo you can paddle about on (a Meshy model). Models: ArtSource/Tools/model_props.py and Art/Meshy/flamingo.glb.
     /// </summary>
     public static partial class GameSceneBuilder
     {
@@ -22,7 +21,6 @@ namespace PleaseDontDrown.Editor
         private static readonly Vector3 CannonSpot = new(28f, 0f, 7f);
         private static readonly Vector3 ZiplineTowerSpot = new(35f, 0f, 7f);
         private static readonly Vector3 ZiplinePostSpot = new(35f, 0f, -30f);
-        private static readonly Vector3 SoccerGoalSpot = new(-37f, 0f, 12f);
         private static readonly Vector3 DivingBoardSpot = new(-9.15f, 0.3f, -17.2f); // off the dock's side near its end (the end stays clear to run off)
         private static readonly Vector3 FlamingoSpot = new(-17f, 0f, -6f);
 
@@ -31,8 +29,7 @@ namespace PleaseDontDrown.Editor
         {
             new Vector3(TrampolineSpots[0].x, TrampolineSpots[0].z, 2.2f), new Vector3(TrampolineSpots[1].x, TrampolineSpots[1].z, 2.2f),
             new Vector3(CannonSpot.x, CannonSpot.z, 2.2f), new Vector3(ZiplineTowerSpot.x, ZiplineTowerSpot.z, 2.5f),
-            new Vector3(ZiplineTowerSpot.x, ZiplineTowerSpot.z + 5f, 2f), new Vector3(SoccerGoalSpot.x, SoccerGoalSpot.z, 3f),
-            new Vector3(SoccerGoalSpot.x + 6f, SoccerGoalSpot.z, 2.5f), new Vector3(HoopSpot.x, HoopSpot.z, 3f), new Vector3(HutSpot.x, HutSpot.z, 3f),
+            new Vector3(ZiplineTowerSpot.x, ZiplineTowerSpot.z + 5f, 2f), new Vector3(HoopSpot.x, HoopSpot.z, 3f), new Vector3(HutSpot.x, HutSpot.z, 3f),
             new Vector3(RingTableSpot.x, RingTableSpot.z, 1.8f)
         };
 
@@ -41,9 +38,9 @@ namespace PleaseDontDrown.Editor
             foreach (Vector3 spot in TrampolineSpots) BuildTrampoline(parent, spot);
             BuildCannon(parent);
             BuildZipline(parent);
-            BuildSoccerGoal(parent);
             BuildDivingBoard(parent);
             BuildFlamingo(parent);
+            BuildMoreAttractions(parent); // slide, banana boat, strongman, coconut shy (GameSceneBuilder.Attractions2.cs)
         }
 
         private static void BuildTrampoline(Transform parent, Vector3 at)
@@ -163,40 +160,6 @@ namespace PleaseDontDrown.Editor
             SetRef(zip, "_audio", SpatialAudio(handle.gameObject, 3f, 50f));
             ConfigureInteractable(root.gameObject.AddComponent<Interactable>(), new Collider[] { grabBox },
                 handleModel != null ? handleModel.GetComponentsInChildren<Renderer>() : new Renderer[0], 3.2f);
-        }
-
-        private static void BuildSoccerGoal(Transform parent)
-        {
-            var root = new GameObject("SoccerGoal").transform;
-            root.SetParent(parent, false);
-            root.position = Ground(SoccerGoalSpot);
-            root.rotation = Quaternion.Euler(0f, 90f, 0f); // the mouth faces along the beach (+x)
-            PropModel("soccer_goal", root);
-            void Post(string n, Vector3 c, Vector3 s)
-            {
-                var go = new GameObject(n);
-                go.transform.SetParent(root, false);
-                go.transform.localPosition = c;
-                go.AddComponent<BoxCollider>().size = s;
-            }
-            Post("PostL", new Vector3(-1.5f, 0.8f, 0f), new Vector3(0.1f, 1.6f, 0.1f));
-            Post("PostR", new Vector3(1.5f, 0.8f, 0f), new Vector3(0.1f, 1.6f, 0.1f));
-            Post("Bar", new Vector3(0f, 1.6f, 0f), new Vector3(3.1f, 0.1f, 0.1f));
-            Post("Back", new Vector3(0f, 0.5f, -1.15f), new Vector3(3.0f, 1.0f, 0.06f)); // the net catches the ball
-            var mouth = new GameObject("Mouth").transform;
-            mouth.SetParent(root, false);
-            root.gameObject.AddComponent<NetworkObject>();
-            var goal = root.gameObject.AddComponent<SoccerGoal>();
-            SetRef(goal, "_mouth", mouth);
-            SetRef(goal, "_audio", SpatialAudio(root.gameObject, 3f, 50f));
-            // A beach ball to play with, kept in stock in front of the goal.
-            var rack = root.gameObject.AddComponent<ItemRack>();
-            var spot = new GameObject("BallSpot").transform;
-            spot.SetParent(root, false);
-            spot.position = Ground(root.TransformPoint(new Vector3(0f, 0f, 6f))) + Vector3.up * 0.35f;
-            SetField(rack, "_itemName", p => p.stringValue = SoccerGoal.BallName);
-            SetRefs(rack, "_spots", spot);
-            SetField(rack, "_worldCap", p => p.intValue = 4);
         }
 
         private static void BuildDivingBoard(Transform parent)

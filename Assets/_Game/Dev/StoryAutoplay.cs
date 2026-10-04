@@ -410,7 +410,7 @@ namespace PleaseDontDrown.Dev
             {
                 Vehicle ski = null;
                 foreach (Vehicle v in Vehicle.All)
-                    if (v.DisplayName.IndexOf("jet", StringComparison.OrdinalIgnoreCase) >= 0 && v.transform.position.z > -120f && v.transform.position.x > -150f)
+                    if (v.DisplayName == "Jet Ski" && v.transform.position.z > -120f && v.transform.position.x > -150f) // the robber's (the story's)
                         ski = v;
                 if (ski == null)
                 {
