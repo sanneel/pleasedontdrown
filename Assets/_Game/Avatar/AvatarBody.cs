@@ -33,5 +33,17 @@ namespace PleaseDontDrown.Avatars
         public bool HasFace;
         [Tooltip("The head's size from the head bone: up to its top, out to its widest, forward to the face, back to the back of the skull (hair included).")]
         public float HeadTop, HeadHalfWidth, HeadFront, HeadBack;
+
+        [Header("Funny body (recoloured and reshaped per look, see AvatarFunny)")]
+        [Tooltip("RGB = the model's colours, A = which part each texel is (AvatarFunny.Region * 32). Readable. Null = not a funny body.")]
+        public Texture2D Recolor;
+        [Tooltip("Typical brightness of each region in the texture (index = AvatarFunny.Region): the tint keeps the shading relative to it.")]
+        public float[] RegionLuma;
+        [Tooltip("The painted googly eyes, in head-bone space at rest: centre of each eye's front and the eye's radius.")]
+        public Vector3 GooglyL, GooglyR;
+        public float GooglyRadius;
+        [Tooltip("Tip of the nose and the mouth (teeth), in head-bone space.")]
+        public Vector3 NoseTip, TeethAt;
+        public bool IsFunny => Recolor != null;
     }
 }

@@ -45,7 +45,7 @@ namespace PleaseDontDrown.Avatars
         // Generated bodies: undoes each upper arm's bind turn (the model's A-pose arm), to measure the arm's turn from it.
         private Quaternion _armUnbindL = Quaternion.identity, _armUnbindR = Quaternion.identity;
 
-        public AvatarLook Look { get; private set; } = AvatarLook.Lifeguard;
+        public AvatarLook Look { get; private set; } = AvatarLook.ClassicLifeguard; // cheap stand-in until a look is set
         /// <summary>The generated body in use, or null for the code-built one.</summary>
         public AvatarBody GeneratedBody { get; private set; }
         public float Scale { get; private set; } = 1f;
@@ -129,6 +129,7 @@ namespace PleaseDontDrown.Avatars
         public void SetShadowsOnly(bool shadowsOnly)
         {
             if (_renderer != null) _renderer.shadowCastingMode = shadowsOnly ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
+            if (TryGetComponent(out AvatarFunny funny)) funny.SetShadowsOnly(shadowsOnly);
         }
 
         /// <summary>Face: eyes 0 (shut) .. 1 (open) .. 1.5 (wide), mouth 0 (closed) .. 1 (open wide), brows -1 (worried) .. 1 (angry).</summary>
@@ -169,6 +170,9 @@ namespace PleaseDontDrown.Avatars
             else BuildMesh(look);
             _built = true;
             ResetPose();
+            // The players' funny body: their own colours, shape, googly eyes and hats (AvatarFunny).
+            if (GeneratedBody != null && GeneratedBody.IsFunny) AvatarFunny.Attach(this, GeneratedBody, look);
+            else AvatarFunny.Detach(this);
             Rebuilt?.Invoke();
         }
 

@@ -13,6 +13,7 @@ namespace PleaseDontDrown.UI
     public class AvatarCustomizer : MonoBehaviour
     {
         private const string PrefsKey = "pdd.avatar.look";
+        private const string GoofyKey = "pdd.avatar.goofy"; // set once a saved classic look has been moved onto the goofy body
         private static readonly Vector3 StagePosition = new(0f, -300f, 0f);
 
         private static AvatarCustomizer _instance;
@@ -34,7 +35,16 @@ namespace PleaseDontDrown.UI
                 if (_localLook == null)
                 {
                     string saved = PlayerPrefs.GetString(PrefsKey, "");
-                    _localLook = ulong.TryParse(saved, out ulong packed) ? AvatarLook.Unpack(packed) : AvatarLook.Lifeguard;
+                    AvatarLook look = ulong.TryParse(saved, out ulong packed) ? AvatarLook.Unpack(packed) : AvatarLook.Lifeguard;
+                    // Everyone becomes the goofy lifeguard once (keeping their colours); CHARACTER switches back.
+                    if (PlayerPrefs.GetInt(GoofyKey, 0) == 0)
+                    {
+                        PlayerPrefs.SetInt(GoofyKey, 1);
+                        if (look.Body == 0) look.Body = AvatarLook.Bodies.Goofy;
+                        PlayerPrefs.SetString(PrefsKey, look.Pack().ToString());
+                        PlayerPrefs.Save();
+                    }
+                    _localLook = look;
                 }
                 return _localLook.Value;
             }
@@ -152,7 +162,7 @@ namespace PleaseDontDrown.UI
         // ------------------------------------------------------------------ panel
 
         private const float PanelWidth = 1300f, PanelHeight = 880f;
-        private const float RowHeight = 40f, LabelWidth = 196f, ChipSize = 28f, ChipGap = 5f;
+        private const float RowHeight = 37f, LabelWidth = 196f, ChipSize = 28f, ChipGap = 5f;
 
         private void OnGUI()
         {
@@ -181,33 +191,64 @@ namespace PleaseDontDrown.UI
             AvatarLook look = LocalLook;
             bool changed = false;
             float x = panel.x + 540f, y = panel.y + 92f;
-            changed |= Row(x, ref y, "BODY", AvatarLook.BuildNames[look.Build], ref look.Build, 4);
-            changed |= Row(x, ref y, "FIGURE", AvatarLook.FigureNames[look.Figure % 2], ref look.Figure, 2);
-            changed |= Row(x, ref y, "HEIGHT", AvatarLook.HeightNames[look.Height], ref look.Height, 4);
-            changed |= ColorRow(x, ref y, "SKIN", ref look.Skin, AvatarLook.SkinTones);
-            changed |= EnumRow(x, ref y, "HAIR", ref look.Hair);
-            changed |= ColorRow(x, ref y, "HAIR COLOUR", ref look.HairColor, AvatarLook.HairColors);
-            changed |= EnumRow(x, ref y, "TOP", ref look.Top);
-            changed |= ColorRow(x, ref y, "TOP COLOUR", ref look.TopColor, AvatarLook.ClothColors);
-            changed |= EnumRow(x, ref y, "SHORTS", ref look.Bottom);
-            changed |= ColorRow(x, ref y, "SHORTS COLOUR", ref look.BottomColor, AvatarLook.ClothColors);
-            changed |= EnumRow(x, ref y, "HAT", ref look.Hat);
-            changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
-            changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
-            changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
-            changed |= Toggle(x, ref y, "WHISTLE", ref look.Extras, AvatarExtras.Whistle);
-            changed |= Toggle(x, ref y, "SUNSCREEN NOSE", ref look.Extras, AvatarExtras.Sunscreen);
-            changed |= Toggle(x, ref y, "ARM FLOATIES", ref look.Extras, AvatarExtras.Floaties);
+            bool goofy = look.IsGoofy;
+            if (Arrows(x, ref y, "CHARACTER", goofy ? "Goofy" : "Classic") != 0)
+            {
+                look.Body = goofy ? (byte)0 : AvatarLook.Bodies.Goofy;
+                goofy = !goofy;
+                changed = true;
+            }
+            if (goofy)
+            {
+                // The goofy lifeguard: shape and face first (that's the fun), then colours and things to wear.
+                changed |= Row(x, ref y, "HEAD", AvatarLook.HeadSizeNames[look.HeadSize & 3], ref look.HeadSize, 4);
+                changed |= Row(x, ref y, "BELLY", AvatarLook.BellyNames[look.Belly & 3], ref look.Belly, 4);
+                changed |= Row(x, ref y, "NOSE", AvatarLook.NoseNames[look.Nose & 3], ref look.Nose, 4);
+                changed |= Row(x, ref y, "EYES", AvatarLook.EyeNames[look.Eyes & 3], ref look.Eyes, 4);
+                changed |= Row(x, ref y, "TEETH", AvatarLook.TeethNames[look.Teeth & 3], ref look.Teeth, 4);
+                changed |= ColorRow(x, ref y, "SKIN", ref look.Skin, AvatarLook.SkinTones);
+                changed |= ColorRow(x, ref y, "HAIR COLOUR", ref look.HairColor, AvatarLook.HairColors);
+                changed |= ColorRow(x, ref y, "TOP COLOUR", ref look.TopColor, AvatarLook.ClothColors);
+                changed |= ColorRow(x, ref y, "SHORTS COLOUR", ref look.BottomColor, AvatarLook.ClothColors);
+                changed |= EnumRow(x, ref y, "HAT", ref look.Hat);
+                changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
+                changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
+                changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
+                changed |= Toggle(x, ref y, "SUNSCREEN NOSE", ref look.Extras, AvatarExtras.Sunscreen);
+                changed |= Toggle(x, ref y, "ARM FLOATIES", ref look.Extras, AvatarExtras.Floaties);
+            }
+            else
+            {
+                changed |= Row(x, ref y, "BODY", AvatarLook.BuildNames[look.Build], ref look.Build, 4);
+                changed |= Row(x, ref y, "FIGURE", AvatarLook.FigureNames[look.Figure % 2], ref look.Figure, 2);
+                changed |= Row(x, ref y, "HEIGHT", AvatarLook.HeightNames[look.Height], ref look.Height, 4);
+                changed |= ColorRow(x, ref y, "SKIN", ref look.Skin, AvatarLook.SkinTones);
+                changed |= EnumRow(x, ref y, "HAIR", ref look.Hair);
+                changed |= ColorRow(x, ref y, "HAIR COLOUR", ref look.HairColor, AvatarLook.HairColors);
+                changed |= EnumRow(x, ref y, "TOP", ref look.Top);
+                changed |= ColorRow(x, ref y, "TOP COLOUR", ref look.TopColor, AvatarLook.ClothColors);
+                changed |= EnumRow(x, ref y, "SHORTS", ref look.Bottom);
+                changed |= ColorRow(x, ref y, "SHORTS COLOUR", ref look.BottomColor, AvatarLook.ClothColors);
+                changed |= EnumRow(x, ref y, "HAT", ref look.Hat);
+                changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
+                changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
+                changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
+                changed |= Toggle(x, ref y, "WHISTLE", ref look.Extras, AvatarExtras.Whistle);
+                changed |= Toggle(x, ref y, "SUNSCREEN NOSE", ref look.Extras, AvatarExtras.Sunscreen);
+                changed |= Toggle(x, ref y, "ARM FLOATIES", ref look.Extras, AvatarExtras.Floaties);
+            }
 
             float by = panel.yMax - 84f, bx = panel.x + 36f;
             if (Hud.Button(new Rect(bx, by, 220f, 56f), "RANDOM", centred: true, small: true))
             {
-                look = AvatarLook.Random(new System.Random(Environment.TickCount));
+                AvatarLook random = AvatarLook.Random(new System.Random(Environment.TickCount));
+                if (!goofy) random.Body = 0;
+                look = random;
                 changed = true;
             }
             if (Hud.Button(new Rect(bx + 232f, by, 238f, 56f), "UNIFORM", centred: true, small: true))
             {
-                look = AvatarLook.Lifeguard;
+                look = goofy ? AvatarLook.Lifeguard : AvatarLook.ClassicLifeguard;
                 changed = true;
             }
             if (Hud.Button(new Rect(bx + 510f, by, 160f, 56f), "WAVE", centred: true, small: true) && _animator != null)

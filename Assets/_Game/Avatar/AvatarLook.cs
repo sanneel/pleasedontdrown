@@ -36,6 +36,12 @@ namespace PleaseDontDrown.Avatars
         public AvatarExtras Extras;
         public byte Figure;       // 0 masculine, 1 feminine (hips, waist, bust with jiggle bones)
         public byte Body;         // 0 code-built from the fields above, else a generated AvatarBody (see AvatarBodies)
+        // The funny player body (Bodies.Goofy): 0 is always the model as it was generated.
+        public byte HeadSize;     // HeadSizeNames: normal, big, huge, small
+        public byte Belly;        // BellyNames: normal, round, beach ball, flat
+        public byte Nose;         // NoseNames: normal, big, clown, button
+        public byte Eyes;         // EyeNames (googly): normal, huge, cross-eyed, tiny pupils
+        public byte Teeth;        // TeethNames: pearly, bucky, gold, rotten
 
         public static readonly Color[] SkinTones =
         {
@@ -69,6 +75,8 @@ namespace PleaseDontDrown.Avatars
             public const byte TouristPurple = 5;   // purple bikini, curvy
             public const byte TouristBuddy = 6;    // sunburnt dad in flowery trunks
             public const byte Robber = 7;          // the thief: his own model, hands taken out of his pockets (ArtSource/Tools/robber_arms.py)
+            /// <summary>The players' funny lifeguard (googly eyes, buck teeth, pot belly): recoloured and reshaped per look.</summary>
+            public const byte Goofy = 8;
 
             /// <summary>
             /// Look-alikes of the tourists (ArtSource/Tools/make_variants.py): other skin, hair, eyes, outfit colour, face
@@ -96,15 +104,34 @@ namespace PleaseDontDrown.Avatars
         public static readonly string[] FigureNames = { "Masculine", "Feminine" };
         public bool Feminine => Figure == 1;
         public static readonly string[] HeightNames = { "Short", "Medium", "Tall", "Very tall" };
+        public static readonly string[] HeadSizeNames = { "Normal", "Big", "HUGE", "Tiny" };
+        public static readonly string[] BellyNames = { "Normal", "Round", "Beach ball", "Flat" };
+        public static readonly string[] NoseNames = { "Normal", "Big", "Clown", "Button" };
+        public static readonly string[] EyeNames = { "Googly", "Huge googly", "Cross-eyed", "Tiny pupils" };
+        public static readonly string[] TeethNames = { "Pearly", "Bucky", "Gold", "Rotten" };
+        public bool IsGoofy => Body == Bodies.Goofy;
 
-        /// <summary>The station uniform: red shorts, white tank with a red stripe, red cap on backwards, whistle.</summary>
+        /// <summary>The station uniform on the goofy lifeguard: red shorts, white tank, whistle (the code-built fields are the classic body's).</summary>
         public static AvatarLook Lifeguard => new()
         {
             Build = 1, Height = 1, Skin = 2, Hair = HairStyle.Short, HairColor = 1,
             Top = TopStyle.LifeguardTank, TopColor = 1, Bottom = BottomStyle.Shorts, BottomColor = 0,
-            Hat = HatStyle.CapBackwards, HatColor = 0, Glasses = GlassesStyle.None, Face = FacialHair.None,
-            Extras = AvatarExtras.Whistle | AvatarExtras.Sunscreen
+            Hat = HatStyle.None, HatColor = 0, Glasses = GlassesStyle.None, Face = FacialHair.None,
+            Extras = AvatarExtras.Whistle, Body = Bodies.Goofy
         };
+
+        /// <summary>The classic code-built lifeguard (cap on backwards, sunscreen nose).</summary>
+        public static AvatarLook ClassicLifeguard
+        {
+            get
+            {
+                AvatarLook look = Lifeguard;
+                look.Body = 0;
+                look.Hat = HatStyle.CapBackwards;
+                look.Extras |= AvatarExtras.Sunscreen;
+                return look;
+            }
+        }
 
         /// <summary>Same seed, same tourist on every machine: loud shirts, hats, the occasional pair of arm floaties.</summary>
         public static AvatarLook RandomTourist(int seed) => RandomTourist(seed, -1);
@@ -156,8 +183,15 @@ namespace PleaseDontDrown.Avatars
         public static AvatarLook Random(System.Random rng)
         {
             AvatarLook look = RandomTourist(rng.Next());
-            look.Extras &= ~AvatarExtras.Floaties;
-            look.Body = 0; // players are always the customizable code-built character
+            // Players are the goofy lifeguard, as silly as the dice say.
+            look.Body = Bodies.Goofy;
+            look.HeadSize = (byte)Pick(rng, 0, 0, 1, 2, 3);
+            look.Belly = (byte)rng.Next(4);
+            look.Nose = (byte)Pick(rng, 0, 0, 1, 2, 3);
+            look.Eyes = (byte)rng.Next(4);
+            look.Teeth = (byte)rng.Next(4);
+            look.Hat = (HatStyle)Pick(rng, 0, 0, 1, 2, 3, 4, 5, 6, 7);
+            look.Extras = (AvatarExtras)rng.Next(8) | AvatarExtras.Whistle;
             return look;
         }
 
@@ -172,15 +206,18 @@ namespace PleaseDontDrown.Avatars
 
         // ------------------------------------------------------------------ packing
 
-        private const ulong Marker = 0xA7UL << 56; // tells a real look from 0 / garbage
+        // Tells a real look from 0 / garbage, and which layout it is. 0xA7 (top byte): the old layout, 49 bits with an
+        // 8-bit Body. 0xB (top nibble): Body in 7 bits (ids up to 127) and the goofy body's shape after it, 58 bits.
+        private const ulong OldMarker = 0xA7UL << 56;
+        private const ulong Marker = 0xBUL << 60;
 
-        // Body is last and 8 bits (ids up to 255: the look-alikes start at 32); 49 bits in all, under the marker. Old
-        // packs (5-bit Body) read the same.
-        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 8 };
+        private static readonly int[] OldWidths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 8 };
+        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 7, 2, 2, 2, 2, 2 };
 
         public ulong Pack()
         {
-            int[] values = { Build, Height, Skin, (int)Hair, HairColor, (int)Top, TopColor, (int)Bottom, BottomColor, (int)Hat, HatColor, (int)Glasses, (int)Face, (int)Extras, Figure, Body };
+            int[] values = { Build, Height, Skin, (int)Hair, HairColor, (int)Top, TopColor, (int)Bottom, BottomColor, (int)Hat, HatColor, (int)Glasses, (int)Face, (int)Extras, Figure, Body,
+                HeadSize, Belly, Nose, Eyes, Teeth };
             ulong packed = 0;
             int shift = 0;
             for (int i = 0; i < Widths.Length; i++)
@@ -193,20 +230,22 @@ namespace PleaseDontDrown.Avatars
 
         public static AvatarLook Unpack(ulong packed)
         {
-            if ((packed & (0xFFUL << 56)) != Marker) return Lifeguard;
+            int[] widths = (packed & (0xFUL << 60)) == Marker ? Widths : (packed & (0xFFUL << 56)) == OldMarker ? OldWidths : null;
+            if (widths == null) return Lifeguard;
             var v = new int[Widths.Length];
             int shift = 0;
-            for (int i = 0; i < Widths.Length; i++)
+            for (int i = 0; i < widths.Length; i++)
             {
-                v[i] = (int)((packed >> shift) & ((1UL << Widths[i]) - 1));
-                shift += Widths[i];
+                v[i] = (int)((packed >> shift) & ((1UL << widths[i]) - 1));
+                shift += widths[i];
             }
             return new AvatarLook
             {
                 Build = (byte)v[0], Height = (byte)v[1], Skin = (byte)v[2], Hair = (HairStyle)v[3], HairColor = (byte)v[4],
                 Top = (TopStyle)Mathf.Min(v[5], (int)TopStyle.Bikini), TopColor = (byte)v[6], Bottom = (BottomStyle)v[7],
                 BottomColor = (byte)v[8], Hat = (HatStyle)v[9], HatColor = (byte)v[10], Glasses = (GlassesStyle)v[11],
-                Face = (FacialHair)v[12], Extras = (AvatarExtras)v[13], Figure = (byte)v[14], Body = (byte)v[15]
+                Face = (FacialHair)v[12], Extras = (AvatarExtras)v[13], Figure = (byte)v[14], Body = (byte)v[15],
+                HeadSize = (byte)v[16], Belly = (byte)v[17], Nose = (byte)v[18], Eyes = (byte)v[19], Teeth = (byte)v[20]
             };
         }
 

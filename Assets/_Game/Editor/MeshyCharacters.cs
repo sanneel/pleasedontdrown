@@ -17,7 +17,7 @@ namespace PleaseDontDrown.Editor
     /// that the rig's rest pose (arms and legs straight down) turns the A-pose arms down. Every procedural pose and
     /// gesture then works on it unchanged.
     /// </summary>
-    public static class MeshyCharacters
+    public static partial class MeshyCharacters
     {
         private const string SourceDir = "Assets/_Game/Art/Characters";
         private const string OutputDir = "Assets/_Game/Avatar/Bodies";
@@ -33,6 +33,7 @@ namespace PleaseDontDrown.Editor
             (AvatarLook.Bodies.TouristPurple, "Tourist (purple bikini)", "tourist_bikini_purple"),
             (AvatarLook.Bodies.TouristBuddy, "Tourist (sunburnt dad)", "tourist_buddy"),
             (AvatarLook.Bodies.Robber, "Robber", "robber"),
+            (AvatarLook.Bodies.Goofy, "Goofy lifeguard", "goofy"),
         };
 
         /// <summary>Bodies that keep their painted face as it is: the robber's eyes are behind sunglasses (lids would blink on the lenses).</summary>
@@ -858,6 +859,11 @@ namespace PleaseDontDrown.Editor
                     body.RestPositions = rest;
                 }
 
+                // The players' funny body: part ids for recolouring, the googly eyes, nose and teeth (MeshyCharacters.Funny.cs).
+                FunnyFit funny = FunnyBodies.Contains(file)
+                    ? FitFunny(file, source, vertices, normals, weights, skin.sharedMaterial, P(Bone.Head), P(Bone.Neck), P(Bone.Hips), P(Bone.Chest), P(Bone.Spine))
+                    : null;
+
                 string meshPath = $"{OutputDir}/{file}_mesh.asset";
                 var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
                 bool isNew = mesh == null;
@@ -880,11 +886,13 @@ namespace PleaseDontDrown.Editor
                 }
                 mesh.boneWeights = weights.Concat(extra.Weights).ToArray();
                 mesh.bindposes = bind.Select(m => m.inverse).ToArray();
+                if (funny != null) AddFunnyShapes(mesh, funny, vertices, weights, mesh.vertexCount);
                 mesh.RecalculateBounds();
                 if (isNew) AssetDatabase.CreateAsset(mesh, meshPath);
                 else EditorUtility.SetDirty(mesh);
                 body.Mesh = mesh;
                 body.Material = BodyMaterial(skin.sharedMaterial, file);
+                if (funny != null) ApplyFunny(body, funny, file, P(Bone.Head));
 
                 string bodyPath = $"{OutputDir}/{file}.asset";
                 var existing = AssetDatabase.LoadAssetAtPath<AvatarBody>(bodyPath);

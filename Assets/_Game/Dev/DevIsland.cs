@@ -135,7 +135,7 @@ namespace PleaseDontDrown.Dev
             foreach (Model m in _gallery)
             {
                 if (m.Npc == null) continue;
-                AvatarLook look = m.Body == 0 ? AvatarLook.Lifeguard : new AvatarLook { Body = m.Body, Figure = (byte)(m.Feminine ? 1 : 0) };
+                AvatarLook look = m.Body == 0 ? AvatarLook.ClassicLifeguard : new AvatarLook { Body = m.Body, Figure = (byte)(m.Feminine ? 1 : 0) };
                 if (m.Body == 0 && m.Feminine) look.Figure = 1;
                 m.Npc.ServerSetup(m.Name, NpcRole.Bystander, look);
                 m.Npc.ServerSetPose(AvatarPose.Normal);

@@ -195,6 +195,23 @@ namespace PleaseDontDrown.Editor
             return look;
         }
 
+        /// <summary>goofy:head:belly:nose:eyes:teeth:hat:glasses:face (numbers; missing ones 0), on the uniform's colours.</summary>
+        private static AvatarLook Goofy(string[] spec)
+        {
+            int At(int i) => spec.Length > i && int.TryParse(spec[i], out int v) ? v : 0;
+            AvatarLook look = AvatarLook.Lifeguard;
+            look.HeadSize = (byte)At(1);
+            look.Belly = (byte)At(2);
+            look.Nose = (byte)At(3);
+            look.Eyes = (byte)At(4);
+            look.Teeth = (byte)At(5);
+            look.Hat = (HatStyle)At(6);
+            look.Glasses = (GlassesStyle)At(7);
+            look.Face = (FacialHair)At(8);
+            look.HatColor = 6;
+            return look;
+        }
+
         private static AvatarLook CodeBuilt(AvatarLook look)
         {
             look.Body = 0;
@@ -205,13 +222,14 @@ namespace PleaseDontDrown.Editor
         {
             float F(int k) => float.Parse(p[k], CultureInfo.InvariantCulture);
             string[] lookSpec = p[1].Split(':');
-            int seed = lookSpec.Length > 1 ? int.Parse(lookSpec[1]) : 0;
+            int seed = lookSpec.Length > 1 && int.TryParse(lookSpec[1], out int parsed) ? parsed : 0;
             AvatarLook look = lookSpec[0] switch
             {
                 "tourist" => AvatarLook.RandomTourist(seed),
                 "woman" => AvatarLook.RandomTourist(seed, 1),
                 "man" => AvatarLook.RandomTourist(seed, 0),
                 "random" => AvatarLook.Random(new System.Random(seed)),
+                "goofy" => Goofy(lookSpec),
                 "sandy" => Story.StoryDirector.SandyLook,
                 "sandyboss" => SandyBoss(),
                 "body" => new AvatarLook { Body = (byte)seed, Figure = (byte)(AvatarLook.Bodies.IsFeminine((byte)seed) ? 1 : 0) },

@@ -104,3 +104,10 @@ MonoBehaviour:
   HeadHalfWidth: 0.1461518
   HeadFront: 0.18409435
   HeadBack: 0.12980533
+  Recolor: {fileID: 0}
+  RegionLuma: []
+  GooglyL: {x: 0, y: 0, z: 0}
+  GooglyR: {x: 0, y: 0, z: 0}
+  GooglyRadius: 0
+  NoseTip: {x: 0, y: 0, z: 0}
+  TeethAt: {x: 0, y: 0, z: 0}
