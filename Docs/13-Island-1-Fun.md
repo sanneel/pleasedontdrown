@@ -18,6 +18,7 @@ Things to do on island 1 besides the three story rescues (2026-10-04). Positions
 | **Banana boat** | Towed by the lifeguards' own jet ski (no keys, parked in front of the banana's nose; sit on it and the banana hitches on). One lifeguard drives, another rides the banana; a sharp turn at speed flings the banana rider into the sea. (Only that jet ski tows: the robber's one is the story's ride to the hotel island.) | `Fun/BananaBoat.cs` |
 | **Diving board** | Off the side of the dock near its end, over deep water: step onto the springy tip. | `BouncePad` |
 | **Flamingo float** | A Meshy model (text to 3D, Meshy 6 Lite + texture, CC BY 4.0): a slow paddling ride, no keys, near the dock. | `GameSceneBuilder.Attractions.cs` BuildFlamingo |
+| **Parrots** | Instead of seagulls: 8 cartoon macaws (red, green, blue) on the palm crowns and the beach hut's roof. They look about, squawk and say cheeky lines ("PLEASE DON'T DROWN!"), fly off when you get within 3.5 m, circle the island and glide back to a free perch. Cosmetic, each machine flies its own. | `Fun/Parrot.cs`, `GameSceneBuilder.Parrots.cs` |
 
 **Easier basketball:** a firm throw within 35 degrees of the hoop (1-13 m) goes on a high arc to the rim
 (`BasketballHoop.TryAssist`, solved by simulating the flight), and a rim magnet eases near misses through the middle
