@@ -544,6 +544,19 @@ namespace PleaseDontDrown.Player
         private void GetHoldTarget(Item item, out Vector3 position, out Quaternion rotation)
         {
             Transform aim = IsLocal ? AimTransform : _head;
+            // Somebody else's gun or bat: held by their body (third person), not floated in front of their eyes the
+            // way our own first-person view model is (that put guns up beside the head, pointing at the sky).
+            if (!IsLocal && item.RigidInHand && item.GripRight != null)
+            {
+                if (_rig == null) _rig = GetComponentInChildren<Avatars.AvatarRig>();
+                Quaternion flat = Quaternion.Euler(0f, aim.eulerAngles.y, 0f);
+                bool rigged = _rig != null && _rig[Avatars.AvatarRig.Bone.UpperArmR] != null;
+                Vector3 shoulderR = rigged ? _rig[Avatars.AvatarRig.Bone.UpperArmR].position : transform.position + flat * new Vector3(0.17f, 1.38f, 0f);
+                Vector3 shoulderL = rigged ? _rig[Avatars.AvatarRig.Bone.UpperArmL].position : transform.position + flat * new Vector3(-0.17f, 1.38f, 0f);
+                float reach = rigged ? _rig.UpperArmLength + _rig.ForearmLength + _rig.HandLength * 0.5f : 0.6f;
+                ThirdPersonHold(item, shoulderR, shoulderL, reach, aim.forward, out position, out rotation);
+                return;
+            }
             item.GetHoldPose(_hub, out Vector3 holdOffset, out Quaternion holdRotation, out float pitchFollow);
             if (IsLocal && !item.HasCustomHoldPose && !item.RigidInHand && _eatBlend <= 0f)
             {
@@ -599,6 +612,14 @@ namespace PleaseDontDrown.Player
             {
                 if (item.GripRight != null) right = new HandGrip(item.GripRight.position, item.GripRight.forward, -item.GripRight.up, item.GripPose);
                 if (item.GripLeft != null) left = new HandGrip(item.GripLeft.position, item.GripLeft.forward, -item.GripLeft.up, item.GripPoseLeft);
+                // Seen from outside: the left hand on the forend where the arm reaches (long guns' grips are far out).
+                if (!IsLocal && left.Active && item.RigidInHand)
+                {
+                    if (_rig == null) _rig = GetComponentInChildren<Avatars.AvatarRig>();
+                    if (_rig != null && _rig[Avatars.AvatarRig.Bone.UpperArmL] != null)
+                        left.Point = ReachableLeftGrip(left.Point, item.transform.forward, _rig[Avatars.AvatarRig.Bone.UpperArmL].position,
+                            _rig.UpperArmLength + _rig.ForearmLength + _rig.HandLength * 0.5f);
+                }
                 // A gun being worked (reloading, the bolt): the hands follow its moves.
                 if (item.TryGetComponent(out Combat.Weapon gun))
                 {
@@ -670,6 +691,72 @@ namespace PleaseDontDrown.Player
             left = new HandGrip(c - side * (halfWidth + 0.012f) + near, along, side, HandPose.BoxGrip);
             right = new HandGrip(c + side * (halfWidth + 0.012f) + near, along, -side, HandPose.BoxGrip);
             return GripKind.TwoHands;
+        }
+
+        private Avatars.AvatarRig _rig;
+
+        /// <summary>How far up or down a held gun follows where its holder looks (third person).</summary>
+        public const float ThirdPersonMaxPitch = 45f, LongGunMaxPitch = 18f;
+
+        /// <summary>
+        /// A front grip the left arm can actually reach: slid back along the gun (you can hold a forend anywhere
+        /// along it) until it's within <paramref name="armReach"/> of the left shoulder.
+        /// </summary>
+        public static Vector3 ReachableLeftGrip(Vector3 grip, Vector3 along, Vector3 leftShoulder, float armReach)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                float over = Vector3.Distance(grip, leftShoulder) - armReach * 0.95f;
+                if (over <= 0.003f) break;
+                grip -= along * over;
+            }
+            return grip;
+        }
+
+        /// <summary>
+        /// Where a gun (or a bat, a tool) goes in somebody's hands seen from outside, so that its right grip lands on
+        /// a natural hand spot: a long gun shouldered (the hand just in front of the right shoulder), a pistol held out
+        /// in front at chest height, anything else carried low at the side, pointing where they look (pitch limited).
+        /// The arms then reach the grips by IK. Shared with the editor's gun-hold check (ReviewCapture), which renders
+        /// every gun this way and fails if a hand can't reach its grip.
+        /// </summary>
+        public static void ThirdPersonHold(Item item, Vector3 rightShoulder, Vector3 leftShoulder, float armReach, Vector3 lookForward,
+                                           out Vector3 position, out Quaternion rotation)
+        {
+            float yaw = Mathf.Atan2(lookForward.x, lookForward.z) * Mathf.Rad2Deg;
+            float pitch = Mathf.Clamp(-Mathf.Asin(Mathf.Clamp(lookForward.y, -1f, 1f)) * Mathf.Rad2Deg, -ThirdPersonMaxPitch, ThirdPersonMaxPitch);
+            bool gun = item.TryGetComponent(out Combat.Weapon _);
+            bool longGun = gun && item.GripLeft != null && ItemLength(item) > 0.45f;
+            if (longGun) pitch = Mathf.Clamp(pitch, -LongGunMaxPitch, LongGunMaxPitch); // tipped further, the stock hits the (big) head
+            Quaternion look = Quaternion.Euler(gun ? pitch : 0f, yaw, 0f);
+            Vector3 hand = longGun ? rightShoulder + look * new Vector3(-0.07f, -0.11f, 0.26f)   // shouldered
+                : gun ? rightShoulder + look * new Vector3(-0.15f, -0.06f, 0.47f)                // pistol held out
+                : rightShoulder + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0.02f, -0.42f, 0.22f); // low at the side
+            rotation = gun ? look : Quaternion.Euler(0f, yaw, 0f) * Quaternion.Euler(-60f, 0f, 0f);
+            // The grip in the item's own frame, then the item placed so that grip sits in the hand.
+            Transform t = item.transform;
+            Vector3 gripLocal = Quaternion.Inverse(t.rotation) * (item.GripRight.position - t.position);
+            position = hand - rotation * gripLocal;
+            if (item.GripLeft == null) return;
+            // Two hands: slide it back along the barrel until the left hand reaches its grip too (long guns' front
+            // grips are far out), but never so far that the right hand is jammed into the shoulder.
+            Vector3 leftLocal = Quaternion.Inverse(t.rotation) * (item.GripLeft.position - t.position);
+            Vector3 along = rotation * Vector3.forward;
+            for (int i = 0; i < 4; i++)
+            {
+                float over = Vector3.Distance(position + rotation * leftLocal, leftShoulder) - armReach * 0.92f;
+                float room = Vector3.Dot(position + rotation * gripLocal - rightShoulder, along) - 0.1f;
+                if (over <= 0.005f || room <= 0f) break;
+                position -= along * Mathf.Min(over, room);
+            }
+        }
+
+        private static float ItemLength(Item item)
+        {
+            float best = 0f;
+            foreach (Renderer r in item.GetComponentsInChildren<Renderer>())
+                best = Mathf.Max(best, r.localBounds.size.z * r.transform.lossyScale.z, r.bounds.size.magnitude * 0.6f);
+            return best;
         }
 
         /// <summary>Angular velocity (rad/s per unit speed) that turns <paramref name="from"/> toward <paramref name="to"/>.</summary>
