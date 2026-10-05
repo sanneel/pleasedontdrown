@@ -35,3 +35,4 @@ crashlytics-build.properties
 *.aab
 *.unitypackage
 /[Ss]creenshots/
+*.blend1

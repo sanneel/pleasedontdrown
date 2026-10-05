@@ -55,6 +55,22 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        /// <summary>Refresh only tourist assets after a Blender art pass; keep the library and other bodies intact.</summary>
+        public static void BakeTourists()
+        {
+            foreach (var (id, name, file) in Bodies.Where(b => b.file.StartsWith("tourist_")))
+            {
+                Bake($"{SourceDir}/{file}.glb", id, name, file);
+                for (int n = 1; n <= 16; n++)
+                {
+                    string variant = $"{file}_v{n:00}";
+                    string glb = $"{SourceDir}/{variant}.glb";
+                    if (File.Exists(glb)) Bake(glb, AvatarLook.Bodies.Variant(id, n), $"{name} #{n}", variant);
+                }
+            }
+            AssetDatabase.SaveAssets();
+        }
+
         /// <summary>Bakes every body whose GLB is present and writes the library the game loads.</summary>
         public static void BakeAll()
         {

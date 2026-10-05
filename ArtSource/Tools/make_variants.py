@@ -298,6 +298,12 @@ skin = np.maximum(skin, rim)
 # Eyes: front of the face at eye height, not skin, not hair, not the white, not the lips.
 eye_zone = covered & (Pz > head_z + 0.3 * head_len) & (Pz < head_z + 0.62 * head_len) & (np.abs(Px) < 0.065) & \
     (Py < face_front_y + 0.035)
+# A ponytail increases head_len enough to include the eyebrows. Bound iris recolouring by
+# the actual sclera band, otherwise green/blue eyes also turn the eyebrows green/blue.
+sclera = eye_zone & (rgb.min(1) > .62) & ((rgb.max(1)-rgb.min(1)) < .20) & (np.abs(Px) > .015)
+if sclera.sum() >= 30:
+    sclera_low, sclera_high = np.quantile(Pz[sclera], [.02, .98])
+    eye_zone &= (Pz >= sclera_low-.003) & (Pz <= sclera_high+.003)
 Y = luminance(lin)
 lipish = (lab[:, 1] > 18) & (lab[:, 1] > lab[:, 2] * 0.9)
 eyes = eye_zone & (d_skin > 20) & (hair < 0.5) & (Y < 0.45) & ~lipish
