@@ -14,6 +14,8 @@ namespace PleaseDontDrown.Avatars
         public string DisplayName;
         public Mesh Mesh;               // bone order = AvatarRig's (body bones, then left and right fingers)
         public Material Material;
+        [Tooltip("The same, with the painted eyes shut (painted into the texture): worn while the eyes are closed. Null: none.")]
+        public Material ClosedEyesMaterial;
         [Tooltip("Rest local position of every AvatarRig.Bone (limbs point down their -Y, like the code-built rig).")]
         public Vector3[] RestPositions;
         public float Scale = 1f;        // as AvatarRig.Scale: hip height / 0.92

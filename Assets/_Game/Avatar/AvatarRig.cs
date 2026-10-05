@@ -140,9 +140,21 @@ namespace PleaseDontDrown.Avatars
             {
                 // A painted face: the eyelids come down over the eyes, the open mouth grows over the lips.
                 if (!GeneratedBody.HasFace) return;
-                // A lid half way down leaves half a painted eye staring out from under it, so these eyes are either
-                // open or shut (a blink is two frames).
-                var lid = eyes < 0.45f ? Vector3.one : Vector3.zero;
+                // These eyes are either open or shut (a blink is two frames).
+                bool shut = eyes < 0.45f;
+                if (GeneratedBody.ClosedEyesMaterial != null && !GeneratedBody.IsFunny)
+                {
+                    // Shut eyes are painted into a second texture: wear it (no lid patches, no mouth hole).
+                    if (_renderer != null)
+                    {
+                        Material want = shut ? GeneratedBody.ClosedEyesMaterial : GeneratedBody.Material;
+                        if (_renderer.sharedMaterial != want) _renderer.sharedMaterial = want;
+                    }
+                    this[Bone.EyeL].localScale = this[Bone.EyeR].localScale = Vector3.zero;
+                    this[Bone.Mouth].localScale = Vector3.zero;
+                    return;
+                }
+                var lid = shut ? Vector3.one : Vector3.zero;
                 this[Bone.EyeL].localScale = lid;
                 this[Bone.EyeR].localScale = lid;
                 float open = Mathf.Clamp01((mouth - 0.1f) * 1.6f);

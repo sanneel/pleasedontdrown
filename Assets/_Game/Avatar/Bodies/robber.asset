@@ -16,6 +16,7 @@ MonoBehaviour:
   DisplayName: Robber
   Mesh: {fileID: 4300000, guid: 53d8e0627cafc58458494f94cb49ff58, type: 2}
   Material: {fileID: 2100000, guid: 0e7fd4b2aa8a60742ac7eee83fcd9073, type: 2}
+  ClosedEyesMaterial: {fileID: 0}
   RestPositions:
   - {x: 0, y: 0.8939556, z: -0.10127268}
   - {x: 0, y: 0.04745221, z: -0.0025392175}

@@ -1388,6 +1388,7 @@ namespace PleaseDontDrown.Avatars
 
         private void AimedGestures(Transform upperL, Transform foreL, Transform upperR, Transform foreR)
         {
+            Kissing = 0f;
             float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
             Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
             if (GestureActive(AvatarGesture.Punch, 0.38f))
@@ -1437,8 +1438,25 @@ namespace PleaseDontDrown.Avatars
             }
         }
 
-        /// <summary>Our lips: the mouth bone sits on them (every body: built ones and the baked Meshy faces).</summary>
-        private Vector3 MouthPoint => B(Bone.Mouth) != null ? B(Bone.Mouth).position : B(Bone.Head).TransformPoint(new Vector3(0f, 0.035f, 0.12f) * _rig.Scale);
+        /// <summary>
+        /// Our lips: the mouth bone sits on them (every body: built ones and the baked Meshy faces). Puckered up for a
+        /// kiss (the players' goofy body) they stick out in front of the face, and that's where the lips are then.
+        /// </summary>
+        private Vector3 MouthPoint
+        {
+            get
+            {
+                Transform head = B(Bone.Head);
+                Vector3 lips = B(Bone.Mouth) != null ? B(Bone.Mouth).position : head.TransformPoint(new Vector3(0f, 0.035f, 0.12f) * _rig.Scale);
+                return lips + head.TransformVector(Vector3.forward * (PuckerLength * Kissing));
+            }
+        }
+
+        /// <summary>How far the lips pucker out for a kiss, in head space (0: they don't). Set by AvatarFunny.</summary>
+        public float PuckerLength { get; set; }
+
+        /// <summary>0..1: how far into a kiss (a rescue breath) we are this frame.</summary>
+        public float Kissing { get; private set; }
 
         /// <summary>Where our lips are right now (the kiss check lines two of these up).</summary>
         public Vector3 Lips => MouthPoint;
@@ -1452,9 +1470,10 @@ namespace PleaseDontDrown.Avatars
         private void Kiss(Vector3 lips, float w, Transform upperL, Transform foreL, Transform upperR, Transform foreR, float la, float lb)
         {
             if (w <= 0.001f) return;
+            Kissing = w;
             Transform hips = B(Bone.Hips), head = B(Bone.Head);
             Vector3 fwd = transform.forward, right = transform.right;
-            Vector3 target = lips + Vector3.up * 0.02f;
+            Vector3 target = lips + Vector3.up * 0.01f;
             Vector3 along = Vector3.ProjectOnPlane(target - hips.position, Vector3.up);
             along = along.sqrMagnitude > 1e-4f ? along.normalized : fwd;
 
@@ -1471,7 +1490,7 @@ namespace PleaseDontDrown.Avatars
                     bone.rotation = Quaternion.Slerp(Quaternion.identity, bend, share[i] * w) * bone.rotation;
                 }
             // 2. Face down onto theirs, tilted sideways a little, eyes shut (the face code does the eyes).
-            Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along * 0.35f, along) * Quaternion.Euler(0f, 0f, 22f);
+            Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along * 0.35f, along) * Quaternion.Euler(0f, 0f, 38f);
             head.rotation = Quaternion.Slerp(head.rotation, faceDown, w * 0.85f);
             // 3. Whatever is still missing: lean the hips in (up to 30 cm), knees stay; then curl the neck the last bit.
             Vector3 gap = target - MouthPoint;
@@ -1480,7 +1499,7 @@ namespace PleaseDontDrown.Avatars
                 hips.position += Vector3.ClampMagnitude(gap, 0.3f * _rig.Scale) * w;
                 PoseLegs();
             }
-            for (int pass = 0; pass < 3; pass++)
+            for (int pass = 0; pass < 6; pass++)
                 foreach (Transform bone in new[] { B(Bone.Chest), B(Bone.Neck) })
                 {
                     Vector3 toMouth = MouthPoint - bone.position, toLips = target - bone.position;

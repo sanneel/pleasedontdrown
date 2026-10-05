@@ -18,7 +18,7 @@ namespace PleaseDontDrown.Editor
     /// </summary>
     public static class KissCheck
     {
-        private const float Tolerance = 0.03f;
+        private const float Tolerance = 0.035f; // lip centre to lip centre: the puckered lips are ~2 cm thick, so this is touching
 
         public static void RunBatch()
         {
@@ -80,14 +80,21 @@ namespace PleaseDontDrown.Editor
             animator.Play(AvatarGesture.Breath, mouth);
             // The lips down on theirs: the middle of the breath.
             for (int i = 0; i <= 18; i++) { AvatarAnimator.TimeOverride = 102f + i / 30f; animator.Tick(1f / 30f); }
+            if (body.TryGetComponent(out AvatarFunny funny)) funny.PosePucker();
             float gap = Vector3.Distance(animator.Lips, mouth);
             AvatarAnimator.TimeOverride = null;
 
             string name = $"kiss_t{tourist}_h{head}";
-            Vector3 eye = Vector3.Lerp(mouth, animator.Lips, 0.5f) + new Vector3(0.85f, 0.3f, -0.15f); // from beyond her head
-            camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(Vector3.Lerp(mouth, animator.Lips, 0.5f) - eye));
-            camera.fieldOfView = 35f;
-            Render(camera, name);
+            // Two views: from the side (the way people standing round see it) and close up on the faces.
+            Vector3 meet = Vector3.Lerp(mouth, animator.Lips, 0.5f);
+            foreach ((string view, Vector3 offset, float fov) in new[] { ("behind", new Vector3(-0.8f, 1.25f, -2.4f), 38f), ("across", new Vector3(-0.3f, 1.25f, 2.5f), 38f),
+                         ("headend", new Vector3(2.5f, 1.25f, 0.4f), 38f), ("feetend", new Vector3(-2.6f, 1.25f, 0.9f), 38f) })
+            {
+                Vector3 eye = meet + offset;
+                camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(meet - eye));
+                camera.fieldOfView = fov;
+                Render(camera, $"{name}_{view}");
+            }
             Object.DestroyImmediate(victimObject);
             Object.DestroyImmediate(body);
 

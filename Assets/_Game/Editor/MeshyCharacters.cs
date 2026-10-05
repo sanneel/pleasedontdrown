@@ -584,6 +584,7 @@ namespace PleaseDontDrown.Editor
                 var lid = usual * 0.93f;
                 return around.OrderBy(s => Distance(s.C, lid)).First().Uv;
             }
+            Color SkinRoundColor(Rect eye) => At(SkinRound(eye));
             Rect both = Rect.MinMaxRect(eyeL.xMin, Mathf.Min(eyeL.yMin, eyeR.yMin), eyeR.xMax, Mathf.Max(eyeL.yMax, eyeR.yMax));
             Vector2 darkUv = samples.Where(s => both.Contains(new Vector2(s.P.x, s.P.y)) && !(s.P.x > eyeL.xMax && s.P.x < eyeR.xMin))
                 .OrderBy(s => s.C.r + s.C.g + s.C.b).First().Uv;
@@ -721,8 +722,22 @@ namespace PleaseDontDrown.Editor
                 var hinge = new Vector2(eye.center.x, eye.center.y + ry);
                 return new Vector3(hinge.x, hinge.y, SurfaceZ(hinge));
             }
-            lidL = Lid(eyeL, eyeR, Bone.EyeL);
-            lidR = Lid(eyeR, eyeL, Bone.EyeR);
+            // Closed eyes painted into a copy of the texture (MeshyCharacters.ClosedEyes.cs); the old lid patches only
+            // where that can't be done. Each eye as found, together with the other one mirrored (a badly found eye).
+            Rect Both(Rect eye, Rect other) => Rect.MinMaxRect(Mathf.Min(eye.xMin, -other.xMax), Mathf.Min(eye.yMin, other.yMin),
+                Mathf.Max(eye.xMax, -other.xMin), Mathf.Max(eye.yMax, other.yMax));
+            Color lashColor = Color.Lerp(At(darkUv), Color.black, 0.35f);
+            if (PaintClosedEyes(texture, vertices, normals, uvs, triangles, headJoint.y - 0.03f, new[] { Both(eyeL, eyeR), Both(eyeR, eyeL) },
+                    SkinRoundColor(eyeL), lashColor, file))
+            {
+                lidL = new Vector3(eyeL.center.x, eyeL.yMax, SurfaceZ(new Vector2(eyeL.center.x, eyeL.yMax)));
+                lidR = new Vector3(eyeR.center.x, eyeR.yMax, SurfaceZ(new Vector2(eyeR.center.x, eyeR.yMax)));
+            }
+            else
+            {
+                lidL = Lid(eyeL, eyeR, Bone.EyeL);
+                lidR = Lid(eyeR, eyeL, Bone.EyeR);
+            }
 
             // Mouth: lips (redder and bluer than the skin) and teeth, under the eyes, in the middle.
             float skinRed = Redness(skin), skinBlue = Blueness(skin), between = (eyeR.center.x - eyeL.center.x) * 0.5f;
@@ -744,7 +759,7 @@ namespace PleaseDontDrown.Editor
                 {
                     Rect box = basis.Mouth.On(vertices);
                     float rx = Mathf.Clamp(box.width * 0.3f, 0.009f, 0.019f);
-                    Patch(box.center, rx, rx * 0.62f, -1f, 1f, 0.0035f, darkUv, Bone.Mouth);
+                    // (No open-mouth patch: a dark disc on painted lips only ever looked like a hole.)
                     mouthAt = new Vector3(box.center.x, box.center.y, SurfaceZ(box.center));
                     mouthNote = "mouth where the base model's is";
                 }
@@ -761,7 +776,7 @@ namespace PleaseDontDrown.Editor
                 // between the lips, not the black of the lashes.
                 float rx = Mathf.Clamp(width * 0.3f, 0.009f, 0.019f);
                 Vector2 mouthUv = line.Count > 0 ? line[0].Uv : darkUv;
-                Patch(center, rx, rx * 0.62f, -1f, 1f, 0.0035f, mouthUv, Bone.Mouth);
+                // (No open-mouth patch: a dark disc on painted lips only ever looked like a hole.)
                 mouthAt = new Vector3(center.x, center.y, SurfaceZ(center));
                 mouthNote = $"mouth {width * 100f:0.0} cm wide at y {center.y:0.000}";
                 fit.HasMouth = true;
@@ -980,6 +995,7 @@ namespace PleaseDontDrown.Editor
                 else EditorUtility.SetDirty(mesh);
                 body.Mesh = mesh;
                 body.Material = BodyMaterial(skin.sharedMaterial, file);
+                body.ClosedEyesMaterial = body.HasFace ? SaveClosedEyes(file, body.Material) : null; // (MeshyCharacters.ClosedEyes.cs)
                 if (funny != null) ApplyFunny(body, funny, file, P(Bone.Head));
 
                 string bodyPath = $"{OutputDir}/{file}.asset";
