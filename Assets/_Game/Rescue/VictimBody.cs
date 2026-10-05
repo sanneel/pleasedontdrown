@@ -103,7 +103,9 @@ namespace PleaseDontDrown.Rescue
         /// <summary>Middle of the chest, where CPR hands go.</summary>
         public Vector3 ChestPoint => transform.position + transform.forward * 0.17f + transform.up * 0.12f;
         /// <summary>The mouth (rescue breaths).</summary>
-        public Vector3 MouthPoint => transform.TransformPoint(_headLocal + new Vector3(0f, -0.03f, 0.13f));
+        public Vector3 MouthPoint => _avatar != null && _avatar.IsBuilt && _avatar[AvatarRig.Bone.Mouth] != null
+            ? _avatar[AvatarRig.Bone.Mouth].position // on the painted lips of whoever this is
+            : transform.TransformPoint(_headLocal + new Vector3(0f, -0.03f, 0.13f));
         public bool IsBuilt => _avatar != null && _avatar.IsBuilt;
         /// <summary>The float (life ring...) this person is holding onto, if any. Found on every machine.</summary>
         public Floatable HeldFloat { get; private set; }

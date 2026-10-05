@@ -1437,8 +1437,11 @@ namespace PleaseDontDrown.Avatars
             }
         }
 
-        /// <summary>Our lips, just in front of the head.</summary>
-        private Vector3 MouthPoint => B(Bone.Head).TransformPoint(new Vector3(0f, 0.035f, 0.12f) * _rig.Scale);
+        /// <summary>Our lips: the mouth bone sits on them (every body: built ones and the baked Meshy faces).</summary>
+        private Vector3 MouthPoint => B(Bone.Mouth) != null ? B(Bone.Mouth).position : B(Bone.Head).TransformPoint(new Vector3(0f, 0.035f, 0.12f) * _rig.Scale);
+
+        /// <summary>Where our lips are right now (the kiss check lines two of these up).</summary>
+        public Vector3 Lips => MouthPoint;
 
         /// <summary>
         /// Lips on lips, kneeling: the knees and hips stay where the kneel put them; the back curls down (spine, then
@@ -1457,8 +1460,8 @@ namespace PleaseDontDrown.Avatars
 
             // 1. Curl the back down toward their face: spine, chest and neck share the bend (CCD, a few passes).
             Transform[] chain = { B(Bone.Spine), B(Bone.Chest), B(Bone.Neck) };
-            float[] share = { 0.45f, 0.55f, 0.35f };
-            for (int pass = 0; pass < 4; pass++)
+            float[] share = { 0.55f, 0.65f, 0.5f };
+            for (int pass = 0; pass < 6; pass++)
                 for (int i = 0; i < chain.Length; i++)
                 {
                     Transform bone = chain[i];
@@ -1470,13 +1473,20 @@ namespace PleaseDontDrown.Avatars
             // 2. Face down onto theirs, tilted sideways a little, eyes shut (the face code does the eyes).
             Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along * 0.35f, along) * Quaternion.Euler(0f, 0f, 22f);
             head.rotation = Quaternion.Slerp(head.rotation, faceDown, w * 0.85f);
-            // 3. Whatever is still missing: lean the hips in a little (never more than a hand's width), knees stay.
+            // 3. Whatever is still missing: lean the hips in (up to 30 cm), knees stay; then curl the neck the last bit.
             Vector3 gap = target - MouthPoint;
             if (gap.sqrMagnitude > 1e-6f)
             {
-                hips.position += Vector3.ClampMagnitude(gap, 0.18f * _rig.Scale) * w;
+                hips.position += Vector3.ClampMagnitude(gap, 0.3f * _rig.Scale) * w;
                 PoseLegs();
             }
+            for (int pass = 0; pass < 3; pass++)
+                foreach (Transform bone in new[] { B(Bone.Chest), B(Bone.Neck) })
+                {
+                    Vector3 toMouth = MouthPoint - bone.position, toLips = target - bone.position;
+                    if (toMouth.sqrMagnitude < 1e-6f || toLips.sqrMagnitude < 1e-6f) continue;
+                    bone.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(toMouth, toLips), 0.6f * w) * bone.rotation;
+                }
 
             // Hands: one on the forehead, one under the chin.
             IK.Solve(upperL, foreL, la, lb, lips + along * 0.13f + Vector3.up * 0.07f - right * 0.05f, -fwd - right, w, false);

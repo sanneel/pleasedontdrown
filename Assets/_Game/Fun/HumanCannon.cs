@@ -39,6 +39,19 @@ namespace PleaseDontDrown.Fun
 
         public bool Busy => _occupant.Value != null;
 
+        private static readonly System.Collections.Generic.List<HumanCannon> All = new();
+        private void OnEnable() => All.Add(this);
+        private void OnDisable() => All.Remove(this);
+
+        /// <summary>Is this lifeguard sitting in a cannon right now?</summary>
+        public static bool IsInside(PlayerHub player)
+        {
+            if (player == null) return false;
+            foreach (HumanCannon c in All)
+                if (c != null && c._occupant.Value != null && c._occupant.Value == player.NetworkObject) return true;
+            return false;
+        }
+
         // ------------------------------------------------------------------ interaction (the player's machine)
 
         public bool CanInteract(PlayerHub player) => !Busy && !_aimingHere && player != null && player.Motor != null && player.Motor.Seat == null

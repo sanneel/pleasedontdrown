@@ -421,6 +421,44 @@ namespace PleaseDontDrown.Editor
         private static float Median(IEnumerable<float> values) => Percentile(values.OrderBy(v => v).ToList(), 0.5f);
 
         /// <summary>
+        /// Least squares: uv = (a x + b y + c) for each of u and v, over the samples' face positions. The residual is
+        /// the typical miss in UV units.
+        /// </summary>
+        private static bool FitAffine(List<Sample> samples, out Vector3 u, out Vector3 v, out float residual)
+        {
+            u = v = Vector3.zero;
+            residual = float.MaxValue;
+            double sxx = 0, sxy = 0, sx = 0, syy = 0, sy = 0, n = samples.Count;
+            double sxu = 0, syu = 0, su = 0, sxv = 0, syv = 0, sv = 0;
+            foreach (Sample s in samples)
+            {
+                double x = s.P.x, y = s.P.y;
+                sxx += x * x; sxy += x * y; sx += x; syy += y * y; sy += y;
+                sxu += x * s.Uv.x; syu += y * s.Uv.x; su += s.Uv.x;
+                sxv += x * s.Uv.y; syv += y * s.Uv.y; sv += s.Uv.y;
+            }
+            // Solve [sxx sxy sx; sxy syy sy; sx sy n] * (a b c) = rhs by Cramer's rule.
+            double Det(double a1, double a2, double a3, double b1, double b2, double b3, double c1, double c2, double c3) =>
+                a1 * (b2 * c3 - b3 * c2) - a2 * (b1 * c3 - b3 * c1) + a3 * (b1 * c2 - b2 * c1);
+            double det = Det(sxx, sxy, sx, sxy, syy, sy, sx, sy, n);
+            if (Math.Abs(det) < 1e-18) return false;
+            Vector3 Solve(double r1, double r2, double r3) => new(
+                (float)(Det(r1, sxy, sx, r2, syy, sy, r3, sy, n) / det),
+                (float)(Det(sxx, r1, sx, sxy, r2, sy, sx, r3, n) / det),
+                (float)(Det(sxx, sxy, r1, sxy, syy, r2, sx, sy, r3) / det));
+            u = Solve(sxu, syu, su);
+            v = Solve(sxv, syv, sv);
+            double err = 0;
+            foreach (Sample s in samples)
+            {
+                float du = u.x * s.P.x + u.y * s.P.y + u.z - s.Uv.x, dv = v.x * s.P.x + v.y * s.P.y + v.z - s.Uv.y;
+                err += du * du + dv * dv;
+            }
+            residual = (float)Math.Sqrt(err / n);
+            return true;
+        }
+
+        /// <summary>
         /// These models' faces are painted on. The painted eyes and mouth are found in the texture (the whites of the
         /// eyes; lips and teeth), and three small pieces are added in front of them: a lid of the face's own skin
         /// colour over each eye, hinged along its top edge on the eye bone, with a dark lash line along its lower
@@ -551,9 +589,18 @@ namespace PleaseDontDrown.Editor
                 .OrderBy(s => s.C.r + s.C.g + s.C.b).First().Uv;
 
             // A rounded patch lying on the face, between two heights of its oval (v: -1 bottom .. 1 top).
-            void Patch(Vector2 center, float rx, float ry, float vFrom, float vTo, float lift, Vector2 uv, Bone bone)
+            void Patch(Vector2 center, float rx, float ry, float vFrom, float vTo, float lift, Vector2 uv, Bone bone, Func<float, float, float, Vector2> uvAt = null)
             {
                 List<Sample> near = samples.Where(s => Mathf.Abs(s.P.x - center.x) < rx + 0.012f && Mathf.Abs(s.P.y - center.y) < ry + 0.012f).ToList();
+                // Only the face itself: a lock of hair hanging in front of the eye (25 cm out) pulled lid points onto
+                // it, and the stretched lid broke up into pieces.
+                if (near.Count > 0)
+                {
+                    // (How far out the face is, from its skin only: the hair in front can outnumber it.)
+                    List<Sample> skinNear = near.Where(s => Distance(s.C, skin) < 0.2f).ToList();
+                    float faceZ = Median((skinNear.Count >= 20 ? skinNear : near).Select(s => s.P.z));
+                    near = near.Where(s => Mathf.Abs(s.P.z - faceZ) < 0.025f).ToList(); // (hair behind the face too: the inside of a lock)
+                }
                 const int nx = 10, ny = 8;
                 int first = extra.Vertices.Count;
                 // One direction for the whole patch (lit evenly, like the skin round it), not each bump's own.
@@ -574,7 +621,9 @@ namespace PleaseDontDrown.Editor
                             if (d < best) { best = d; on = s; }
                             if (d < 0.014f * 0.014f) round += s.N;
                             // Modelled lashes and eyeballs stand out from the face: the patch goes over whatever is in front.
-                            if (d < 0.008f * 0.008f) front = Mathf.Max(front, s.P.z);
+                            // (Over a wide circle: a bulging painted eye has few vertices, and a lid that only looked
+                            // 8 mm around itself went behind the bulge in patches.)
+                            if (d < 0.016f * 0.016f) front = Mathf.Max(front, s.P.z);
                         }
                         // In the middle it clears whatever stands out (the eyeball, modelled lashes); toward its rim it
                         // comes down onto the face itself, so it reads as skin and not as a plate stuck on.
@@ -588,7 +637,7 @@ namespace PleaseDontDrown.Editor
                         // Toward its rim it takes the face's own shading, so it doesn't stand out as a lighter disc.
                         float edge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.45f, 1f, Mathf.Max(Mathf.Abs(u), Mathf.Abs(v))));
                         extra.Normals.Add(Vector3.Slerp(lidNormal, on.N.sqrMagnitude > 1e-6f ? on.N.normalized : lidNormal, edge));
-                        extra.Uvs.Add(uv);
+                        extra.Uvs.Add(uvAt != null ? uvAt(x, y, v) : uv);
                         extra.Weights.Add(new BoneWeight { boneIndex0 = (int)bone, weight0 = 1f });
                     }
                 // Even the patch out (it only ever moves forward: nothing behind may poke through).
@@ -627,17 +676,53 @@ namespace PleaseDontDrown.Editor
             }
             float SurfaceZ(Vector2 at) => samples.OrderBy(s => (s.P.x - at.x) * (s.P.x - at.x) + (s.P.y - at.y) * (s.P.y - at.y)).First().P.z;
 
-            Vector3 Lid(Rect eye, Bone bone)
+            Vector3 Lid(Rect eye, Rect other, Bone bone)
             {
+                // Faces are symmetric: the lid covers this eye as found and the other eye mirrored across the
+                // middle, so a badly found eye (small flat painted eyes) still ends up all under its lid.
+                Rect mirror = Rect.MinMaxRect(-other.xMax, other.yMin, -other.xMin, other.yMax);
+                eye = Rect.MinMaxRect(Mathf.Min(eye.xMin, mirror.xMin), Mathf.Min(eye.yMin, mirror.yMin),
+                    Mathf.Max(eye.xMax, mirror.xMax), Mathf.Max(eye.yMax, mirror.yMax));
                 // A little bigger than the painted eye (an oval inside a box misses its corners).
-                float rx = eye.width * 0.5f * 1.16f + 0.0015f, ry = eye.height * 0.5f * 1.18f + 0.0015f;
-                Patch(eye.center, rx, ry, -1f, 1f, 0.004f, SkinRound(eye), bone);
+                float rx = eye.width * 0.5f * 1.28f + 0.002f, ry = eye.height * 0.5f * 1.3f + 0.002f; // all of the painted eye, its corners too
+                // The lid is the skin just above the eye come down over it: textured with that strip of the face
+                // itself (its own tone and shading detail), not one flat colour, which read as a smudge.
+                Vector2 flat = SkinRound(eye);
+                List<Sample> strip = faceSkin.Where(s => s.P.y > eye.yMax && s.P.y < eye.yMax + 0.016f && Distance(s.C, skin) < 0.11f
+                                                         && Mathf.Abs(s.P.x - eye.center.x) < rx + 0.004f).ToList(); // (pale hair passed for skin)
+                // One piece of the texture only: a strip crossing a UV seam would mix two far-apart places into
+                // the lid (bits of eye and hair showed on it).
+                if (strip.Count > 0)
+                {
+                    var middleUv = new Vector2(Median(strip.Select(s => s.Uv.x)), Median(strip.Select(s => s.Uv.y)));
+                    strip = strip.Where(s => (s.Uv - middleUv).sqrMagnitude < 0.03f * 0.03f).ToList();
+                }
+                // Face position -> texture: one smooth (affine) map fitted to that strip, so the lid's texture is one
+                // continuous piece of skin (mapping each lid point to its own nearest sample let the in-between
+                // texture wander across the painted eye). If it doesn't fit cleanly (a seam, a mirror), one flat colour.
+                Func<float, float, float, Vector2> skinAbove = null;
+                if (strip.Count >= 30 && FitAffine(strip, out Vector3 fu, out Vector3 fv, out float residual) && residual < 0.004f)
+                    skinAbove = (x, y, v) =>
+                    {
+                        float want = eye.yMax + 0.002f + (v + 1f) * 0.5f * 0.011f; // lid bottom = right above the eye, top = higher
+                        return new Vector2(fu.x * x + fu.y * want + fu.z, fv.x * x + fv.y * want + fv.z);
+                    };
+                // Check it: every bit of the lid must come out skin-coloured (no eye, lash or hair on it). Else flat.
+                if (skinAbove != null)
+                    for (int j = 0; j <= 8 && skinAbove != null; j++)
+                        for (int i = 0; i <= 10; i++)
+                        {
+                            float u = -1f + 2f * i / 10f, v = -1f + 2f * j / 8f;
+                            float x = eye.center.x + rx * u * Mathf.Sqrt(1f - 0.5f * v * v), y = eye.center.y + ry * v * Mathf.Sqrt(1f - 0.5f * u * u);
+                            if (Distance(At(skinAbove(x, y, v)), skin) > 0.16f) { skinAbove = null; break; }
+                        }
+                Patch(eye.center, rx, ry, -1f, 1f, 0.004f, flat, bone, skinAbove);
                 Patch(eye.center, rx, ry, -1f, -0.84f, 0.006f, darkUv, bone); // the lashes: a thin dark line along the lid's edge
                 var hinge = new Vector2(eye.center.x, eye.center.y + ry);
                 return new Vector3(hinge.x, hinge.y, SurfaceZ(hinge));
             }
-            lidL = Lid(eyeL, Bone.EyeL);
-            lidR = Lid(eyeR, Bone.EyeR);
+            lidL = Lid(eyeL, eyeR, Bone.EyeL);
+            lidR = Lid(eyeR, eyeL, Bone.EyeR);
 
             // Mouth: lips (redder and bluer than the skin) and teeth, under the eyes, in the middle.
             float skinRed = Redness(skin), skinBlue = Blueness(skin), between = (eyeR.center.x - eyeL.center.x) * 0.5f;
@@ -658,8 +743,8 @@ namespace PleaseDontDrown.Editor
                 if (basis.HasMouth && basis.Mouth.Anchors.Length >= 6)
                 {
                     Rect box = basis.Mouth.On(vertices);
-                    float rx = Mathf.Clamp(box.width * 0.2f, 0.006f, 0.011f);
-                    Patch(box.center, rx, rx * 0.55f, -1f, 1f, 0.0035f, darkUv, Bone.Mouth);
+                    float rx = Mathf.Clamp(box.width * 0.3f, 0.009f, 0.019f);
+                    Patch(box.center, rx, rx * 0.62f, -1f, 1f, 0.0035f, darkUv, Bone.Mouth);
                     mouthAt = new Vector3(box.center.x, box.center.y, SurfaceZ(box.center));
                     mouthNote = "mouth where the base model's is";
                 }
@@ -672,8 +757,11 @@ namespace PleaseDontDrown.Editor
                 if (dark.Count < 5) dark = lips;
                 List<Sample> line = dark.Take(Mathf.Max(5, dark.Count / 5)).ToList();
                 var center = new Vector2(Mathf.Clamp(lips.Average(s => s.P.x), -0.012f, 0.012f), Median(line.Select(s => s.P.y)));
-                float rx = Mathf.Clamp(width * 0.2f, 0.006f, 0.011f);
-                Patch(center, rx, rx * 0.55f, -1f, 1f, 0.0035f, darkUv, Bone.Mouth);
+                // An open mouth as wide as a third of the lips (it was a 1-2 cm dot), the dark red of the line
+                // between the lips, not the black of the lashes.
+                float rx = Mathf.Clamp(width * 0.3f, 0.009f, 0.019f);
+                Vector2 mouthUv = line.Count > 0 ? line[0].Uv : darkUv;
+                Patch(center, rx, rx * 0.62f, -1f, 1f, 0.0035f, mouthUv, Bone.Mouth);
                 mouthAt = new Vector3(center.x, center.y, SurfaceZ(center));
                 mouthNote = $"mouth {width * 100f:0.0} cm wide at y {center.y:0.000}";
                 fit.HasMouth = true;

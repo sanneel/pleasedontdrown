@@ -222,6 +222,34 @@ namespace PleaseDontDrown.Player
         /// <summary>Throw with a charge from 0 (lob) to 1 (full power). Queued until the host confirms the pickup.</summary>
         public void Throw(float charge) => RequestRelease(Mathf.Clamp01(charge));
 
+        private Combat.PlayerCombat _combat;
+
+        /// <summary>Owner: our hands are busy being knocked out, carried or fired from a cannon.</summary>
+        public bool HandsTaken()
+        {
+            if (_combat == null) _combat = GetComponent<Combat.PlayerCombat>();
+            return (_combat != null && _combat.IsDazed) || PlayerCarry.IsCarried(_hub) || Fun.HumanCannon.IsInside(_hub);
+        }
+
+        /// <summary>Owner: whatever is in our hands goes in a free pocket (it stays ours), else it's dropped.</summary>
+        public void Stow()
+        {
+            Item held = HeldItem;
+            if (held == null) return;
+            CancelCharge();
+            StopEating();
+            if (held.Pocketable)
+            {
+                int free = FirstFreeSlot();
+                if (free >= 0)
+                {
+                    SelectSlot(free);
+                    return;
+                }
+            }
+            Drop();
+        }
+
         public void Drop() => RequestRelease(-1f);
 
         private void RequestRelease(float charge)
@@ -395,6 +423,15 @@ namespace PleaseDontDrown.Player
             Item held = HeldItem;
             if (held == null)
                 return;
+
+            // Hands that can't hold anything (knocked out cold, carried off by someone, stuffed in the cannon): what
+            // was in them goes in a pocket, or falls. (It used to stay floating where the hands had been: a gun up
+            // in the air over somebody sliding about on the sand.)
+            if (HandsTaken())
+            {
+                Stow();
+                return;
+            }
 
             if (_queuedThrow.HasValue)
             {
