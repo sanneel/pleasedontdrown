@@ -76,6 +76,7 @@ namespace PleaseDontDrown.Editor
                 bloom.threshold.Override(2f);      // only the sun, HDR clouds and glints glow
                 bloom.intensity.Override(1.6f);
                 bloom.scatter.Override(0.7f);
+                bloom.highQualityFiltering.Override(true);
                 var vignette = Comp<Vignette>(p);
                 vignette.color.Override(Color.black);
                 vignette.intensity.Override(0.3f);

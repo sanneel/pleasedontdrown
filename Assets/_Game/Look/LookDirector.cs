@@ -1,3 +1,4 @@
+using PleaseDontDrown.Core;
 using PleaseDontDrown.World.Water;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -20,6 +21,7 @@ namespace PleaseDontDrown.Look
         private LensDistortion _lens;
         private float _weight;
         private Camera _prepared;
+        private int _preparedVersion;
 
         /// <summary>Switches on post-processing (bloom, tonemapping, vignette...) and edge smoothing on a camera.</summary>
         public static void Prepare(Camera camera)
@@ -27,8 +29,7 @@ namespace PleaseDontDrown.Look
             if (camera == null) return;
             UniversalAdditionalCameraData data = camera.GetUniversalAdditionalCameraData();
             data.renderPostProcessing = true;
-            data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
-            data.antialiasingQuality = AntialiasingQuality.Medium;
+            PictureSettings.ApplyTo(data);
         }
 
         private void Start()
@@ -44,9 +45,10 @@ namespace PleaseDontDrown.Look
         private void LateUpdate()
         {
             Camera cam = Camera.main;
-            if (cam != null && cam != _prepared)
+            if (cam != null && (cam != _prepared || _preparedVersion != PictureSettings.Version))
             {
                 _prepared = cam;
+                _preparedVersion = PictureSettings.Version;
                 Prepare(cam);
             }
             if (_underwater == null) return;

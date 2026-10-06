@@ -12,7 +12,7 @@ namespace PleaseDontDrown.UI
     /// </summary>
     public class DevConnectMenu : MonoBehaviour
     {
-        private enum Page { Main, Join, Options, Controls, Invite, Travel, ConfirmLeave, ConfirmQuit }
+        private enum Page { Main, Join, Options, Controls, Graphics, Invite, Travel, ConfirmLeave, ConfirmQuit }
 
         [SerializeField] private ConnectionService _connection;
 
@@ -32,12 +32,12 @@ namespace PleaseDontDrown.UI
         {
             GameInput.ToggleMenu.performed += OnToggleMenu;
             GameInput.ToggleOverlay.performed += OnToggleOverlay;
-            DevCommands.Register("menu", "<pause|options|keys|guide|close>", "Open a menu page (to look at it in tests).", args =>
+            DevCommands.Register("menu", "<pause|options|keys|graphics|guide|close>", "Open a menu page (to look at it in tests).", args =>
             {
                 string page = args.Length > 0 ? args[0] : "pause";
                 _guideOpen = page == "guide";
-                if (_connection.IsActive) SetPause(page is "pause" or "options" or "keys");
-                _page = page == "options" ? Page.Options : page == "keys" ? Page.Controls : Page.Main;
+                if (_connection.IsActive) SetPause(page is "pause" or "options" or "keys" or "graphics");
+                _page = page switch { "options" => Page.Options, "keys" => Page.Controls, "graphics" => Page.Graphics, _ => Page.Main };
             }, owner: this);
         }
 
@@ -55,7 +55,7 @@ namespace PleaseDontDrown.UI
             if (GameInput.IsRebinding || GameInput.RebindJustEnded) return; // that Esc cancelled a key change
             if (_page != Page.Main && (_pauseOpen || !_connection.IsActive))
             {
-                _page = _page == Page.Controls ? Page.Options : Page.Main; // Esc steps back out of a sub-screen first
+                _page = _page is Page.Controls or Page.Graphics ? Page.Options : Page.Main; // Esc steps back out of a sub-screen first
                 return;
             }
             if (!_connection.IsActive) return;
@@ -132,7 +132,7 @@ namespace PleaseDontDrown.UI
             if (Hud.Button(Row(x, ref y), "PLAY", primary: true)) _connection.Play();
             if (Hud.Button(Row(x, ref y), "JOIN GAME", selected: _page == Page.Join)) _page = _page == Page.Join ? Page.Main : Page.Join;
             if (Hud.Button(Row(x, ref y), "CHARACTER")) AvatarCustomizer.Open();
-            bool options = _page is Page.Options or Page.Controls;
+            bool options = _page is Page.Options or Page.Controls or Page.Graphics;
             if (Hud.Button(Row(x, ref y), "OPTIONS", selected: options)) _page = options ? Page.Main : Page.Options;
             if (Hud.Button(Row(x, ref y), GameDisplay.IsFullscreen ? "WINDOWED" : "FULLSCREEN")) GameDisplay.Toggle();
             if (Hud.Button(Row(x, ref y), "QUIT")) Application.Quit();
@@ -140,6 +140,7 @@ namespace PleaseDontDrown.UI
             if (_page == Page.Join) DrawJoinPanel(x + ButtonWidth + 30f, height - 40f);
             else if (_page == Page.Options) DrawOptionsPanel(new Rect(x + ButtonWidth + 30f, height - 40f - OptionsHeight, OptionsWidth, OptionsHeight));
             else if (_page == Page.Controls) DrawControlsPanel(new Rect(x + ButtonWidth + 30f, height - 40f - ControlsHeight, ControlsWidth, ControlsHeight));
+            else if (_page == Page.Graphics) DrawGraphicsPanel(new Rect(x + ButtonWidth + 30f, height - 40f - GraphicsHeight, GraphicsWidth, GraphicsHeight));
 
             string steam = SteamBootstrap.IsReady
                 ? "Steam: " + SteamBootstrap.LocalName + "   Your Steam friends can join you."
@@ -221,6 +222,13 @@ namespace PleaseDontDrown.UI
                     var panel = new Rect((width - ControlsWidth) * 0.5f, (height - ControlsHeight - ButtonHeight - 20f) * 0.5f, ControlsWidth, ControlsHeight);
                     DrawControlsPanel(panel);
                     if (!GameInput.IsRebinding && Hud.Button(new Rect(x, panel.yMax + 20f, ButtonWidth, ButtonHeight), "BACK", centred: true)) _page = Page.Options;
+                    return;
+                }
+                case Page.Graphics:
+                {
+                    var panel = new Rect((width - GraphicsWidth) * 0.5f, (height - GraphicsHeight - ButtonHeight - 20f) * 0.5f, GraphicsWidth, GraphicsHeight);
+                    DrawGraphicsPanel(panel);
+                    if (Hud.Button(new Rect(x, panel.yMax + 20f, ButtonWidth, ButtonHeight), "BACK", centred: true)) _page = Page.Options;
                     return;
                 }
                 case Page.Travel:
@@ -314,7 +322,8 @@ namespace PleaseDontDrown.UI
             changed = OptionRow(panel, ref y, "VOICES", voice, 0f, 1f, Mathf.RoundToInt(voice * 100f).ToString());
             if (!Mathf.Approximately(changed, voice)) SoundSettings.Voice = Mathf.Round(changed * 20f) / 20f;
 
-            if (Hud.Button(new Rect(panel.x + 28f, panel.yMax - 66f, 220f, 46f), "RESET", small: true))
+            const float third = (OptionsWidth - 56f - 32f) / 3f;
+            if (Hud.Button(new Rect(panel.x + 28f, panel.yMax - 66f, third, 46f), "RESET", small: true))
             {
                 LookSettings.Sensitivity = LookSettings.DefaultSensitivity;
                 LookSettings.Fov = LookSettings.DefaultFov;
@@ -323,7 +332,62 @@ namespace PleaseDontDrown.UI
                 SoundSettings.Voice = SoundSettings.DefaultVoice;
                 PlayerPrefs.Save();
             }
-            if (Hud.Button(new Rect(panel.xMax - 248f, panel.yMax - 66f, 220f, 46f), "KEYS", small: true)) _page = Page.Controls;
+            if (Hud.Button(new Rect(panel.x + 28f + third + 16f, panel.yMax - 66f, third, 46f), "GRAPHICS", small: true)) _page = Page.Graphics;
+            if (Hud.Button(new Rect(panel.xMax - 28f - third, panel.yMax - 66f, third, 46f), "KEYS", small: true)) _page = Page.Controls;
+        }
+
+        // ------------------------------------------------------------------ graphics
+
+        private const float GraphicsWidth = 620f, GraphicsHeight = 576f;
+        private static readonly string[] QualityNames = { "LOW", "MEDIUM", "HIGH" };
+        private static readonly string[] SmoothingNames = { "OFF", "FXAA", "SMAA" };
+        private static readonly string[] VSyncNames = { "ON", "OFF" };
+        private static readonly string[] CapNames = { "30", "60", "120", "144", "165", "240", "MAX" };
+
+        /// <summary>Quality, edge smoothing, vsync, the frame cap and the render scale; they apply as you click.</summary>
+        private void DrawGraphicsPanel(Rect panel)
+        {
+            Hud.Panel(panel);
+            Hud.Label(new Rect(panel.x + 28f, panel.y + 16f, panel.width - 56f, 44f), "GRAPHICS", 36f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            float y = panel.y + 78f;
+
+            int quality = (int)PictureSettings.Quality;
+            int picked = ChoiceRow(panel, ref y, "QUALITY", QualityNames, quality);
+            if (picked != quality) PictureSettings.Quality = (PictureSettings.Level)picked;
+
+            int smoothing = (int)PictureSettings.AntiAliasing;
+            picked = ChoiceRow(panel, ref y, "ANTI-ALIASING", SmoothingNames, smoothing);
+            if (picked != smoothing) PictureSettings.AntiAliasing = (PictureSettings.Smoothing)picked;
+
+            int vSync = PictureSettings.VSync ? 0 : 1;
+            picked = ChoiceRow(panel, ref y, "VSYNC", VSyncNames, vSync);
+            if (picked != vSync) PictureSettings.VSync = picked == 0;
+
+            GUI.enabled = !PictureSettings.VSync;
+            int cap = PictureSettings.FrameCap;
+            picked = ChoiceRow(panel, ref y, "FRAME CAP", CapNames, cap);
+            if (picked != cap) PictureSettings.FrameCap = picked;
+            GUI.enabled = true;
+
+            float scale = PictureSettings.RenderScale;
+            float changed = OptionRow(panel, ref y, "RENDER SCALE", scale, PictureSettings.MinRenderScale, PictureSettings.MaxRenderScale,
+                Mathf.RoundToInt(scale * 100f) + "%");
+            if (!Mathf.Approximately(changed, scale)) PictureSettings.RenderScale = Mathf.Round(changed * 20f) / 20f;
+
+            if (Hud.Button(new Rect(panel.x + 28f, panel.yMax - 66f, 220f, 46f), "RESET", small: true)) PictureSettings.ResetAll();
+        }
+
+        /// <summary>A label over a row of buttons, the chosen one framed; returns the one picked.</summary>
+        private static int ChoiceRow(Rect panel, ref float y, string label, string[] choices, int selected)
+        {
+            const float gap = 8f;
+            Hud.Label(new Rect(panel.x + 28f, y, 280f, 30f), label, 21f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            float width = (panel.width - 56f - gap * (choices.Length - 1)) / choices.Length;
+            for (int i = 0; i < choices.Length; i++)
+                if (Hud.Button(new Rect(panel.x + 28f + i * (width + gap), y + 32f, width, 40f), choices[i], centred: true, selected: i == selected, small: true))
+                    selected = i;
+            y += 82f;
+            return selected;
         }
 
         // ------------------------------------------------------------------ keys
