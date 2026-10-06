@@ -58,6 +58,7 @@ namespace PleaseDontDrown.Editor
         /// <summary>Refresh only tourist assets after a Blender art pass; keep the library and other bodies intact.</summary>
         public static void BakeTourists()
         {
+            if (!CanBake("tourist bodies")) return;
             foreach (var (id, name, file) in Bodies.Where(b => b.file.StartsWith("tourist_")))
             {
                 Bake($"{SourceDir}/{file}.glb", id, name, file);
@@ -74,6 +75,7 @@ namespace PleaseDontDrown.Editor
         /// <summary>Re-bake only the players' goofy lifeguard (its hands, say), keeping every other body as it is.</summary>
         public static void BakeGoofy()
         {
+            if (!CanBake("the goofy lifeguard")) return;
             try
             {
                 foreach (var (id, name, file) in Bodies.Where(b => b.file == "goofy"))
@@ -87,9 +89,22 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        /// <summary>
+        /// Baking reads the models' textures through the GPU (the face, the skin, the hands): without a graphics
+        /// device (-nographics) every pixel reads black, no face is found and every body came out with its face and
+        /// closed eyes switched off. Then the bodies already baked stay as they are.
+        /// </summary>
+        private static bool CanBake(string what)
+        {
+            if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null) return true;
+            Debug.LogWarning($"[Build] no graphics device (-nographics): {what} NOT re-baked, keeping the bodies already there");
+            return false;
+        }
+
         /// <summary>Bakes every body whose GLB is present and writes the library the game loads.</summary>
         public static void BakeAll()
         {
+            if (!CanBake("character bodies")) return;
             Directory.CreateDirectory(OutputDir);
             var baked = new List<AvatarBody>();
             var all = new List<(byte id, string name, string file)>(Bodies);

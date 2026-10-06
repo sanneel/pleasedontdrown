@@ -420,6 +420,7 @@ namespace PleaseDontDrown.Editor
                 animator.Tick(1f / 30f);
             }
             AvatarAnimator.TimeOverride = null;
+            if (pose == "shut") rig.SetExpression(0f, 0.1f); // eyes closed (the painted closed-eyes face), as a tourist out cold
             if (pose == "fists")
             {
                 rig.LeftHand?.Pose(HandPose.Fist);
