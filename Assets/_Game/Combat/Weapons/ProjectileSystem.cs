@@ -232,7 +232,7 @@ namespace PleaseDontDrown.Combat
             float size = p.Kind == ProjectileKind.Heavy ? 1.6f : p.Kind == ProjectileKind.Pellet ? 0.7f : 1f;
             Puff(hit.point, normal, color, Mathf.RoundToInt(6 * size), size);
             if (!character && hit.collider.attachedRigidbody == null) AddHole(hit.point, normal, 0.055f * size);
-            AudioSource.PlayClipAtPoint(ProceduralAudio.BulletImpact, hit.point, p.Kind == ProjectileKind.Pellet ? 0.35f : 0.6f);
+            BeachAudio.PlayAt(ProceduralAudio.BulletImpact, hit.point, p.Kind == ProjectileKind.Pellet ? 0.35f : 0.6f);
             if (p.Local && p.Weapon != null) p.Weapon.OnProjectileHit(hit, dir, p.Damage);
         }
 
@@ -280,9 +280,13 @@ namespace PleaseDontDrown.Combat
                     _tracerMesh, 0, _tracers, n);
 
             // Bullet holes, oldest first out.
+            bool anyHole = false;
             for (int i = 0; i < _holeCount; i++)
+            {
                 if (Time.time - _holeTimes[i] > HoleLife) _holes[i] = Matrix4x4.zero;
-            if (_holeCount > 0)
+                else anyHole = true;
+            }
+            if (anyHole)
                 Graphics.RenderMeshInstanced(new RenderParams(_holeMaterial) { shadowCastingMode = ShadowCastingMode.Off },
                     _holeMesh, 0, _holes, _holeCount);
         }

@@ -24,6 +24,8 @@ namespace PleaseDontDrown.World.Water
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => CameraUnderwater = false;
 
+        private void Awake() => useGUILayout = false;
+
         private void Start() => Apply(false);
 
         private void LateUpdate()

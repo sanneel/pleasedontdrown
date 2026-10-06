@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Items;
@@ -123,8 +124,10 @@ namespace PleaseDontDrown.Player
         {
             _slotsFrame = Time.frameCount;
             System.Array.Clear(_slots, 0, SlotCount);
-            foreach (Item item in Item.All)
+            IReadOnlyList<Item> items = Item.All;
+            for (int i = 0; i < items.Count; i++)
             {
+                Item item = items[i];
                 if (item.Holder != _hub) continue;
                 int slot = item.Slot;
                 if (slot >= 0 && slot < SlotCount && _slots[slot] == null) _slots[slot] = item;

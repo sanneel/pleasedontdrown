@@ -51,6 +51,7 @@ namespace PleaseDontDrown.Story
         private void Awake()
         {
             Instance = this;
+            useGUILayout = false;
             if (_wobble != null)
             {
                 _wobbleRest = _wobble.localRotation;

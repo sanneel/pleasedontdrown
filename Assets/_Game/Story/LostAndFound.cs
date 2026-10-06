@@ -43,11 +43,15 @@ namespace PleaseDontDrown.Story
             if (Instance == this) Instance = null;
         }
 
-        private static List<LostItem> Carried(PlayerHub player)
+        private static readonly List<LostItem> _carriedNow = new();
+
+        private static List<LostItem> Carried(PlayerHub player, List<LostItem> into = null)
         {
-            var list = new List<LostItem>();
-            foreach (Item item in Item.All)
-                if (item.Holder == player && item.TryGetComponent(out LostItem lost))
+            List<LostItem> list = into ?? new List<LostItem>();
+            list.Clear();
+            IReadOnlyList<Item> items = Item.All;
+            for (int i = 0; i < items.Count; i++)
+                if (items[i].Holder == player && items[i].TryGetComponent(out LostItem lost))
                     list.Add(lost);
             return list;
         }
@@ -56,7 +60,7 @@ namespace PleaseDontDrown.Story
 
         public string GetPrompt(PlayerHub player)
         {
-            List<LostItem> carried = Carried(player);
+            List<LostItem> carried = Carried(player, _carriedNow);
             if (carried.Count == 0) return "Lost & Found (bring things tourists lost)";
             int reward = 0;
             foreach (LostItem l in carried) reward += l.Reward;
@@ -65,7 +69,7 @@ namespace PleaseDontDrown.Story
 
         public void OnInteract(PlayerHub player)
         {
-            if (Carried(player).Count == 0)
+            if (Carried(player, _carriedNow).Count == 0)
             {
                 PlayerHud.ShowToast("Nothing to hand in. Tourists drop wallets, phones and sunglasses on the beach and in the water.", 3.5f);
                 return;

@@ -103,6 +103,7 @@ namespace PleaseDontDrown.Story
         private readonly Dictionary<VictimBrain, PlayerHub> _heroOf = new();
         private readonly List<LostAndFound.HandedIn> _handedIn = new();
         private readonly List<(StoryNpc npc, PlayerHub by)> _talks = new();
+        private static readonly WaitForSeconds ShortWait = new(0.2f), QuarterWait = new(0.25f), PollWait = new(0.3f);
         private readonly List<StoryNpc> _defeated = new();
         private readonly List<string> _purchases = new();
         private readonly List<GameObject> _spawnedActors = new();
@@ -453,9 +454,16 @@ namespace PleaseDontDrown.Story
             _talks.Clear();
             _waitingForTalk = true;
             npc.ServerSetTalkable(true, prompt);
-            while (!_talks.Exists(t => t.npc == npc)) yield return null;
+            while (!TalkedTo(npc)) yield return null;
             _waitingForTalk = false;
             _talks.Clear();
+        }
+
+        private bool TalkedTo(StoryNpc npc)
+        {
+            foreach ((StoryNpc who, PlayerHub _) in _talks)
+                if (who == npc) return true;
+            return false;
         }
 
         private StoryNpc SpawnNpc(string displayName, NpcRole role, AvatarLook look, Vector3 position, float yaw, int health = 0)

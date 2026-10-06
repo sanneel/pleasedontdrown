@@ -97,6 +97,7 @@ namespace PleaseDontDrown.Rescue
         private float _nextLyingScan;
         private Collider[] _allColliders = Array.Empty<Collider>();
         private readonly System.Collections.Generic.HashSet<Collider> _passThrough = new(); // players' bodies we let walk over us
+        private static readonly System.Collections.Generic.List<Collider> _playerColliders = new();
 
         /// <summary>Where the mouth and nose are: underwater here = no air.</summary>
         public Vector3 HeadPosition => transform.TransformPoint(_headLocal);
@@ -578,11 +579,14 @@ namespace PleaseDontDrown.Rescue
             VictimState state = _brain.State;
             bool lying = !_item.IsHeld && _brain.IsAshore && transform.forward.y > 0.4f &&
                          (!state.IsConscious() || state == VictimState.Injured || Time.time < _layDownUntil);
-            foreach (PlayerHub player in PlayerHub.All)
+            System.Collections.Generic.IReadOnlyList<PlayerHub> players = PlayerHub.All;
+            for (int i = 0; i < players.Count; i++)
             {
+                PlayerHub player = players[i];
                 if (player == null) continue;
                 // Every solid part of the lifeguard (body capsule, feet, head...), not just the main capsule.
-                foreach (Collider body in player.GetComponentsInChildren<Collider>())
+                player.GetComponentsInChildren(_playerColliders);
+                foreach (Collider body in _playerColliders)
                 {
                     if (body == null || body.isTrigger) continue;
                     if (lying)

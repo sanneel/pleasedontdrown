@@ -11,6 +11,7 @@ namespace PleaseDontDrown.Core
         private static AudioClip[] _water, _pickup, _swim, _footsteps;
         private static AudioClip _drop, _throw, _equip, _swoosh, _menu, _hover, _bird, _surf, _dive, _emerge;
         private static AudioSource _local;
+        private static readonly System.Collections.Generic.List<AudioSource> _oneShots = new();
         private static int _waterIndex, _pickupIndex, _swimIndex, _footstepIndex;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -19,6 +20,7 @@ namespace PleaseDontDrown.Core
             _water = _pickup = _swim = _footsteps = null;
             _drop = _throw = _equip = _swoosh = _menu = _hover = _bird = _surf = _dive = _emerge = null;
             _local = null;
+            _oneShots.Clear();
             _waterIndex = _pickupIndex = _swimIndex = _footstepIndex = 0;
         }
 
@@ -85,6 +87,36 @@ namespace PleaseDontDrown.Core
                 _local.spatialBlend = 0f;
             }
             _local.PlayOneShot(clip, volume);
+        }
+
+        /// <summary>A sound at a point in the world, as AudioSource.PlayClipAtPoint plays it, from reused sources.</summary>
+        public static void PlayAt(AudioClip clip, Vector3 position, float volume = 1f)
+        {
+            if (clip == null) return;
+            AudioSource source = null;
+            for (int i = _oneShots.Count - 1; i >= 0; i--)
+            {
+                AudioSource candidate = _oneShots[i];
+                if (candidate == null) _oneShots.RemoveAt(i);
+                else if (!candidate.isPlaying)
+                {
+                    source = candidate;
+                    break;
+                }
+            }
+            if (source == null)
+            {
+                var go = new GameObject("One shot audio");
+                UnityEngine.Object.DontDestroyOnLoad(go);
+                source = go.AddComponent<AudioSource>();
+                source.playOnAwake = false;
+                source.spatialBlend = 1f;
+                _oneShots.Add(source);
+            }
+            source.transform.position = position;
+            source.clip = clip;
+            source.volume = volume;
+            source.Play();
         }
 
         private static AudioClip MakeWater(int size, int variant)

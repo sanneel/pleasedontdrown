@@ -201,8 +201,10 @@ namespace PleaseDontDrown.Fun
         private void Magnet()
         {
             Vector3 c = _rim.position;
-            foreach (Item ball in Item.All)
+            IReadOnlyList<Item> items = Item.All;
+            for (int i = 0; i < items.Count; i++)
             {
+                Item ball = items[i];
                 if (ball == null || ball.IsHeld || ball.DisplayName != BallName) continue;
                 Rigidbody body = ball.Sync.Body;
                 if (body == null || body.isKinematic) continue;
@@ -223,8 +225,10 @@ namespace PleaseDontDrown.Fun
             if (_rim != null) Magnet();
             if (!IsServerInitialized || _rim == null) return;
             Vector3 c = _rim.position;
-            foreach (Item ball in Item.All)
+            IReadOnlyList<Item> items = Item.All;
+            for (int i = 0; i < items.Count; i++)
             {
+                Item ball = items[i];
                 if (ball == null || ball.DisplayName != BallName) continue;
                 if (!_tracks.TryGetValue(ball, out Track t)) _tracks[ball] = t = new Track();
                 Vector3 p = ball.transform.position;

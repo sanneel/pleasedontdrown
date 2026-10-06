@@ -156,7 +156,7 @@ namespace PleaseDontDrown.Fun
         {
             FloatingText.Spawn(at + Vector3.up * 0.8f, "WAAAAAH!", new Color(1f, 0.95f, 0.4f), 1.3f, 1.6f);
             PlayerHud.ShowToast($"<b>{who}</b> flew off the banana!", 2f);
-            AudioSource.PlayClipAtPoint(FunSounds.SlideDown, at, 0.9f);
+            Core.BeachAudio.PlayAt(FunSounds.SlideDown, at, 0.9f);
         }
 
         [ObserversRpc]

@@ -104,6 +104,8 @@ namespace PleaseDontDrown.Story
         }
 
         private readonly List<Member> _members = new();
+        private readonly List<Member> _updating = new();
+        private static readonly float[] NearbyRadii = { 12f, 20f };
         private System.Random _rng;
         private float _nextTopUp;
         private int _spawned;
@@ -333,7 +335,9 @@ namespace PleaseDontDrown.Story
             if (!IsServerInitialized) return;
             for (int i = _members.Count - 1; i >= 0; i--)
                 if (_members[i].Npc == null || !_members[i].Npc.IsSpawned) Forget(_members[i]);
-            foreach (Member m in _members.ToArray())
+            _updating.Clear();
+            _updating.AddRange(_members);
+            foreach (Member m in _updating)
             {
                 if (m.NextPose.HasValue && Time.time >= m.NextPoseAt)
                 {
@@ -658,7 +662,7 @@ namespace PleaseDontDrown.Story
             m.JustTreaded = false;
 
             if (PlanSwimRoute(m) && StartLeg(m)) return;
-            foreach (float radius in new[] { 12f, 20f })
+            foreach (float radius in NearbyRadii)
                 if (NearbyWaterSpot(p, radius, _swimX, _swimZ, SwimMin, SwimMax, out Vector3 near))
                 {
                     SetRoute(m, "nearby", near);

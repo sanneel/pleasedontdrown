@@ -30,6 +30,7 @@ namespace PleaseDontDrown.Player
         private readonly SyncVar<ulong> _avatarLook = new SyncVar<ulong>();
         private readonly SyncVar<byte> _activeSlot = new SyncVar<byte>();
         private FirstPersonArms _arms;
+        private PlayerCarry _carry;
 
         private static readonly List<PlayerHub> _all = new();
 
@@ -46,6 +47,7 @@ namespace PleaseDontDrown.Player
         public PlayerHands Hands => _hands;
         public PlayerAvatar Avatar => _avatar;
         public PlayerVitals Vitals => _vitals;
+        public PlayerCarry Carry => _carry != null ? _carry : (_carry = GetComponent<PlayerCarry>());
         /// <summary>Selected inventory slot as the host knows it (our own player predicts; see PlayerHands).</summary>
         public int SyncedActiveSlot => _activeSlot.Value;
         public FirstPersonArms Arms => _arms;

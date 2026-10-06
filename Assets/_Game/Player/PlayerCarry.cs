@@ -31,11 +31,26 @@ namespace PleaseDontDrown.Player
         private int _wriggles;
         private Collider _ignoring;
 
-        public PlayerHub Hub => _hub;
-        /// <summary>Who has us in their arms (null: our own feet).</summary>
-        public PlayerHub Carrier => _carrier.Value != null ? _carrier.Value.GetComponent<PlayerHub>() : null;
+        private NetworkObject _carrierObject;
+        private PlayerHub _carrierHub;
 
-        public static PlayerCarry Of(PlayerHub hub) => hub != null ? hub.GetComponent<PlayerCarry>() : null;
+        /// <summary>Who has us in their arms (null: our own feet).</summary>
+        public PlayerHub Carrier
+        {
+            get
+            {
+                NetworkObject carrier = _carrier.Value;
+                if (carrier == null) return null;
+                if (carrier != _carrierObject)
+                {
+                    _carrierObject = carrier;
+                    _carrierHub = carrier.GetComponent<PlayerHub>();
+                }
+                return _carrierHub;
+            }
+        }
+
+        public static PlayerCarry Of(PlayerHub hub) => hub != null ? hub.Carry : null;
         public static bool IsCarried(PlayerHub hub) => Of(hub)?.Carrier != null;
 
         /// <summary>The lifeguard <paramref name="carrier"/> has in their arms, or null.</summary>
@@ -243,7 +258,7 @@ namespace PleaseDontDrown.Player
         {
             FloatingText.Spawn(at + Vector3.up * 1.2f, "YEEEET!", new Color(1f, 0.6f, 0.2f), 1.5f, 1.4f);
             PlayerHud.ShowToast(shout, 2f);
-            AudioSource.PlayClipAtPoint(FunSounds.Whoop, at, 0.9f);
+            BeachAudio.PlayAt(FunSounds.Whoop, at, 0.9f);
         }
 
         // ------------------------------------------------------------------ wriggling free (the carried one's machine)

@@ -109,8 +109,8 @@ namespace PleaseDontDrown.Combat
         private void BonkObservers(Vector3 point, float impact)
         {
             FloatingText.Spawn(point + Vector3.up * 0.25f, impact > BonkDazeImpact ? "BONK!!" : "BONK!", new Color(1f, 0.75f, 0.3f), 1f, 1f);
-            AudioSource.PlayClipAtPoint(ProceduralAudio.Bonk, point, 1f);
-            if (impact > BonkDazeImpact) AudioSource.PlayClipAtPoint(FunSounds.Boing, point, 0.7f);
+            BeachAudio.PlayAt(ProceduralAudio.Bonk, point, 1f);
+            if (impact > BonkDazeImpact) BeachAudio.PlayAt(FunSounds.Boing, point, 0.7f);
         }
 
         // ------------------------------------------------------------------ owner: the daze view and the cannonball
@@ -169,7 +169,7 @@ namespace PleaseDontDrown.Combat
                 SplashFx.Spawn(p + Quaternion.Euler(0f, i * 90f + 45f, 0f) * Vector3.forward * 0.8f, 0.7f);
             string verdict = score >= 9.5f ? "PERFECT!" : score >= 8f ? "HUGE!" : score >= 6.5f ? "NICE" : "BELLY FLOP";
             FloatingText.Spawn(p + Vector3.up * 1.8f, $"CANNONBALL! {score:0.0}/10 {verdict}", new Color(0.5f, 0.9f, 1f), 1.2f, 2.2f);
-            AudioSource.PlayClipAtPoint(score >= 8f ? FunSounds.Cheer : FunSounds.Whoop, p, 0.8f);
+            BeachAudio.PlayAt(score >= 8f ? FunSounds.Cheer : FunSounds.Whoop, p, 0.8f);
             if (IsOwner) PlayerHud.ShowToast($"Cannonball rated <b>{score:0.0}</b>. {verdict}", 2.5f);
         }
     }

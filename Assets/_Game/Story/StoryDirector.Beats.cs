@@ -97,7 +97,7 @@ namespace PleaseDontDrown.Story
             _waitingForTalk = true;
             PlayerHub greeted = null;
             float giveUp = Time.time + 25f;
-            while (Time.time < giveUp && !_talks.Exists(t => t.npc == _sandy))
+            while (Time.time < giveUp && !TalkedTo(_sandy))
             {
                 greeted = StoryNpc.NearestPlayer(_sandy.transform.position, 500f);
                 if (greeted != null)
@@ -141,7 +141,7 @@ namespace PleaseDontDrown.Story
                 _sandy.ServerSetPose(AvatarPose.Normal);
                 _sandy.ServerMoveTo(_sandyHome, 2f);
                 float giveUp = Time.time + 40f;
-                while (_sandy.IsMoving && Time.time < giveUp) yield return new WaitForSeconds(0.3f);
+                while (_sandy.IsMoving && Time.time < giveUp) yield return PollWait;
             }
             SandySits();
         }
@@ -219,7 +219,7 @@ namespace PleaseDontDrown.Story
                             StartCoroutine(Say(_sandy, $"(shouting) Ooh, somebody's {l.Kind.ToLowerInvariant()}? Bring it to my window, I'll pay you!"));
                             break;
                         }
-                yield return new WaitForSeconds(0.3f);
+                yield return PollWait;
             }
         }
 
@@ -315,7 +315,7 @@ namespace PleaseDontDrown.Story
                 foreach (Item i in Item.All)
                     if (i.TryGetComponent(out LostItem l) && l.IsStolen) left++;
                 if (left == 0 && returned < need) returned = need;
-                yield return new WaitForSeconds(0.2f);
+                yield return ShortWait;
             }
             NoMarker();
             _sandy.ServerSetPose(AvatarPose.Scared);
@@ -396,7 +396,7 @@ namespace PleaseDontDrown.Story
                     SetObjective($"Get {her.Name} out of the water! She isn't making a sound.");
                     Marker(her.Name, her.NetworkObject);
                 }
-                yield return new WaitForSeconds(0.25f);
+                yield return QuarterWait;
             }
             NoMarker();
             _rescued.Clear();
@@ -498,7 +498,7 @@ namespace PleaseDontDrown.Story
                 foreach (PlayerHub p in PlayerHub.All)
                     if (new Vector2(p.transform.position.x - arrival.x, p.transform.position.z - arrival.z).sqrMagnitude < 40f * 40f) arrived = true;
                 if (arrived) break;
-                yield return new WaitForSeconds(0.25f);
+                yield return QuarterWait;
             }
             NoMarker();
             SetObjective("You made it to the hotel island");
@@ -554,7 +554,7 @@ namespace PleaseDontDrown.Story
                     SpawnItem("Pistol", _reception != null ? _reception.HandOverPoint : desk.position + Vector3.up * 1.2f);
                     _purchases.Add("Pistol");
                 }
-                yield return new WaitForSeconds(0.3f);
+                yield return PollWait;
             }
             NoMarker();
             _receptionist.ServerSetMood(AvatarMood.Happy);
@@ -623,7 +623,7 @@ namespace PleaseDontDrown.Story
                         pointingAtBed = false;
                         Marker(guest.Name, guest.NetworkObject);
                     }
-                    yield return new WaitForSeconds(0.2f);
+                    yield return ShortWait;
                 }
                 NoMarker();
                 if (guest != null && guest.IsSpawned && _rescued.Contains(guest)) break;
@@ -715,7 +715,7 @@ namespace PleaseDontDrown.Story
                 }
                 SetObjective("PIRATES! Take them down (pistol or fists)", down, pirates.Count);
                 if (next != null && _markerTarget.Value != next.NetworkObject) Marker("PIRATE", next.NetworkObject);
-                yield return new WaitForSeconds(0.25f);
+                yield return QuarterWait;
             }
             NoMarker();
             foreach (StoryNpc p in pirates) StartCoroutine(RemoveLater(p, 20f));

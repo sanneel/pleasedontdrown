@@ -681,8 +681,10 @@ namespace PleaseDontDrown.Story
         {
             PlayerHub best = null;
             float bestSq = range * range;
-            foreach (PlayerHub p in PlayerHub.All)
+            IReadOnlyList<PlayerHub> players = PlayerHub.All;
+            for (int i = 0; i < players.Count; i++)
             {
+                PlayerHub p = players[i];
                 float d = (p.transform.position - from).sqrMagnitude;
                 if (d < bestSq)
                 {
@@ -737,7 +739,11 @@ namespace PleaseDontDrown.Story
                 Vector3.Dot(transform.forward, went.normalized) < 0.55f)
                 Face(went, dt, 12f);
             // Spawned in the air or into a dune: onto the ground. (Not someone placed on a seat: feet on a stool's footrest.)
-            if (!_moveTarget.HasValue && _pose.Value != AvatarPose.SitChair) transform.position = Grounded(transform.position);
+            if (!_moveTarget.HasValue && _pose.Value != AvatarPose.SitChair)
+            {
+                Vector3 here = transform.position, grounded = Grounded(here);
+                if (grounded.y != here.y) transform.position = grounded;
+            }
         }
 
         /// <summary>Don't stand inside each other (a gang of pirates spreads out around their target).</summary>

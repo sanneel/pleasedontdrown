@@ -243,7 +243,7 @@ namespace PleaseDontDrown.Story
                     if (current != null && guide != null && !string.IsNullOrEmpty(gag.Spotted))
                         StartCoroutine(Comment(guide, say + gag.Spotted, current));
                 }
-                yield return new WaitForSeconds(0.25f);
+                yield return QuarterWait;
             }
             _waveTourists.Remove(saved);
             _progress.Value = 1;
@@ -325,7 +325,7 @@ namespace PleaseDontDrown.Story
             her.ServerMoveTo(hut.Outside.position, 1.7f);
             float giveUp = Time.time + 45f;
             while (her != null && Time.time < giveUp && (her.transform.position - hut.Outside.position).sqrMagnitude > 1.2f * 1.2f)
-                yield return new WaitForSeconds(0.25f);
+                yield return QuarterWait;
             if (her == null || hero == null)
             {
                 if (hero != null) hut.ServerLead(hero, null);
@@ -390,7 +390,7 @@ namespace PleaseDontDrown.Story
                 // Lent while on dry sand: wade in first, the joke needs the water.
                 panicker.ServerMoveTo(shallows, 2.2f, water: true);
                 float until = Time.time + 15f;
-                while (panicker.IsMoving && Time.time < until) yield return new WaitForSeconds(0.3f);
+                while (panicker.IsMoving && Time.time < until) yield return PollWait;
                 panicker.ServerStop();
             }
             Vector3 beach =BeachPointFrom(panicker.transform.position, _island1) + new Vector3(_island1.Shoreward.x, 0f, _island1.Shoreward.z).normalized * 6f;
@@ -411,7 +411,7 @@ namespace PleaseDontDrown.Story
             float nextShout = 0f;
             _talks.Clear();
             panicker.ServerSetTalkable(true, $"Calm {panicker.Name} down");
-            while (StoryNpc.NearestPlayer(panicker.transform.position, 3.5f) == null && !_talks.Exists(t => t.npc == panicker))
+            while (StoryNpc.NearestPlayer(panicker.transform.position, 3.5f) == null && !TalkedTo(panicker))
             {
                 if (Time.time >= nextShout)
                 {
@@ -419,7 +419,7 @@ namespace PleaseDontDrown.Story
                     panicker.ServerShout(shouts[n++ % shouts.Length], true);
                     panicker.ServerGesture(AvatarGesture.Wave, beach);
                 }
-                yield return new WaitForSeconds(0.2f);
+                yield return ShortWait;
             }
             panicker.ServerSetTalkable(false);
             _talks.Clear();

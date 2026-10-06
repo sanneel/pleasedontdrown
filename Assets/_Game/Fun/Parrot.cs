@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PleaseDontDrown.Audio;
 using PleaseDontDrown.Player;
 using PleaseDontDrown.UI;
@@ -190,8 +191,10 @@ namespace PleaseDontDrown.Fun
 
         private bool SomebodyNear(float distance)
         {
-            foreach (PlayerHub p in PlayerHub.All)
+            IReadOnlyList<PlayerHub> players = PlayerHub.All;
+            for (int i = 0; i < players.Count; i++)
             {
+                PlayerHub p = players[i];
                 if (p == null) continue;
                 Vector3 d = p.transform.position + Vector3.up - transform.position;
                 if (new Vector2(d.x, d.z).sqrMagnitude < distance * distance && Mathf.Abs(d.y) < distance + 1f) return true;
