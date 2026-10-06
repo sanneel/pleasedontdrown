@@ -94,7 +94,6 @@ namespace PleaseDontDrown.Story
 
         private readonly List<Beat> _beats = new();
         private int _beatIndex = -1;
-        private Coroutine _runner;
         private bool _running;
         // What the beats wait for (host).
         private readonly HashSet<VictimBrain> _waveTourists = new();
@@ -239,7 +238,7 @@ namespace PleaseDontDrown.Story
             if (_sandy != null && index > 0) StartCoroutine(SandyGoesHome()); // interrupted mid-walk: back to the kiosk
             CleanupActors();
             _running = true;
-            _runner = StartCoroutine(RunFrom(index));
+            StartCoroutine(RunFrom(index));
         }
 
         private IEnumerator RunFrom(int index)

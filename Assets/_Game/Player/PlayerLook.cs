@@ -56,7 +56,6 @@ namespace PleaseDontDrown.Player
         /// <summary>Mouse sensitivity and field of view are the player's settings (options menu): <see cref="LookSettings"/>.</summary>
         public float Sensitivity => LookSettings.Sensitivity;
         public float BaseFov => LookSettings.Fov;
-        public float Yaw => _yaw;
         public float Pitch => _pitch;
         /// <summary>Horizontal facing, used for movement.</summary>
         public Quaternion YawRotation => Quaternion.Euler(0f, _yaw, 0f);

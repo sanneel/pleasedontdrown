@@ -32,7 +32,6 @@ namespace PleaseDontDrown.Editor
                 Export(dir, "punch-swoosh", BeachAudio.PunchSwoosh);
                 Export(dir, "menu-hover", BeachAudio.MenuHover);
                 Export(dir, "menu-select", BeachAudio.MenuSelect);
-                Export(dir, "bird", BeachAudio.Bird);
                 Export(dir, "surf-loop", BeachAudio.Surf);
                 Export(dir, "gun-pistol", ProceduralAudio.Shot(GunSound.Pistol));
                 Export(dir, "gun-rifle", ProceduralAudio.Shot(GunSound.Rifle));

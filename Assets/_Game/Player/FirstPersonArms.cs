@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Items;
 using UnityEngine;
@@ -97,46 +96,20 @@ namespace PleaseDontDrown.Player
                 _bones[i].localPosition = new Vector3(i == 0 ? -0.2f : 0.2f, -0.35f, 0.4f);
                 _bones[i].localRotation = Quaternion.identity;
             }
-            // The modelled hand (Meshy sculpt) when it's there; the code-built one otherwise.
-            FirstPersonHandModel model = FirstPersonHandModel.Load();
-            SetupHand(_left, 0, s, model);
-            SetupHand(_right, 1, s, model);
+            SetupHand(_left, 0, s);
+            SetupHand(_right, 1, s);
 
             var bindposes = new Matrix4x4[_bones.Length];
             _left.Bones.ResetPose();
             _right.Bones.ResetPose();
             Matrix4x4 rootToWorld = _root.localToWorldMatrix;
             for (int i = 0; i < _bones.Length; i++) bindposes[i] = _bones[i].worldToLocalMatrix * rootToWorld;
-            if (model != null)
-            {
-                var vertices = new List<Vector3>();
-                var colors = new List<Color32>();
-                var weights = new List<BoneWeight>();
-                var triangles = new List<int>();
-                Color32 skin = look.SkinColor;
-                model.AddHand(-1f, s * HandSize, bindposes[0].inverse, 0, 2, skin, vertices, colors, weights, triangles);
-                model.AddHand(1f, s * HandSize, bindposes[1].inverse, 1, 2 + HandBones.BoneCount, skin, vertices, colors, weights, triangles);
-                if (_mesh == null) _mesh = new Mesh();
-                _mesh.Clear();
-                _mesh.name = "FirstPersonHands";
-                _mesh.indexFormat = vertices.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
-                _mesh.SetVertices(vertices);
-                _mesh.SetColors(colors);
-                _mesh.SetTriangles(triangles, 0);
-                _mesh.boneWeights = weights.ToArray();
-                _mesh.bindposes = bindposes;
-                _mesh.RecalculateNormals();
-                _mesh.RecalculateBounds();
-            }
-            else
-            {
-                var kit = new AvatarMeshKit();
-                void Use(int index) => kit.SetBone(index, bindposes[index].inverse);
-                // How to Fish's look: chunky low-poly hands with flat, faceted shading (not smooth plastic ones).
-                _left.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f), lowPoly: true);
-                _right.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f), lowPoly: true);
-                _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh, flat: true);
-            }
+            var kit = new AvatarMeshKit();
+            void Use(int index) => kit.SetBone(index, bindposes[index].inverse);
+            // How to Fish's look: chunky low-poly hands with flat, faceted shading (not smooth plastic ones).
+            _left.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f), lowPoly: true);
+            _right.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f), lowPoly: true);
+            _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh, flat: true);
 
             if (_renderer == null)
             {
@@ -176,13 +149,13 @@ namespace PleaseDontDrown.Player
             return _handMaterial;
         }
 
-        private void SetupHand(Hand hand, int wrist, float s, FirstPersonHandModel model)
+        private void SetupHand(Hand hand, int wrist, float s)
         {
             hand.Wrist = _bones[wrist];
             int first = 2 + (hand.Right ? HandBones.BoneCount : 0);
             var reuse = new Transform[HandBones.BoneCount];
             System.Array.Copy(_bones, first, reuse, 0, HandBones.BoneCount);
-            hand.Bones = new HandBones(hand.Wrist, hand.Side, s * HandSize, reuse, model?.Shape);
+            hand.Bones = new HandBones(hand.Wrist, hand.Side, s * HandSize, reuse, null);
             System.Array.Copy(hand.Bones.Bones, 0, _bones, first, HandBones.BoneCount);
             hand.Palm = hand.Wrist.position;
             hand.Rot = _root.rotation;
@@ -253,71 +226,6 @@ namespace PleaseDontDrown.Player
             _punchImpact = new Vector3(0f, 0f, 1f);
         }
 
-        /// <summary>Boxing (camera space; <paramref name="side"/> -1 left fist, +1 right).</summary>
-        private static Vector3 Guard(float side) => new(side * 0.2f, -0.25f, 0.36f);
-
-        private void PunchPath(PunchKind kind, float side, out Vector3 wind, out Vector3 control, out Vector3 impact)
-        {
-            switch (kind)
-            {
-                case PunchKind.Hook:
-                    // Swings out wide and comes round across the middle, elbow up.
-                    wind = new Vector3(side * 0.42f, -0.15f, 0.26f);
-                    control = new Vector3(side * 0.4f, -0.1f, 0.66f);
-                    impact = new Vector3(-side * 0.04f, -0.09f, 0.62f);
-                    break;
-                case PunchKind.Uppercut:
-                    // Dips low, then drives straight up the middle.
-                    wind = new Vector3(side * 0.14f, -0.48f, 0.3f);
-                    control = new Vector3(side * 0.08f, -0.36f, 0.58f);
-                    impact = new Vector3(side * 0.03f, -0.02f, 0.56f);
-                    break;
-                case PunchKind.Overhand:
-                    // Cocked high behind, loops over the top and down.
-                    wind = new Vector3(side * 0.34f, 0.06f, 0.04f);
-                    control = new Vector3(side * 0.26f, 0.14f, 0.52f);
-                    impact = new Vector3(side * 0.02f, -0.12f, 0.68f);
-                    break;
-                default:
-                    // Straight down the pipe, turning over at the end.
-                    wind = new Vector3(side * 0.16f, -0.21f, 0.22f);
-                    impact = new Vector3(side * 0.03f, -0.09f, 0.74f);
-                    control = (wind + impact) * 0.5f;
-                    break;
-            }
-        }
-
-        /// <summary>Where a fist's knuckles point and where its palm faces, for each punch at impact.</summary>
-        private static void PunchOrientation(PunchKind kind, float side, Transform cam, out Vector3 knuckles, out Vector3 palm)
-        {
-            Vector3 f = cam.forward, u = cam.up, r = cam.right;
-            switch (kind)
-            {
-                case PunchKind.Hook:
-                    knuckles = (f - r * (side * 0.8f)).normalized;
-                    palm = -u;
-                    break;
-                case PunchKind.Uppercut:
-                    knuckles = (u + f * 0.35f).normalized;
-                    palm = -f;
-                    break;
-                case PunchKind.Overhand:
-                    knuckles = (f - u * 0.45f).normalized;
-                    palm = (-u - r * (side * 0.4f)).normalized;
-                    break;
-                default:
-                    knuckles = f;
-                    palm = -u;
-                    break;
-            }
-        }
-
-        private static Vector3 Bezier(Vector3 a, Vector3 b, Vector3 c, float t)
-        {
-            float m = 1f - t;
-            return m * m * a + 2f * m * t * b + t * t * c;
-        }
-
         /// <summary>A fist throwing (or recovering from) the current punch, or up in guard. False when not boxing.</summary>
         private bool BoxingPose(Hand hand, Transform cam, out Vector3 palm, out Quaternion rot, out HandPose pose)
         {
@@ -336,7 +244,7 @@ namespace PleaseDontDrown.Player
             float strike = Combat.PlayerCombat.StrikeTime, back = Combat.PlayerCombat.ReturnTime;
             Vector3 restKnuckles = (cam.forward * 0.6f + cam.up * 0.8f).normalized;
             Vector3 restPalm = (-cam.forward * 0.6f - cam.right * (side * 0.7f)).normalized;
-            PunchOrientation(PunchKind.Straight, side, cam, out Vector3 knuckles, out Vector3 palmDir);
+            Vector3 knuckles = cam.forward, palmDir = -cam.up;
             float percent; // 0 at rest .. 1 at the target
             if (since < strike)
             {

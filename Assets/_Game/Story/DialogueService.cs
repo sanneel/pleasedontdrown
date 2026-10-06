@@ -29,7 +29,6 @@ namespace PleaseDontDrown.Story
         public static DialogueService Instance { get; private set; }
         /// <summary>The line on screen now (local).</summary>
         public static DialogueLine? Current { get; private set; }
-        public static IReadOnlyList<DialogueLine> History => _history;
 
         /// <summary>The player's own lines use this speaker name and show as "You".</summary>
         public const string PlayerSpeaker = "@player";

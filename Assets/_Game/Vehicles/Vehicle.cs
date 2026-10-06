@@ -523,8 +523,6 @@ namespace PleaseDontDrown.Vehicles
             return true;
         }
 
-        /// <summary>Where the seated driver's feet go (their root), so the hips land on the seat.</summary>
-        public Vector3 DriverFeetPosition => (_seat != null ? _seat.position : transform.position) - Vector3.up * 0.5f;
 
         // ------------------------------------------------------------------ every frame
 

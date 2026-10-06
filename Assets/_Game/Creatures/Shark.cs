@@ -32,7 +32,6 @@ namespace PleaseDontDrown.Creatures
         private Vector3 _leaveTo;
         private float _leaveUntil;
 
-        public bool IsDone => _mode == Mode.Leave && Time.time > _leaveUntil;
         /// <summary>Host: the shark bit someone.</summary>
         public static event System.Action<Shark, VictimBrain> ServerBit;
 

@@ -152,13 +152,11 @@ namespace PleaseDontDrown.Combat
         public string Kind => _kind;
         public string DisplayName => _item != null ? _item.DisplayName : _kind;
         public string UseLabel => "Shoot";
-        public int Ammo => Local == this ? _localAmmo : _ammo.Value;
         public int MagazineSize => _extended.Value ? _extendedMagazine : _magazine;
         public int Damage => Tier.Damage;
         public int Pellets => _pellets;
         public bool FullAuto => _fullAuto;
         public float Interval => _interval;
-        public bool IsReloading => _reloading;
         public float ReloadProgress => _reloading ? Mathf.Clamp01((Time.time - _reloadStart) / _reloadTime) : 0f;
         public float Aim => _aim;
         /// <summary>Aiming down the sights right now (the player can't sprint meanwhile).</summary>

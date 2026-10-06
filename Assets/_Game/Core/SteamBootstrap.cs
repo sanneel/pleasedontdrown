@@ -64,13 +64,6 @@ namespace PleaseDontDrown.Core
                 : "[Steam] Not available (is the Steam client running?). Offline play still works.");
         }
 
-        public static bool OpenFriendsOverlay()
-        {
-            if (!OverlayAvailable) return false;
-            SteamFriends.ActivateGameOverlay("friends");
-            return true;
-        }
-
         private void OnOverlayChanged(GameOverlayActivated_t data)
         {
             bool open = data.m_bActive != 0;

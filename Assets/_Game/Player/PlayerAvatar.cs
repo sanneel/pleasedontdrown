@@ -34,7 +34,6 @@ namespace PleaseDontDrown.Player
         private bool _bodyRestKnown;
 
         public AvatarRig Rig => _rig;
-        public AvatarAnimator Animator => _animator;
         /// <summary>A remote player is eating (their food sits at their mouth for everyone).</summary>
         public bool RemoteEating => _remoteEating;
 
@@ -132,7 +131,6 @@ namespace PleaseDontDrown.Player
                 m.Swimming = motor.IsSwimming;
                 m.Underwater = motor.IsHeadUnderwater;
                 m.Climbing = motor.IsClimbing;
-                m.Sprinting = motor.IsSprinting;
             }
             else
             {
@@ -145,7 +143,6 @@ namespace PleaseDontDrown.Player
                     _grounded = Mathf.Abs(_velocity.y) < 2.5f && GroundBelow(position, 0.35f);
                 }
                 m.Grounded = _grounded || m.Swimming;
-                m.Sprinting = new Vector2(_velocity.x, _velocity.z).magnitude > 6f;
             }
 
             if (hands != null)
@@ -232,7 +229,7 @@ namespace PleaseDontDrown.Player
                 m.LookPitch = 0f;
                 m.Velocity = Vector3.zero;
                 m.Grounded = false; // (in the air in someone's arms: no feet planted on the sand below)
-                m.Swimming = m.Underwater = m.Climbing = m.Sprinting = false;
+                m.Swimming = m.Underwater = m.Climbing = false;
                 m.Holding = m.TwoHanded = m.CarryingPerson = false;
                 return;
             }

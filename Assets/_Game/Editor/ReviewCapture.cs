@@ -303,7 +303,7 @@ namespace PleaseDontDrown.Editor
             switch (pose)
             {
                 case "walk": m.Velocity = forward * 2.2f; break;
-                case "run": m.Velocity = forward * 7f; m.Sprinting = true; break;
+                case "run": m.Velocity = forward * 7f; break;
                 case "crouch": m.Crouch = 1f; break;
                 case "jump": m.Grounded = false; m.Velocity = forward * 3f; break;
                 case "swim": m.Swimming = true; m.Velocity = forward * 3f; break;

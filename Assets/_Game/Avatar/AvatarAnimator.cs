@@ -23,7 +23,6 @@ namespace PleaseDontDrown.Avatars
         public bool Swimming;
         public bool Underwater;
         public bool Climbing;
-        public bool Sprinting;
         public bool Holding;          // hands on an item (grips below)
         public bool TwoHanded;
         public bool CarryingPerson;

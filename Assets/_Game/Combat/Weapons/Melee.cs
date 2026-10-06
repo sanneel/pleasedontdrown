@@ -59,7 +59,6 @@ namespace PleaseDontDrown.Combat
         private float _inspectStart = -10f;
 
         public string UseLabel => "Stab";
-        public bool IsStriking => _phase != Phase.Idle;
 
         private const float InspectSeconds = 1.6f;
 

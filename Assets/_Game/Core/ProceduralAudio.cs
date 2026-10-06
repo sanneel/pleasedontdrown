@@ -481,7 +481,7 @@ namespace PleaseDontDrown.Core
             });
         }
 
-        private static AudioClip Build(string name, float seconds, System.Func<float, float> wave)
+        internal static AudioClip Build(string name, float seconds, System.Func<float, float> wave)
         {
             int count = Mathf.CeilToInt(seconds * SampleRate);
             var data = new float[count];

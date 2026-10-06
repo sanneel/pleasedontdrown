@@ -205,8 +205,6 @@ namespace PleaseDontDrown.Avatars
             return b;
         }
 
-        /// <summary>Arm/leg thickness multiplier for a body build (first-person arms match the body).</summary>
-        public static float LimbWidthFor(byte build) => BodyFor(build).Limb;
 
         private static Body BodyFor(byte build) => build switch
         {

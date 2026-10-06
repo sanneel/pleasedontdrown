@@ -62,7 +62,6 @@ namespace PleaseDontDrown.Items
         private float _nextRequest;
 
         public int Skin => _skin.Value;
-        public string SkinName => Finishes[Mathf.Clamp(_skin.Value, 0, Finishes.Length - 1)].Name;
 
         /// <summary>The skinnable item in the local player's hands, if any (for the HUD prompt).</summary>
         public static ItemSkin LocalHeld { get; private set; }

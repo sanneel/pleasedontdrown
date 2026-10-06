@@ -7,9 +7,8 @@ namespace PleaseDontDrown.Core
     /// <summary>Original beach foley inspired by the reference game's short, varied sound cues.</summary>
     public static class BeachAudio
     {
-        private const int Rate = 44100;
         private static AudioClip[] _water, _pickup, _swim, _footsteps;
-        private static AudioClip _drop, _throw, _equip, _swoosh, _menu, _hover, _bird, _surf, _dive, _emerge;
+        private static AudioClip _drop, _throw, _equip, _swoosh, _menu, _hover, _surf, _dive, _emerge;
         private static AudioSource _local;
         private static readonly System.Collections.Generic.List<AudioSource> _oneShots = new();
         private static int _waterIndex, _pickupIndex, _swimIndex, _footstepIndex;
@@ -18,7 +17,7 @@ namespace PleaseDontDrown.Core
         private static void Reset()
         {
             _water = _pickup = _swim = _footsteps = null;
-            _drop = _throw = _equip = _swoosh = _menu = _hover = _bird = _surf = _dive = _emerge = null;
+            _drop = _throw = _equip = _swoosh = _menu = _hover = _surf = _dive = _emerge = null;
             _local = null;
             _oneShots.Clear();
             _waterIndex = _pickupIndex = _swimIndex = _footstepIndex = 0;
@@ -67,10 +66,9 @@ namespace PleaseDontDrown.Core
         public static AudioClip Equip => _equip != null ? _equip : _equip = MakeImpact("Equip", 0.25f, 340f, 0.18f);
         public static AudioClip PunchSwoosh => _swoosh != null ? _swoosh : _swoosh = MakeSweep("PunchSwoosh", 0.28f, 81, 0.75f);
         public static AudioClip MenuSelect => _menu != null ? _menu : _menu = MakeChime();
-        public static AudioClip MenuHover => _hover != null ? _hover : _hover = Build("MenuHover", 0.13f, t =>
+        public static AudioClip MenuHover => _hover != null ? _hover : _hover = ProceduralAudio.Build("MenuHover", 0.13f, t =>
             Mathf.Sin(2f * Mathf.PI * (510f * t + 80f * t * t)) *
             Mathf.Sin(Mathf.PI * t / 0.13f) * 0.11f);
-        public static AudioClip Bird => _bird != null ? _bird : _bird = MakeBird();
         public static AudioClip Surf => _surf != null ? _surf : _surf = MakeSurf();
         public static AudioClip Dive => _dive != null ? _dive : _dive = MakeWater(2, 2);
         public static AudioClip Emerge => _emerge != null ? _emerge : _emerge = MakeWater(0, 1);
@@ -124,7 +122,7 @@ namespace PleaseDontDrown.Core
             float length = new[] { 0.55f, 1.05f, 1.55f }[size];
             var rng = new System.Random(190 + size * 17 + variant);
             float low = 0f, high = 0f;
-            return Build($"Water{size}_{variant}", length, t =>
+            return ProceduralAudio.Build($"Water{size}_{variant}", length, t =>
             {
                 float n = (float)(rng.NextDouble() * 2 - 1);
                 low += (n - low) * (0.18f + 0.06f * size);
@@ -150,7 +148,7 @@ namespace PleaseDontDrown.Core
         {
             var rng = new System.Random(511 + variant);
             float filtered = 0f;
-            return Build($"Pickup{variant}", 0.45f, t =>
+            return ProceduralAudio.Build($"Pickup{variant}", 0.45f, t =>
             {
                 float n = (float)(rng.NextDouble() * 2 - 1);
                 filtered += (n - filtered) * 0.25f;
@@ -166,7 +164,7 @@ namespace PleaseDontDrown.Core
             var rng = new System.Random(1010 + surface * 23 + variant);
             float low = 0f;
             float length = surface == 0 ? 0.42f : 0.35f;
-            return Build($"Footstep{surface}_{variant}", length, t =>
+            return ProceduralAudio.Build($"Footstep{surface}_{variant}", length, t =>
             {
                 float n = (float)(rng.NextDouble() * 2 - 1);
                 float cutoff = surface == 0 ? 0.2f : surface == 1 ? 0.32f : 0.65f;
@@ -185,7 +183,7 @@ namespace PleaseDontDrown.Core
         {
             var rng = new System.Random(814 + variant);
             float low = 0f;
-            return Build($"SwimStroke{variant}", 0.63f, t =>
+            return ProceduralAudio.Build($"SwimStroke{variant}", 0.63f, t =>
             {
                 float n = (float)(rng.NextDouble() * 2 - 1);
                 low += (n - low) * 0.17f;
@@ -199,7 +197,7 @@ namespace PleaseDontDrown.Core
         {
             var rng = new System.Random((int)frequency);
             float low = 0f;
-            return Build(name, length, t =>
+            return ProceduralAudio.Build(name, length, t =>
             {
                 float n = (float)(rng.NextDouble() * 2 - 1);
                 low += (n - low) * 0.24f;
@@ -212,7 +210,7 @@ namespace PleaseDontDrown.Core
         {
             var rng = new System.Random(seed);
             float low = 0f;
-            return Build(name, length, t =>
+            return ProceduralAudio.Build(name, length, t =>
             {
                 float n = (float)(rng.NextDouble() * 2 - 1);
                 low += (n - low) * Mathf.Lerp(0.08f, 0.58f, t / length);
@@ -221,19 +219,11 @@ namespace PleaseDontDrown.Core
             });
         }
 
-        private static AudioClip MakeChime() => Build("MenuSelect", 0.27f, t =>
+        private static AudioClip MakeChime() => ProceduralAudio.Build("MenuSelect", 0.27f, t =>
         {
             float ping = Mathf.Sin(2f * Mathf.PI * (680f * t + 180f * t * t));
             float overtone = Mathf.Sin(2f * Mathf.PI * 1240f * t) * 0.26f;
             return (ping + overtone) * Mathf.Exp(-17f * t) * Mathf.Clamp01(t / 0.003f) * 0.22f;
-        });
-
-        private static AudioClip MakeBird() => Build("BeachBird", 0.72f, t =>
-        {
-            float local = t < 0.27f ? t : t - 0.34f;
-            if (local < 0f || local > 0.27f) return 0f;
-            float phase = 1050f * local + 340f * local * local + 35f * Mathf.Sin(local * 37f);
-            return Mathf.Sin(2f * Mathf.PI * phase) * Mathf.Sin(Mathf.PI * local / 0.27f) * 0.16f;
         });
 
         private static AudioClip MakeSurf()
@@ -241,7 +231,7 @@ namespace PleaseDontDrown.Core
             var rng = new System.Random(942);
             float low = 0f, slow = 0f;
             const float length = 12f;
-            return Build("BeachSurfLoop", length, t =>
+            return ProceduralAudio.Build("BeachSurfLoop", length, t =>
             {
                 float n = (float)(rng.NextDouble() * 2 - 1);
                 low += (n - low) * 0.12f;
@@ -252,15 +242,6 @@ namespace PleaseDontDrown.Core
             });
         }
 
-        private static AudioClip Build(string name, float seconds, Func<float, float> wave)
-        {
-            var samples = new float[Mathf.CeilToInt(seconds * Rate)];
-            for (int i = 0; i < samples.Length; i++)
-                samples[i] = Mathf.Clamp(wave(i / (float)Rate), -1f, 1f);
-            AudioClip clip = AudioClip.Create(name, samples.Length, 1, Rate, false);
-            clip.SetData(samples, 0);
-            return clip;
-        }
     }
 
 }

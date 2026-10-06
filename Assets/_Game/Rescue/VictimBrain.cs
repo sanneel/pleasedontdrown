@@ -158,7 +158,6 @@ namespace PleaseDontDrown.Rescue
         public VictimState State => _state.Value;
         public float Air01 => _air.Value;
         public float Panic01 => _panic.Value / 100f;
-        public float Condition01 => _condition.Value;
         public float Cpr01 => _cpr.Value;
         public CprStep NextCprStep => _cprStep.Value;
         /// <summary>How far into the current CPR step (0 = none done yet) and how many it takes.</summary>

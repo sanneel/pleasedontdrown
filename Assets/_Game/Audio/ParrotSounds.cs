@@ -37,16 +37,6 @@ namespace PleaseDontDrown.Audio
         /// <summary>Wings clattering as it takes off.</summary>
         public static AudioClip Flap => _flap != null ? _flap : _flap = MakeFlap();
 
-        private static AudioClip Build(string name, float seconds, Func<float, float> wave)
-        {
-            int n = Mathf.CeilToInt(seconds * SampleRate);
-            var data = new float[n];
-            for (int i = 0; i < n; i++) data[i] = Mathf.Clamp(wave(i / (float)SampleRate), -1f, 1f);
-            AudioClip clip = AudioClip.Create(name, n, 1, SampleRate, false);
-            clip.SetData(data, 0);
-            return clip;
-        }
-
         /// <summary>A raspy voice: a sawtooth with a rough flutter and breath noise, squeezed through a nasal band.</summary>
         private sealed class Voice
         {
@@ -70,7 +60,7 @@ namespace PleaseDontDrown.Audio
         private static AudioClip MakeSquawk(int seed, float pitch)
         {
             var voice = new Voice(seed);
-            return Build($"ParrotSquawk{seed}", 0.62f, t =>
+            return Core.ProceduralAudio.Build($"ParrotSquawk{seed}", 0.62f, t =>
             {
                 // "raa" (short, lower) then "AWK!" (longer, up and falling away)
                 float f, env;
@@ -96,7 +86,7 @@ namespace PleaseDontDrown.Audio
             var voice = new Voice(7);
             float[] tones = { 1.0f, 1.25f, 0.9f, 1.35f, 1.1f, 0.8f };
             const float syllable = 0.15f, gap = 0.04f;
-            return Build("ParrotTalk", tones.Length * (syllable + gap) + 0.1f, t =>
+            return Core.ProceduralAudio.Build("ParrotTalk", tones.Length * (syllable + gap) + 0.1f, t =>
             {
                 int k = Mathf.FloorToInt(t / (syllable + gap));
                 if (k >= tones.Length) return 0f;
@@ -111,7 +101,7 @@ namespace PleaseDontDrown.Audio
         {
             var rng = new System.Random(11);
             float low = 0f;
-            return Build("ParrotFlap", 0.7f, t =>
+            return Core.ProceduralAudio.Build("ParrotFlap", 0.7f, t =>
             {
                 float beat = Mathf.Repeat(t, 0.11f) / 0.11f;
                 float env = Mathf.Exp(-beat * 9f) * (1f - t / 0.7f);

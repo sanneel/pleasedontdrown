@@ -64,7 +64,6 @@ namespace PleaseDontDrown.World.Water
         private static readonly int CenterId = Shader.PropertyToID("_PDD_OceanCenter");
 
         public static bool Exists => _instance != null;
-        public static float BaseLevel => _instance != null ? _instance._waterLevel : float.NegativeInfinity;
 
         /// <summary>Shared wave time in seconds (network clock when connected), wrapped to the loop length.</summary>
         public static float WaveTime

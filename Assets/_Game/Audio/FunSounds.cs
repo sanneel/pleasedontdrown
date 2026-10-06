@@ -17,16 +17,6 @@ namespace PleaseDontDrown.Audio
         private static void ResetStatics() =>
             _bounce = _rim = _swish = _cheer = _slide = _boing = _tweet = _squeak = _oohLow = _oohHigh = _cuckoo = _whoop = null;
 
-        private static AudioClip Build(string name, float seconds, Func<float, float> wave)
-        {
-            int n = Mathf.CeilToInt(seconds * SampleRate);
-            var data = new float[n];
-            for (int i = 0; i < n; i++) data[i] = Mathf.Clamp(wave(i / (float)SampleRate), -1f, 1f);
-            AudioClip clip = AudioClip.Create(name, n, 1, SampleRate, false);
-            clip.SetData(data, 0);
-            return clip;
-        }
-
         private static Func<float> Noise(int seed)
         {
             var rng = new System.Random(seed);
@@ -34,14 +24,14 @@ namespace PleaseDontDrown.Audio
         }
 
         /// <summary>Rubber ball on sand or boards: a hollow thump.</summary>
-        public static AudioClip BallBounce => _bounce != null ? _bounce : _bounce = Build("BallBounce", 0.22f, t =>
+        public static AudioClip BallBounce => _bounce != null ? _bounce : _bounce = Core.ProceduralAudio.Build("BallBounce", 0.22f, t =>
         {
             float f = Mathf.Lerp(180f, 120f, t / 0.22f);
             return (Mathf.Sin(2f * Mathf.PI * f * t) + 0.35f * Mathf.Sin(2f * Mathf.PI * f * 2.7f * t)) * Mathf.Exp(-22f * t) * Mathf.Clamp01(t / 0.002f) * 0.75f;
         });
 
         /// <summary>Ball off the steel rim: a ringing clang.</summary>
-        public static AudioClip Rim => _rim != null ? _rim : _rim = Build("Rim", 0.9f, t =>
+        public static AudioClip Rim => _rim != null ? _rim : _rim = Core.ProceduralAudio.Build("Rim", 0.9f, t =>
         {
             float s = Mathf.Sin(2f * Mathf.PI * 523f * t) * 0.5f + Mathf.Sin(2f * Mathf.PI * 1391f * t) * 0.3f + Mathf.Sin(2f * Mathf.PI * 2207f * t) * 0.2f;
             return s * Mathf.Exp(-6f * t) * Mathf.Clamp01(t / 0.001f) * 0.6f;
@@ -55,7 +45,7 @@ namespace PleaseDontDrown.Audio
                 if (_swish != null) return _swish;
                 Func<float> noise = Noise(7);
                 float low = 0f;
-                return _swish = Build("Swish", 0.45f, t =>
+                return _swish = Core.ProceduralAudio.Build("Swish", 0.45f, t =>
                 {
                     float x = noise();
                     low += (x - low) * 0.25f;
@@ -74,7 +64,7 @@ namespace PleaseDontDrown.Audio
                 Func<float> noise = Noise(31);
                 float band = 0f, band2 = 0f;
                 float[] phases = new float[6];
-                return _cheer = Build("Cheer", 2.2f, t =>
+                return _cheer = Core.ProceduralAudio.Build("Cheer", 2.2f, t =>
                 {
                     float x = noise();
                     band += (x - band) * 0.12f;
@@ -100,7 +90,7 @@ namespace PleaseDontDrown.Audio
             {
                 if (_slide != null) return _slide;
                 float phase = 0f;
-                return _slide = Build("SlideDown", 0.8f, t =>
+                return _slide = Core.ProceduralAudio.Build("SlideDown", 0.8f, t =>
                 {
                     float f = Mathf.Lerp(1400f, 300f, Mathf.Pow(t / 0.8f, 0.7f)) * (1f + 0.02f * Mathf.Sin(t * 40f));
                     phase += 2f * Mathf.PI * f / SampleRate;
@@ -116,7 +106,7 @@ namespace PleaseDontDrown.Audio
             {
                 if (_boing != null) return _boing;
                 float phase = 0f;
-                return _boing = Build("Boing", 0.7f, t =>
+                return _boing = Core.ProceduralAudio.Build("Boing", 0.7f, t =>
                 {
                     float f = 160f * (1f + 0.6f * Mathf.Sin(2f * Mathf.PI * 9f * t) * Mathf.Exp(-3f * t)) + 40f * t;
                     phase += 2f * Mathf.PI * f / SampleRate;
@@ -132,7 +122,7 @@ namespace PleaseDontDrown.Audio
             {
                 if (_tweet != null) return _tweet;
                 float phase = 0f;
-                return _tweet = Build("Tweet", 1.2f, t =>
+                return _tweet = Core.ProceduralAudio.Build("Tweet", 1.2f, t =>
                 {
                     float chirp = Mathf.Repeat(t, 0.3f);
                     float f = 2600f + 1800f * Mathf.Sin(Mathf.PI * chirp / 0.12f) * (chirp < 0.12f ? 1f : 0f);
@@ -150,7 +140,7 @@ namespace PleaseDontDrown.Audio
             {
                 if (_squeak != null) return _squeak;
                 float phase = 0f;
-                return _squeak = Build("Squeak", 0.28f, t =>
+                return _squeak = Core.ProceduralAudio.Build("Squeak", 0.28f, t =>
                 {
                     float f = 900f + 500f * Mathf.Sin(Mathf.PI * t / 0.28f) + 60f * Mathf.Sin(t * 260f);
                     phase += 2f * Mathf.PI * f / SampleRate;
@@ -169,7 +159,7 @@ namespace PleaseDontDrown.Audio
         {
             const float length = 0.75f;
             float phase = 0f;
-            return Build(name, length, t =>
+            return Core.ProceduralAudio.Build(name, length, t =>
             {
                 float u = t / length;
                 float f = f0 * (1f + 0.25f * Mathf.Sin(Mathf.PI * u) - 0.1f * u) * (1f + 0.01f * Mathf.Sin(t * 38f));
@@ -186,7 +176,7 @@ namespace PleaseDontDrown.Audio
         }
 
         /// <summary>A cuckoo clock: cuck-oo.</summary>
-        public static AudioClip Cuckoo => _cuckoo != null ? _cuckoo : _cuckoo = Build("Cuckoo", 0.75f, t =>
+        public static AudioClip Cuckoo => _cuckoo != null ? _cuckoo : _cuckoo = Core.ProceduralAudio.Build("Cuckoo", 0.75f, t =>
         {
             float f = t < 0.32f ? 740f : 587f;
             float local = t < 0.32f ? t : t - 0.38f;
@@ -201,7 +191,7 @@ namespace PleaseDontDrown.Audio
             {
                 if (_whoop != null) return _whoop;
                 float phase = 0f;
-                return _whoop = Build("Whoop", 0.5f, t =>
+                return _whoop = Core.ProceduralAudio.Build("Whoop", 0.5f, t =>
                 {
                     float f = Mathf.Lerp(500f, 1500f, t / 0.5f);
                     phase += 2f * Mathf.PI * f / SampleRate;

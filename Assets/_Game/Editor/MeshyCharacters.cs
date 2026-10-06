@@ -385,7 +385,6 @@ namespace PleaseDontDrown.Editor
             public int VertexCount;
             public Spot EyeL, EyeR, Mouth;
             public bool HasMouth;
-            public float MouthWidth;
         }
 
         /// <summary>A box on the face and the vertices near it (their middle and spread, to carry it to a reshaped face).</summary>
