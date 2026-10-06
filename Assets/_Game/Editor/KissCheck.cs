@@ -67,7 +67,8 @@ namespace PleaseDontDrown.Editor
 
             // The lifeguard kneeling at the chest, facing it.
             var body = new GameObject("KissCheckLifeguard");
-            Vector3 feet = new Vector3(chest.x, spot.y, chest.z - 0.62f);
+            Vector3 kneel = VictimBody.KneelSpot(chest, victim.HeadPosition); // (as PlayerAvatar.KneelBeside puts the body)
+            Vector3 feet = new Vector3(kneel.x, spot.y, kneel.z - 0.62f);
             body.transform.SetPositionAndRotation(feet, Quaternion.identity);
             AvatarLook look = AvatarLook.Lifeguard;
             look.HeadSize = head;
@@ -93,6 +94,20 @@ namespace PleaseDontDrown.Editor
                 Vector3 eye = meet + offset;
                 camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(meet - eye));
                 camera.fieldOfView = fov;
+                Render(camera, $"{name}_{view}");
+            }
+            // And a chest compression a moment later: the hands stacked on the middle of the chest.
+            for (int i = 0; i <= 30; i++) { AvatarAnimator.TimeOverride = 104f + i / 30f; animator.Tick(1f / 30f); }
+            animator.Play(AvatarGesture.Pump, chest);
+            AvatarAnimator.TimeOverride = 105.1f;
+            animator.Tick(1f / 30f);
+            AvatarAnimator.TimeOverride = null;
+            Vector3 pressAt = chest + new Vector3(0f, 0.15f, 0f);
+            foreach ((string view, Vector3 offset) in new[] { ("pump_side", new Vector3(-0.2f, 1.1f, -2.2f)), ("pump_across", new Vector3(0.2f, 1.1f, 2.2f)) })
+            {
+                Vector3 eye = pressAt + offset;
+                camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(pressAt - eye));
+                camera.fieldOfView = 34f;
                 Render(camera, $"{name}_{view}");
             }
             Object.DestroyImmediate(victimObject);

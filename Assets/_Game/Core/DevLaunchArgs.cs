@@ -74,6 +74,14 @@ namespace PleaseDontDrown.Core
                         yield return new WaitForSecondsRealtime(seconds);
                         continue;
                     }
+                    // "waitplayers <n>" holds until n lifeguards are in the game (copies acting a scene together start in step).
+                    if (command.StartsWith("waitplayers ") && int.TryParse(command.Substring(12), out int players))
+                    {
+                        float giveUp = Time.realtimeSinceStartup + 60f;
+                        while (Player.PlayerHub.All.Count < players && Time.realtimeSinceStartup < giveUp)
+                            yield return null;
+                        continue;
+                    }
                     Debug.Log($"[Dev] > {command}");
                     DevCommands.Execute(command);
                 }

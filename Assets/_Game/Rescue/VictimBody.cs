@@ -100,8 +100,25 @@ namespace PleaseDontDrown.Rescue
 
         /// <summary>Where the mouth and nose are: underwater here = no air.</summary>
         public Vector3 HeadPosition => transform.TransformPoint(_headLocal);
-        /// <summary>Middle of the chest, where CPR hands go.</summary>
-        public Vector3 ChestPoint => transform.position + transform.forward * 0.17f + transform.up * 0.12f;
+        /// <summary>
+        /// Middle of the chest, where CPR hands go: on the breastbone over the body's own chest bone (a
+        /// fixed spot from the root put the hands up at the collarbone on some bodies).
+        /// </summary>
+        public Vector3 ChestPoint
+        {
+            get
+            {
+                if (_avatar != null && _avatar.IsBuilt && _avatar[AvatarRig.Bone.Spine] != null && _avatar[AvatarRig.Bone.Chest] != null)
+                    return Vector3.LerpUnclamped(_avatar[AvatarRig.Bone.Spine].position, _avatar[AvatarRig.Bone.Chest].position, 1.05f) + transform.forward * (0.13f * _avatar.Scale);
+                return transform.position + transform.forward * 0.17f + transform.up * 0.12f;
+            }
+        }
+        /// <summary>
+        /// Where a rescuer kneels beside them: level with a point some 40% of the way from the chest to the head, from
+        /// where the hands reach the breastbone and the lips reach theirs.
+        /// </summary>
+        public static Vector3 KneelSpot(Vector3 chest, Vector3 head) => head == Vector3.zero ? chest : Vector3.Lerp(chest, head, 0.42f);
+
         /// <summary>The mouth (rescue breaths).</summary>
         public Vector3 MouthPoint => _avatar != null && _avatar.IsBuilt && _avatar[AvatarRig.Bone.Mouth] != null
             ? _avatar[AvatarRig.Bone.Mouth].position // on the painted lips of whoever this is

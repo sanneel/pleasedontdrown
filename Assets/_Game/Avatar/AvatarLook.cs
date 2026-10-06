@@ -37,7 +37,7 @@ namespace PleaseDontDrown.Avatars
         public byte Figure;       // 0 masculine, 1 feminine (hips, waist, bust with jiggle bones)
         public byte Body;         // 0 code-built from the fields above, else a generated AvatarBody (see AvatarBodies)
         // The funny player body (Bodies.Goofy): 0 is always the model as it was generated.
-        public byte HeadSize;     // HeadSizeNames: normal, big, huge, small
+        public byte HeadSize;     // 0 normal, 3 small (the big sizes 1 and 2 are gone: see Tame)
         public byte Belly;        // BellyNames: normal, round, beach ball, flat
         public byte Nose;         // NoseNames: normal, big, clown, button
         public byte Eyes;         // EyeNames (googly): normal, huge, cross-eyed, tiny pupils
@@ -104,7 +104,25 @@ namespace PleaseDontDrown.Avatars
         public static readonly string[] FigureNames = { "Masculine", "Feminine" };
         public bool Feminine => Figure == 1;
         public static readonly string[] HeightNames = { "Short", "Medium", "Tall", "Very tall" };
-        public static readonly string[] HeadSizeNames = { "Normal", "Big", "HUGE", "Tiny" };
+        public const byte SmallHead = 3;
+        public static string HeadSizeName(byte size) => size == SmallHead ? "Small" : "Normal";
+
+        /// <summary>
+        /// The hats anyone may wear: snug ones only. Big hats (straw, bucket, cowboy, pirate, crown, party hat,
+        /// headphones), like big heads, changed the whole character and got in the way of everything (the kiss of
+        /// life, held things, the camera).
+        /// </summary>
+        public static readonly HatStyle[] Hats =
+            { HatStyle.None, HatStyle.Cap, HatStyle.CapBackwards, HatStyle.Visor, HatStyle.Headband, HatStyle.Bandana, HatStyle.Beanie };
+
+        /// <summary>No big head and no big hat, whatever was saved or sent.</summary>
+        public AvatarLook Tame()
+        {
+            AvatarLook look = this;
+            if (Array.IndexOf(Hats, look.Hat) < 0) look.Hat = HatStyle.None;
+            if (look.HeadSize != SmallHead) look.HeadSize = 0;
+            return look;
+        }
         public static readonly string[] BellyNames = { "Normal", "Round", "Beach ball", "Flat" };
         public static readonly string[] NoseNames = { "Normal", "Big", "Clown", "Button" };
         public static readonly string[] EyeNames = { "Googly", "Huge googly", "Cross-eyed", "Tiny pupils" };
@@ -151,7 +169,7 @@ namespace PleaseDontDrown.Avatars
                 TopColor = (byte)rng.Next(ClothColors.Length),
                 Bottom = (BottomStyle)Pick(rng, 0, 1, 1, 2, 2, 3),
                 BottomColor = (byte)rng.Next(ClothColors.Length),
-                Hat = (HatStyle)Pick(rng, 0, 0, 0, 1, 3, 3, 5, 5, 6, 7),
+                Hat = (HatStyle)Pick(rng, 0, 0, 0, 1, 4, 4, 8, 8, 6, 7),
                 HatColor = (byte)rng.Next(ClothColors.Length),
                 Glasses = (GlassesStyle)Pick(rng, 0, 0, 0, 1, 1, 2, 3),
                 Face = (FacialHair)Pick(rng, 0, 0, 0, 1, 2, 3)
@@ -166,7 +184,7 @@ namespace PleaseDontDrown.Avatars
                 look.Face = FacialHair.None;
                 look.Build = (byte)Pick(rng, 0, 0, 1, 1, 3);
                 look.Bottom = BottomStyle.Trunks;
-                if (look.Hat is HatStyle.Cap or HatStyle.CapBackwards or HatStyle.Bandana) look.Hat = HatStyle.StrawHat;
+                if (look.Hat is HatStyle.Cap or HatStyle.CapBackwards or HatStyle.Bandana) look.Hat = HatStyle.Visor;
             }
             if (look.Top == TopStyle.Swimsuit) look.Face = FacialHair.None;
             if (rng.NextDouble() < 0.3) look.Extras |= AvatarExtras.Floaties;
@@ -185,7 +203,7 @@ namespace PleaseDontDrown.Avatars
             AvatarLook look = RandomTourist(rng.Next());
             // Players are the goofy lifeguard, as silly as the dice say.
             look.Body = Bodies.Goofy;
-            look.HeadSize = (byte)Pick(rng, 0, 0, 1, 2, 3);
+            look.HeadSize = (byte)Pick(rng, 0, 0, 0, SmallHead);
             look.Belly = (byte)rng.Next(4);
             look.Nose = (byte)Pick(rng, 0, 0, 1, 2, 3);
             look.Eyes = (byte)rng.Next(4);
@@ -246,7 +264,7 @@ namespace PleaseDontDrown.Avatars
                 BottomColor = (byte)v[8], Hat = (HatStyle)v[9], HatColor = (byte)v[10], Glasses = (GlassesStyle)v[11],
                 Face = (FacialHair)v[12], Extras = (AvatarExtras)v[13], Figure = (byte)v[14], Body = (byte)v[15],
                 HeadSize = (byte)v[16], Belly = (byte)v[17], Nose = (byte)v[18], Eyes = (byte)v[19], Teeth = (byte)v[20]
-            };
+            }.Tame();
         }
 
         public bool Equals(AvatarLook other) => Pack() == other.Pack();

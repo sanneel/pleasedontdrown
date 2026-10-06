@@ -26,7 +26,7 @@ namespace PleaseDontDrown.Player
         private bool _remoteEating;
         private float _remoteChargeTime;
         private float _lastPumpTime = -10f;
-        private Vector3 _cprPoint;
+        private Vector3 _cprPoint, _kneelPoint; // where the hands press; where the body kneels beside it
         private float _groundCheckAt;
         private bool _grounded = true;
         private Vector3 _kneelShift;      // the body moved over to the tourist it is doing CPR on (the player stays put)
@@ -90,10 +90,11 @@ namespace PleaseDontDrown.Player
         }
 
         /// <summary>A CPR compression by this player on a chest at <paramref name="chest"/>.</summary>
-        public void OnPump(Vector3 chest)
+        public void OnPump(Vector3 chest, Vector3 head = default)
         {
             _lastPumpTime = Time.time;
             _cprPoint = chest;
+            _kneelPoint = Rescue.VictimBody.KneelSpot(chest, head);
             _animator.Play(AvatarGesture.Pump);
         }
 
@@ -225,12 +226,12 @@ namespace PleaseDontDrown.Player
             if (carrier != null)
             {
                 PlayerCarry.HoldPoint(carrier, out float yaw);
-                m.Pose = AvatarPose.Lie;
+                m.Pose = AvatarPose.Carried;
                 m.Mood = AvatarMood.Scared;
-                m.FacingYaw = yaw + 90f;
+                m.FacingYaw = yaw + 180f; // over the shoulder, facing behind us
                 m.LookPitch = 0f;
                 m.Velocity = Vector3.zero;
-                m.Grounded = true;
+                m.Grounded = false; // (in the air in someone's arms: no feet planted on the sand below)
                 m.Swimming = m.Underwater = m.Climbing = m.Sprinting = false;
                 m.Holding = m.TwoHanded = m.CarryingPerson = false;
                 return;
@@ -243,8 +244,10 @@ namespace PleaseDontDrown.Player
             m.TwoHanded = false;
             m.CarryingPerson = true;
             m.Charge = 0f;
-            m.GripLeft = new HandGrip(chest + forward * 0.55f - right * 0.3f - Vector3.up * 0.3f, forward, Vector3.up, HandPose.Carry);
-            m.GripRight = new HandGrip(chest + forward * 0.55f + right * 0.3f - Vector3.up * 0.35f, forward, Vector3.up, HandPose.Carry);
+            // Holding the legs of the one over our shoulder: right arm round the thighs, left hand on a knee below
+            // (higher, it would be under our own chin: PlayerCarry.HoldOffset).
+            m.GripLeft = new HandGrip(chest + forward * 0.32f + right * 0.16f - Vector3.up * 0.47f, -right, -forward, HandPose.Carry);
+            m.GripRight = new HandGrip(chest + forward * 0.24f + right * 0.3f - Vector3.up * 0.12f, -right, -forward, HandPose.Carry);
         }
 
         /// <summary>
@@ -264,7 +267,7 @@ namespace PleaseDontDrown.Player
             Vector3 shift = Vector3.zero;
             if (kneeling)
             {
-                Vector3 to = _cprPoint - position;
+                Vector3 to = _kneelPoint - position;
                 to.y = 0f;
                 float distance = to.magnitude;
                 if (distance > arm) shift = to / distance * Mathf.Min(distance - arm, most);

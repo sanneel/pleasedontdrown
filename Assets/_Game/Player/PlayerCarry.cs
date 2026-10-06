@@ -48,10 +48,14 @@ namespace PleaseDontDrown.Player
         }
 
         /// <summary>Where a carried lifeguard's feet go: across the carrier's arms, lying back, head to the left.</summary>
+        /// <summary>Where the one carried lies, from the carrier's feet (turned with the carrier's look).</summary>
+        public static readonly Vector3 HoldOffset = new(0.17f, 1.04f, 0.04f);
+
         public static Vector3 HoldPoint(PlayerHub carrier, out float yaw)
         {
             yaw = carrier.Head != null ? carrier.Head.eulerAngles.y : carrier.transform.eulerAngles.y;
-            return carrier.transform.position + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0.5f, 0.85f, 0.62f);
+            // (Fireman's carry: their hips on our right shoulder, facing behind us; AvatarPose.Carried.)
+            return carrier.transform.position + Quaternion.Euler(0f, yaw, 0f) * HoldOffset;
         }
 
         private void Awake()

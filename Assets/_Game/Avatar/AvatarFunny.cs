@@ -25,7 +25,7 @@ namespace PleaseDontDrown.Avatars
         public const string NoseBig = "NoseBig", NoseSmall = "NoseSmall";
 
         /// <summary>Head bone scale per <see cref="AvatarLook.HeadSize"/>.</summary>
-        public static readonly float[] HeadScales = { 1f, 1.22f, 1.5f, 0.8f };
+        public static readonly float[] HeadScales = { 1f, 1f, 1f, 0.8f }; // (no big heads any more: AvatarLook.Tame)
 
         private static readonly Color PearlyWhite = new(0.98f, 0.97f, 0.9f), Gold = new(1f, 0.76f, 0.18f), Rotten = new(0.6f, 0.58f, 0.25f);
         private static readonly Color ClownRed = new(0.95f, 0.08f, 0.08f), SunscreenWhite = new(0.97f, 0.97f, 1f);

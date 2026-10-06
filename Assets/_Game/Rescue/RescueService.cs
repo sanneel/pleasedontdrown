@@ -179,10 +179,11 @@ namespace PleaseDontDrown.Rescue
             DevCommands.Register("victim", "[distance] [state] [f|m]", "Spawn a tourist in front of you (default 10 m, distressed, either figure).", VictimCommand, cheat: true, owner: this);
             DevCommands.Register("vset", "<state|air|panic|condition> <value>", "Change the nearest tourist (state: fine distressed panicking drowning unconscious saved lost).",
                 VsetCommand, cheat: true, owner: this);
-            DevCommands.Register("cpr", "[pumps]", "Do CPR on the nearest tourist (automated tests).", args =>
+            DevCommands.Register("cpr", "[pumps] [seconds between]", "Do CPR on the nearest tourist (automated tests).", args =>
             {
                 int pumps = args.Length > 0 ? Mathf.Clamp((int)DevCommands.ParseFloat(args, 0), 1, 40) : 1;
-                StartCoroutine(PumpRoutine(pumps));
+                float gap = args.Length > 1 ? Mathf.Max(0.1f, DevCommands.ParseFloat(args, 1)) : 0.2f;
+                StartCoroutine(PumpRoutine(pumps, gap));
             }, cheat: true, owner: this);
             DevCommands.Register("clearvictims", "", "Remove every tourist.", _ => ClearServer(), cheat: true, owner: this);
             DevCommands.Register("ragdoll", "", "Show where the nearest tourist's limbs point (pose debugging).", _ =>
@@ -255,7 +256,7 @@ namespace PleaseDontDrown.Rescue
                 Despawn(v.gameObject);
         }
 
-        private IEnumerator PumpRoutine(int pumps)
+        private IEnumerator PumpRoutine(int pumps, float gap)
         {
             VictimBrain v = Nearest();
             if (v == null)
@@ -263,10 +264,15 @@ namespace PleaseDontDrown.Rescue
                 DevCommands.Print("no tourists");
                 yield break;
             }
+            float last = -10f;
             for (int i = 0; i < pumps && v != null; i++)
             {
+                // A breath or a slap takes its time (and the host ignores one within 0.45 s of the last press).
+                if (v.NextCprStep != CprStep.Compress && Time.time - last < 0.9f) yield return new WaitForSeconds(0.9f - (Time.time - last));
+                if (v == null) break;
                 v.RequestPump();
-                yield return new WaitForSeconds(0.2f);
+                last = Time.time;
+                yield return new WaitForSeconds(gap);
             }
             if (v != null) DevCommands.Print($"{v.Name}: {v.State}, cpr {v.Cpr01:P0}");
         }

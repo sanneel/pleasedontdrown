@@ -159,6 +159,27 @@ namespace PleaseDontDrown.Player
         private Vector3 _leanPoint;
         private float _leanStart = -10f, _leanLength;
 
+        private Vector3 _kneelChest, _kneelHead;
+        private float _kneelUntil = -10f, _kneel;
+
+        /// <summary>
+        /// Doing CPR: the view kneels beside the chest being pressed (as the body does for everyone else), so our hands
+        /// reach it. From where we stood (up to a couple of metres off), lone hands flew out across the sand and
+        /// covered the face we were giving the kiss of life. Each press keeps us down; we stand up a moment after the last.
+        /// </summary>
+        public void KneelAt(Vector3 chest, Vector3 head)
+        {
+            _kneelChest = chest;
+            _kneelHead = head != Vector3.zero ? head : chest;
+            _kneelUntil = Time.time + 1.4f;
+        }
+
+        /// <summary>Another CPR step (the kiss of life, a slap) on the same chest: stay kneeling.</summary>
+        public void StayKneeling()
+        {
+            if (Time.time < _kneelUntil) _kneelUntil = Time.time + 1.4f;
+        }
+
         /// <summary>
         /// Lean the view right in to a point and back (mouth-to-mouth: the camera goes down to their lips, holds, and
         /// comes back up). The look direction itself doesn't change.
@@ -262,6 +283,25 @@ namespace PleaseDontDrown.Player
 
             _camera.transform.localPosition = _delayedBob + _head.InverseTransformVector(Vector3.up * (settle - ExtraDrop));
             _camera.transform.localRotation = Quaternion.Euler(_fallTilt, 0f, _roll + ExtraRoll);
+
+            // Kneeling for CPR: the eye goes down beside the chest, on our side of them (the look stays ours).
+            _kneel = Mathf.MoveTowards(_kneel, Time.time < _kneelUntil ? 1f : 0f, Time.deltaTime * 3.5f);
+            if (_kneel > 0f)
+            {
+                Vector3 eye = _camera.transform.position;
+                Vector3 along = Vector3.ProjectOnPlane(_kneelHead - _kneelChest, Vector3.up);
+                along = along.sqrMagnitude > 1e-4f ? along.normalized : Vector3.forward;
+                Vector3 side = Vector3.ProjectOnPlane(_head.position - _kneelChest, Vector3.up);
+                side -= along * Vector3.Dot(side, along);
+                side = side.sqrMagnitude > 1e-4f ? side.normalized : Vector3.Cross(Vector3.up, along);
+                Vector3 kneeling = Rescue.VictimBody.KneelSpot(_kneelChest, _kneelHead) + side * 0.6f + Vector3.up * 0.72f;
+                float w = Mathf.SmoothStep(0f, 1f, _kneel);
+                _camera.transform.position = Vector3.Lerp(eye, kneeling, w);
+                // ...and looks down at the chest under our hands (the horizon stays level: they lie across the view).
+                Vector3 at = _kneelChest - along * 0.04f;
+                Quaternion down = Quaternion.LookRotation(at - kneeling, Vector3.up);
+                _camera.transform.rotation = Quaternion.Slerp(_camera.transform.rotation, down, w);
+            }
 
             // Leaning in (mouth-to-mouth): the eye comes down over their face (they lie on their back, face up) to just
             // above the lips, looking down at them, head tipped a little, then back up.

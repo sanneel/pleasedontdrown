@@ -225,10 +225,11 @@ namespace PleaseDontDrown.Player
         private void GestureObservers(AvatarGesture gesture, Vector3 point) => _avatar.OnGesture(gesture, point);
 
         /// <summary>This player pressed a chest for CPR (called on every machine; see VictimBrain).</summary>
-        public void ShowPump(Vector3 chest)
+        public void ShowPump(Vector3 chest, Vector3 head = default)
         {
-            _avatar.OnPump(chest);
+            _avatar.OnPump(chest, head);
             if (_arms != null) _arms.OnPump(chest);
+            if (IsOwner && Look != null) Look.KneelAt(chest, head); // our own view kneels beside them
         }
 
         /// <summary>The other CPR steps: a rescue breath at the mouth, or a punch to the face (every machine).</summary>
@@ -242,7 +243,11 @@ namespace PleaseDontDrown.Player
                 else _arms.Play(gesture, point);
             }
             // Mouth-to-mouth in first person: our view goes right down to their lips and back.
-            if (IsOwner && step == Rescue.CprStep.Breath && Look != null) Look.LeanIn(point, 1.1f);
+            if (IsOwner && Look != null)
+            {
+                Look.StayKneeling();
+                if (step == Rescue.CprStep.Breath) Look.LeanIn(point, 1.1f);
+            }
         }
 
         [ServerRpc]

@@ -502,13 +502,14 @@ namespace PleaseDontDrown.Vehicles
         public bool GetGrips(PlayerHub player, out HandGrip left, out HandGrip right)
         {
             int index = SeatIndexOf(player);
-            if (index <= 0) return GetHandlebars(out left, out right);
+            if (index <= 0 && !_straddle) return GetHandlebars(out left, out right);
             left = right = default;
-            Transform seat = SeatTransform(index);
-            Transform gl = seat.Find("GripLeft"), gr = seat.Find("GripRight");
+            Transform seat = SeatTransform(Mathf.Max(0, index));
+            Transform gl = index <= 0 ? _gripLeft : seat.Find("GripLeft"), gr = index <= 0 ? _gripRight : seat.Find("GripRight");
             if (gl == null || gr == null) return false;
-            left = new HandGrip(gl.position, gl.forward, -gl.up, HandPose.LooseFist);
-            right = new HandGrip(gr.position, gr.forward, -gr.up, HandPose.LooseFist);
+            // A tight fist round the handle (a loose one left the fingers splayed over it like a claw).
+            left = new HandGrip(gl.position, gl.forward, -gl.up, HandPose.Fist);
+            right = new HandGrip(gr.position, gr.forward, -gr.up, HandPose.Fist);
             return true;
         }
 

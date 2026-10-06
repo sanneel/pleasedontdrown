@@ -52,6 +52,13 @@ namespace PleaseDontDrown.Editor
                     SpawnAvatar(p);
                     continue;
                 }
+                if (p[0] == "clear")
+                {
+                    // Everyone posed so far goes: the next poses can stand on the same spot.
+                    foreach (GameObject spawned in Spawned) if (spawned != null) Object.DestroyImmediate(spawned);
+                    Spawned.Clear();
+                    continue;
+                }
                 if (p[0] == "fphands")
                 {
                     // A trailing "nogun" hides the item, to look at the hands alone.
@@ -218,6 +225,8 @@ namespace PleaseDontDrown.Editor
             return look;
         }
 
+        private static readonly System.Collections.Generic.List<GameObject> Spawned = new();
+
         private static void SpawnAvatar(string[] p)
         {
             float F(int k) => float.Parse(p[k], CultureInfo.InvariantCulture);
@@ -241,6 +250,7 @@ namespace PleaseDontDrown.Editor
             };
             AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
             var go = new GameObject("ReviewAvatar");
+            Spawned.Add(go);
             // y "g": standing on whatever ground is there (slopes, steps).
             float groundY = 0f;
             if (p[3] == "g")
@@ -276,6 +286,20 @@ namespace PleaseDontDrown.Editor
             var m = new AvatarMotion { FacingYaw = yaw, Grounded = true };
             Vector3 chest = go.transform.position + Vector3.up * 1.2f;
             if (p[3] == "g") Debug.Log($"[Review] avatar {p[1]} on the ground at y {groundY:0.00}");
+            // "ride:N": on seat N of the banana boat exactly as in the game (Vehicle.GlueDriver puts the feet half a
+            // metre under the seat; Vehicle.GetGrips puts the fists on its handles). The x y z yaw given are ignored.
+            if (pose.StartsWith("ride:") && RideSeat(int.Parse(pose.Substring(5)), out Transform rideSeat, out Transform rideL, out Transform rideR))
+            {
+                yaw = rideSeat.eulerAngles.y;
+                forward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+                go.transform.SetPositionAndRotation(rideSeat.position - Vector3.up * 0.5f, Quaternion.Euler(0f, yaw, 0f));
+                m.FacingYaw = yaw;
+                m.Seated = m.Straddle = true;
+                m.Holding = m.TwoHanded = true;
+                m.GripLeft = new HandGrip(rideL.position, rideL.forward, -rideL.up, HandPose.Fist);
+                m.GripRight = new HandGrip(rideR.position, rideR.forward, -rideR.up, HandPose.Fist);
+                pose = "ride";
+            }
             switch (pose)
             {
                 case "walk": m.Velocity = forward * 2.2f; break;
@@ -292,10 +316,22 @@ namespace PleaseDontDrown.Editor
                     m.GripRight = new HandGrip(chest + forward * 0.5f + go.transform.right * 0.3f, forward, -go.transform.right, HandPose.BoxGrip);
                     break;
                 case "carry":
+                case "carrypair":
+                    // As PlayerAvatar.CarryPoses: arms out under a lifeguard lying across them.
                     m.Holding = true; m.CarryingPerson = true;
-                    m.GripLeft = new HandGrip(chest + forward * 0.45f - go.transform.right * 0.3f - Vector3.up * 0.2f, forward, Vector3.up, HandPose.Carry);
-                    m.GripRight = new HandGrip(chest + forward * 0.45f + go.transform.right * 0.3f - Vector3.up * 0.25f, forward, Vector3.up, HandPose.Carry);
+                    Vector3 r = go.transform.right;
+                    m.GripLeft = new HandGrip(chest + forward * 0.32f + r * 0.16f - Vector3.up * 0.47f, -r, -forward, HandPose.Carry);
+                    m.GripRight = new HandGrip(chest + forward * 0.24f + r * 0.3f - Vector3.up * 0.12f, -r, -forward, HandPose.Carry);
+                    if (pose == "carrypair")
+                    {
+                        // ...and the one carried, lying back where PlayerCarry.HoldPoint puts them, head to the left.
+                        Vector3 inArms = go.transform.position + Quaternion.Euler(0f, yaw, 0f) * Player.PlayerCarry.HoldOffset;
+                        SpawnAvatar(new[] { "avatar", p[1], inArms.x.ToString(CultureInfo.InvariantCulture), inArms.y.ToString(CultureInfo.InvariantCulture),
+                            inArms.z.ToString(CultureInfo.InvariantCulture), (yaw + 180f).ToString(CultureInfo.InvariantCulture), "carried" });
+                    }
                     break;
+                case "carried": m.Pose = AvatarPose.Carried; m.Mood = AvatarMood.Scared; m.Grounded = false; break;
+                case "pump": m.Cpr = true; m.CprPoint = go.transform.position + forward * 0.6f + Vector3.up * 0.2f; break;
                 case "charge": m.Charge = 1f; break;
                 case "eat": m.Eating = true; break;
                 case "kiss":
@@ -364,12 +400,12 @@ namespace PleaseDontDrown.Editor
             {
                 "throw" => AvatarGesture.Throw, "wave" => AvatarGesture.Wave, "interact" => AvatarGesture.Interact, "punch" => AvatarGesture.Punch,
                 "kiss" => AvatarGesture.Breath, "zap" => AvatarGesture.Zap, "shoot" => AvatarGesture.Shoot, "jumpshot" => AvatarGesture.JumpShot,
-                _ => AvatarGesture.None
+                "pump" => AvatarGesture.Pump, _ => AvatarGesture.None
             };
             if (gesture != AvatarGesture.None)
             {
                 // Caught part-way through (the punch at full reach, the kiss with the lips down).
-                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Breath => 0.55f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, AvatarGesture.JumpShot => 0.3f, _ => 0.12f };
+                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Breath => 0.55f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, AvatarGesture.JumpShot => 0.3f, AvatarGesture.Pump => 0.06f, _ => 0.12f };
                 float now = AvatarAnimator.TimeOverride ?? 103f;
                 AvatarAnimator.TimeOverride = now;
                 Vector3 point = gesture switch
@@ -389,6 +425,37 @@ namespace PleaseDontDrown.Editor
                 rig.LeftHand?.Pose(HandPose.Fist);
                 rig.RightHand?.Pose(HandPose.Fist);
             }
+        }
+
+        /// <summary>Seat N of the banana boat in the scene (0 the front) and the handles its rider holds.</summary>
+        private static bool RideSeat(int index, out Transform seat, out Transform gripL, out Transform gripR)
+        {
+            seat = gripL = gripR = null;
+            foreach (Vehicles.Vehicle v in Object.FindObjectsByType<Vehicles.Vehicle>(FindObjectsSortMode.None))
+            {
+                if (!v.Straddle) continue;
+                Transform root = v.transform;
+                if (index == 0)
+                {
+                    seat = root.Find("Seat");
+                    gripL = root.Find("GripLeft");
+                    gripR = root.Find("GripRight");
+                }
+                else
+                {
+                    int k = 0;
+                    foreach (Transform child in root)
+                        if (child.name == "BackSeat" && ++k == index)
+                        {
+                            seat = child;
+                            gripL = child.Find("GripLeft");
+                            gripR = child.Find("GripRight");
+                        }
+                }
+                if (seat != null && gripL != null && gripR != null) return true;
+            }
+            Debug.LogError($"[Review] no banana seat {index}");
+            return false;
         }
 
         private static AvatarPose? PoseByName(string name) => name switch

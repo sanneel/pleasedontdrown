@@ -71,6 +71,22 @@ namespace PleaseDontDrown.Editor
             AssetDatabase.SaveAssets();
         }
 
+        /// <summary>Re-bake only the players' goofy lifeguard (its hands, say), keeping every other body as it is.</summary>
+        public static void BakeGoofy()
+        {
+            try
+            {
+                foreach (var (id, name, file) in Bodies.Where(b => b.file == "goofy"))
+                    Bake($"{SourceDir}/{file}.glb", id, name, file);
+                AssetDatabase.SaveAssets();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Build] goofy bake FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         /// <summary>Bakes every body whose GLB is present and writes the library the game loads.</summary>
         public static void BakeAll()
         {
@@ -226,7 +242,15 @@ namespace PleaseDontDrown.Editor
             float over = middle.Count > 0 ? Percentile(middle, 0.98f) - hi : 0f;
             float under = middle.Count > 0 ? lo - Percentile(middle, 0.02f) : 0f;
             float sign;
-            if (Mathf.Max(over, under) > 0.006f) sign = over >= under ? 1f : -1f;
+            if (Mathf.Max(over, under) > 0.015f) sign = over >= under ? 1f : -1f;
+            else if (Mathf.Max(over, under) > 0.006f)
+            {
+                // A thumb that barely shows (the goofy lifeguard's cartoon hand: 8 mm) can't be told from a lumpy
+                // finger: read that way, it put the palm on the back of the hand and every grip bent the fingers
+                // backwards into a splayed starfish. These models face +z, so the thumb points forward.
+                sign = Vector3.Dot(wide, Vector3.forward) >= 0f ? 1f : -1f;
+                Debug.Log($"[Build] body {file}: {which} thumb only {Mathf.Max(over, under):0.000} m out, taking it to point forward");
+            }
             else
             {
                 // No thumb to be seen: take it to point away from the body (palms forward), as these models stand.

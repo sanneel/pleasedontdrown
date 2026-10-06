@@ -201,7 +201,11 @@ namespace PleaseDontDrown.UI
             if (goofy)
             {
                 // The goofy lifeguard: shape and face first (that's the fun), then colours and things to wear.
-                changed |= Row(x, ref y, "HEAD", AvatarLook.HeadSizeNames[look.HeadSize & 3], ref look.HeadSize, 4);
+                if (Arrows(x, ref y, "HEAD", AvatarLook.HeadSizeName(look.HeadSize)) != 0)
+                {
+                    look.HeadSize = look.HeadSize == AvatarLook.SmallHead ? (byte)0 : AvatarLook.SmallHead;
+                    changed = true;
+                }
                 changed |= Row(x, ref y, "BELLY", AvatarLook.BellyNames[look.Belly & 3], ref look.Belly, 4);
                 changed |= Row(x, ref y, "NOSE", AvatarLook.NoseNames[look.Nose & 3], ref look.Nose, 4);
                 changed |= Row(x, ref y, "EYES", AvatarLook.EyeNames[look.Eyes & 3], ref look.Eyes, 4);
@@ -210,7 +214,7 @@ namespace PleaseDontDrown.UI
                 changed |= ColorRow(x, ref y, "HAIR COLOUR", ref look.HairColor, AvatarLook.HairColors);
                 changed |= ColorRow(x, ref y, "TOP COLOUR", ref look.TopColor, AvatarLook.ClothColors);
                 changed |= ColorRow(x, ref y, "SHORTS COLOUR", ref look.BottomColor, AvatarLook.ClothColors);
-                changed |= EnumRow(x, ref y, "HAT", ref look.Hat);
+                changed |= HatRow(x, ref y, ref look.Hat);
                 changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
                 changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
                 changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
@@ -229,7 +233,7 @@ namespace PleaseDontDrown.UI
                 changed |= ColorRow(x, ref y, "TOP COLOUR", ref look.TopColor, AvatarLook.ClothColors);
                 changed |= EnumRow(x, ref y, "SHORTS", ref look.Bottom);
                 changed |= ColorRow(x, ref y, "SHORTS COLOUR", ref look.BottomColor, AvatarLook.ClothColors);
-                changed |= EnumRow(x, ref y, "HAT", ref look.Hat);
+                changed |= HatRow(x, ref y, ref look.Hat);
                 changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
                 changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
                 changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
@@ -265,6 +269,17 @@ namespace PleaseDontDrown.UI
             int dir = Arrows(x, ref y, label, value);
             if (dir == 0) return false;
             field = (byte)((field + dir + count) % count);
+            return true;
+        }
+
+        /// <summary>Only the snug hats (AvatarLook.Hats).</summary>
+        private static bool HatRow(float x, ref float y, ref HatStyle hat)
+        {
+            HatStyle[] hats = AvatarLook.Hats;
+            int index = Mathf.Max(0, Array.IndexOf(hats, hat));
+            int dir = Arrows(x, ref y, "HAT", EnumValues<HatStyle>.Names[Array.IndexOf(EnumValues<HatStyle>.All, hats[index])]);
+            if (dir == 0) return false;
+            hat = hats[(index + dir + hats.Length) % hats.Length];
             return true;
         }
 
