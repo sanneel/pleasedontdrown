@@ -209,7 +209,7 @@ namespace PleaseDontDrown.Story
             if (_dark <= 0.001f) return;
             Hud.Fill(new Rect(0f, 0f, Hud.Width, Hud.Height), new Color(0f, 0f, 0f, _dark));
             if (_dark > 0.9f)
-                Hud.Label(new Rect(0f, Hud.Height * 0.45f, Hud.Width, 80f), "*the door is shut. what happens in the hut stays in the hut.*", 30f,
+                Hud.Label(new Rect(0f, Hud.Height * 0.45f, Hud.Width, 80f), "*the toilet door is locked. what happens in the toilets stays in the toilets.*", 30f,
                     new Color(1f, 0.85f, 0.9f, (_dark - 0.9f) * 10f));
         }
     }

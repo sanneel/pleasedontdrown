@@ -31,6 +31,10 @@ PAINT = {  # sRGB, all matte
     "husk": (0.47, 0.3, 0.17), "husk_dark": (0.22, 0.13, 0.08), "husk_light": (0.62, 0.45, 0.28),
     "rock": (0.52, 0.52, 0.54), "rock_dark": (0.36, 0.37, 0.4), "rock_light": (0.66, 0.65, 0.64), "moss": (0.35, 0.5, 0.3),
     "cloth": (0.9, 0.9, 0.9), "seat": (0.8, 0.3, 0.25), "cream": (0.96, 0.93, 0.84), "dial": (0.12, 0.2, 0.36),
+    "straw": (0.86, 0.72, 0.42), "straw_dark": (0.66, 0.52, 0.28), "straw_light": (0.94, 0.83, 0.55),
+    "bamboo": (0.82, 0.7, 0.42), "bamboo_dark": (0.6, 0.48, 0.25), "teal_dark": (0.08, 0.45, 0.47),
+    "bottle_green": (0.18, 0.5, 0.25), "bottle_amber": (0.7, 0.4, 0.1), "bottle_blue": (0.2, 0.42, 0.75),
+    "chalk": (0.15, 0.2, 0.18),
 }
 
 def srgb_to_linear(c): return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
@@ -92,6 +96,26 @@ def paint(ob, pick):
         if name not in slots:
             ob.data.materials.append(material(name)); slots[name] = len(ob.data.materials) - 1
         p.material_index = slots[name]
+
+def text3d(name, s, centre, height, depth, mat, face='+z'):
+    """Raised lettering (Blender's own font), centred on centre (Unity space), capitals height tall, depth thick,
+    reading left to right for someone looking at the face it is on ('+z': seen from +z, '-x': seen from -x)."""
+    cu = bpy.data.curves.new(name, 'FONT'); cu.body = s; cu.extrude = depth / 2; cu.align_x = 'CENTER'; cu.align_y = 'CENTER'
+    cu.size = height * 1.38  # (capitals are about 0.72 of the font size)
+    ob = bpy.data.objects.new(name, cu); bpy.context.scene.collection.objects.link(ob)
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.convert(target='MESH')
+    ob = bpy.context.view_layer.objects.active
+    # The font lies in Blender's XY plane facing +Z: stand it up facing the wanted Unity direction.
+    turns = {'+z': (math.radians(90), 0, 0), '-z': (math.radians(90), 0, math.radians(180)),
+             '+x': (math.radians(90), 0, math.radians(-90)), '-x': (math.radians(90), 0, math.radians(90))}
+    ob.rotation_euler = turns[face]
+    ob.location = B(centre)
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    ob.data.materials.clear(); ob.data.materials.append(material(mat))
+    parts.append(ob)
+    return ob
 
 def box(name, centre, size, mat, rot=(0, 0, 0), bevel=0.004, segments=1):
     hx, hy, hz = size[0] / 2, size[1] / 2, size[2] / 2
@@ -773,6 +797,199 @@ def beach_hut():
     box("Mat", (0, H0 + 0.005, W - 0.35), (0.8, 0.01, 0.45), "pink", bevel=0)
 
 @prop
+def beach_toilets():
+    """Island 1's public toilets (local: floor centre at the origin, the doors face +z): a whitewashed block with a
+    teal skirting band, two cubicles under a sloping plank roof with a deep overhang, a TOILETS board over the
+    doors, little-woman and little-man plates, vent slats up high, a hand basin and mirror on the right-hand wall
+    and a bin. The left doorway (x -1.6..-0.7, 2.1 m tall) is open: the scene builder hangs a real door in it. The
+    right-hand cubicle's door is part of the model, shut, its tag turned to OCCUPIED."""
+    W, D, H0, H1 = 2.3, 1.35, 0.15, 2.5
+    box("Slab", (0, H0 / 2, 0.15), (2 * W + 0.5, H0, 2 * D + 0.6), "concrete", bevel=0.02)
+    t = 0.14
+    def wall_x(name, x, z0, z1, y0, y1, mat="cream"):
+        box(name, (x, (y0 + y1) / 2, (z0 + z1) / 2), (t, y1 - y0, z1 - z0), mat, bevel=0.01)
+    def wall_z(name, z, x0, x1, y0, y1, mat="cream"):
+        box(name, ((x0 + x1) / 2, (y0 + y1) / 2, z), (x1 - x0, y1 - y0, t), mat, bevel=0.01)
+    wall_z("Back", -D, -W, W, H0, H1)
+    wall_x("Left", -W, -D, D, H0, H1)
+    wall_x("Right", W, -D, D, H0, H1)
+    wall_x("Middle", 0, -D, D, H0, H1)
+    door_top = H0 + 2.1
+    for name, x0, x1 in (("FrontL", -W, -1.6), ("FrontM", -0.7, 0.7), ("FrontR", 1.6, W)):
+        wall_z(name, D, x0, x1, H0, H1)
+    wall_z("LintelL", D, -1.6, -0.7, door_top, H1)
+    wall_z("LintelR", D, 0.7, 1.6, door_top, H1)
+    # A teal skirting band round the outside, and door frames.
+    for name, c, s in (("BandFront", (0, 0.55, D + 0.075), (2 * W + 0.16, 0.8, 0.02)), ("BandBack", (0, 0.55, -D - 0.075), (2 * W + 0.16, 0.8, 0.02)),
+                       ("BandLeft", (-W - 0.075, 0.55, 0), (0.02, 0.8, 2 * D + 0.16)), ("BandRight", (W + 0.075, 0.55, 0), (0.02, 0.8, 2 * D + 0.16))):
+        if name == "BandFront":
+            for k, (x0, x1) in enumerate(((-W - 0.08, -1.6), (-0.7, 0.7), (1.6, W + 0.08))):
+                box(f"{name}{k}", ((x0 + x1) / 2, 0.55, D + 0.075), (x1 - x0, 0.8, 0.02), "teal", bevel=0.004)
+            continue
+        box(name, c, s, "teal", bevel=0.004)
+    for cx in (-1.15, 1.15):
+        for side in (-1, 1):
+            box(f"Jamb{cx}{side}", (cx + side * 0.48, H0 + 1.05, D + 0.08), (0.07, 2.12, 0.05), "teal_dark", bevel=0.008)
+        box(f"Head{cx}", (cx, door_top + 0.04, D + 0.08), (1.03, 0.08, 0.05), "teal_dark", bevel=0.008)
+    # The right-hand door: shut, planked, with its OCCUPIED tag.
+    for i in range(5):
+        box(f"ShutPlank{i}", (0.7 + 0.09 + i * 0.18, H0 + 1.05, D + 0.02), (0.17, 2.08, 0.04), "teal", bevel=0.006)
+    box("ShutKnob", (1.52, H0 + 1.0, D + 0.065), (0.05, 0.05, 0.05), "steel", bevel=0.015)
+    box("TagPlate", (1.15, H0 + 1.35, D + 0.055), (0.4, 0.1, 0.015), "white", bevel=0.004)
+    text3d("TagText", "OCCUPIED", (1.15, H0 + 1.35, D + 0.066), 0.05, 0.006, "red")
+    # Little-woman and little-man plates on the wall beside each door.
+    def figure(cx, cy, z, dress):
+        lathe(f"FigHead{cx}", (cx, cy + 0.11, z), [(0.0, -0.006), (0.032, -0.006), (0.032, 0.006), (0.0, 0.006)], "dark", seg=16, axis='z')
+        if dress:
+            prism(f"Dress{cx}", [(-0.055, -0.05), (0.055, -0.05), (0.022, 0.07), (-0.022, 0.07)], z - 0.006, z + 0.006, "dark", plane='xy', centre=(cx, cy - 0.01, 0))
+        else:
+            box(f"Body{cx}", (cx, cy, z), (0.06, 0.12, 0.012), "dark", bevel=0.003)
+        box(f"LegL{cx}", (cx - 0.016, cy - 0.1, z), (0.022, 0.09, 0.012), "dark", bevel=0)
+        box(f"LegR{cx}", (cx + 0.016, cy - 0.1, z), (0.022, 0.09, 0.012), "dark", bevel=0)
+    box("PlateL", (-1.95, 1.55, D + 0.08), (0.24, 0.32, 0.02), "white", bevel=0.01)
+    figure(-1.95, 1.56, D + 0.095, True)
+    box("PlateR", (1.95, 1.55, D + 0.08), (0.24, 0.32, 0.02), "white", bevel=0.01)
+    figure(1.95, 1.56, D + 0.095, False)
+    # Vent slats up high in the front.
+    for i, x in enumerate((-0.35, 0.35)):
+        box(f"VentFrame{i}", (x, H1 - 0.22, D + 0.075), (0.5, 0.24, 0.02), "teal_dark", bevel=0.004)
+        for k in range(4):
+            box(f"Slat{i}{k}", (x, H1 - 0.3 + k * 0.055, D + 0.09), (0.46, 0.03, 0.02), "white", rot=(-25, 0, 0), bevel=0.002)
+    # The roof: planks sloping down to the back, a deep overhang over the doors, a fascia board.
+    over, rise = 0.65, 0.25
+    slope = math.degrees(math.atan2(rise, 2 * D + over + 0.2))
+    for i in range(16):
+        x = -W - 0.2 + (i + 0.5) * (2 * W + 0.4) / 16
+        box(f"RoofPlank{i}", (x, H1 + rise / 2 + 0.06, over / 2), ((2 * W + 0.4) / 16 - 0.012, 0.06, 2 * D + over + 0.3),
+            "wood_light" if i % 3 else "wood", rot=(-slope, 0, 0), bevel=0.006)
+    for side in (-1, 1):
+        box(f"Beam{side}", (side * (W - 0.1), H1 + 0.04, over / 2), (0.12, 0.1, 2 * D + over + 0.25), "wood_dark", rot=(-slope, 0, 0), bevel=0.01)
+    box("Fascia", (0, H1 + rise + 0.03, D + over + 0.12), (2 * W + 0.45, 0.18, 0.05), "teal_dark", bevel=0.01)
+    for side in (-1, 1):
+        box(f"Bracket{side}", (side * (W - 0.15), H1 - 0.1, D + over * 0.5), (0.08, 0.5, 0.08), "wood_dark", rot=(40, 0, 0), bevel=0.008)
+    # The TOILETS board on the wall between the doors (under the overhang it would hide in the shade).
+    box("Board", (0, 1.85, D + 0.1), (1.25, 0.32, 0.05), "white", bevel=0.015)
+    text3d("BoardText", "TOILETS", (0, 1.85, D + 0.13), 0.17, 0.02, "teal_dark")
+    # Hand basin and mirror on the right-hand outside wall, a bin beside it.
+    bx = W + 0.075
+    lathe("Basin", (bx + 0.22, 0.85, 0.3), [(0.0, -0.08), (0.17, -0.08), (0.2, 0.05), (0.17, 0.06), (0.0, -0.04)], "white", seg=20)
+    box("BasinPost", (bx + 0.2, 0.42, 0.3), (0.1, 0.78, 0.1), "white", bevel=0.01)
+    box("Tap", (bx + 0.06, 1.0, 0.3), (0.12, 0.03, 0.03), "steel", bevel=0.008)
+    box("TapRiser", (bx + 0.02, 0.95, 0.3), (0.03, 0.1, 0.03), "steel", bevel=0.008)
+    box("MirrorFrame", (bx + 0.012, 1.55, 0.3), (0.02, 0.5, 0.4), "teal_dark", bevel=0.006)
+    box("Mirror", (bx + 0.025, 1.55, 0.3), (0.012, 0.42, 0.32), "glass", bevel=0.002)
+    lathe("Bin", (bx + 0.35, 0.0, -0.55), [(0.0, 0.0), (0.2, 0.0), (0.22, 0.62), (0.24, 0.66), (0.0, 0.66)], "green", seg=18)
+    lathe("BinLid", (bx + 0.35, 0.66, -0.55), [(0.0, 0.0), (0.25, 0.0), (0.25, 0.04), (0.0, 0.08)], "teal_dark", seg=18)
+    box("Step", (-1.15, 0.05, D + 0.5), (1.0, 0.1, 0.32), "concrete", bevel=0.01)
+
+
+@prop
+def beach_bar():
+    """Island 1's beach bar (local: floor centre at the origin, the counter and stools face +z): a plank deck, four
+    bamboo posts under a shaggy thatched roof, a bamboo-fronted counter with a dark wood top, a back shelf of
+    bottles, four stools, a BEACH BAR board on the roof and a string of coloured bulbs along the front eave."""
+    rng = random.Random(11)
+    W, D, H0 = 2.1, 1.5, 0.15
+    box("Deck", (0, H0 / 2, 0), (2 * W + 0.4, H0, 2 * D + 0.4), "wood", bevel=0.015)
+    for i in range(12):
+        z = -D - 0.1 + (i + 0.5) * (2 * D + 0.2) / 12
+        box(f"DeckBoard{i}", (0, H0 + 0.004, z), (2 * W + 0.35, 0.008, (2 * D + 0.2) / 12 - 0.02), "wood_light" if i % 2 else "wood", bevel=0)
+    top = 2.55
+    def bamboo(name, x, z, y0, y1, r=0.07):
+        lathe(name, (x, y0, z), [(0.0, 0.0), (r, 0.0), (r, y1 - y0), (0.0, y1 - y0)], "bamboo", seg=10)
+        n = int((y1 - y0) / 0.45)
+        for k in range(1, n + 1):
+            yk = y0 + k * (y1 - y0) / (n + 1)
+            lathe(f"{name}Ring{k}", (x, yk - 0.02, z), [(0.0, 0.0), (r + 0.012, 0.0), (r + 0.012, 0.04), (0.0, 0.04)], "bamboo_dark", seg=10)
+    for i, (x, z) in enumerate(((-W, -D), (W, -D), (-W, D), (W, D))):
+        bamboo(f"Post{i}", x, z, H0, top + 0.1, 0.08)
+    # The counter along the front: bamboo canes on its face, a thick dark top overhanging both sides.
+    cz, ch = D - 0.35, 1.1
+    for i in range(30):
+        x = -W + 0.15 + i * (2 * W - 0.3) / 29
+        lathe(f"Cane{i}", (x, H0, cz + 0.22), [(0.0, 0.0), (0.045, 0.0), (0.045, ch - H0 - 0.06), (0.0, ch - H0 - 0.06)], "bamboo" if i % 2 else "bamboo_dark", seg=8)
+    box("CounterBody", (0, (H0 + ch) / 2, cz), (2 * W - 0.2, ch - H0, 0.4), "wood_dark", bevel=0.01)
+    box("CounterTop", (0, ch + 0.035, cz + 0.05), (2 * W + 0.1, 0.07, 0.7), "wood_dark", bevel=0.015)
+    box("CounterEdge", (0, ch + 0.035, cz + 0.4), (2 * W + 0.1, 0.09, 0.03), "teal_dark", bevel=0.006)
+    # Back shelf with bottles.
+    sz = -D + 0.2
+    box("ShelfBack", (0, 1.25, sz - 0.12), (2 * W - 0.4, 1.8, 0.04), "wood", bevel=0.01)
+    for k, y in enumerate((0.95, 1.45, 1.95)):
+        box(f"Shelf{k}", (0, y, sz), (2 * W - 0.4, 0.04, 0.26), "wood_light", bevel=0.006)
+        for b in range(9):
+            x = -W + 0.45 + b * (2 * W - 0.9) / 8 + rng.uniform(-0.04, 0.04)
+            mat = rng.choice(["bottle_green", "bottle_amber", "bottle_blue", "glass"])
+            h = rng.uniform(0.22, 0.32)
+            lathe(f"Bottle{k}{b}", (x, y + 0.02, sz), [(0.0, 0.0), (0.045, 0.0), (0.045, h * 0.6), (0.018, h * 0.78), (0.016, h), (0.0, h)], mat, seg=10)
+    box("BarBelowShelf", (0, 0.5, sz), (2 * W - 0.4, 0.7, 0.26), "teal", bevel=0.01)
+    # Coconut cups on the counter (decoration; the real drinks are items).
+    for i, x in enumerate((-1.4, 1.5)):
+        blob(f"CocoCup{i}", (x, ch + 0.13, cz - 0.05), (0.075, 0.065, 0.075), "husk", subdiv=2, rough=0.04, seed=i)
+        tube(f"Straw{i}", [(x, ch + 0.17, cz - 0.05), (x + 0.03, ch + 0.3, cz - 0.05)], 0.006, "red", seg=6)
+    # Stools in front of the counter.
+    for i in range(4):
+        x = -1.5 + i * 1.0
+        z = D + 0.35
+        lathe(f"StoolSeat{i}", (x, 0.72, z), [(0.0, 0.0), (0.2, 0.0), (0.21, 0.04), (0.19, 0.08), (0.0, 0.08)], "teal" if i % 2 else "orange", seg=18)
+        lathe(f"StoolPost{i}", (x, 0.0, z), [(0.0, 0.0), (0.035, 0.0), (0.035, 0.72), (0.0, 0.72)], "steel", seg=8)
+        lathe(f"StoolFoot{i}", (x, 0.0, z), [(0.0, 0.0), (0.18, 0.0), (0.16, 0.03), (0.0, 0.03)], "steel", seg=14)
+        lathe(f"StoolRing{i}", (x, 0.3, z), [(0.13, 0.0), (0.15, 0.0), (0.15, 0.025), (0.13, 0.025)], "steel", seg=14)
+    # Thatched hip roof in three tiers, each overhanging the one above it with a shaggy fringe, like palm thatch.
+    peak = top + 1.05
+    ov = 0.55
+    base = [(-W - ov, -D - ov), (W + ov, -D - ov), (W + ov, D + ov), (-W - ov, D + ov)]
+    for tier, (shrink, lift) in enumerate(((1.0, 0.0), (0.7, 0.34), (0.42, 0.64))):
+        y0 = top + (peak - top) * lift + tier * 0.06
+        cs = [(x * shrink, z * shrink) for x, z in base]
+        ra, rb = (-W * 0.35 * shrink, peak + tier * 0.06, 0), (W * 0.35 * shrink, peak + tier * 0.06, 0)
+        slabs = []
+        for i in range(4):
+            (x0, z0), (x1, z1) = cs[i], cs[(i + 1) % 4]
+            if i == 1:
+                verts, faces = [(x0, y0, z0), (x1, y0, z1), rb], [(0, 1, 2)]
+            elif i == 3:
+                verts, faces = [(x0, y0, z0), (x1, y0, z1), ra], [(0, 1, 2)]
+            elif i == 0:
+                verts, faces = [(x0, y0, z0), (x1, y0, z1), rb, ra], [(0, 1, 2, 3)]
+            else:
+                verts, faces = [(x0, y0, z0), (x1, y0, z1), ra, rb], [(0, 1, 2, 3)]
+            slabs.append(add(f"Thatch{tier}{i}", verts, faces, ["straw", "straw_light", "straw"][tier]))
+        for o in slabs:  # some thickness
+            mod = o.modifiers.new("solid", 'SOLIDIFY'); mod.thickness = 0.12; mod.offset = 0
+            bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier=mod.name)
+        for i in range(4):
+            (x0, z0), (x1, z1) = cs[i], cs[(i + 1) % 4]
+            n = max(10, int(26 * shrink))
+            ang = math.degrees(math.atan2(x1 - x0, z1 - z0))
+            for k in range(n):
+                u = (k + 0.5) / n
+                x, z = x0 + (x1 - x0) * u, z0 + (z1 - z0) * u
+                length = rng.uniform(0.26, 0.4) * (1.0 if tier == 0 else 0.75)
+                box(f"Fringe{tier}{i}{k}", (x, y0 - length / 2 + 0.06, z), (0.2 * max(shrink, 0.6), length, 0.05), rng.choice(["straw", "straw_dark", "straw_light"]),
+                    rot=(rng.uniform(-8, 8), ang + 90, rng.uniform(-6, 6)), bevel=0)
+    box("RidgeCap", (0, peak + 0.15, 0), (W * 0.35 * 2 * 0.42 + 0.3, 0.12, 0.22), "straw_dark", bevel=0.03)
+    # The BEACH BAR board on the front, and a string of coloured bulbs along the front eave.
+    box("SignBoard", (0, top + 0.42, D + 0.12), (2.0, 0.42, 0.06), "teal_dark", bevel=0.02)
+    text3d("SignText", "BEACH BAR", (0, top + 0.42, D + 0.16), 0.24, 0.025, "yellow")
+    for side in (-1, 1):
+        box(f"SignPost{side}", (side * 0.8, top + 0.12, D + 0.1), (0.06, 0.5, 0.06), "bamboo_dark", bevel=0.01)
+    bulbs = ["red", "yellow", "teal", "orange", "green", "blue"]
+    path = []
+    for k in range(13):
+        u = k / 12
+        x = -W - 0.3 + (2 * W + 0.6) * u
+        y = top - 0.12 - math.sin(u * math.pi * 3) ** 2 * 0.18
+        path.append((x, y, D + 0.42))
+    tube("BulbWire", path, 0.008, "dark", seg=5)
+    for k, (x, y, z) in enumerate(path[1:-1]):
+        blob(f"Bulb{k}", (x, y - 0.06, z), (0.035, 0.05, 0.035), bulbs[k % len(bulbs)], subdiv=1, rough=0.0)
+    # A chalkboard menu by the left post.
+    box("MenuFrame", (-W - 0.34, 0.95, D - 0.1), (0.03, 0.78, 0.63), "wood_dark", bevel=0.01)
+    box("MenuBoard", (-W - 0.36, 0.95, D - 0.1), (0.02, 0.7, 0.55), "chalk", bevel=0.005)
+    text3d("MenuText", "DRINKS", (-W - 0.375, 1.15, D - 0.1), 0.08, 0.006, "white", face='-x')
+    box("MenuLeg", (-W - 0.34, 0.3, D - 0.1), (0.05, 0.6, 0.05), "wood_dark", bevel=0.008)
+
+@prop
 def basketball_hoop():
     """A beach basketball hoop (hoop-local: the pole's foot at z -1.0, the backboard's face at z 0 facing +z, the
     rim's centre at (0, 3.05, 0.38), 0.23 m across its middle). The net is its own model (basketball_net)."""
@@ -1288,7 +1505,8 @@ VIEWS = {"watch_tower": (0.9, 0.55, 1.0), "shack": (0.9, 0.55, 1.0), "dock": (1.
          "beach_hut": (0.8, 0.5, 1.0), "basketball_hoop": (0.9, 0.4, 1.0), "basketball": (0.6, 0.6, 1.0),
          "trampoline": (0.9, 0.6, 1.0), "human_cannon": (1.0, 0.5, 0.6), "cannon_barrel": (1.0, 0.5, 0.6), "cannon_wheel": (1.0, 0.2, 0.2), "diving_board": (1.0, 0.5, 0.8),
          "zipline_post": (1.0, 0.3, 1.0), "zipline_handle": (1.0, 0.3, 1.0),
-         "banana_boat": (1.0, 0.5, 0.7), "parrot": (0.8, 0.35, 1.0), "parrot_wing": (1.0, 0.3, 0.3)}
+         "banana_boat": (1.0, 0.5, 0.7), "parrot": (0.8, 0.35, 1.0), "parrot_wing": (1.0, 0.3, 0.3),
+         "beach_toilets": (0.8, 0.45, 1.0), "beach_bar": (0.8, 0.45, 1.0)}
 for name, build in PROPS.items():
     if only and name not in only: continue
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']: bpy.data.objects.remove(ob)

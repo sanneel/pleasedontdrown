@@ -30,7 +30,7 @@ namespace PleaseDontDrown.Editor
         private static Vector3[] AttractionSpots() => new[]
         {
             new Vector3(TrampolineSpots[0].x, TrampolineSpots[0].z, 2.2f), new Vector3(TrampolineSpots[1].x, TrampolineSpots[1].z, 2.2f),
-            new Vector3(CannonSpot.x, CannonSpot.z, 2.6f), new Vector3(HoopSpot.x, HoopSpot.z, 3f), new Vector3(HutSpot.x, HutSpot.z, 3f),
+            new Vector3(CannonSpot.x, CannonSpot.z, 2.6f), new Vector3(HoopSpot.x, HoopSpot.z, 3f), new Vector3(HutSpot.x, HutSpot.z, 3.6f), new Vector3(BarSpot.x, BarSpot.z, 3.6f),
             new Vector3(RingTableSpot.x, RingTableSpot.z, 1.8f)
         };
 

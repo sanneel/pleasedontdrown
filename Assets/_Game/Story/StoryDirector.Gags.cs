@@ -293,9 +293,9 @@ namespace PleaseDontDrown.Story
 
         private static readonly string[] HutInvites =
         {
-            "My hero... Come with me. I want to thank you. PROPERLY.",
-            "You saved my life. Come, come, I have to show you something. In the hut.",
-            "Those lips... I mean, that CPR! Come with me, quick!"
+            "My hero... Come with me to the toilets. I want to thank you. PROPERLY.",
+            "You saved my life. Come, come, I have to show you something. In the toilets.",
+            "Those lips... I mean, that CPR! Quick, to the toilets!"
         };
         private static readonly string[] HutGoodbyes = { "Call me!", "Best. Rescue. EVER.", "Same time tomorrow? I'll drown at three." };
 
@@ -317,7 +317,7 @@ namespace PleaseDontDrown.Story
             her.ServerSetMood(AvatarMood.Happy);
             her.ServerFace(hero.transform.position);
             yield return Say(her, Pick(HutInvites));
-            Debug.Log($"[Story] {name} leads {hero.DisplayName} to the hut");
+            Debug.Log($"[Story] {name} leads {hero.DisplayName} to the toilets");
 
             // Hand in hand to the door (the lifeguard has no say in it).
             hut.ServerLead(hero, her);

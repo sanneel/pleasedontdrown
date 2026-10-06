@@ -19,7 +19,8 @@ namespace PleaseDontDrown.Editor
     {
         private static readonly Vector3 HoopSpot = new(-6f, 0f, 30f);
         private static readonly Vector3 RingTableSpot = new(15.5f, 0f, 5.2f);
-        private static readonly Vector3 HutSpot = new(21f, 0f, 19f);
+        private static readonly Vector3 HutSpot = new(21f, 0f, 19f); // the toilets
+        private static readonly Vector3 BarSpot = new(28.5f, 0f, 17f);
 
         private static IEnumerable<Object> BuildFunItems()
         {
@@ -77,7 +78,8 @@ namespace PleaseDontDrown.Editor
             fun.SetParent(env, false);
             BuildHoop(fun);
             BuildRingTable(fun);
-            BuildBeachHut(fun);
+            BuildBeachToilets(fun);
+            BuildBeachBar(fun);
             BuildAttractions(fun); // trampolines, cannon, diving board, flamingo, banana boat
             BuildParrots(env, fun); // instead of seagulls (GameSceneBuilder.Parrots.cs)
         }
@@ -208,19 +210,24 @@ namespace PleaseDontDrown.Editor
             SetField(rack, "_worldCap", p => p.intValue = 9);
         }
 
-        // ------------------------------------------------------------------ the beach hut
+        // ------------------------------------------------------------------ the beach toilets
 
-        private static void BuildBeachHut(Transform parent)
+        /// <summary>
+        /// The public toilets (Art/Props/beach_toilets.glb): two cubicles, the right one shut and OCCUPIED, the left one
+        /// with a real door. That's where a grateful tourist drags her hero after the kiss of life (LoveHut, the gag in
+        /// StoryDirector.Gags): the whole block shakes and squeaks while Sandy pretends she saw nothing.
+        /// </summary>
+        private static void BuildBeachToilets(Transform parent)
         {
-            var root = new GameObject("BeachHut").transform;
+            var root = new GameObject("BeachToilets").transform;
             root.SetParent(parent, false);
             root.position = Ground(HutSpot);
-            root.rotation = Quaternion.Euler(0f, 180f, 0f); // the door faces the sea
+            root.rotation = Quaternion.Euler(0f, 180f, 0f); // the doors face the sea
             TagSurface(root.gameObject, SurfaceKind.Wood);
-            GameObject model = PropModel("beach_hut", root);
+            GameObject model = PropModel("beach_toilets", root);
             Transform wobble = model != null ? model.transform : root;
 
-            // Walls you can't walk through (the model has no colliders of its own); a doorway in the front.
+            // Walls you can't walk through (the model has no colliders of its own); the left cubicle's doorway open.
             void Wall(string name, Vector3 centre, Vector3 size)
             {
                 var go = new GameObject(name);
@@ -228,24 +235,30 @@ namespace PleaseDontDrown.Editor
                 go.transform.localPosition = centre;
                 go.AddComponent<BoxCollider>().size = size;
             }
-            Wall("Deck", new Vector3(0f, 0.075f, 0f), new Vector3(2.9f, 0.15f, 2.9f));
-            Wall("WallBack", new Vector3(0f, 1.35f, -1.3f), new Vector3(2.7f, 2.4f, 0.1f));
-            Wall("WallLeft", new Vector3(-1.3f, 1.35f, 0f), new Vector3(0.1f, 2.4f, 2.7f));
-            Wall("WallRight", new Vector3(1.3f, 1.35f, 0f), new Vector3(0.1f, 2.4f, 2.7f));
-            Wall("WallFrontL", new Vector3(-0.875f, 1.35f, 1.3f), new Vector3(0.85f, 2.4f, 0.1f));
-            Wall("WallFrontR", new Vector3(0.875f, 1.35f, 1.3f), new Vector3(0.85f, 2.4f, 0.1f));
-            Wall("Lintel", new Vector3(0f, 2.4f, 1.3f), new Vector3(0.9f, 0.3f, 0.1f));
-            Wall("Roof", new Vector3(0f, 2.95f, 0f), new Vector3(2.9f, 0.8f, 2.9f));
+            const float w = 2.3f, d = 1.35f, t = 0.14f;
+            Wall("Slab", new Vector3(0f, 0.075f, 0.15f), new Vector3(2f * w + 0.5f, 0.15f, 2f * d + 0.6f));
+            Wall("WallBack", new Vector3(0f, 1.325f, -d), new Vector3(2f * w + t, 2.35f, t));
+            Wall("WallLeft", new Vector3(-w, 1.325f, 0f), new Vector3(t, 2.35f, 2f * d + t));
+            Wall("WallRight", new Vector3(w, 1.325f, 0f), new Vector3(t, 2.35f, 2f * d + t));
+            Wall("WallMiddle", new Vector3(0f, 1.325f, 0f), new Vector3(t, 2.35f, 2f * d));
+            Wall("FrontLeft", new Vector3(-1.95f, 1.325f, d), new Vector3(0.7f, 2.35f, t));
+            Wall("FrontMiddle", new Vector3(0f, 1.325f, d), new Vector3(1.4f, 2.35f, t));
+            Wall("FrontRight", new Vector3(1.95f, 1.325f, d), new Vector3(0.7f, 2.35f, t));
+            Wall("Lintel", new Vector3(-1.15f, 2.375f, d), new Vector3(0.9f, 0.25f, t));
+            Wall("ShutDoor", new Vector3(1.15f, 1.325f, d), new Vector3(0.9f, 2.35f, t)); // OCCUPIED
+            Wall("Roof", new Vector3(0f, 2.75f, 0.3f), new Vector3(2f * w + 0.4f, 0.3f, 2f * d + 0.9f));
+            Wall("Basin", new Vector3(w + 0.3f, 0.5f, 0.3f), new Vector3(0.45f, 1f, 0.45f));
+            Wall("Bin", new Vector3(w + 0.43f, 0.33f, -0.55f), new Vector3(0.5f, 0.66f, 0.5f));
 
-            var spec = new MeshyArt.DoorSpec { Hinge = new Vector3(-0.45f, 0.15f, 1.3f), Width = 0.9f, Height = 2.1f, LeafDirection = 1f, WallFacing = 1f };
-            BuildDoor(root, "HutDoor", spec, new Color(1f, 0.55f, 0.72f), new Color(0.97f, 0.97f, 0.95f), planks: true);
+            var spec = new MeshyArt.DoorSpec { Hinge = new Vector3(-1.6f, 0.15f, d), Width = 0.9f, Height = 2.1f, LeafDirection = 1f, WallFacing = 1f };
+            BuildDoor(root, "ToiletDoor", spec, new Color(0.2f, 0.72f, 0.7f), new Color(0.08f, 0.45f, 0.47f), planks: true);
 
             var inside = new GameObject("Inside").transform;
             inside.SetParent(root, false);
-            inside.localPosition = new Vector3(0f, 0.16f, -0.4f);
+            inside.localPosition = new Vector3(-1.15f, 0.16f, -0.3f);
             var outside = new GameObject("Outside").transform;
             outside.SetParent(root, false);
-            outside.localPosition = new Vector3(0f, 0f, 2.4f);
+            outside.localPosition = new Vector3(-1.15f, 0f, 2.4f);
             outside.localRotation = Quaternion.Euler(0f, 180f, 0f); // facing the door
             outside.position = Ground(outside.position);
 
@@ -256,6 +269,53 @@ namespace PleaseDontDrown.Editor
             SetRef(hut, "_inside", inside);
             SetRef(hut, "_wobble", wobble);
             SetRef(hut, "_audio", SpatialAudio(root.gameObject, 4f, 45f));
+        }
+
+        // ------------------------------------------------------------------ the beach bar
+
+        /// <summary>
+        /// The beach bar (Art/Props/beach_bar.glb): a thatched tiki bar facing the sea, stools along the counter and
+        /// coconut drinks on it (an ItemRack keeps three there: pick one up and drink it).
+        /// </summary>
+        private static void BuildBeachBar(Transform parent)
+        {
+            var root = new GameObject("BeachBar").transform;
+            root.SetParent(parent, false);
+            root.position = Ground(BarSpot);
+            root.rotation = Quaternion.Euler(0f, 180f, 0f); // the counter faces the sea
+            TagSurface(root.gameObject, SurfaceKind.Wood);
+            PropModel("beach_bar", root);
+            void Solid(string name, Vector3 centre, Vector3 size)
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(root, false);
+                go.transform.localPosition = centre;
+                go.AddComponent<BoxCollider>().size = size;
+            }
+            Solid("Deck", new Vector3(0f, 0.075f, 0f), new Vector3(4.6f, 0.15f, 3.4f));
+            Solid("Counter", new Vector3(0f, 0.62f, 1.2f), new Vector3(4.3f, 1.14f, 0.72f));
+            Solid("BackShelf", new Vector3(0f, 1.2f, -1.32f), new Vector3(3.8f, 2.4f, 0.42f));
+            Solid("Roof", new Vector3(0f, 3.0f, 0f), new Vector3(5.4f, 0.5f, 4.2f));
+            foreach (float x in new[] { -2.1f, 2.1f })
+                foreach (float z in new[] { -1.5f, 1.5f })
+                    Solid("Post", new Vector3(x, 1.4f, z), new Vector3(0.18f, 2.6f, 0.18f));
+            for (int i = 0; i < 4; i++)
+                Solid("Stool", new Vector3(-1.5f + i, 0.4f, 1.85f), new Vector3(0.22f, 0.8f, 0.22f)); // (slim: you can step between them to the counter)
+            Solid("Menu", new Vector3(-2.45f, 0.7f, 1.4f), new Vector3(0.1f, 1.4f, 0.7f));
+
+            root.gameObject.AddComponent<NetworkObject>();
+            var rack = root.gameObject.AddComponent<ItemRack>();
+            var spots = new List<Object>();
+            for (int i = 0; i < 3; i++)
+            {
+                var spot = new GameObject($"DrinkSpot{i}").transform;
+                spot.SetParent(root, false);
+                spot.localPosition = new Vector3(-0.7f + i * 0.7f, 1.3f, 1.15f);
+                spots.Add(spot);
+            }
+            SetField(rack, "_itemName", p => p.stringValue = "Coconut");
+            SetRefs(rack, "_spots", spots.ToArray());
+            SetField(rack, "_worldCap", p => p.intValue = 8);
         }
     }
 }
