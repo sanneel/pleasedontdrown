@@ -33,6 +33,7 @@ namespace PleaseDontDrown.UI
         private static Font _heavy, _bold;
         private static readonly Dictionary<long, GUIStyle> _styles = new();
         private static readonly Dictionary<HudIcon, Texture2D> _icons = new();
+        private static readonly Dictionary<int, Texture2D> _arcs = new();
         private static readonly Regex _colorTags = new("</?color[^>]*>", RegexOptions.Compiled);
         // Shadow text for labels with colour tags, so the same label isn't stripped again every frame.
         private const int PlainTextCap = 64;
@@ -44,6 +45,7 @@ namespace PleaseDontDrown.UI
             _styles.Clear();
             _plainText.Clear();
             _icons.Clear();
+            _arcs.Clear();
             _heavy = _bold = null;
             _hoverId = 0;
             _hoverFrame = -10;
@@ -154,6 +156,79 @@ namespace PleaseDontDrown.UI
             }
             float inset = sheet.width * 0.16f;
             Picture(new Rect(sheet.x + inset, sheet.y + inset, sheet.width - inset * 2f, sheet.height - inset * 2f), Icon(icon), new Color(1f, 1f, 1f, 0.95f * alpha));
+        }
+
+        /// <summary>
+        /// A round vital, the way How to Fish shows them: no box, just a thin white ring round a white picture. The
+        /// ring is the meter, running out anticlockwise from the top; what was just lost shows in coral for a moment
+        /// (<paramref name="trail"/>, easing down after <paramref name="value"/>). Low, the picture takes the warning
+        /// colour and pulses.
+        /// </summary>
+        public static void Vital(Rect sheet, float value, float trail, HudIcon icon, Color warnColor, bool low, float alpha = 1f)
+        {
+            if (alpha <= 0.01f || Event.current.type != EventType.Repaint) return;
+            value = Mathf.Clamp01(value);
+            trail = Mathf.Clamp01(Mathf.Max(trail, value));
+            const float thick = 0.075f; // of the diameter
+            var shadow = new Rect(sheet.x + 1.5f, sheet.y + 2f, sheet.width, sheet.height);
+            Arc(shadow, 0f, 1f, thick * 1.25f, new Color(0f, 0f, 0f, 0.35f * alpha));
+            Arc(sheet, 0f, 1f, thick, new Color(1f, 1f, 1f, 0.22f * alpha));               // the empty track
+            // (Full, the ring closes at the top; it empties from there round to the right.)
+            if (trail > value + 0.002f) Arc(sheet, 1f - trail, 1f - value, thick, new Color(Coral.r, Coral.g, Coral.b, alpha)); // just lost
+            if (value > 0.002f) Arc(sheet, 1f - value, 1f, thick, new Color(1f, 1f, 1f, alpha));
+            float pulse = low ? 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 9f) : 0f;
+            Color tint = low ? Color.Lerp(warnColor, Color.white, pulse * 0.35f) : Color.white;
+            tint.a = alpha;
+            float inset = sheet.width * (0.2f - 0.02f * pulse);
+            var inner = new Rect(sheet.x + inset, sheet.y + inset, sheet.width - inset * 2f, sheet.height - inset * 2f);
+            Picture(new Rect(inner.x + 1.5f, inner.y + 2f, inner.width, inner.height), Icon(icon), new Color(0f, 0f, 0f, 0.35f * alpha));
+            Picture(inner, Icon(icon), tint);
+        }
+
+        /// <summary>
+        /// A ring segment in a square, from <paramref name="from"/> to <paramref name="to"/> of the way round
+        /// (0 = the top, going clockwise), <paramref name="thickness"/> a share of the diameter.
+        /// </summary>
+        public static void Arc(Rect sheet, float from, float to, float thickness, Color color)
+        {
+            if (Event.current.type != EventType.Repaint || color.a <= 0.005f) return;
+            from = Mathf.Clamp01(from);
+            to = Mathf.Clamp01(to);
+            if (to - from <= 0.001f) return;
+            Texture2D arc = ArcTexture(to - from, thickness);
+            Rect px = Px(sheet);
+            Matrix4x4 before = GUI.matrix;
+            if (from > 0.0005f) GUIUtility.RotateAroundPivot(from * 360f, px.center);
+            GUI.DrawTexture(px, arc, ScaleMode.StretchToFill, true, 0f, color, 0f, 0f);
+            GUI.matrix = before;
+        }
+
+        /// <summary>A white ring segment from the top clockwise (cached per 1/240 of a turn and thickness).</summary>
+        private static Texture2D ArcTexture(float length, float thickness)
+        {
+            int steps = Mathf.Clamp(Mathf.RoundToInt(length * 240f), 1, 240);
+            int thick = Mathf.Clamp(Mathf.RoundToInt(thickness * 400f), 4, 200);
+            int key = steps | (thick << 9);
+            if (_arcs.TryGetValue(key, out Texture2D texture) && texture != null) return texture;
+            const int n = 128;
+            float outer = n * 0.5f - 1f, inner = outer - thick / 400f * n, end = steps / 240f * Mathf.PI * 2f;
+            texture = new Texture2D(n, n, TextureFormat.RGBA32, false) { name = "HudArc", wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
+            var pixels = new Color32[n * n];
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    float dx = x + 0.5f - n * 0.5f, dy = y + 0.5f - n * 0.5f; // texture y runs up
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    float band = Mathf.Clamp01(outer - r + 0.5f) * Mathf.Clamp01(r - inner + 0.5f);
+                    float angle = Mathf.Atan2(dx, dy); // 0 at the top, clockwise positive
+                    if (angle < 0f) angle += Mathf.PI * 2f;
+                    float edge = steps >= 240 ? 1f : Mathf.Clamp01((end - angle) * r + 0.5f) * Mathf.Clamp01(angle * r + 0.5f);
+                    pixels[y * n + x] = new Color32(255, 255, 255, (byte)(255f * band * edge));
+                }
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            _arcs[key] = texture;
+            return texture;
         }
 
         // ------------------------------------------------------------------ controls (menus and panels)
@@ -280,7 +355,7 @@ namespace PleaseDontDrown.UI
         public static Texture2D Icon(HudIcon icon)
         {
             if (_icons.TryGetValue(icon, out Texture2D texture) && texture != null) return texture;
-            const int n = 64, samples = 4;
+            const int n = 96, samples = 4;
             texture = new Texture2D(n, n, TextureFormat.RGBA32, false) { name = "HudIcon_" + icon, wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.HideAndDontSave };
             var pixels = new Color32[n * n];
             for (int y = 0; y < n; y++)
@@ -317,8 +392,8 @@ namespace PleaseDontDrown.UI
                 case HudIcon.Stamina:
                     return InPolygon(p, Bolt);
                 default: // bubbles
-                    return Ring(p, new Vector2(0.38f, 0.36f), 0.27f, 0.07f) || Ring(p, new Vector2(0.72f, 0.70f), 0.17f, 0.06f) ||
-                           Disc(p, new Vector2(0.30f, 0.84f), 0.08f);
+                    return Ring(p, new Vector2(0.38f, 0.36f), 0.28f, 0.11f) || Ring(p, new Vector2(0.73f, 0.71f), 0.18f, 0.09f) ||
+                           Disc(p, new Vector2(0.30f, 0.84f), 0.09f);
             }
         }
 

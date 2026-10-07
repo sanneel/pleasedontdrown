@@ -100,17 +100,18 @@ namespace PleaseDontDrown.Story
             }
             if (Economy.Instance != null)
             {
-                // Above the vitals squares.
+                // Above the vitals rings, in their style: white lettering in a thin white rounded frame, no box.
                 if (Economy.Money != _money || !Mathf.Approximately(Hud.Scale, _moneyScale))
                 {
                     _money = Economy.Money;
                     _moneyScale = Hud.Scale;
                     _moneyText = "$" + _money;
-                    _moneyWidth = Hud.TextWidth(_moneyText, 30f, true) + 36f;
+                    _moneyWidth = Hud.TextWidth(_moneyText, 28f, true) + 30f;
                 }
-                var pill = new Rect(50f, Hud.Height - 25f - 64f - 14f - 46f, _moneyWidth, 46f);
-                Hud.Fill(pill, new Color(0f, 0f, 0f, 0.5f), 12f);
-                Hud.Label(pill, _moneyText, 30f, new Color(0.56f, 1f, 0.56f), heavy: true, shadow: false);
+                var pill = new Rect(50f, Hud.Height - 25f - 60f - 16f - 42f, _moneyWidth, 42f);
+                Hud.Frame(new Rect(pill.x + 1.5f, pill.y + 2f, pill.width, pill.height), new Color(0f, 0f, 0f, 0.35f), 3f, 10f);
+                Hud.Frame(pill, Color.white, 2.5f, 10f);
+                Hud.Label(pill, _moneyText, 28f, Color.white, heavy: true);
             }
         }
 
