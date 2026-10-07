@@ -89,13 +89,22 @@ namespace PleaseDontDrown.Player
                 float speed = args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 13f;
                 Release(carried, _hub.Head.forward * speed + Vector3.up * 4f, true);
             }, owner: this);
-            DevCommands.Register("cannon", "", "Climb into the nearest cannon, or load whoever you carry (automated tests).", _ =>
+            DevCommands.Register("cannon", "[in|fire]", "The nearest cannon: push it / load whoever you carry / let go; 'in' climbs in; 'fire' clicks fire (automated tests).", args =>
             {
                 Fun.HumanCannon best = null;
                 foreach (Fun.HumanCannon c in FindObjectsByType<Fun.HumanCannon>(FindObjectsSortMode.None))
                     if (best == null || (c.transform.position - transform.position).sqrMagnitude < (best.transform.position - transform.position).sqrMagnitude)
                         best = c;
-                if (best == null || !best.CanInteract(_hub)) { DevCommands.Print("no cannon free"); return; }
+                if (best == null) { DevCommands.Print("no cannon"); return; }
+                if (args.Length > 0 && args[0] == "fire") { best.PressFire(); return; }
+                if (args.Length > 0 && args[0] == "in")
+                {
+                    if (!best.CanSecondary(_hub)) { DevCommands.Print("can't climb in"); return; }
+                    DevCommands.Print(best.GetSecondaryPrompt(_hub));
+                    best.OnSecondary(_hub);
+                    return;
+                }
+                if (!best.CanInteract(_hub)) { DevCommands.Print("no cannon free"); return; }
                 DevCommands.Print(best.GetPrompt(_hub));
                 best.OnInteract(_hub);
             }, owner: this);

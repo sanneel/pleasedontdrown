@@ -175,6 +175,9 @@ namespace PleaseDontDrown.Avatars
         }
         public float BodyYaw => _bodyYaw;
 
+        /// <summary>Set: the whole body turned this way instead of upright (stuffed up a cannon's barrel).</summary>
+        public Quaternion? RootOverride { get; set; }
+
         /// <summary>Starts an idle habit now (review tools; in play they come up by themselves).</summary>
         public void Play(IdleAct act, float seconds)
         {
@@ -312,7 +315,7 @@ namespace PleaseDontDrown.Avatars
             if (_turningInPlace && Mathf.Abs(delta) < 4f) _turningInPlace = false;
             if (moving || _turningInPlace)
                 _bodyYaw += delta * k(moving ? _turnSpeed : _turnSpeed * 0.6f);
-            transform.rotation = Quaternion.Euler(0f, _bodyYaw, 0f);
+            transform.rotation = RootOverride ?? Quaternion.Euler(0f, _bodyYaw, 0f);
 
             _move = Mathf.MoveTowards(_move, Mathf.InverseLerp(0.15f, 1.4f, speed) + (_turningInPlace ? 0.35f : 0f), dt * 4f);
             _move = Mathf.Clamp01(_move);

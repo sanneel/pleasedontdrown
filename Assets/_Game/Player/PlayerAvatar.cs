@@ -28,6 +28,8 @@ namespace PleaseDontDrown.Player
         private float _lastPumpTime = -10f;
         private Vector3 _cprPoint, _kneelPoint; // where the hands press; where the body kneels beside it
         private float _kneelReach = 0.55f;      // how far out from the middle of their body (clear of a big belly)
+        private bool _inCannon;                 // drawn up a cannon's barrel, at _cannonBody
+        private Vector3 _cannonBody;
         private float _groundCheckAt;
         private bool _grounded = true;
         private Vector3 _kneelShift;      // the body moved over to the tourist it is doing CPR on (the player stays put)
@@ -211,6 +213,7 @@ namespace PleaseDontDrown.Player
                 }
             }
             CarryPoses(ref m, position);
+            CannonPoses(ref m);
             // Led by the hand to the beach hut: our hand in hers.
             if (!m.Holding && Story.LoveHut.HandHold(_hub.transform, out Story.LoveHut.HandGripPoint hold))
             {
@@ -218,6 +221,40 @@ namespace PleaseDontDrown.Player
                 m.GripRight = new HandGrip(hold.Point, hold.Toward, Vector3.Cross(Vector3.up, hold.Toward), HandPose.LooseFist);
             }
             _animator.Motion = m;
+        }
+
+        /// <summary>
+        /// The cannon: stuffed up the barrel, the head and both hands sticking out of the muzzle (for everyone, whatever
+        /// the body's network position is doing); or pushing it about, both hands on its push bar.
+        /// </summary>
+        private void CannonPoses(ref AvatarMotion m)
+        {
+            if (Fun.HumanCannon.InBarrel(_hub, out Vector3 muzzle, out Quaternion rotation))
+            {
+                m.Pose = AvatarPose.HandsUp;
+                m.Mood = AvatarMood.Happy;
+                m.Velocity = Vector3.zero;
+                m.Grounded = false;
+                m.Flying = m.StarJump = m.Swimming = m.Underwater = m.Climbing = m.Sprinting = false;
+                m.Holding = m.TwoHanded = m.CarryingPerson = false;
+                m.LookPitch = 0f;
+                _animator.RootOverride = rotation;
+                // The whole head out of the muzzle (chin at the rim) and the hands up above it: the feet that far
+                // down the barrel. (The body's own eye height: the goofy lifeguard's eyes are well under the camera's.)
+                float eyes = _rig != null && _rig.EyeHeight > 0.3f ? _rig.EyeHeight : _standEyeHeight;
+                float s = _rig != null ? _rig.Scale : 1f;
+                _cannonBody = muzzle - rotation * Vector3.up * Mathf.Max(0.4f, eyes - 0.2f * s);
+                _inCannon = true;
+                return;
+            }
+            _animator.RootOverride = null;
+            _inCannon = false;
+            if (!m.Holding && Fun.HumanCannon.PushGrips(_hub, out HandGrip left, out HandGrip right))
+            {
+                m.Holding = m.TwoHanded = true;
+                m.GripLeft = left;
+                m.GripRight = right;
+            }
         }
 
         /// <summary>
@@ -281,7 +318,7 @@ namespace PleaseDontDrown.Player
             }
             _kneelShift = Vector3.Lerp(_kneelShift, shift, 1f - Mathf.Exp(-9f * dt));
             if (_kneelShift.sqrMagnitude < 1e-6f && shift == Vector3.zero) _kneelShift = Vector3.zero;
-            body.position = transform.TransformPoint(_bodyRest) + _kneelShift;
+            body.position = _inCannon ? _cannonBody : transform.TransformPoint(_bodyRest) + _kneelShift;
         }
 
         private bool GroundBelow(Vector3 feet, float distance)

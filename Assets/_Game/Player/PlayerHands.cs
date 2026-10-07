@@ -229,7 +229,7 @@ namespace PleaseDontDrown.Player
         public bool HandsTaken()
         {
             if (_combat == null) _combat = GetComponent<Combat.PlayerCombat>();
-            return (_combat != null && _combat.IsDazed) || PlayerCarry.IsCarried(_hub) || Fun.HumanCannon.IsInside(_hub);
+            return (_combat != null && _combat.IsDazed) || PlayerCarry.IsCarried(_hub) || Fun.HumanCannon.IsInside(_hub) || Fun.HumanCannon.IsPushing(_hub);
         }
 
         /// <summary>Owner: whatever is in our hands goes in a free pocket (it stays ours), else it's dropped.</summary>

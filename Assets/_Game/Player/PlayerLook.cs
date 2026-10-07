@@ -161,6 +161,18 @@ namespace PleaseDontDrown.Player
 
         private Vector3 _kneelChest, _kneelHead;
         private float _kneelReach = 0.55f;
+        private Vector3 _viewFrom;
+        private int _viewFrame = -10;
+
+        /// <summary>
+        /// This frame the eye is at <paramref name="position"/> instead of in our head (still looking where we look):
+        /// shut in the cannon, we peer out of its muzzle. Call every frame it should hold.
+        /// </summary>
+        public void ViewFrom(Vector3 position)
+        {
+            _viewFrom = position;
+            _viewFrame = Time.frameCount;
+        }
         private float _kneelUntil = -10f, _kneel;
 
         /// <summary>
@@ -317,6 +329,8 @@ namespace PleaseDontDrown.Player
                 Quaternion face = Quaternion.LookRotation(_leanPoint - close, toward) * Quaternion.Euler(0f, 0f, 15f);
                 _camera.transform.SetPositionAndRotation(Vector3.Lerp(eye, close, lean), Quaternion.Slerp(_camera.transform.rotation, face, lean));
             }
+
+            if (Time.frameCount - _viewFrame <= 1) _camera.transform.position = _viewFrom;
         }
 
         /// <summary>

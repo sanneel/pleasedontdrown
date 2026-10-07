@@ -117,6 +117,17 @@ def text3d(name, s, centre, height, depth, mat, face='+z'):
     parts.append(ob)
     return ob
 
+def wrap_on_cylinder(ob, radius, turn=0.0):
+    """Bend a flat piece made facing +z at the axis (text3d / a disc at x, z = 0) round an upright cylinder of
+    `radius` (Unity space: the y axis), so it lies on a bottle's curved label instead of standing off it."""
+    for v in ob.data.vertices:
+        u = U(v.co)                      # Unity space
+        theta = u.x / radius + turn
+        out = radius + u.z
+        v.co = B((math.sin(theta) * out, u.y, math.cos(theta) * out))
+    ob.data.update()
+    return ob
+
 def box(name, centre, size, mat, rot=(0, 0, 0), bevel=0.004, segments=1):
     hx, hy, hz = size[0] / 2, size[1] / 2, size[2] / 2
     R = euler(*rot); c = Vector(centre)
@@ -415,10 +426,21 @@ def beer_bottle():
         lathe(name, (0, 0, 0), [(r * k, y * k) for r, y in prof], mat, seg=seg)
     L("Glass", [(0.0, -0.115), (0.026, -0.115), (0.031, -0.109), (0.031, 0.02), (0.029, 0.04), (0.021, 0.063),
                 (0.0125, 0.083), (0.0112, 0.106), (0.0125, 0.108), (0.0125, 0.113), (0.0, 0.113)], "bottle_amber", 20)
-    L("Label", [(0.0316, -0.075), (0.0316, -0.004)], "cream", 20)
-    L("Band", [(0.032, -0.05), (0.032, -0.03)], "red", 20)
+    L("Label", [(0.0316, -0.078), (0.0316, -0.002)], "cream", 32)
+    L("Band", [(0.0321, -0.054), (0.0321, -0.031)], "red", 32)
     L("Foil", [(0.0128, 0.086), (0.0122, 0.1)], "gold", 16)
     L("Cap", [(0.0, 0.111), (0.0142, 0.111), (0.0142, 0.116), (0.012, 0.12), (0.0, 0.12)], "gold", 14)
+    # The label's design, raised a hair off it and wrapped round the glass: the brand in white on the red band, a
+    # setting sun over a wave above it, the kind of beer underneath.
+    # (Front and back, so the drinker and whoever they're toasting both see it.)
+    R = 0.0321 * k
+    for side, turn in (("F", 0.0), ("B", math.pi)):
+        wrap_on_cylinder(text3d(f"Brand{side}", "DROWN", (0, -0.0425 * k, 0), 0.0155 * k, 0.0012, "white"), R + 0.0004, turn)
+        wrap_on_cylinder(text3d(f"Kind{side}", "LAGER", (0, -0.069 * k, 0), 0.0072 * k, 0.0010, "blue_dark"), 0.0316 * k + 0.0004, turn)
+        sun = lathe(f"Sun{side}", (0, -0.017 * k, 0), [(0.0, 0.0), (0.0085 * k, 0.0), (0.0085 * k, 0.0011), (0.0, 0.0011)], "yellow", seg=24, axis='z')
+        wrap_on_cylinder(sun, 0.0316 * k + 0.0003, turn)
+        wave = [(x * 0.001 * k, (-0.0205 + 0.0016 * math.sin(x * 0.9)) * k, 0.0) for x in range(-12, 13)]
+        wrap_on_cylinder(tube(f"Wave{side}", wave, 0.0013 * k, "blue", seg=6), 0.0316 * k + 0.0011, turn)
 
 @prop
 def defibrillator():
@@ -1078,6 +1100,13 @@ def human_cannon():
         tube(f"Axle{side}", [(side * 0.45, 0.48, -0.5), (side * 0.6, 0.48, -0.5)], 0.05, "steel", seg=8)
         tube(f"AxleF{side}", [(side * 0.45, 0.32, 0.55), (side * 0.6, 0.32, 0.55)], 0.04, "steel", seg=8)
     box("Trail", (0, 0.32, -1.2), (0.35, 0.18, 0.7), "wood_dark", rot=(-12, 0, 0), bevel=0.02)
+    # A push bar off the end of the trail, wheelbarrow style, to roll it about the beach by (hands at x +-0.24,
+    # y 0.93, z -1.9: HumanCannon.BarLeft/BarRight).
+    for side in (-1, 1):
+        tube(f"Strut{side}", [(side * 0.13, 0.36, -1.48), (side * 0.2, 0.62, -1.66), (side * 0.27, 0.93, -1.9)], 0.035, "wood_dark", seg=8)
+    tube("PushBar", [(-0.36, 0.93, -1.9), (0.36, 0.93, -1.9)], 0.034, "wood", seg=10)
+    for side in (-1, 1):
+        tube(f"Grip{side}", [(side * 0.15, 0.93, -1.9), (side * 0.33, 0.93, -1.9)], 0.042, "black", seg=10)
 
 def cannon_wheel_of(radius):
     """A spoked cart wheel round the x axis (local: its hub at the origin)."""
