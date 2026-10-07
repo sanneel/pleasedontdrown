@@ -4,7 +4,7 @@ using Bone = PleaseDontDrown.Avatars.AvatarRig.Bone;
 namespace PleaseDontDrown.Avatars
 {
     /// <summary>One-off moves that play over whatever the body is doing.</summary>
-    public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot, JumpShot }
+    public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot, JumpShot, Burp }
 
     /// <summary>Whole-body poses held for a while (story characters, knockouts).</summary>
     public enum AvatarPose : byte { Normal, Down, Kneel, Scared, HandsUp, Lie, LieFront, Sit, SitChair, Carried }
@@ -30,6 +30,7 @@ namespace PleaseDontDrown.Avatars
         public HandGrip GripLeft, GripRight; // world palm points, finger/palm directions, finger curls
         public float Charge;          // 0..1 throw wind-up
         public bool Eating;
+        public bool Drinking;         // eating a drink: the hand keeps its grip on the bottle (tipped up at the lips), the head goes back
         public bool Cpr;
         public Vector3 CprPoint;      // world, the chest being pressed
         public bool Seated;           // on a vehicle seat (hands come from the grips)
@@ -237,6 +238,7 @@ namespace PleaseDontDrown.Avatars
             SampleGround(dt);
             _rig.ResetPose(fingers: false); // PoseHands sets every finger bone
             PoseBody();
+            PoseBurp();
             PoseLegs();
             PoseArms();
             PoseHead();
@@ -562,6 +564,23 @@ namespace PleaseDontDrown.Avatars
         }
 
         private float GestureT(float duration) => Mathf.Clamp01((Now - _gestureStart) / duration);
+        private const float BurpSeconds = 1.7f;
+
+        /// <summary>
+        /// A burp you can see from across the beach (the goofy face can't open its mouth): the chest fills and leans
+        /// back to wind up, then heaves forward with it, with a couple of aftershocks.
+        /// </summary>
+        private void PoseBurp()
+        {
+            if (!GestureActive(AvatarGesture.Burp, BurpSeconds)) return;
+            float b = GestureT(BurpSeconds) * BurpSeconds;
+            float wind = Mathf.SmoothStep(0f, 1f, b / 0.22f) * (1f - Mathf.SmoothStep(0f, 1f, (b - 0.22f) / 0.1f));
+            float heave = b < 0.24f ? 0f : Mathf.Clamp01((b - 0.24f) / 0.07f) * (1f - Mathf.SmoothStep(0f, 1f, (b - 0.75f) / 0.6f));
+            float shake = heave * Mathf.Max(0f, Mathf.Sin((b - 0.24f) * 26f)) * 0.5f;
+            float pitch = -9f * wind + (11f + 5f * shake) * heave;
+            B(Bone.Spine).localRotation *= Quaternion.Euler(pitch * 0.45f, 0f, 0f);
+            B(Bone.Chest).localRotation *= Quaternion.Euler(pitch * 0.55f, 0f, 0f);
+        }
         private bool GestureActive(AvatarGesture g, float duration) => _gesture == g && Now - _gestureStart < duration;
 
         private Transform B(Bone b) => _rig[b];
@@ -905,7 +924,7 @@ namespace PleaseDontDrown.Avatars
                     // round it (spread flat, the cartoon fingers fanned out like claws).
                     pose = HandPose.Lerp(pose, right ? CprLowerHand : CprUpperHand, _cpr);
                 }
-                if (right && _eat > 0.01f) pose = HandPose.Lerp(pose, HandPose.Cup, _eat);
+                if (right && _eat > 0.01f && !m.Drinking) pose = HandPose.Lerp(pose, HandPose.Cup, _eat);
                 if (right && GestureActive(AvatarGesture.Wave, 1.6f))
                 {
                     rotation = HandBones.Orient(Vector3.up, fwd, side);
@@ -1049,7 +1068,7 @@ namespace PleaseDontDrown.Avatars
                 IK.Solve(upperL, foreL, la, lb, point, elbowL, _charge * 0.7f, false);
             }
 
-            if (_eat > 0.01f)
+            if (_eat > 0.01f && !m.Drinking)
             {
                 Transform head = B(Bone.Head);
                 Vector3 mouth = head.TransformPoint(new Vector3(0.03f, 0.07f, 0.24f) * _rig.Scale);
@@ -1633,6 +1652,15 @@ namespace PleaseDontDrown.Avatars
             swimTilt *= 1f - 0.55f * breath;
             float turn = (-CrawlRoll * 0.75f + 62f * breath) * crawl;
             float tilt = (_variety.HeadTilt + _leanSide.Value * -0.4f) * standing;
+            if (Motion.Drinking) pitch -= 22f * _eat; // chugging: the head goes back with the bottle
+            if (GestureActive(AvatarGesture.Burp, BurpSeconds))
+            {
+                // A beer coming back up: a little lean back to wind up, then the head jerks forward with it and shakes.
+                float b = GestureT(BurpSeconds) * BurpSeconds;
+                float wind = Mathf.SmoothStep(0f, 1f, b / 0.22f) * (1f - Mathf.SmoothStep(0f, 1f, (b - 0.22f) / 0.12f));
+                float out_ = b < 0.25f ? 0f : Mathf.Clamp01((b - 0.25f) / 0.08f) * (1f - Mathf.SmoothStep(0f, 1f, (b - 0.9f) / 0.45f));
+                pitch += -16f * wind + (10f + 3f * Mathf.Sin(Now * 31f)) * out_;
+            }
             B(Bone.Neck).localRotation = Quaternion.Euler(pitch * 0.3f + swimTilt * 0.4f, yaw * 0.25f + turn * 0.4f, tilt * 0.4f);
             B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 15f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
         }
@@ -1662,6 +1690,13 @@ namespace PleaseDontDrown.Avatars
             if (_down > 0.5f) { eyes = 0.08f; mouth = 0.45f; }
             else if (_lie > 0.5f && !Motion.Talking) { eyes = 0.12f; mouth = 0.05f; brows = 0.2f; } // soaking up the sun
             if (GestureActive(AvatarGesture.Breath, 1.1f)) { mouth = 0.08f; eyes = 0.08f; brows = 0.3f; } // a kiss: lips pressed, eyes shut
+            else if (GestureActive(AvatarGesture.Burp, BurpSeconds))
+            {
+                float b = GestureT(BurpSeconds) * BurpSeconds;
+                if (b < 0.25f) { mouth = 0.05f; brows = 0.6f; } // holding it in, cheeks puffed
+                else if (b < 1.05f) { mouth = 0.8f + 0.15f * Mathf.Sin(t * 37f); eyes = 0.35f; brows = -0.4f; }
+                else { mouth = 0.12f; eyes = 1.15f; brows = 0.35f; } // ...pardon me
+            }
             _rig.SetExpression(eyes, mouth, brows);
         }
     }

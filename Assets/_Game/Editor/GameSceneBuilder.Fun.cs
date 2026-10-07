@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using FishNet.Object;
+using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Fun;
 using PleaseDontDrown.Items;
 using PleaseDontDrown.Story;
@@ -70,6 +71,49 @@ namespace PleaseDontDrown.Editor
                 go.GetComponent<Rigidbody>().collisionDetectionMode = CollisionDetectionMode.Continuous;
             });
             yield return ball;
+
+            // A cold beer from the beach bar: drink it like food (hold Secondary), burp about ten seconds later.
+            PhysicsMaterial glass = GetPhysicsMaterial("BottleGlass", 0.15f, 0.5f, PhysicsMaterialCombine.Average);
+            Material amber = GetMaterial("BeerBottle", new Color(0.7f, 0.4f, 0.1f));
+            Item beer = BuildItem("Beer", "Beer", 0.5f, new Vector3(0.22f, -0.28f, 0.5f), new Vector3(-8f, 0f, 0f), 1f, glass, root =>
+            {
+                Primitive(PrimitiveType.Capsule, "Bottle", root, Vector3.zero, new Vector3(0.083f, 0.156f, 0.083f), amber);
+                DressProp(root, "beer_bottle");
+            }, linearDamping: 0.1f, angularDamping: 0.4f, density: 0.7f, waterDrag: 1.0f, configure: go =>
+            {
+                Item item = go.GetComponent<Item>();
+                SetBool(item, "_pocketable", true);
+                SetEnum(item, "_grip", (int)ItemGrip.OneHand);
+                AudioSource audio = SpatialAudio(go, 1.5f, 25f);
+                var drink = go.AddComponent<Edible>();
+                SetRef(drink, "_audio", audio);
+                SetField(drink, "_food", p => p.floatValue = 0.12f);
+                SetField(drink, "_seconds", p => p.floatValue = 2.6f);
+                SetBool(drink, "_drink", true);
+                SetField(drink, "_burpAfter", p => p.floatValue = 10f);
+                SetField(drink, "_lip", p => p.vector3Value = new Vector3(0f, 0.156f, 0f));
+                go.AddComponent<BottleHold>();
+                // The right hand round the bottle's belly: palm on its right side, a little toward you, fingers wrapped
+                // round the front (tried side by side in ReviewCapture "bottle:yaw:1": 30 degrees was the one).
+                var grip = new GameObject("GripRight").transform;
+                grip.SetParent(go.transform, false);
+                Quaternion round = Quaternion.Euler(0f, 30f, 0f);
+                Vector3 outward = round * Vector3.right;
+                grip.localPosition = outward * 0.036f + new Vector3(0f, -0.045f, 0f);
+                grip.localRotation = Quaternion.LookRotation(round * Vector3.forward, outward);
+                SetRef(item, "_gripRight", grip);
+                SetField(item, "_gripPose", p =>
+                {
+                    p.FindPropertyRelative("Index").floatValue = 0.82f;
+                    p.FindPropertyRelative("Middle").floatValue = 0.86f;
+                    p.FindPropertyRelative("Ring").floatValue = 0.9f;
+                    p.FindPropertyRelative("Pinky").floatValue = 0.94f;
+                    p.FindPropertyRelative("Thumb").floatValue = 0.7f;
+                    p.FindPropertyRelative("Spread").floatValue = 0f;
+                });
+                SetRef(go.AddComponent<ImpactSound>(), "_audio", audio);
+            });
+            yield return beer;
         }
 
         private static void BuildIsland1Fun(Transform env)
@@ -302,6 +346,7 @@ namespace PleaseDontDrown.Editor
             for (int i = 0; i < 4; i++)
                 Solid("Stool", new Vector3(-1.5f + i, 0.4f, 1.85f), new Vector3(0.22f, 0.8f, 0.22f)); // (slim: you can step between them to the counter)
             Solid("Menu", new Vector3(-2.45f, 0.7f, 1.4f), new Vector3(0.1f, 1.4f, 0.7f));
+            BuildBarista(root);
 
             root.gameObject.AddComponent<NetworkObject>();
             var rack = root.gameObject.AddComponent<ItemRack>();
@@ -316,6 +361,70 @@ namespace PleaseDontDrown.Editor
             SetField(rack, "_itemName", p => p.stringValue = "Coconut");
             SetRefs(rack, "_spots", spots.ToArray());
             SetField(rack, "_worldCap", p => p.intValue = 8);
+
+            // Two beers always waiting at the ends of the counter (more from the barista).
+            var beerRack = root.gameObject.AddComponent<ItemRack>();
+            var beerSpots = new List<Object>();
+            foreach (float x in new[] { -1.05f, 1.1f })
+            {
+                var spot = new GameObject("BeerSpot").transform;
+                spot.SetParent(root, false);
+                spot.localPosition = new Vector3(x, 1.36f, 1.15f);
+                beerSpots.Add(spot);
+            }
+            SetField(beerRack, "_itemName", p => p.stringValue = "Beer");
+            SetRefs(beerRack, "_spots", beerSpots.ToArray());
+            SetField(beerRack, "_worldCap", p => p.intValue = 12);
+        }
+
+        /// <summary>
+        /// The barista behind the counter (Fun/Barista): a stand-in body for now (his own model is coming), wiping the
+        /// counter with a rag; Interact orders a beer, put down in front of whichever stool you're at.
+        /// </summary>
+        private static void BuildBarista(Transform bar)
+        {
+            var root = new GameObject("Barista").transform;
+            root.SetParent(bar, false);
+            root.localPosition = new Vector3(0.25f, 0.158f, 0.6f); // on the deck right behind the counter, facing the stools
+            var capsule = root.gameObject.AddComponent<CapsuleCollider>();
+            capsule.height = 1.85f;
+            capsule.radius = 0.3f;
+            capsule.center = new Vector3(0f, 0.92f, 0f);
+
+            var avatarGo = new GameObject("Avatar");
+            avatarGo.transform.SetParent(root, false);
+            avatarGo.AddComponent<SkinnedMeshRenderer>();
+            var rig = avatarGo.AddComponent<AvatarRig>();
+            SetRef(rig, "_material", AvatarMaterial());
+            SetBool(rig, "_buildOnAwake", false);
+            var animator = avatarGo.AddComponent<AvatarAnimator>();
+            SetRef(animator, "_rig", rig);
+            SetRef(avatarGo.AddComponent<AvatarJiggle>(), "_rig", rig);
+
+            Transform Marker(string name, Vector3 local)
+            {
+                var t = new GameObject(name).transform;
+                t.SetParent(bar, false);
+                t.localPosition = local;
+                return t;
+            }
+            var serve = new List<Object>();
+            for (int i = 0; i < 4; i++) serve.Add(Marker($"ServeSpot{i}", new Vector3(-1.5f + i, 1.36f, 1.38f)));
+            Transform wipeFrom = Marker("WipeFrom", new Vector3(-0.25f, 1.19f, 0.98f));
+            Transform wipeTo = Marker("WipeTo", new Vector3(0.75f, 1.19f, 0.98f));
+            GameObject rag = Primitive(PrimitiveType.Cube, "Rag", root, new Vector3(0.3f, 1.03f, 0.38f), new Vector3(0.15f, 0.014f, 0.11f),
+                GetMaterial("BarRag", new Color(0.92f, 0.9f, 0.84f)), keepCollider: false);
+
+            var barista = root.gameObject.AddComponent<Barista>();
+            SetRef(barista, "_rig", rig);
+            SetRef(barista, "_animator", animator);
+            SetRef(barista, "_audio", SpatialAudio(root.gameObject, 3f, 40f));
+            SetRefs(barista, "_serveSpots", serve.ToArray());
+            SetRef(barista, "_wipeFrom", wipeFrom);
+            SetRef(barista, "_wipeTo", wipeTo);
+            SetRef(barista, "_rag", rag.transform);
+            ConfigureInteractable(root.gameObject.AddComponent<Interaction.Interactable>(), new Collider[] { capsule },
+                new Renderer[] { avatarGo.GetComponent<SkinnedMeshRenderer>() }, 3.6f);
         }
     }
 }

@@ -166,7 +166,9 @@ namespace PleaseDontDrown.Player
                     if (_remoteEating && hands.HeldItem == null) _remoteEating = false;
                     m.Eating = _remoteEating;
                 }
-                if (m.Eating) m.Holding = false; // the eating layer puts the hand at the mouth
+                // The eating layer puts the hand at the mouth; a bottle stays in the hand that tips it up.
+                m.Drinking = m.Eating && hands.HeldItem != null && hands.HeldItem.TryGetComponent(out Items.Edible drink) && drink.Drink;
+                if (m.Eating && !m.Drinking) m.Holding = false;
             }
 
             // Knocked flat (three punches, a coconut to the head): down on the sand for everyone to see.

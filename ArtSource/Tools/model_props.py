@@ -244,6 +244,10 @@ def finish(name, sharp=38.0, flat=False):
     ob = bpy.context.view_layer.objects.active
     ob.name = name; ob.data.name = name
     bm = bmesh.new(); bm.from_mesh(ob.data)
+    if name == "defibrillator":
+        # The tiny screen trace and paddle leads can create collapsed end-cap
+        # faces. Remove only zero-area geometry before exporting this prop.
+        bmesh.ops.dissolve_degenerate(bm, edges=list(bm.edges), dist=1e-7)
     limit = math.radians(sharp)
     for f in bm.faces: f.smooth = not flat
     for e in bm.edges:
@@ -401,6 +405,20 @@ def coconut():
         lathe(f"Eye{i}", d, [(0.0, -0.006), (0.013, -0.002), (0.015, 0.003), (0.0, 0.006)], "husk_dark", seg=8,
               rot=(math.degrees(math.sin(t)) * 0.33, 0, -math.degrees(math.cos(t)) * 0.33))
     lathe("Cap", (0, 0.108, 0), [(0.0, 0.004), (0.03, 0.002), (0.06, -0.012)], "husk_light", seg=9)
+
+@prop
+def beer_bottle():
+    """A chunky brown longneck 0.31 m tall (cartoon-sized for the goofy lifeguards' big hands; centred, the lip at
+    y 0.156): a cream label with a red band round its belly, gold foil round the neck and a gold crown cap."""
+    k = 1.3
+    def L(name, prof, mat, seg):
+        lathe(name, (0, 0, 0), [(r * k, y * k) for r, y in prof], mat, seg=seg)
+    L("Glass", [(0.0, -0.115), (0.026, -0.115), (0.031, -0.109), (0.031, 0.02), (0.029, 0.04), (0.021, 0.063),
+                (0.0125, 0.083), (0.0112, 0.106), (0.0125, 0.108), (0.0125, 0.113), (0.0, 0.113)], "bottle_amber", 20)
+    L("Label", [(0.0316, -0.075), (0.0316, -0.004)], "cream", 20)
+    L("Band", [(0.032, -0.05), (0.032, -0.03)], "red", 20)
+    L("Foil", [(0.0128, 0.086), (0.0122, 0.1)], "gold", 16)
+    L("Cap", [(0.0, 0.111), (0.0142, 0.111), (0.0142, 0.116), (0.012, 0.12), (0.0, 0.12)], "gold", 14)
 
 @prop
 def defibrillator():
