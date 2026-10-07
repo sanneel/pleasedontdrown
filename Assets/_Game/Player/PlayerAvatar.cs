@@ -27,6 +27,7 @@ namespace PleaseDontDrown.Player
         private float _remoteChargeTime;
         private float _lastPumpTime = -10f;
         private Vector3 _cprPoint, _kneelPoint; // where the hands press; where the body kneels beside it
+        private float _kneelReach = 0.55f;      // how far out from the middle of their body (clear of a big belly)
         private float _groundCheckAt;
         private bool _grounded = true;
         private Vector3 _kneelShift;      // the body moved over to the tourist it is doing CPR on (the player stays put)
@@ -90,11 +91,12 @@ namespace PleaseDontDrown.Player
         }
 
         /// <summary>A CPR compression by this player on a chest at <paramref name="chest"/>.</summary>
-        public void OnPump(Vector3 chest, Vector3 head = default)
+        public void OnPump(Vector3 chest, Vector3 head = default, float reach = 0.55f)
         {
             _lastPumpTime = Time.time;
             _cprPoint = chest;
             _kneelPoint = Rescue.VictimBody.KneelSpot(chest, head);
+            _kneelReach = reach;
             _animator.Play(AvatarGesture.Pump);
         }
 
@@ -258,7 +260,8 @@ namespace PleaseDontDrown.Player
         /// </summary>
         private void KneelBeside(bool kneeling, Vector3 position, float dt)
         {
-            const float arm = 0.55f, most = 2.2f;
+            const float most = 2.2f;
+            float arm = _kneelReach;
             Transform body = _animator.transform;
             if (body == transform) return; // the body is the player itself here: nothing to shift
             if (!_bodyRestKnown)
@@ -272,7 +275,9 @@ namespace PleaseDontDrown.Player
                 Vector3 to = _kneelPoint - position;
                 to.y = 0f;
                 float distance = to.magnitude;
+                // Pulled in from further away; pushed back out when standing too close (knees inside a big belly).
                 if (distance > arm) shift = to / distance * Mathf.Min(distance - arm, most);
+                else if (distance > 0.05f) shift = to / distance * (distance - arm);
             }
             _kneelShift = Vector3.Lerp(_kneelShift, shift, 1f - Mathf.Exp(-9f * dt));
             if (_kneelShift.sqrMagnitude < 1e-6f && shift == Vector3.zero) _kneelShift = Vector3.zero;

@@ -1080,6 +1080,21 @@ namespace PleaseDontDrown.Avatars
                 // Arms straight down, hands stacked on the chest.
                 Vector3 point = m.CprPoint;
                 if (point == Vector3.zero) point = transform.position + fwd * 0.55f + up * 0.15f;
+                // Leaning further over a chest the straight arms don't reach (a wide round dad is knelt beside from
+                // further out): the shoulders come over the hands, the way compressions are really done, instead of
+                // the hands hovering in the air in front of an upright rescuer.
+                Transform spine = B(Bone.Spine);
+                float armReach = (la + lb) * 0.97f, leaned = 0f;
+                for (int k = 0; k < 4 && leaned < 40f; k++)
+                {
+                    Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
+                    float gap = Vector3.Distance(shoulders, point + up * 0.05f) - armReach;
+                    if (gap <= 0.005f) break;
+                    float torso = Mathf.Max(Vector3.Distance(spine.position, shoulders), 0.1f);
+                    float step = Mathf.Min(gap / torso * Mathf.Rad2Deg, 40f - leaned);
+                    Turn(spine, right, step * _cpr);
+                    leaned += step;
+                }
                 // (One right on top of the other, on the middle of the chest: 5 cm apart sideways they read as two
                 // hands side by side.)
                 IK.Solve(upperR, foreR, la, lb, point + up * 0.02f, -fwd + right, _cpr, false);

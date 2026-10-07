@@ -64,11 +64,12 @@ namespace PleaseDontDrown.Editor
             victimObject.transform.SetPositionAndRotation(spot + Vector3.up * 0.14f, Quaternion.LookRotation(Vector3.up, Vector3.right));
             victim.ApplyLooks(AvatarLook.RandomTourist(tourist), tourist);
             Vector3 chest = victim.ChestPoint, mouth = victim.MouthPoint;
+            Debug.Log($"[KissCheck] tourist {tourist}: chest {chest - spot}, mouth {mouth - spot}, head {victim.HeadPosition - spot}, reach {victim.KneelReach:F2}");
 
             // The lifeguard kneeling at the chest, facing it.
             var body = new GameObject("KissCheckLifeguard");
             Vector3 kneel = VictimBody.KneelSpot(chest, victim.HeadPosition); // (as PlayerAvatar.KneelBeside puts the body)
-            Vector3 feet = new Vector3(kneel.x, spot.y, kneel.z - 0.62f);
+            Vector3 feet = new Vector3(kneel.x, spot.y, kneel.z - victim.KneelReach); // (as KneelBeside keeps it)
             body.transform.SetPositionAndRotation(feet, Quaternion.identity);
             AvatarLook look = AvatarLook.Lifeguard;
             look.HeadSize = head;
@@ -78,6 +79,25 @@ namespace PleaseDontDrown.Editor
             animator.Rig = rig;
             animator.Motion = new AvatarMotion { FacingYaw = 0f, Grounded = true, Cpr = true, CprPoint = chest };
             for (int i = 0; i < 60; i++) { AvatarAnimator.TimeOverride = 100f + i / 30f; animator.Tick(1f / 30f); }
+            // Compressing (before any breath): the hands on the breastbone, the rescuer kneeling clear of the body.
+            // (A few compressions first, as in the game: a pump every 0.6 s; caught just after one.)
+            for (int i = 0; i < 54; i++)
+            {
+                AvatarAnimator.TimeOverride = 98f + i / 30f;
+                if (i % 18 == 0) animator.Play(AvatarGesture.Pump, chest);
+                animator.Tick(1f / 30f);
+            }
+            AvatarAnimator.TimeOverride = 99.85f;
+            animator.Tick(1f / 30f);
+            foreach ((string view, Vector3 offset) in new[] { ("press_level", new Vector3(0f, 0.1f, 1.8f)), ("press_feet", new Vector3(-2f, 0.25f, 0.1f)),
+                         ("press_high", new Vector3(-0.6f, 1.3f, 1.3f)) })
+            {
+                Vector3 eye = chest + offset;
+                camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(chest - eye));
+                camera.fieldOfView = 36f;
+                Render(camera, $"kiss_t{tourist}_h{head}_{view}");
+            }
+            AvatarAnimator.TimeOverride = 102f;
             animator.Play(AvatarGesture.Breath, mouth);
             // The lips down on theirs: the middle of the breath.
             for (int i = 0; i <= 18; i++) { AvatarAnimator.TimeOverride = 102f + i / 30f; animator.Tick(1f / 30f); }
@@ -103,7 +123,9 @@ namespace PleaseDontDrown.Editor
             animator.Tick(1f / 30f);
             AvatarAnimator.TimeOverride = null;
             Vector3 pressAt = chest + new Vector3(0f, 0.15f, 0f);
-            foreach ((string view, Vector3 offset) in new[] { ("pump_side", new Vector3(-0.2f, 1.1f, -2.2f)), ("pump_across", new Vector3(0.2f, 1.1f, 2.2f)) })
+            foreach ((string view, Vector3 offset) in new[] { ("pump_side", new Vector3(-0.2f, 1.1f, -2.2f)), ("pump_across", new Vector3(0.2f, 1.1f, 2.2f)),
+                         ("pump_top", new Vector3(-1.1f, 1.7f, 1.0f)), ("pump_close", new Vector3(-0.75f, 0.55f, 0.9f)),
+                         ("pump_level", new Vector3(0f, 0.05f, 1.7f)), ("pump_feet", new Vector3(-1.9f, 0.1f, 0.15f)) })
             {
                 Vector3 eye = pressAt + offset;
                 camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(pressAt - eye));

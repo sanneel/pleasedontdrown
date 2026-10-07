@@ -228,11 +228,12 @@ namespace PleaseDontDrown.Player
         private void GestureObservers(AvatarGesture gesture, Vector3 point) => _avatar.OnGesture(gesture, point);
 
         /// <summary>This player pressed a chest for CPR (called on every machine; see VictimBrain).</summary>
-        public void ShowPump(Vector3 chest, Vector3 head = default)
+        /// <param name="reach">How far from the middle of their body to kneel (<see cref="Rescue.VictimBody.KneelReach"/>).</param>
+        public void ShowPump(Vector3 chest, Vector3 head = default, float reach = 0.55f)
         {
-            _avatar.OnPump(chest, head);
+            _avatar.OnPump(chest, head, reach);
             if (_arms != null) _arms.OnPump(chest);
-            if (IsOwner && Look != null) Look.KneelAt(chest, head); // our own view kneels beside them
+            if (IsOwner && Look != null) Look.KneelAt(chest, head, reach); // our own view kneels beside them
         }
 
         /// <summary>The other CPR steps: a rescue breath at the mouth, or a punch to the face (every machine).</summary>

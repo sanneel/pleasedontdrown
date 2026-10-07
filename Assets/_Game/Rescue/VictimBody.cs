@@ -109,9 +109,72 @@ namespace PleaseDontDrown.Rescue
             get
             {
                 if (_avatar != null && _avatar.IsBuilt && _avatar[AvatarRig.Bone.Spine] != null && _avatar[AvatarRig.Bone.Chest] != null)
-                    return Vector3.LerpUnclamped(_avatar[AvatarRig.Bone.Spine].position, _avatar[AvatarRig.Bone.Chest].position, 1.05f) + transform.forward * (0.13f * _avatar.Scale);
+                {
+                    if (!_chestMeasured) MeasureChest();
+                    return _avatar[AvatarRig.Bone.Chest].TransformPoint(_chestSkinLocal);
+                }
                 return transform.position + transform.forward * 0.17f + transform.up * 0.12f;
             }
+        }
+
+        /// <summary>
+        /// How far from the middle of the body a rescuer kneels beside them: clear of the widest of the torso (a round
+        /// dad's belly spreads far wider than a slim tourist's waist), close enough for the hands to reach the chest.
+        /// </summary>
+        public float KneelReach
+        {
+            get
+            {
+                if (_avatar != null && _avatar.IsBuilt && !_chestMeasured && _avatar[AvatarRig.Bone.Chest] != null) MeasureChest();
+                return Mathf.Max(0.55f, _chestHalfWidth + 0.36f);
+            }
+        }
+
+        // The breastbone's skin (in the chest bone's space) and the torso's half width, measured on the body itself
+        // once per look: the round dads' chests stand far higher off the sand than a bone offset tuned on slim bodies
+        // (the hands went into their bellies) and their bellies far wider (the rescuer knelt inside them).
+        private Vector3 _chestSkinLocal;
+        private float _chestHalfWidth = 0.18f;
+        private bool _chestMeasured;
+
+        private void MeasureChest()
+        {
+            _chestMeasured = true;
+            Transform spine = _avatar[AvatarRig.Bone.Spine], chest = _avatar[AvatarRig.Bone.Chest], hips = _avatar[AvatarRig.Bone.Hips];
+            Transform head = _avatar[AvatarRig.Bone.Head];
+            float s = _avatar.Scale;
+            Vector3 bone = Vector3.LerpUnclamped(spine.position, chest.position, 1.05f);
+            _chestSkinLocal = chest.InverseTransformPoint(bone + transform.forward * (0.13f * s));
+            _chestHalfWidth = 0.18f * s;
+            SkinnedMeshRenderer skin = _avatar.Renderer;
+            if (skin == null || skin.sharedMesh == null || head == null) return;
+            Vector3 along = (head.position - chest.position).normalized; // toward the head
+            Vector3 front = Vector3.ProjectOnPlane(transform.forward, along).normalized;
+            Vector3 side = Vector3.Cross(along, front);
+            var baked = new Mesh();
+            skin.BakeMesh(baked, false);
+            Vector3[] vertices = baked.vertices;
+            BoneWeight[] weights = skin.sharedMesh.boneWeights;
+            Transform[] bones = skin.bones;
+            Matrix4x4 toWorld = skin.transform.localToWorldMatrix;
+            float depth = float.MinValue, half = 0f;
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 d = toWorld.MultiplyPoint3x4(vertices[i]) - bone;
+                float a = Vector3.Dot(d, along), f = Vector3.Dot(d, front), x = Vector3.Dot(d, side);
+                if (Mathf.Abs(a) < 0.05f * s && Mathf.Abs(x) < 0.035f * s) depth = Mathf.Max(depth, f);
+                // The torso's own skin (not the arms lying beside it), from the hips up to the chest.
+                if (i < weights.Length && a > -0.45f * s && a < 0.1f * s)
+                {
+                    int b = weights[i].boneIndex0;
+                    Transform owner = b < bones.Length ? bones[b] : null;
+                    if (owner == spine || owner == chest || owner == hips) half = Mathf.Max(half, Mathf.Abs(x));
+                }
+            }
+            if (Application.isPlaying) Destroy(baked); else DestroyImmediate(baked);
+            if (depth > 0.04f * s && depth < 0.6f * s) _chestSkinLocal = chest.InverseTransformPoint(bone + front * (depth + 0.01f * s));
+            if (half > 0.08f * s && half < 0.8f * s) _chestHalfWidth = half;
+            Debug.Log($"[Victim] {name}: chest skin {depth * 100f:F1} cm out from the bones, torso {half * 200f:F0} cm wide");
         }
         /// <summary>
         /// Where a rescuer kneels beside them: level with a point some 40% of the way from the chest to the head, from
@@ -184,6 +247,7 @@ namespace PleaseDontDrown.Rescue
             _voice = look.Feminine ? 2 + Mathf.Abs(seed % 2) : Mathf.Abs(seed % 2);
             if (_avatar == null) return;
             _avatar.Build(look);
+            _chestMeasured = false;
             // Hips of the cartoon body on the torso's hip joints.
             _avatar.transform.localPosition = new Vector3(0f, _hipY - _avatar.HipHeight, 0f);
             _avatar.transform.localRotation = Quaternion.identity;
