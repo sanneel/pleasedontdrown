@@ -11,9 +11,9 @@ namespace PleaseDontDrown.Fun
 {
     /// <summary>
     /// The banana boat, towed by the lifeguards' jet ski: one lifeguard drives the ski, another sits on the banana
-    /// behind it. Drive the ski up to the banana's nose and it hitches on (a rope from the ski's tail). Turn too hard
-    /// at speed and whoever is on the banana goes flying into the sea. Whichever machine simulates the banana pulls it
-    /// along the rope; the host decides hitching and who gets flung off.
+    /// behind it. Drive the ski up to the banana's nose and it hitches on (a rope from the ski's tail). Hold a long,
+    /// sharp turn at full speed (around a U-turn) and whoever is on the banana goes flying into the sea. Whichever
+    /// machine simulates the banana pulls it along the rope; the host decides hitching and who gets flung off.
     /// </summary>
     public class BananaBoat : NetworkBehaviour
     {
@@ -23,13 +23,15 @@ namespace PleaseDontDrown.Fun
         [SerializeField] private float _ropeLength = 6f;
 
         public const string TugName = "Lifeguard Jet Ski";
-        private const float FlingSpeed = 6f, FlingTurn = 55f; // m/s and degrees a second
+        private const float FlingSpeed = 10f, FlingTurn = 70f; // m/s and degrees a second
+        private const float FlingSweep = 150f, WhipDrain = 200f; // degrees of hard turning it takes, and how fast it fades
 
         private readonly SyncVar<NetworkObject> _towedBy = new SyncVar<NetworkObject>();
         private Rigidbody _body;
         private float _nextThink, _nextFling, _unmannedSince = -1f;
         private Vector3 _lastPos;
         private float _lastYaw, _speed, _yawRate;
+        private float _whip, _whipSign;
 
         private void Awake() => _body = GetComponent<Rigidbody>();
 
@@ -90,11 +92,22 @@ namespace PleaseDontDrown.Fun
             _lastPos = p;
             _lastYaw = yaw;
 
-            // Too sharp a turn too fast: everyone on the banana goes flying (the back riders furthest: they're
-            // on the end of the whip).
-            var riders = _vehicle != null ? _vehicle.Aboard() : null;
-            if (riders != null && riders.Count > 0 && _speed > FlingSpeed && Mathf.Abs(_yawRate) > FlingTurn && Time.time > _nextFling)
+            // A hard turn at speed, held round to about a U-turn: everyone on the banana goes flying (the back riders
+            // furthest: they're on the end of the whip). Short swerves fade away and turning back starts over.
+            float sign = Mathf.Sign(_yawRate);
+            if (_speed > FlingSpeed && Mathf.Abs(_yawRate) > FlingTurn)
             {
+                if (sign != _whipSign) _whip = 0f;
+                _whipSign = sign;
+                _whip += Mathf.Abs(_yawRate) * dt;
+            }
+            else _whip = Mathf.MoveTowards(_whip, 0f, WhipDrain * dt);
+
+            var riders = _vehicle != null ? _vehicle.Aboard() : null;
+            if (riders != null && riders.Count > 0 && _whip >= FlingSweep && Time.time > _nextFling)
+            {
+                float swept = _whip;
+                _whip = 0f;
                 _nextFling = Time.time + 4f;
                 Vector3 outward = -transform.right * Mathf.Sign(_yawRate);
                 for (int i = 0; i < riders.Count; i++)
@@ -104,7 +117,7 @@ namespace PleaseDontDrown.Fun
                     else _vehicle.ServerKickRider(rider);
                     FlingTarget(rider.Owner, outward * (6f + i * 1.5f) + Vector3.up * (5f + i));
                     FlungObservers(rider.DisplayName, p + Vector3.up);
-                    Debug.Log($"[Banana] {rider.DisplayName} flung off at {_speed:F1} m/s, turning {_yawRate:F0} deg/s");
+                    Debug.Log($"[Banana] {rider.DisplayName} flung off at {_speed:F1} m/s, turning {_yawRate:F0} deg/s for {swept:F0} deg");
                 }
             }
 
