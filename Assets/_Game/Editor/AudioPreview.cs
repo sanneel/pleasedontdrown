@@ -30,6 +30,14 @@ namespace PleaseDontDrown.Editor
                 Export(dir, "throw", BeachAudio.Throw);
                 Export(dir, "equip", BeachAudio.Equip);
                 Export(dir, "punch-swoosh", BeachAudio.PunchSwoosh);
+                for (int i = 0; i < 3; i++)
+                {
+                    Export(dir, $"coconut-bite-{i}", Audio.ActionFoley.Bite);
+                    Export(dir, $"drink-glug-{i}", Audio.ActionFoley.Gulp);
+                    Export(dir, $"air-punch-{i}", Audio.ActionFoley.Punch);
+                    Export(dir, $"air-throw-{i}", Audio.ActionFoley.Throw);
+                    Export(dir, $"air-blade-{i}", Audio.ActionFoley.Blade);
+                }
                 Export(dir, "menu-hover", BeachAudio.MenuHover);
                 Export(dir, "menu-select", BeachAudio.MenuSelect);
                 Export(dir, "bird", BeachAudio.Bird);

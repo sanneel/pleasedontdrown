@@ -56,9 +56,10 @@ namespace PleaseDontDrown.Editor
             string paint = imported.name;
             Color colour = imported.HasProperty("baseColorFactor") ? imported.GetColor("baseColorFactor")
                 : imported.HasProperty("_BaseColor") ? imported.GetColor("_BaseColor") : imported.color;
-            bool metal = paint is "gold" or "brass" or "brass_dark" or "steel";
-            bool glossy = paint is "screen" or "screen_light" or "lens" or "glass";
-            return GetMaterial("Prop_" + paint, colour, metallic: metal ? 0.7f : 0f, smoothness: metal ? 0.55f : glossy ? 0.8f : 0.12f);
+            bool metal = paint is "gold" or "brass" or "brass_dark" or "steel" or "beer_foil";
+            bool glossy = paint is "screen" or "screen_light" or "lens" or "glass" or "beer_glass" or "condensation";
+            return GetMaterial("Prop_" + paint, colour, metallic: metal ? 0.7f : 0f,
+                smoothness: paint == "condensation" ? 0.92f : paint == "coconut_flesh" ? 0.58f : metal ? 0.65f : glossy ? 0.84f : 0.12f);
         }
 
         /// <summary>

@@ -436,17 +436,7 @@ namespace PleaseDontDrown.Core
         {
             get
             {
-                if (_knifeSwish != null) return _knifeSwish;
-                var rng = new System.Random(515);
-                float low = 0f;
-                return _knifeSwish = Build("KnifeSwish", 0.22f, t =>
-                {
-                    float u = t / 0.22f;
-                    float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
-                    low += (noise - low) * Mathf.Lerp(0.35f, 0.9f, Mathf.Sin(u * Mathf.PI));
-                    float hiss = noise - low; // the high part
-                    return hiss * 0.55f * Mathf.Sin(u * Mathf.PI) * Mathf.Sin(u * Mathf.PI);
-                });
+                return Audio.ActionFoley.Blade;
             }
         }
 

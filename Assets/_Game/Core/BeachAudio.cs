@@ -61,9 +61,9 @@ namespace PleaseDontDrown.Core
         }
 
         public static AudioClip Drop => _drop != null ? _drop : _drop = MakeImpact("ItemDrop", 0.34f, 140f, 0.26f);
-        public static AudioClip Throw => _throw != null ? _throw : _throw = MakeSweep("ItemThrow", 0.30f, 42, 0.54f);
+        public static AudioClip Throw => Audio.ActionFoley.Throw;
         public static AudioClip Equip => _equip != null ? _equip : _equip = MakeImpact("Equip", 0.25f, 340f, 0.18f);
-        public static AudioClip PunchSwoosh => _swoosh != null ? _swoosh : _swoosh = MakeSweep("PunchSwoosh", 0.28f, 81, 0.75f);
+        public static AudioClip PunchSwoosh => Audio.ActionFoley.Punch;
         public static AudioClip MenuSelect => _menu != null ? _menu : _menu = MakeChime();
         public static AudioClip MenuHover => _hover != null ? _hover : _hover = Build("MenuHover", 0.13f, t =>
             Mathf.Sin(2f * Mathf.PI * (510f * t + 80f * t * t)) *

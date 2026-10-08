@@ -41,14 +41,25 @@ namespace PleaseDontDrown.Items
 
         private void Crunch()
         {
-            if (_audio != null) _audio.PlayOneShot(_drink ? BurpSound.Gulp : ProceduralAudio.Crunch, Random.Range(0.8f, 1f));
+            if (_audio != null) _audio.PlayOneShot(_drink ? ActionFoley.Gulp : ActionFoley.Bite, _drink ? 0.85f : 0.75f);
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void BiteServer() => BiteObservers();
+        private void BiteServer(NetworkConnection caller = null)
+        {
+            var holder = GetComponent<Item>().Holder;
+            if (holder == null || holder.Owner != caller) return;
+            BiteObservers();
+        }
 
-        [ObserversRpc(ExcludeOwner = true)]
-        private void BiteObservers() => Crunch();
+        [ObserversRpc]
+        private void BiteObservers()
+        {
+            // The holder already heard the immediate local bite. Item ownership may
+            // belong to the server, so ExcludeOwner alone could play it twice.
+            if (GetComponent<Item>().Holder == PlayerHub.Local) return;
+            Crunch();
+        }
 
         /// <summary>The eater finished it: the host removes it.</summary>
         public void Consume(PlayerHub eater) => ConsumeServer();

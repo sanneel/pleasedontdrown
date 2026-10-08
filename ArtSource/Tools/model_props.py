@@ -35,6 +35,9 @@ PAINT = {  # sRGB, all matte
     "bamboo": (0.82, 0.7, 0.42), "bamboo_dark": (0.6, 0.48, 0.25), "teal_dark": (0.08, 0.45, 0.47),
     "bottle_green": (0.18, 0.5, 0.25), "bottle_amber": (0.7, 0.4, 0.1), "bottle_blue": (0.2, 0.42, 0.75),
     "chalk": (0.15, 0.2, 0.18),
+    "beer_glass": (0.37, 0.15, 0.045), "beer_foil": (0.92, 0.67, 0.24),
+    "beer_label": (0.99, 0.95, 0.80), "condensation": (0.64, 0.79, 0.81),
+    "coconut_flesh": (0.98, 0.97, 0.90),
 }
 
 def srgb_to_linear(c): return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
@@ -45,8 +48,8 @@ def material(name):
     m = bpy.data.materials.new(name); m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*[srgb_to_linear(c) for c in PAINT[name]], 1)
-    b.inputs["Roughness"].default_value = 0.82
-    b.inputs["Metallic"].default_value = 0.0
+    b.inputs["Roughness"].default_value = {"beer_glass": 0.16, "beer_foil": 0.24, "condensation": 0.08, "coconut_flesh": 0.42}.get(name, 0.82)
+    b.inputs["Metallic"].default_value = 0.75 if name == "beer_foil" else 0.0
     return m
 
 def B(p):
@@ -135,7 +138,7 @@ def box(name, centre, size, mat, rot=(0, 0, 0), bevel=0.004, segments=1):
     faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
     return add(name, verts, faces, mat, bevel=min(bevel, min(size) * 0.3), segments=segments)
 
-def lathe(name, centre, profile, mat, seg=16, axis='y', rot=(0, 0, 0), bevel=0.0, turn=0.5):
+def lathe(name, centre, profile, mat, seg=16, axis='y', rot=(0, 0, 0), bevel=0.0, turn=0.5, caps=True):
     """A shape turned round an axis: profile = [(radius, height along the axis)...] from one end to the other."""
     R = euler(*rot); c = Vector(centre)
     def place(r, h, i):
@@ -157,8 +160,8 @@ def lathe(name, centre, profile, mat, seg=16, axis='y', rot=(0, 0, 0), bevel=0.0
             if len(r0) == 1: faces.append((r0[0], r1[i], r1[j]))
             elif len(r1) == 1: faces.append((r0[i], r0[j], r1[0]))
             else: faces.append((r0[i], r0[j], r1[j], r1[i]))
-    if len(rings[0]) > 1: faces.append(tuple(rings[0]))
-    if len(rings[-1]) > 1: faces.append(tuple(rings[-1]))
+    if caps and len(rings[0]) > 1: faces.append(tuple(rings[0]))
+    if caps and len(rings[-1]) > 1: faces.append(tuple(rings[-1]))
     return add(name, verts, faces, mat, bevel=bevel)
 
 def arc_profile(radius, y0, y1, steps, squash=1.0):
@@ -408,14 +411,25 @@ def life_ring():
 
 @prop
 def coconut():
-    """A brown husk a little taller than wide: a paler fibrous cap on top with the three dark eyes in it."""
-    blob("Husk", (0, 0, 0), (0.1, 0.115, 0.1), "husk", subdiv=3, rough=0.05, freq=3.0, seed=2.0)
-    for i in range(3):
-        t = math.radians(i * 120 + 20)
-        d = Vector((math.cos(t) * 0.036, 0.107, math.sin(t) * 0.036))
-        lathe(f"Eye{i}", d, [(0.0, -0.006), (0.013, -0.002), (0.015, 0.003), (0.0, 0.006)], "husk_dark", seg=8,
-              rot=(math.degrees(math.sin(t)) * 0.33, 0, -math.degrees(math.cos(t)) * 0.33))
-    lathe("Cap", (0, 0.108, 0), [(0.0, 0.004), (0.03, 0.002), (0.06, -0.012)], "husk_light", seg=9)
+    """An opened snack coconut: fibrous brown shell, thick white rim and a shallow flesh bowl."""
+    profile = [(0, -.112), (.037, -.103), (.068, -.079), (.090, -.041), (.101, .004),
+               (.098, .041), (.087, .083), (.081, .088), (.074, .081), (.072, .059), (0, .030)]
+    lathe("Shell", (0, 0, 0), profile, "husk", seg=48)
+    flesh = lathe("FreshFlesh", (0, 0, 0), [(.082, .089), (.074, .087), (.070, .063),
+                                           (.057, .061), (.034, .055), (0, .050)], "coconut_flesh", seg=48, caps=False)
+    # An open concave surface has no volume to guide Blender's normal repair.
+    # All visible flesh faces must face into the bowl, toward the sky.
+    bm = bmesh.new(); bm.from_mesh(flesh.data); bm.normal_update()
+    bmesh.ops.reverse_faces(bm, faces=[f for f in bm.faces if f.normal.z < 0])
+    bm.to_mesh(flesh.data); bm.free()
+    for i in range(28):
+        angle = 2 * math.pi * i / 28
+        pts = []
+        for radius, height in profile[1:7]:
+            a = angle + .028 * math.sin(height * 36 + i)
+            pts.append(((radius + .0008) * math.cos(a), height, (radius + .0008) * math.sin(a)))
+        tube(f"Fibre{i}", pts, .00065 if i % 3 else .0010,
+             "husk_light" if i % 3 else "husk_dark", seg=4)
 
 @prop
 def beer_bottle():
@@ -423,13 +437,25 @@ def beer_bottle():
     y 0.156): a cream label with a red band round its belly, gold foil round the neck and a gold crown cap."""
     k = 1.3
     def L(name, prof, mat, seg):
-        lathe(name, (0, 0, 0), [(r * k, y * k) for r, y in prof], mat, seg=seg)
+        lathe(name, (0, 0, 0), [(r * k, y * k) for r, y in prof], mat, seg=seg, caps=False)
     L("Glass", [(0.0, -0.115), (0.026, -0.115), (0.031, -0.109), (0.031, 0.02), (0.029, 0.04), (0.021, 0.063),
-                (0.0125, 0.083), (0.0112, 0.106), (0.0125, 0.108), (0.0125, 0.113), (0.0, 0.113)], "bottle_amber", 20)
-    L("Label", [(0.0316, -0.078), (0.0316, -0.002)], "cream", 32)
+                (0.0125, 0.083), (0.0112, 0.106), (0.0125, 0.108), (0.0125, 0.12),
+                (0.0095, 0.12), (0.0095, 0.103)], "beer_glass", 48)
+    L("Label", [(0.0316, -0.078), (0.0316, -0.002)], "beer_label", 64)
     L("Band", [(0.0321, -0.054), (0.0321, -0.031)], "red", 32)
-    L("Foil", [(0.0128, 0.086), (0.0122, 0.1)], "gold", 16)
-    L("Cap", [(0.0, 0.111), (0.0142, 0.111), (0.0142, 0.116), (0.012, 0.12), (0.0, 0.12)], "gold", 14)
+    L("Foil", [(0.0128, 0.086), (0.0122, 0.1)], "beer_foil", 32)
+    L("OpenLip", [(0.0127, 0.112), (0.0134, 0.116), (0.0130, 0.12), (0.0095, 0.12)], "beer_foil", 48)
+    L("BottomRim", [(0.029, -0.113), (0.0314, -0.108), (0.0314, -0.102)], "beer_glass", 48)
+    L("LabelTopTrim", [(0.0319, -.006), (0.0319, -.002)], "blue_dark", 64)
+    L("LabelBottomTrim", [(0.0319, -.079), (0.0319, -.075)], "blue_dark", 64)
+    rng = random.Random(621)
+    for i in range(24):
+        angle = rng.random() * 2 * math.pi
+        y = rng.uniform(-.14, .021)
+        if -.106 < y < -.002: continue  # keep the lettering readable
+        r = .0312 * k
+        blob(f"ColdDrop{i}", (math.cos(angle) * r, y, math.sin(angle) * r),
+             (.0015, .0024 + rng.random() * .0018, .0015), "condensation", subdiv=1, rough=0)
     # The label's design, raised a hair off it and wrapped round the glass: the brand in white on the red band, a
     # setting sun over a wave above it, the kind of beer underneath.
     # (Front and back, so the drinker and whoever they're toasting both see it.)
