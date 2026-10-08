@@ -63,7 +63,7 @@ Python/Blender scripts in `ArtSource/Tools/`), `Tools/` (test and helper scripts
 |---|---|
 | Story, beats, gags, console commands for the story | `Docs/05-Story-Mode.md`, `Docs/14-Tsunami-Island-1.md` |
 | Island 1 attractions | `Docs/13-Island-1-Fun.md` |
-| Island 2 resort and hotel | `Docs/Island-2-Resort.md` |
+| Island 2 resort and hotel | `Docs/Island-2-Resort.md`, `Docs/Hotel-Finish.md` |
 | Guns | `Docs/08-Weapons.md` |
 | Dev island (test sandbox) | `Docs/09-Dev-Island.md` |
 | Multiplayer with Steam | `Docs/10-Steam-Friends.md` |
