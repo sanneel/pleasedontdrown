@@ -44,7 +44,7 @@ namespace PleaseDontDrown.Editor
         private static readonly Vector3 Island2Spawn = new(20f, 0.3f, -231f);
         private static readonly Vector3 PirateLanding = new(-8f, 0f, -219f);
         private static readonly Vector3 PirateBoatStart = new(-80f, 0f, -168f);
-        private static readonly Vector3 PirateBoatParked = new(-150f, 0f, -330f);
+        private static readonly Vector3 PirateBoatParked = new(-210f, 0f, -330f);
 
         // =====================================================================
         // Items
@@ -126,6 +126,18 @@ namespace PleaseDontDrown.Editor
                 SetBool(go.GetComponent<Item>(), "_pocketable", true);
                 SetEnum(go.GetComponent<Item>(), "_grip", (int)ItemGrip.OneHand);
             });
+
+            yield return BuildItem("FleetKeyCase", "Fleet Key Case", 0.7f, smallHold, Vector3.zero, 1f, rubber, root =>
+            {
+                Primitive(PrimitiveType.Cube, "OrangeCase", root, Vector3.zero, new Vector3(0.42f, 0.17f, 0.30f), orange);
+                Primitive(PrimitiveType.Cube, "Lid", root, new Vector3(0f, 0.10f, 0f), new Vector3(0.44f, 0.045f, 0.32f), black, keepCollider: false);
+                for (int i = 0; i < 4; i++)
+                {
+                    Primitive(PrimitiveType.Cube, "KeyTag", root, new Vector3(-0.14f + i * 0.095f, 0.13f, 0f), new Vector3(0.06f, 0.02f, 0.12f), orange, keepCollider: false);
+                    Primitive(PrimitiveType.Cube, "Key", root, new Vector3(-0.14f + i * 0.095f, 0.135f, 0.07f), new Vector3(0.02f, 0.018f, 0.07f), steel, keepCollider: false);
+                }
+                Primitive(PrimitiveType.Cube, "Handle", root, new Vector3(0f, 0.02f, -0.19f), new Vector3(0.17f, 0.05f, 0.07f), black, keepCollider: false);
+            }, density: 0.25f, configure: go => SetBool(go.GetComponent<Item>(), "_pocketable", true));
 
             // Guns: pistol, SMG, shotgun, rifle, sniper (GameSceneBuilder.Weapons.cs).
             foreach (Object gun in BuildWeapons(wood)) yield return gun;
@@ -277,8 +289,9 @@ namespace PleaseDontDrown.Editor
                 lostSpots.Add(Point(story, $"LostItemSpot_{lostSpots.Count}", OnGround(towels1[i].position + towels1[i].right * 1.1f), 0f));
             Transform robberSpawn = Point(story, "RobberSpawn", OnGround(RobberSpawn), 90f);
 
-            // The robber's jet ski, tied up by the dock.
-            Vehicle jetSki = BuildJetSki(env, OnWater(JetSkiDock1), 180f);
+            BuildRentalDock(env, story, npcPrefab, out StoryNpc rentalOperator, out Vehicle[] rentalFleet,
+                out Transform[] rentalBerths, out Transform rentalKeys);
+            Vehicle jetSki = rentalFleet[0];
 
             // ---------------------------------------------------------------- island 2: the hotel
             BuildDock(env, "HotelDock", Dock2, 24f);
@@ -314,6 +327,10 @@ namespace PleaseDontDrown.Editor
             SetRef(director, "_reception", reception);
             SetRef(director, "_receptionDesk", desk);
             SetRef(director, "_jetSki", jetSki);
+            SetRef(director, "_rentalOperator", rentalOperator);
+            SetRefs(director, "_rentalFleet", rentalFleet);
+            SetRefs(director, "_rentalBerths", rentalBerths);
+            SetRef(director, "_rentalKeySpot", rentalKeys);
             SetRef(director, "_jetSkiIsland2Dock", jetSkiDock2);
             SetRef(director, "_pirateBoat", pirateBoat);
             SetRef(director, "_pirateBoatStart", pirateStart);
@@ -363,7 +380,7 @@ namespace PleaseDontDrown.Editor
         /// Bakes a navmesh per island from the scene's static colliders (terrain, buildings, counters, trunks, dock
         /// posts, rocks; nothing with a rigidbody) and adds a loader, so story characters walk around things.
         /// </summary>
-        private static void BakeNavMeshes()
+        private static void BakeNavMeshes(bool resortOnly = false)
         {
             Directory.CreateDirectory(NavMeshDir);
             // Objects were created and moved by script: bring the physics scene up to date, or collecting the
@@ -379,12 +396,13 @@ namespace PleaseDontDrown.Editor
             (string name, Bounds bounds)[] areas =
             {
                 ("Island1", new Bounds(new Vector3(0f, 0f, 8f), new Vector3(130f, 40f, 124f))),
-                ("Island2", new Bounds(new Vector3(20f, 0f, -232f), new Vector3(144f, 40f, 124f))),
+                ("Island2", new Bounds(new Vector3(20f, 15f, -345f), new Vector3(392f, 70f, 330f))),
                 ("DevIsland", new Bounds(new Vector3(-230f, 0f, -60f), new Vector3(110f, 40f, 90f)))
             };
             var baked = new List<Object>();
             foreach ((string name, Bounds bounds) in areas)
             {
+                if (resortOnly && name != "Island2") continue;
                 var sources = new List<NavMeshBuildSource>();
                 UnityEngine.AI.NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.PhysicsColliders, 0, new List<NavMeshBuildMarkup>(), sources);
                 sources.RemoveAll(s => s.component is Collider c && (c.attachedRigidbody != null || c.isTrigger));
@@ -420,11 +438,18 @@ namespace PleaseDontDrown.Editor
                 NavMeshData data = UnityEngine.AI.NavMeshBuilder.BuildNavMeshData(settings, sources, bounds, Vector3.zero, Quaternion.identity);
                 data.name = $"NavMesh_{name}";
                 string path = $"{NavMeshDir}/{name}.asset";
-                AssetDatabase.DeleteAsset(path);
-                AssetDatabase.CreateAsset(data, path);
-                baked.Add(data);
+                var existing = AssetDatabase.LoadAssetAtPath<NavMeshData>(path);
+                if (existing != null)
+                {
+                    EditorUtility.CopySerialized(data, existing);
+                    Object.DestroyImmediate(data);
+                    EditorUtility.SetDirty(existing);
+                    baked.Add(existing);
+                }
+                else { AssetDatabase.CreateAsset(data, path); baked.Add(data); }
                 Debug.Log($"[Build] navmesh {name}: {sources.Count} sources");
             }
+            if (resortOnly) return; // Existing loader retains its stable Island2 asset reference.
             var loader = new GameObject("Navigation").AddComponent<NavMeshLoader>();
             SetRefs(loader, "_data", baked.ToArray());
         }
@@ -810,6 +835,7 @@ namespace PleaseDontDrown.Editor
             lamp.range = 16f;
             lamp.intensity = 1.6f;
             lamp.color = new Color(1f, 0.92f, 0.8f);
+            BuildResortExterior(hotel);
             return hotel;
         }
 

@@ -159,6 +159,19 @@ namespace PleaseDontDrown.Player
         private float _leanStart = -10f, _leanLength;
 
         private Vector3 _kneelChest, _kneelHead;
+        private float _kneelReach = 0.55f;
+        private Vector3 _viewFrom;
+        private int _viewFrame = -10;
+
+        /// <summary>
+        /// This frame the eye is at <paramref name="position"/> instead of in our head (still looking where we look):
+        /// shut in the cannon, we peer out of its muzzle. Call every frame it should hold.
+        /// </summary>
+        public void ViewFrom(Vector3 position)
+        {
+            _viewFrom = position;
+            _viewFrame = Time.frameCount;
+        }
         private float _kneelUntil = -10f, _kneel;
 
         /// <summary>
@@ -166,8 +179,9 @@ namespace PleaseDontDrown.Player
         /// reach it. From where we stood (up to a couple of metres off), lone hands flew out across the sand and
         /// covered the face we were giving the kiss of life. Each press keeps us down; we stand up a moment after the last.
         /// </summary>
-        public void KneelAt(Vector3 chest, Vector3 head)
+        public void KneelAt(Vector3 chest, Vector3 head, float reach = 0.55f)
         {
+            _kneelReach = reach;
             _kneelChest = chest;
             _kneelHead = head != Vector3.zero ? head : chest;
             _kneelUntil = Time.time + 1.4f;
@@ -293,7 +307,7 @@ namespace PleaseDontDrown.Player
                 Vector3 side = Vector3.ProjectOnPlane(_head.position - _kneelChest, Vector3.up);
                 side -= along * Vector3.Dot(side, along);
                 side = side.sqrMagnitude > 1e-4f ? side.normalized : Vector3.Cross(Vector3.up, along);
-                Vector3 kneeling = Rescue.VictimBody.KneelSpot(_kneelChest, _kneelHead) + side * 0.6f + Vector3.up * 0.72f;
+                Vector3 kneeling = Rescue.VictimBody.KneelSpot(_kneelChest, _kneelHead) + side * (_kneelReach + 0.05f) + Vector3.up * 0.72f;
                 float w = Mathf.SmoothStep(0f, 1f, _kneel);
                 _camera.transform.position = Vector3.Lerp(eye, kneeling, w);
                 // ...and looks down at the chest under our hands (the horizon stays level: they lie across the view).
@@ -314,6 +328,8 @@ namespace PleaseDontDrown.Player
                 Quaternion face = Quaternion.LookRotation(_leanPoint - close, toward) * Quaternion.Euler(0f, 0f, 15f);
                 _camera.transform.SetPositionAndRotation(Vector3.Lerp(eye, close, lean), Quaternion.Slerp(_camera.transform.rotation, face, lean));
             }
+
+            if (Time.frameCount - _viewFrame <= 1) _camera.transform.position = _viewFrom;
         }
 
         /// <summary>

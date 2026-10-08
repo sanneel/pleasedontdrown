@@ -99,6 +99,7 @@ namespace PleaseDontDrown.Player
         public int ActiveSlot => IsLocal ? _localSlot : _hub.SyncedActiveSlot;
         /// <summary>Holding food to the mouth.</summary>
         public bool IsEating { get; private set; }
+        private Avatars.AvatarAnimator _animator; // remote players: where their lips are (drinking)
         public float EatProgress01 => _eatProgress;
         public bool IsCharging => _chargeSource != ChargeSource.None && Charge01 > 0f;
 
@@ -231,7 +232,7 @@ namespace PleaseDontDrown.Player
         public bool HandsTaken()
         {
             if (_combat == null) _combat = GetComponent<Combat.PlayerCombat>();
-            return (_combat != null && _combat.IsDazed) || PlayerCarry.IsCarried(_hub) || Fun.HumanCannon.IsInside(_hub);
+            return (_combat != null && _combat.IsDazed) || PlayerCarry.IsCarried(_hub) || Fun.HumanCannon.IsInside(_hub) || Fun.HumanCannon.IsPushing(_hub);
         }
 
         /// <summary>Owner: whatever is in our hands goes in a free pocket (it stays ours), else it's dropped.</summary>
@@ -368,6 +369,7 @@ namespace PleaseDontDrown.Player
             if (_hub.Vitals != null) _hub.Vitals.Eat(food.Food);
             PlayerHud.ShowToast($"Mmm, {item.DisplayName.ToLowerInvariant()}.", 2f);
             food.Consume(_hub);
+            if (food.BurpAfter > 0f) _hub.BurpLater(food.BurpAfter);
             Invalidate();
         }
 
@@ -621,7 +623,25 @@ namespace PleaseDontDrown.Player
             if (_eatBlend > 0f)
             {
                 float chew = IsLocal && IsEating ? Mathf.Sin(Time.time * 15f) * 0.012f : 0f;
-                holdOffset = Vector3.Lerp(holdOffset, _mouthOffset + new Vector3(0f, chew, 0f), Mathf.SmoothStep(0f, 1f, _eatBlend));
+                float e = Mathf.SmoothStep(0f, 1f, _eatBlend);
+                Edible drink = item.GetComponent<Edible>();
+                if (drink != null && drink.Drink)
+                {
+                    // A bottle goes up bottom first, its mouth at the lips, tipping further as it empties.
+                    Quaternion tipped = Quaternion.Euler(-(108f + 22f * (IsLocal ? _eatProgress : 0.5f)), 0f, 0f);
+                    Vector3 lip = Vector3.Scale(drink.Lip, item.transform.lossyScale);
+                    holdRotation = Quaternion.Slerp(holdRotation, tipped, e);
+                    // (Right at the lips, not out where food is held up: the neck goes into the mouth, just under the view.
+                    // Seen from outside, at the avatar's own lips, wherever its head is.)
+                    Vector3 lips = new(0.015f, -0.1f, 0.1f);
+                    if (!IsLocal)
+                    {
+                        if (_animator == null) _animator = GetComponentInChildren<Avatars.AvatarAnimator>();
+                        if (_animator != null) lips = aim.InverseTransformPoint(_animator.Lips);
+                    }
+                    holdOffset = Vector3.Lerp(holdOffset, lips - tipped * lip + new Vector3(0f, chew * 0.3f, 0f), e);
+                }
+                else holdOffset = Vector3.Lerp(holdOffset, _mouthOffset + new Vector3(0f, chew, 0f), e);
             }
             // Wind-up: pull the item back (and a little down) while a throw charges.
             float pull = Mathf.SmoothStep(0f, 1f, IsLocal ? _dropForce : Charge01);

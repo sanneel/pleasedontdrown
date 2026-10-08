@@ -28,10 +28,12 @@ Material:
     - _Ambient: 0.55
     - _Cull: 2
     - _Rim: 0.28
+    - _SSS: 0.4
     - _ShadowAmount: 1
     - _Softness: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _SSSColor: {r: 1, g: 0.47999996, b: 0.11999995, a: 1}
     - _ShadowTint: {r: 0.62, g: 0.65999997, b: 0.8, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

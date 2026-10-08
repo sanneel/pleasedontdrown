@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using FishNet.Object;
 using PleaseDontDrown.Core;
+using PleaseDontDrown.UI;
 using UnityEngine;
 
 namespace PleaseDontDrown.Story
@@ -68,7 +69,11 @@ namespace PleaseDontDrown.Story
             Current = line;
             _history.Add(line);
             if (_history.Count > 30) _history.RemoveAt(0);
-            if (npc != null) npc.OnSpeak(duration, text);
+            if (npc != null)
+            {
+                FloatingText.SpawnSpeech(npc, text, duration);
+                npc.OnSpeak(duration, text);
+            }
             else
             {
                 // Nobody in the world to say it: the player's own line (in their own kind of voice), or a voice from nowhere.

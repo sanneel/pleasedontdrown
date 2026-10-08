@@ -106,10 +106,10 @@ namespace PleaseDontDrown.Player
             for (int i = 0; i < _bones.Length; i++) bindposes[i] = _bones[i].worldToLocalMatrix * rootToWorld;
             var kit = new AvatarMeshKit();
             void Use(int index) => kit.SetBone(index, bindposes[index].inverse);
-            // How to Fish's look: chunky low-poly hands with flat, faceted shading (not smooth plastic ones).
-            _left.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f), lowPoly: true);
-            _right.Bones.BuildMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f), lowPoly: true);
-            _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh, flat: true);
+            // Rounded palms and slimmer fingers avoid the old faceted blocks intersecting gun frames.
+            _left.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 0 : 2 + f));
+            _right.Bones.BuildSmoothMesh(kit, look.SkinColor, f => Use(f < 0 ? 1 : 2 + HandBones.BoneCount + f));
+            _mesh = kit.ToMesh("FirstPersonHands", bindposes, _mesh, flat: false);
 
             if (_renderer == null)
             {
@@ -130,8 +130,7 @@ namespace PleaseDontDrown.Player
         private Material _handMaterial;
 
         /// <summary>
-        /// Lit like How to Fish's hands: the sun shades the facets (each face its own tone), the side away from it goes
-        /// a warm dark, no rim light and no shadows falling on them.
+        /// Soft wrap lighting for rounded hands, without cast shadows or a bright rim.
         /// </summary>
         private Material HandMaterial()
         {
@@ -140,7 +139,7 @@ namespace PleaseDontDrown.Player
             if (source == null) return null;
             _handMaterial = new Material(source) { name = "FirstPersonHands" };
             _handMaterial.SetFloat("_ShadowAmount", 0f);
-            _handMaterial.SetFloat("_Softness", 0.6f);
+            _handMaterial.SetFloat("_Softness", 1f);
             _handMaterial.SetFloat("_Rim", 0f);
             _handMaterial.SetFloat("_Ambient", 0.5f);
             _handMaterial.SetColor("_ShadowTint", new Color(0.62f, 0.54f, 0.5f));

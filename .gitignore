@@ -36,3 +36,6 @@ crashlytics-build.properties
 *.unitypackage
 /[Ss]creenshots/
 *.blend1
+
+/Builds/
+*.rar

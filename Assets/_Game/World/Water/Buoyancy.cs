@@ -109,7 +109,7 @@ namespace PleaseDontDrown.World.Water
             InWater = SubmergedFraction > 0.001f;
             if (!InWater) return;
 
-            Vector3 v = _rb.linearVelocity;
+            Vector3 v = _rb.linearVelocity - TsunamiState.CurrentAt(_rb.position);
             _rb.AddForce(-v * (_waterDrag * SubmergedFraction) + Vector3.up * (-v.y * _verticalDamping * SubmergedFraction), ForceMode.Acceleration);
             _rb.AddTorque(-_rb.angularVelocity * (_waterAngularDrag * SubmergedFraction), ForceMode.Acceleration);
         }

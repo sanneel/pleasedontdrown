@@ -27,6 +27,9 @@ namespace PleaseDontDrown.UI
         private Items.Item _held;
         private float _heldSince;
         private float _staminaShown, _airShown;
+        // The coral "just lost" part of each vital ring: it waits a moment, then eases down after the level.
+        private float _foodTrail = 1f, _airTrail = 1f, _staminaTrail = 1f;
+        private float _foodDropAt, _airDropAt, _staminaDropAt;
         private float _lastRepaint;
         // Lines of text that only change when what they describe does (not built again every frame).
         private static readonly string[] SlotNumbers = BuildSlotNumbers();
@@ -197,14 +200,21 @@ namespace PleaseDontDrown.UI
                 }
             }
 
+            // Eating and winding up a throw: a small ring round the crosshair fills up (How to Fish's hold circle),
+            // nothing across the middle of the screen.
             if (hands.IsEating || hands.EatProgress01 > 0.01f)
-            {
-                Hud.Bar(new Rect(cx - 110f, cy + 84f, 220f, 12f), hands.EatProgress01, new Color(0.55f, 0.9f, 0.4f));
-                Hud.Label(new Rect(cx - 200f, cy + 100f, 400f, 30f), "eating...", 22f, Color.white);
-            }
-            if (hands.IsCharging)
-                Hud.Bar(new Rect(cx - 100f, cy + 84f, 200f, 12f), hands.Charge01,
-                    Color.Lerp(new Color(1f, 0.9f, 0.4f), new Color(1f, 0.35f, 0.2f), hands.Charge01));
+                HoldRing(cx, cy, hands.EatProgress01, Color.white);
+            else if (hands.IsCharging)
+                HoldRing(cx, cy, hands.Charge01, Color.Lerp(Color.white, Hud.Coral, hands.Charge01 * hands.Charge01));
+        }
+
+        private static void HoldRing(float cx, float cy, float value, Color fill)
+        {
+            const float size = 34f, thick = 0.12f;
+            var r = new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size);
+            Hud.Arc(new Rect(r.x + 1f, r.y + 1.5f, size, size), 0f, 1f, thick * 1.3f, new Color(0f, 0f, 0f, 0.3f));
+            Hud.Arc(r, 0f, 1f, thick, new Color(1f, 1f, 1f, 0.25f));
+            Hud.Arc(r, 0f, value, thick, fill);
         }
 
         private static string Hints(Items.Item held)
@@ -226,36 +236,46 @@ namespace PleaseDontDrown.UI
         }
 
         /// <summary>
-        /// Vitals as squares in the bottom left: food always, stamina and air only while they're in use.
+        /// Vitals as rings in the bottom left, as How to Fish has them: food always, air and stamina only while
+        /// they're in use (they fade in and slide the others along).
         /// </summary>
         private void DrawVitals(PlayerHub local, float dt)
         {
-            const float size = 64f, gap = 10f;
+            const float size = 60f, gap = 14f;
             float x = 50f, y = Hud.Height - 25f - size;
             PlayerMotor motor = local.Motor;
             PlayerVitals vitals = local.Vitals;
             if (vitals != null)
             {
-                Hud.Gauge(new Rect(x, y, size, size), vitals.Food01, vitals.Hungry ? new Color(1f, 0.45f, 0.25f) : new Color(0.95f, 0.62f, 0.25f),
-                    HudIcon.Food, vitals.Hungry);
+                Trail(ref _foodTrail, ref _foodDropAt, vitals.Food01, dt);
+                Hud.Vital(new Rect(x, y, size, size), vitals.Food01, _foodTrail, HudIcon.Food, new Color(1f, 0.55f, 0.3f), vitals.Hungry);
                 x += size + gap;
             }
             if (motor == null) return;
 
             bool air = motor.Air01 < 0.999f || motor.IsHeadUnderwater;
             _airShown = Mathf.MoveTowards(_airShown, air ? 1f : 0f, dt / 0.25f);
+            Trail(ref _airTrail, ref _airDropAt, motor.Air01, dt);
             if (_airShown > 0f)
             {
-                Hud.Gauge(new Rect(x, y, size, size), motor.Air01, motor.Air01 < 0.3f ? new Color(1f, 0.35f, 0.3f) : new Color(0.3f, 0.7f, 1f),
-                    HudIcon.Air, motor.Air01 < 0.3f, _airShown);
+                Hud.Vital(new Rect(x, y, size, size), motor.Air01, _airTrail, HudIcon.Air, new Color(1f, 0.4f, 0.35f), motor.Air01 < 0.3f, _airShown);
                 x += (size + gap) * _airShown;
             }
             _staminaShown = Mathf.MoveTowards(_staminaShown, motor.Stamina01 < 0.999f ? 1f : 0f, dt / 0.25f);
+            Trail(ref _staminaTrail, ref _staminaDropAt, motor.Stamina01, dt);
             if (_staminaShown > 0f)
-                Hud.Gauge(new Rect(x, y, size, size), motor.Stamina01, new Color(1f, 0.8f, 0.2f), HudIcon.Stamina, motor.Stamina01 < 0.15f, _staminaShown);
+                Hud.Vital(new Rect(x, y, size, size), motor.Stamina01, _staminaTrail, HudIcon.Stamina, new Color(1f, 0.75f, 0.2f), motor.Stamina01 < 0.15f, _staminaShown);
 
             if (motor.IsOutOfBreath)
                 Hud.Label(new Rect(0f, Hud.Height * 0.3f, Hud.Width, 46f), "<b>OUT OF AIR!</b> Get to the surface!", 34f, new Color(1f, 0.5f, 0.4f), heavy: true);
+        }
+
+        /// <summary>Follows a level up at once; down, it holds a quarter second, then eases after it.</summary>
+        private static void Trail(ref float trail, ref float dropAt, float value, float dt)
+        {
+            if (value >= trail) { trail = value; dropAt = Time.unscaledTime; return; }
+            if (Time.unscaledTime - dropAt < 0.25f) return;
+            trail = Mathf.MoveTowards(trail, value, Mathf.Max(0.02f, (trail - value) * 6f) * dt);
         }
     }
 }

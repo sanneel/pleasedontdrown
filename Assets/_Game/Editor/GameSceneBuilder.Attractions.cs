@@ -30,7 +30,7 @@ namespace PleaseDontDrown.Editor
         private static Vector3[] AttractionSpots() => new[]
         {
             new Vector3(TrampolineSpots[0].x, TrampolineSpots[0].z, 2.2f), new Vector3(TrampolineSpots[1].x, TrampolineSpots[1].z, 2.2f),
-            new Vector3(CannonSpot.x, CannonSpot.z, 2.6f), new Vector3(HoopSpot.x, HoopSpot.z, 3f), new Vector3(HutSpot.x, HutSpot.z, 3f),
+            new Vector3(CannonSpot.x, CannonSpot.z, 2.6f), new Vector3(HoopSpot.x, HoopSpot.z, 3f), new Vector3(HutSpot.x, HutSpot.z, 3.6f), new Vector3(BarSpot.x, BarSpot.z, 3.6f),
             new Vector3(RingTableSpot.x, RingTableSpot.z, 1.8f)
         };
 
@@ -219,10 +219,10 @@ namespace PleaseDontDrown.Editor
             SetRef(bounce, "_audio", SpatialAudio(pad, 2f, 30f));
         }
 
-        /// <summary>The inflatable flamingo: a slow paddling "vehicle" (no keys, no engine), sit on its back ring and steer by the neck.</summary>
+        /// <summary>The inflatable flamingo: a slow paddling "vehicle" (no keys, no engine), sit on its rear ring with hands resting on the rim.</summary>
         private static void BuildFlamingo(Transform parent)
         {
-            Material pink = GetMaterial("FlamingoPink", new Color(1f, 0.55f, 0.7f));
+            Material pink = GetMaterial("FlamingoPink", new Color(1f, 0.55f, 0.7f), smoothness: 0.94f);
             var root = new GameObject("Flamingo");
             root.transform.SetParent(parent, false);
             root.transform.SetPositionAndRotation(OnWater(FlamingoSpot), Quaternion.Euler(0f, 200f, 0f));
@@ -257,6 +257,7 @@ namespace PleaseDontDrown.Editor
             Object engine = new SerializedObject(vehicle).FindProperty("_engineAudio").objectReferenceValue;
             SetRef(vehicle, "_engineAudio", null); // no engine: it's paddled
             if (engine != null) Object.DestroyImmediate(engine);
+            FlamingoRiderReview.Configure(root);
         }
     }
 }

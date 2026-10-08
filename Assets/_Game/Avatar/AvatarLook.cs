@@ -6,8 +6,8 @@ namespace PleaseDontDrown.Avatars
     public enum HairStyle : byte { Bald, Buzz, Short, Spiky, Long, Ponytail, Afro, Mohawk }
     public enum TopStyle : byte { None, Tank, LifeguardTank, TShirt, Hawaiian, RashGuard, Swimsuit, Bikini }
     public enum BottomStyle : byte { Trunks, Shorts, BoardShorts, Trousers }
-    public enum HatStyle : byte { None, Cap, CapBackwards, BucketHat, Visor, StrawHat, Headband, Bandana }
-    public enum GlassesStyle : byte { None, Sunglasses, Round, Hearts }
+    public enum HatStyle : byte { None, Cap, CapBackwards, BucketHat, Visor, StrawHat, Headband, Bandana, Beanie, Cowboy, Pirate, Crown, PartyHat, Headphones }
+    public enum GlassesStyle : byte { None, Sunglasses, Round, Hearts, Goggles, Aviators, Stars, Sport }
     public enum FacialHair : byte { None, Mustache, Beard, Stubble }
 
     [Flags]
@@ -208,7 +208,8 @@ namespace PleaseDontDrown.Avatars
             look.Nose = (byte)Pick(rng, 0, 0, 1, 2, 3);
             look.Eyes = (byte)rng.Next(4);
             look.Teeth = (byte)rng.Next(4);
-            look.Hat = (HatStyle)Pick(rng, 0, 0, 1, 2, 3, 4, 5, 6, 7);
+            look.Hat = Hats[rng.Next(Hats.Length)];
+            look.Glasses = (GlassesStyle)rng.Next(Enum.GetValues(typeof(GlassesStyle)).Length);
             look.Extras = (AvatarExtras)rng.Next(8) | AvatarExtras.Whistle;
             return look;
         }
@@ -227,10 +228,13 @@ namespace PleaseDontDrown.Avatars
         // Tells a real look from 0 / garbage, and which layout it is. 0xA7 (top byte): the old layout, 49 bits with an
         // 8-bit Body. 0xB (top nibble): Body in 7 bits (ids up to 127) and the goofy body's shape after it, 58 bits.
         private const ulong OldMarker = 0xA7UL << 56;
-        private const ulong Marker = 0xBUL << 60;
+        private const ulong FunnyMarker = 0xBUL << 60;
+        private const ulong Marker = 0xCUL << 60;
 
         private static readonly int[] OldWidths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 8 };
-        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 7, 2, 2, 2, 2, 2 };
+        private static readonly int[] FunnyWidths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 3, 4, 2, 2, 3, 1, 7, 2, 2, 2, 2, 2 };
+        // 60 payload bits: larger hat/eyewear ranges; both previous saved layouts still decode.
+        private static readonly int[] Widths = { 2, 2, 3, 3, 3, 3, 4, 2, 4, 4, 4, 3, 2, 3, 1, 7, 2, 2, 2, 2, 2 };
 
         public ulong Pack()
         {
@@ -248,7 +252,7 @@ namespace PleaseDontDrown.Avatars
 
         public static AvatarLook Unpack(ulong packed)
         {
-            int[] widths = (packed & (0xFUL << 60)) == Marker ? Widths : (packed & (0xFFUL << 56)) == OldMarker ? OldWidths : null;
+            int[] widths = (packed & (0xFUL << 60)) == Marker ? Widths : (packed & (0xFUL << 60)) == FunnyMarker ? FunnyWidths : (packed & (0xFFUL << 56)) == OldMarker ? OldWidths : null;
             if (widths == null) return Lifeguard;
             var v = new int[Widths.Length];
             int shift = 0;
@@ -261,7 +265,7 @@ namespace PleaseDontDrown.Avatars
             {
                 Build = (byte)v[0], Height = (byte)v[1], Skin = (byte)v[2], Hair = (HairStyle)v[3], HairColor = (byte)v[4],
                 Top = (TopStyle)Mathf.Min(v[5], (int)TopStyle.Bikini), TopColor = (byte)v[6], Bottom = (BottomStyle)v[7],
-                BottomColor = (byte)v[8], Hat = (HatStyle)v[9], HatColor = (byte)v[10], Glasses = (GlassesStyle)v[11],
+                BottomColor = (byte)v[8], Hat = (HatStyle)Mathf.Min(v[9], (int)HatStyle.Headphones), HatColor = (byte)v[10], Glasses = (GlassesStyle)v[11],
                 Face = (FacialHair)v[12], Extras = (AvatarExtras)v[13], Figure = (byte)v[14], Body = (byte)v[15],
                 HeadSize = (byte)v[16], Belly = (byte)v[17], Nose = (byte)v[18], Eyes = (byte)v[19], Teeth = (byte)v[20]
             }.Tame();

@@ -1,0 +1,7306 @@
+{
+  "assets": [
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v01.glb",
+      "bytes": 1285600,
+      "sha256": "051e40b7b59a6f5eaa9177d79ebb9f7cda3ba85f94a977e3fb253d3855a2ad94",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.56936,
+        -0.0008,
+        -0.20232
+      ],
+      "local_bounds_max": [
+        0.56933,
+        1.77292,
+        0.20875
+      ],
+      "local_size": [
+        1.13869,
+        1.77371,
+        0.41107
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v02.glb",
+      "bytes": 1310600,
+      "sha256": "de4261775501cbcb62ad11bf15aa3680e0a04a6e0d1f830f2d0313a4fa6f7040",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55501,
+        0.00024,
+        -0.19975
+      ],
+      "local_bounds_max": [
+        0.55498,
+        1.73098,
+        0.21279
+      ],
+      "local_size": [
+        1.10999,
+        1.73074,
+        0.41254
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v03.glb",
+      "bytes": 1291016,
+      "sha256": "823f1f2483e8c89c2c83d41b1fcc6aae23d7056ef84072366b7ccfa2c78fc511",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53393,
+        0.00024,
+        -0.2002
+      ],
+      "local_bounds_max": [
+        0.53391,
+        1.67398,
+        0.19265
+      ],
+      "local_size": [
+        1.06784,
+        1.67374,
+        0.39284
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v04.glb",
+      "bytes": 1243788,
+      "sha256": "ef838d8c2b3279a9b44167bd2d2bea9be085ac3837d123ed0fef1c927a15906b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.52323,
+        -0.0027,
+        -0.18785
+      ],
+      "local_bounds_max": [
+        0.52321,
+        1.63137,
+        0.19137
+      ],
+      "local_size": [
+        1.04644,
+        1.63407,
+        0.37923
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v05.glb",
+      "bytes": 1331272,
+      "sha256": "66f2de36e6d50de85e8e49cf097056ff63ce6def8147d982d49e292fbcd0f574",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.57799,
+        -0.00161,
+        -0.21802
+      ],
+      "local_bounds_max": [
+        0.57796,
+        1.81353,
+        0.21125
+      ],
+      "local_size": [
+        1.15595,
+        1.81514,
+        0.42927
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v06.glb",
+      "bytes": 1302940,
+      "sha256": "4925ead1a098a2fdc2884de68350445800218657315d051dbb8a4673a87e0a0e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.52575,
+        -0.001,
+        -0.1928
+      ],
+      "local_bounds_max": [
+        0.52572,
+        1.64361,
+        0.19651
+      ],
+      "local_size": [
+        1.05147,
+        1.64461,
+        0.3893
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v07.glb",
+      "bytes": 1299200,
+      "sha256": "8066a901dc05a06df04de8e0e67ad561e4221aadf16d8113244f4068d4e15419",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54566,
+        0.00029,
+        -0.20723
+      ],
+      "local_bounds_max": [
+        0.54564,
+        1.71363,
+        0.20034
+      ],
+      "local_size": [
+        1.0913,
+        1.71334,
+        0.40758
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v08.glb",
+      "bytes": 1259352,
+      "sha256": "6ded47a64d03a9ff1d738120171f9dddbd045e5330269046752f38fd1cbe525d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.5635,
+        0.00028,
+        -0.20973
+      ],
+      "local_bounds_max": [
+        0.56348,
+        1.765,
+        0.20893
+      ],
+      "local_size": [
+        1.12698,
+        1.76472,
+        0.41866
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v09.glb",
+      "bytes": 1346292,
+      "sha256": "c67abb54b8eaa9491bfb9322a64752f111d8f2632bde727c66414c62b41f3ddb",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54508,
+        0.00029,
+        -0.20054
+      ],
+      "local_bounds_max": [
+        0.54506,
+        1.70478,
+        0.20755
+      ],
+      "local_size": [
+        1.09014,
+        1.70449,
+        0.40809
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/FaceRepair/Originals/tourist_bikini_sporty_v10.glb",
+      "bytes": 1284476,
+      "sha256": "d18dd1a749916d3406f28a724050e7a7efca9ecc7358a5bdcf7f1ff0b140f46a",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.56172,
+        -0.0023,
+        -0.2076
+      ],
+      "local_bounds_max": [
+        0.56169,
+        1.75781,
+        0.20754
+      ],
+      "local_size": [
+        1.12341,
+        1.76011,
+        0.41513
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/jetski_old.glb",
+      "bytes": 5220100,
+      "sha256": "6101ec0ba496e730586728b18ac2d80c339b60a2e01e77c44d8546e35e5c61c8",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 12000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54398,
+        -0.00034,
+        -1.50029
+      ],
+      "local_bounds_max": [
+        0.53939,
+        1.08654,
+        1.50041
+      ],
+      "local_size": [
+        1.08337,
+        1.08688,
+        3.0007
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/lifeguard.glb",
+      "bytes": 6658456,
+      "sha256": "a356c5e6f4117dcf78891ea192279417ea19902fdd624664c64a6f3727499b72",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 75200,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.48613,
+        -0.95157,
+        -0.20711
+      ],
+      "local_bounds_max": [
+        0.4834,
+        0.94773,
+        0.20931
+      ],
+      "local_size": [
+        0.96953,
+        1.8993,
+        0.41641
+      ],
+      "exact_copies": [
+        "Assets/_Game/Art/Meshy/lifeguard.glb"
+      ]
+    },
+    {
+      "path": "ArtSource/Meshy/palm_tall.glb",
+      "bytes": 9246516,
+      "sha256": "4f9bc061d2dc3f22d21f8f918fcf7060e456e818bf2962a713d1e915c79e57c4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 129714,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54406,
+        -0.95168,
+        -0.55949
+      ],
+      "local_bounds_max": [
+        0.53729,
+        0.94762,
+        0.55644
+      ],
+      "local_size": [
+        1.08135,
+        1.8993,
+        1.11592
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/flamingo_raw.glb",
+      "bytes": 6330312,
+      "sha256": "6baf9d8f90d4f0908e5c785965a0c3a5feb362357e14c6acb5842e6541747192",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 121586,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95076,
+        -0.87017,
+        -0.95011
+      ],
+      "local_bounds_max": [
+        0.947,
+        0.86625,
+        0.94924
+      ],
+      "local_size": [
+        1.89775,
+        1.73643,
+        1.89935
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/goofy_raw.glb",
+      "bytes": 6513208,
+      "sha256": "83f19856da2621b79a6a74d63c2c0c672c674543addb3836472b975ee209977a",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 93096,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.72284,
+        -0.95127,
+        -0.37775
+      ],
+      "local_bounds_max": [
+        0.71891,
+        0.94749,
+        0.3735
+      ],
+      "local_size": [
+        1.44176,
+        1.89876,
+        0.75125
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/hand_raw.glb",
+      "bytes": 3994856,
+      "sha256": "3b76c32f596fa6da438f454389b36337c60f9d665bd605585891867e0a69f035",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 55316,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.74486,
+        -0.9513,
+        -0.42922
+      ],
+      "local_bounds_max": [
+        0.74045,
+        0.94774,
+        0.42623
+      ],
+      "local_size": [
+        1.48531,
+        1.89904,
+        0.85545
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/jetski_lifeguard_raw.glb",
+      "bytes": 9538768,
+      "sha256": "c3860076b09589e45bdf259d6aeebdfd7169c34717b4114bae2318d060601d45",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 131918,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95144,
+        -0.34179,
+        -0.34505
+      ],
+      "local_bounds_max": [
+        0.94745,
+        0.34475,
+        0.34146
+      ],
+      "local_size": [
+        1.8989,
+        0.68654,
+        0.68651
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/jetski_raw.glb",
+      "bytes": 8777228,
+      "sha256": "c44602cf34426bbe2f4300a99f95d961759b8ac5727fc54bb80000170a17d2e4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 131918,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95144,
+        -0.34179,
+        -0.34505
+      ],
+      "local_bounds_max": [
+        0.94745,
+        0.34475,
+        0.34146
+      ],
+      "local_size": [
+        1.8989,
+        0.68654,
+        0.68651
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/pirate_boat_raw.glb",
+      "bytes": 9282880,
+      "sha256": "afd82d80b11479810e96b974ac7995e6ef506b110c6cf2e87617dbfbabd04754",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 138488,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95109,
+        -0.31853,
+        -0.37679
+      ],
+      "local_bounds_max": [
+        0.94788,
+        0.31598,
+        0.37306
+      ],
+      "local_size": [
+        1.89897,
+        0.63451,
+        0.74984
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/pistol_lowpoly_raw.glb",
+      "bytes": 9098108,
+      "sha256": "d9e86fb4779aa9f3ff58a79ec038f98f7b49e5bf3300c11f55546fb4e3570a00",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 170140,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95248,
+        -0.69351,
+        -0.17151
+      ],
+      "local_bounds_max": [
+        0.94744,
+        0.69395,
+        0.17803
+      ],
+      "local_size": [
+        1.89993,
+        1.38745,
+        0.34955
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/rifle_lowpoly_raw.glb",
+      "bytes": 5244048,
+      "sha256": "61abed1c65e6e5e2f19495e1a64f23a3139373611c3bff834e3bb1ed7572e2e5",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 56140,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95239,
+        -0.31979,
+        -0.06792
+      ],
+      "local_bounds_max": [
+        0.9487,
+        0.31889,
+        0.07017
+      ],
+      "local_size": [
+        1.90109,
+        0.63868,
+        0.13809
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/robber_apose.glb",
+      "bytes": 7059368,
+      "sha256": "aae68aee3b125147a209a1211612f730d58ccfa3f751eeb244639ed5f2b0955f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 79869,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.50422,
+        -0.95161,
+        -0.25865
+      ],
+      "local_bounds_max": [
+        0.50089,
+        0.94776,
+        0.30185
+      ],
+      "local_size": [
+        1.00511,
+        1.89937,
+        0.5605
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/robber_backpack_raw.glb",
+      "bytes": 9490796,
+      "sha256": "308a61f3599ed08be75df2b1f37ae87e307bc1dd5e5277c801eae7ad1917cccc",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 165144,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95113,
+        -0.9007,
+        -0.69582
+      ],
+      "local_bounds_max": [
+        0.94762,
+        0.90104,
+        0.69498
+      ],
+      "local_size": [
+        1.89876,
+        1.80173,
+        1.39081
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/robber_raw.glb",
+      "bytes": 7596348,
+      "sha256": "d6760c242527da7bd42cbf441192cdce0469e351d2f325cfb715375eaf29353f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 82014,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.41354,
+        -0.95161,
+        -0.3008
+      ],
+      "local_bounds_max": [
+        0.40761,
+        0.94776,
+        0.30185
+      ],
+      "local_size": [
+        0.82115,
+        1.89937,
+        0.60264
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/sandy_guide_and_boss.glb",
+      "bytes": 8380052,
+      "sha256": "764a9c08bec15f623cf4d20cc1b6a32445d84d3df24729a693a98e5be71b05ab",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 120208,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95057,
+        -0.76109,
+        -0.22819
+      ],
+      "local_bounds_max": [
+        0.94626,
+        0.76172,
+        0.22651
+      ],
+      "local_size": [
+        1.89683,
+        1.52281,
+        0.4547
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/shark_raw.glb",
+      "bytes": 5680004,
+      "sha256": "1f36021fe2276a6b86d7ace825e3eb2cefd8e85761b0c0c957f1384868517232",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 63788,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.81649,
+        -0.48342,
+        -0.95015
+      ],
+      "local_bounds_max": [
+        0.81267,
+        0.49126,
+        0.94809
+      ],
+      "local_size": [
+        1.62916,
+        0.97468,
+        1.89824
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/sniper_lowpoly_raw.glb",
+      "bytes": 4079200,
+      "sha256": "256d9d52324c357dd17b6fb8b88a62b0c921db1cf9fe868233afdf3366188fa8",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 34640,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95167,
+        -0.26239,
+        -0.06693
+      ],
+      "local_bounds_max": [
+        0.94772,
+        0.25852,
+        0.07491
+      ],
+      "local_size": [
+        1.89938,
+        0.52091,
+        0.14184
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/tourist_bikini_purple.glb",
+      "bytes": 7289296,
+      "sha256": "0de6c4b41de15ce3b5a468823538741c92ca7cf01b0b501f26b7d1b5efffda6e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 108820,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.59829,
+        -0.95135,
+        -0.25792
+      ],
+      "local_bounds_max": [
+        0.59423,
+        0.94552,
+        0.25169
+      ],
+      "local_size": [
+        1.19252,
+        1.89687,
+        0.50961
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/tourist_bikini_red.glb",
+      "bytes": 6291124,
+      "sha256": "90d041918a84965c187746de38d866ae065269b23a467d2cf4ac6cadc81fd65a",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 69976,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53792,
+        -0.95135,
+        -0.24458
+      ],
+      "local_bounds_max": [
+        0.53404,
+        0.9471,
+        0.23345
+      ],
+      "local_size": [
+        1.07196,
+        1.89845,
+        0.47803
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/tourist_bikini_sporty.glb",
+      "bytes": 6369324,
+      "sha256": "b45818e69f64a9a25295413191e877009e5077e671ab7b7035f0fce2b017f26e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 70434,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.6087,
+        -0.95106,
+        -0.22205
+      ],
+      "local_bounds_max": [
+        0.60518,
+        0.9479,
+        0.22361
+      ],
+      "local_size": [
+        1.21388,
+        1.89896,
+        0.44566
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/tourist_buddy.glb",
+      "bytes": 7779860,
+      "sha256": "85e21e843e8e55e8ac5b0a08384ca1071d5927ff4de3055c7d2a1f4505ba67af",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 88586,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.63251,
+        -0.9513,
+        -0.32225
+      ],
+      "local_bounds_max": [
+        0.62901,
+        0.94585,
+        0.324
+      ],
+      "local_size": [
+        1.26153,
+        1.89715,
+        0.64626
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/raw/umbrella_raw.glb",
+      "bytes": 12260480,
+      "sha256": "8e413c690c16c94fe662ea127ace6df9a01db61e22eec15b927b80ed71962ec3",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 255344,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95043,
+        -0.95124,
+        -0.95048
+      ],
+      "local_bounds_max": [
+        0.94648,
+        0.94873,
+        0.94685
+      ],
+      "local_size": [
+        1.89691,
+        1.89997,
+        1.89734
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/station_rusty.glb",
+      "bytes": 15200312,
+      "sha256": "00b923fb26b4f07622ad8f15ea0d168aa024745f240c65ea09236e61d3cfa6a1",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 289318,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.88037,
+        -0.95165,
+        -0.82065
+      ],
+      "local_bounds_max": [
+        0.89895,
+        0.9484,
+        0.82677
+      ],
+      "local_size": [
+        1.77932,
+        1.90005,
+        1.64742
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/tourist_dad.glb",
+      "bytes": 8173548,
+      "sha256": "7d1e3c5176a587ca53713a272cbded34e9b0b61c079b4cf35a0e9c207fb0e450",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 91132,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.61324,
+        -0.95131,
+        -0.36709
+      ],
+      "local_bounds_max": [
+        0.60958,
+        0.94792,
+        0.36371
+      ],
+      "local_size": [
+        1.22283,
+        1.89923,
+        0.73079
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Meshy/tower.glb",
+      "bytes": 13586204,
+      "sha256": "af952b96b27d59790d012d70428248f538f41c4376bd74f2f50ded23c65adf20",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 228830,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54311,
+        -0.95207,
+        -0.78557
+      ],
+      "local_bounds_max": [
+        0.53894,
+        0.80119,
+        0.84248
+      ],
+      "local_size": [
+        1.08205,
+        1.75326,
+        1.62805
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/pistol.glb",
+      "bytes": 817788,
+      "sha256": "9475e1d34df5df1a5588bbdc15ecf1be9efc45b32afa3ffc0ea85abfd6fdd31f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          96,
+          32
+        ]
+      ],
+      "triangles": 8000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95129,
+        -0.69152,
+        -0.17123
+      ],
+      "local_bounds_max": [
+        0.94654,
+        0.69267,
+        0.17746
+      ],
+      "local_size": [
+        1.89783,
+        1.38419,
+        0.34869
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/rifle.glb",
+      "bytes": 817792,
+      "sha256": "cbdfd29884960a5a2ec13a21f8aa822b92319aa1ee9b0cbefb798d29b8a4c8a0",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          96,
+          32
+        ]
+      ],
+      "triangles": 8000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95152,
+        -0.31981,
+        -0.06732
+      ],
+      "local_bounds_max": [
+        0.9472,
+        0.31866,
+        0.06972
+      ],
+      "local_size": [
+        1.89872,
+        0.63848,
+        0.13704
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/shotgun.glb",
+      "bytes": 80948,
+      "sha256": "af35af0e409a14554b5807d6043c3ce54a91f6f0f1fdc30b0ae0e43bff6825dd",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1424,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -0.449,
+        -0.1,
+        -0.027
+      ],
+      "local_bounds_max": [
+        0.6235,
+        0.0615,
+        0.027
+      ],
+      "local_size": [
+        1.0725,
+        0.1615,
+        0.054
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/smg.glb",
+      "bytes": 136232,
+      "sha256": "43772d8c255a23550d7396e468f06dd8d66fea30c67bdb08286a18f7a4792327",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 2364,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.272,
+        -0.11341,
+        -0.023
+      ],
+      "local_bounds_max": [
+        0.26,
+        0.072,
+        0.0242
+      ],
+      "local_size": [
+        0.532,
+        0.18541,
+        0.0472
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/sniper.glb",
+      "bytes": 817788,
+      "sha256": "4fee5893b92036d6965b957a5f56e0bcae98658ad3807a896d50b81605f1fdce",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          96,
+          32
+        ]
+      ],
+      "triangles": 8000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95136,
+        -0.26205,
+        -0.06653
+      ],
+      "local_bounds_max": [
+        0.94728,
+        0.25799,
+        0.07466
+      ],
+      "local_size": [
+        1.89863,
+        0.52004,
+        0.14119
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple.glb",
+      "bytes": 5085912,
+      "sha256": "c9f83885078d775a160b3c3b7421348fcc7a5b91ae33501fa63b6e147293012d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.52819,
+        2e-05,
+        -0.22575
+      ],
+      "local_bounds_max": [
+        0.52833,
+        1.6805,
+        0.22557
+      ],
+      "local_size": [
+        1.05652,
+        1.68049,
+        0.45132
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v01.glb",
+      "bytes": 1362740,
+      "sha256": "72592ddbfd7bf978da148f821c25bee99cfae0e1c416b0f4c1bd1b90b3458e2d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.51012,
+        4e-05,
+        -0.22666
+      ],
+      "local_bounds_max": [
+        0.51025,
+        1.6312,
+        0.21778
+      ],
+      "local_size": [
+        1.02037,
+        1.63116,
+        0.44444
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v02.glb",
+      "bytes": 1369520,
+      "sha256": "e30e7af3c8f402deda835bac17f6f8417086a8c33eebca979e2d8d4a5ac8990b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53794,
+        -0.00142,
+        -0.23405
+      ],
+      "local_bounds_max": [
+        0.53808,
+        1.71543,
+        0.24091
+      ],
+      "local_size": [
+        1.07601,
+        1.71685,
+        0.47496
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v03.glb",
+      "bytes": 1323516,
+      "sha256": "11404d4bc02f7686e312923f4d66b3184fbac75c1e7cace55fd0b831fc1e61cf",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53341,
+        4e-05,
+        -0.23102
+      ],
+      "local_bounds_max": [
+        0.53354,
+        1.69997,
+        0.22517
+      ],
+      "local_size": [
+        1.06695,
+        1.69993,
+        0.45619
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v04.glb",
+      "bytes": 1424032,
+      "sha256": "90c510a1248c30f0a4829e57a58ee146ad9a14d4d33b75c5a927bd139b3aa5bb",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55037,
+        4e-05,
+        -0.22847
+      ],
+      "local_bounds_max": [
+        0.55051,
+        1.74464,
+        0.24276
+      ],
+      "local_size": [
+        1.10088,
+        1.7446,
+        0.47124
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v05.glb",
+      "bytes": 1324724,
+      "sha256": "0a3f25eb599ecc379a8b7e25db52131f31c8c3525d0740b51dba9a93532e6b7c",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.51807,
+        -0.00156,
+        -0.2232
+      ],
+      "local_bounds_max": [
+        0.5182,
+        1.64997,
+        0.22209
+      ],
+      "local_size": [
+        1.03626,
+        1.65153,
+        0.44529
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v06.glb",
+      "bytes": 1379408,
+      "sha256": "2326d1e6b7369080de0f972fe2a71e1eb44c1c40ec77d89fa99431bfa59e41e5",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.5281,
+        4e-05,
+        -0.23333
+      ],
+      "local_bounds_max": [
+        0.52823,
+        1.68744,
+        0.22273
+      ],
+      "local_size": [
+        1.05634,
+        1.6874,
+        0.45606
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v07.glb",
+      "bytes": 1371732,
+      "sha256": "8d4c3dd5308623f09cbcd71a30b9b27b53348e6b9f56ec2f051113fc45a7eabd",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.50967,
+        -0.00183,
+        -0.21583
+      ],
+      "local_bounds_max": [
+        0.5098,
+        1.61965,
+        0.21543
+      ],
+      "local_size": [
+        1.01946,
+        1.62148,
+        0.43126
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v08.glb",
+      "bytes": 1321564,
+      "sha256": "a2970f74119f9336bc869779fbd6af291e82d0ba3fabefd5fc05b239dc4305a4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55979,
+        -0.0009,
+        -0.2421
+      ],
+      "local_bounds_max": [
+        0.55993,
+        1.78373,
+        0.24165
+      ],
+      "local_size": [
+        1.11972,
+        1.78462,
+        0.48375
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v09.glb",
+      "bytes": 1303420,
+      "sha256": "29b68ea693e1492bdd284def502836e6f45a1a3ebca5967b8b809bce086094ce",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.49692,
+        4e-05,
+        -0.21836
+      ],
+      "local_bounds_max": [
+        0.49704,
+        1.58667,
+        0.21616
+      ],
+      "local_size": [
+        0.99396,
+        1.58664,
+        0.43452
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_purple_v10.glb",
+      "bytes": 1446944,
+      "sha256": "42797206296d654b1369fb9fd13704e1c3f5c9444cea39cbb46a21161b97c94b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55355,
+        -0.00163,
+        -0.22854
+      ],
+      "local_bounds_max": [
+        0.55369,
+        1.75353,
+        0.24583
+      ],
+      "local_size": [
+        1.10724,
+        1.75516,
+        0.47436
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red.glb",
+      "bytes": 5155308,
+      "sha256": "1ec1d6d9a8a5121add160ae90eb97cba0c2c1be1c9079046f3e59d82b5883a7b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.47436,
+        0.0,
+        -0.21153
+      ],
+      "local_bounds_max": [
+        0.47429,
+        1.68,
+        0.21135
+      ],
+      "local_size": [
+        0.94865,
+        1.68,
+        0.42288
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v01.glb",
+      "bytes": 1291092,
+      "sha256": "8f8753573a38358c09be47dcee0ef15db90dc944c049454dad47f7d396b85802",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.49528,
+        0.00015,
+        -0.228
+      ],
+      "local_bounds_max": [
+        0.49517,
+        1.75106,
+        0.22431
+      ],
+      "local_size": [
+        0.99045,
+        1.7509,
+        0.45232
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v02.glb",
+      "bytes": 1282228,
+      "sha256": "b27852a7b3654a0e21f91d30c16e05ad1b924c768af51301440c7005803b2122",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.45571,
+        0.00015,
+        -0.21026
+      ],
+      "local_bounds_max": [
+        0.45559,
+        1.61548,
+        0.20812
+      ],
+      "local_size": [
+        0.91129,
+        1.61534,
+        0.41837
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v03.glb",
+      "bytes": 1305320,
+      "sha256": "484fbd032094209489d92715c1044934282954139b0815c175e5646c7024c8c7",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.45461,
+        -0.00275,
+        -0.20655
+      ],
+      "local_bounds_max": [
+        0.45465,
+        1.61224,
+        0.20712
+      ],
+      "local_size": [
+        0.90926,
+        1.61499,
+        0.41367
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v04.glb",
+      "bytes": 1310072,
+      "sha256": "4c963114842219a7bb4285973b72c3988af7a6f494fbf231ad62cd02dcb223a9",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.50301,
+        0.00011,
+        -0.23519
+      ],
+      "local_bounds_max": [
+        0.50293,
+        1.78801,
+        0.23048
+      ],
+      "local_size": [
+        1.00593,
+        1.7879,
+        0.46567
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v05.glb",
+      "bytes": 1261488,
+      "sha256": "379f7e5ce97c189be8eb144a213d32aa4bdb38d950415ff0503a9b3b82cbdd1b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.48272,
+        0.00015,
+        -0.2192
+      ],
+      "local_bounds_max": [
+        0.4826,
+        1.71177,
+        0.21772
+      ],
+      "local_size": [
+        0.96532,
+        1.71162,
+        0.43692
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v06.glb",
+      "bytes": 1277496,
+      "sha256": "4be663739ea418ed40ffc98e34ef6acd7d0293081a7021f62f0ef0a450597022",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.46645,
+        0.00014,
+        -0.21238
+      ],
+      "local_bounds_max": [
+        0.46635,
+        1.64817,
+        0.21011
+      ],
+      "local_size": [
+        0.93281,
+        1.64803,
+        0.4225
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v07.glb",
+      "bytes": 1260256,
+      "sha256": "1fcf4719951ad314cad9f39e269a77121fca21887855822fa0ab10203e88db8b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.4446,
+        0.00013,
+        -0.19252
+      ],
+      "local_bounds_max": [
+        0.44451,
+        1.57176,
+        0.19593
+      ],
+      "local_size": [
+        0.88911,
+        1.57162,
+        0.38846
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v08.glb",
+      "bytes": 1269804,
+      "sha256": "b684a841f3fb05949147d97ccde60b44eb12c62463ec30cfc60ab312828e5ead",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.48915,
+        -0.0002,
+        -0.22714
+      ],
+      "local_bounds_max": [
+        0.4891,
+        1.72678,
+        0.2259
+      ],
+      "local_size": [
+        0.97825,
+        1.72699,
+        0.45305
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v09.glb",
+      "bytes": 1261872,
+      "sha256": "16596c47424ccac4de31c88272ae4d29032b517170ec693a58cce08b48de9bbb",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.48989,
+        -0.00162,
+        -0.21334
+      ],
+      "local_bounds_max": [
+        0.48988,
+        1.73332,
+        0.21417
+      ],
+      "local_size": [
+        0.97977,
+        1.73494,
+        0.42751
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_red_v10.glb",
+      "bytes": 1285008,
+      "sha256": "1fadda501ec758e210ffb4a18e1e9face4e4fce54b92c8944aa63139dd8c655e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.4498,
+        0.00015,
+        -0.19551
+      ],
+      "local_bounds_max": [
+        0.44968,
+        1.59125,
+        0.19785
+      ],
+      "local_size": [
+        0.89948,
+        1.5911,
+        0.39336
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty.glb",
+      "bytes": 5236520,
+      "sha256": "3d4d4a271a7c7e5454d62c86396abf9613c1d1a1c4c4846b7a43b53d60bc93e6",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55016,
+        0.00017,
+        -0.20209
+      ],
+      "local_bounds_max": [
+        0.55014,
+        1.72031,
+        0.20183
+      ],
+      "local_size": [
+        1.1003,
+        1.72015,
+        0.40392
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v01.glb",
+      "bytes": 1285512,
+      "sha256": "a0c925e0b9074ebdaece693ecb508b63e4ae482230109c41ded8b95f18b64328",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.56936,
+        -0.0008,
+        -0.20232
+      ],
+      "local_bounds_max": [
+        0.56933,
+        1.77292,
+        0.20875
+      ],
+      "local_size": [
+        1.13869,
+        1.77371,
+        0.41107
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v02.glb",
+      "bytes": 1310436,
+      "sha256": "a3df07b6c98b4610bab317ffdfadf794533b8073fd589dc80452e208f3ce1d2b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55501,
+        0.00024,
+        -0.19975
+      ],
+      "local_bounds_max": [
+        0.55498,
+        1.73098,
+        0.21279
+      ],
+      "local_size": [
+        1.10999,
+        1.73074,
+        0.41254
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v03.glb",
+      "bytes": 1291084,
+      "sha256": "27baf292d5f7711632b0f54600de852707dc23bd164dd646d31fb8d8899439c8",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53393,
+        0.00024,
+        -0.2002
+      ],
+      "local_bounds_max": [
+        0.53391,
+        1.67398,
+        0.19265
+      ],
+      "local_size": [
+        1.06784,
+        1.67374,
+        0.39284
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v04.glb",
+      "bytes": 1243628,
+      "sha256": "fbc6c0fa544b5e81a4e8e6357d8e0e6c28a00fcf43da71c06cc812d008a49c62",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.52323,
+        -0.0027,
+        -0.18785
+      ],
+      "local_bounds_max": [
+        0.52321,
+        1.63137,
+        0.19137
+      ],
+      "local_size": [
+        1.04644,
+        1.63407,
+        0.37923
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v05.glb",
+      "bytes": 1331248,
+      "sha256": "4799ed92a6f8d36ce5bd2330330f421922f538a72e94154d7d2a9358ef2226ec",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.57799,
+        -0.00161,
+        -0.21802
+      ],
+      "local_bounds_max": [
+        0.57796,
+        1.81353,
+        0.21125
+      ],
+      "local_size": [
+        1.15595,
+        1.81514,
+        0.42927
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v06.glb",
+      "bytes": 1302948,
+      "sha256": "317a0c3b4fd34bcbbc43ac9105649f6127f0bdbd3c236a35723e0ca353c80f50",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.52575,
+        -0.001,
+        -0.1928
+      ],
+      "local_bounds_max": [
+        0.52572,
+        1.64361,
+        0.19651
+      ],
+      "local_size": [
+        1.05147,
+        1.64461,
+        0.3893
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v07.glb",
+      "bytes": 1299108,
+      "sha256": "0a601bd99f68d8f7b2973f233ea673c5f2f39d46b47b4c1072a736427a93dc45",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54566,
+        0.00029,
+        -0.20723
+      ],
+      "local_bounds_max": [
+        0.54564,
+        1.71363,
+        0.20034
+      ],
+      "local_size": [
+        1.0913,
+        1.71334,
+        0.40758
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v08.glb",
+      "bytes": 1259368,
+      "sha256": "d626acc47702a3b6bb46128c274621eb3b930da17892e2406ec16e43044ac836",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.5635,
+        0.00028,
+        -0.20973
+      ],
+      "local_bounds_max": [
+        0.56348,
+        1.765,
+        0.20893
+      ],
+      "local_size": [
+        1.12698,
+        1.76472,
+        0.41866
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v09.glb",
+      "bytes": 1346316,
+      "sha256": "03be189bad17535dff9761544920808d48910f096364f3bd657f48fd0c002f1f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54508,
+        0.00029,
+        -0.20054
+      ],
+      "local_bounds_max": [
+        0.54506,
+        1.70478,
+        0.20755
+      ],
+      "local_size": [
+        1.09014,
+        1.70449,
+        0.40809
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_bikini_sporty_v10.glb",
+      "bytes": 1284548,
+      "sha256": "969147dc600bc9c138c572e925495feb8be66576d61d6e6cfc5ce2b605c67d1e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.56172,
+        -0.0023,
+        -0.2076
+      ],
+      "local_bounds_max": [
+        0.56169,
+        1.75781,
+        0.20754
+      ],
+      "local_size": [
+        1.12341,
+        1.76011,
+        0.41513
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy.glb",
+      "bytes": 6128460,
+      "sha256": "092c071a168e1cd3577d32bb0c211f0156b61e25846810c510cd3734e2a9b913",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.59218,
+        0.0,
+        -0.30397
+      ],
+      "local_bounds_max": [
+        0.59244,
+        1.78006,
+        0.30318
+      ],
+      "local_size": [
+        1.18462,
+        1.78006,
+        0.60715
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v01.glb",
+      "bytes": 1420020,
+      "sha256": "97a47cb22fd65252d1dccf4e8349669959426b550807d6e898decb97cc283e48",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.58902,
+        0.0002,
+        -0.28213
+      ],
+      "local_bounds_max": [
+        0.58929,
+        1.77797,
+        0.31632
+      ],
+      "local_size": [
+        1.17832,
+        1.77778,
+        0.59845
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v02.glb",
+      "bytes": 1413248,
+      "sha256": "c0e53c12abd8eb593763be9a705ea8a4e855ebee9f682cd552ab25d9af35a505",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.61946,
+        -0.00016,
+        -0.31985
+      ],
+      "local_bounds_max": [
+        0.61973,
+        1.86934,
+        0.34184
+      ],
+      "local_size": [
+        1.23918,
+        1.86951,
+        0.66169
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v03.glb",
+      "bytes": 1354216,
+      "sha256": "322a3761dec0cd11cb5063aae54ffdd84af2c4e038d7b16fbf0f3989c0f27244",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.59395,
+        -0.00214,
+        -0.32222
+      ],
+      "local_bounds_max": [
+        0.5942,
+        1.78806,
+        0.33127
+      ],
+      "local_size": [
+        1.18815,
+        1.7902,
+        0.65349
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v04.glb",
+      "bytes": 1390076,
+      "sha256": "06fd39ad5ec9ac0c989d7d476c66134affa2d937fd914f18bdff463cf4dc1651",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.58926,
+        -0.0005,
+        -0.30657
+      ],
+      "local_bounds_max": [
+        0.58951,
+        1.7758,
+        0.31211
+      ],
+      "local_size": [
+        1.17877,
+        1.7763,
+        0.61868
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v05.glb",
+      "bytes": 1373880,
+      "sha256": "84eba34fd5c74eae87fd057b1da163b616fe1d9058ce7cf9d572753820f72880",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55689,
+        -0.00171,
+        -0.29898
+      ],
+      "local_bounds_max": [
+        0.55712,
+        1.6635,
+        0.28451
+      ],
+      "local_size": [
+        1.11401,
+        1.66521,
+        0.58349
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v06.glb",
+      "bytes": 1343620,
+      "sha256": "169b084ca6670241defe105f080fbd7a931430a0f561dcdf573d14588efc0052",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.62947,
+        -0.00071,
+        -0.32919
+      ],
+      "local_bounds_max": [
+        0.62974,
+        1.88952,
+        0.34497
+      ],
+      "local_size": [
+        1.25921,
+        1.89023,
+        0.67416
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v07.glb",
+      "bytes": 1400172,
+      "sha256": "852da753ce4726e256d0da646f52372674d8001a3b496ac4a7a51019a807166a",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.57027,
+        -0.00091,
+        -0.30006
+      ],
+      "local_bounds_max": [
+        0.57051,
+        1.71085,
+        0.30054
+      ],
+      "local_size": [
+        1.14078,
+        1.71176,
+        0.6006
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v08.glb",
+      "bytes": 1388648,
+      "sha256": "606a65bd7a93d8aa440f18c84c982b3d2fd56689fbfcd4c0200e439d802e96f7",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.58548,
+        8e-05,
+        -0.29893
+      ],
+      "local_bounds_max": [
+        0.58573,
+        1.75847,
+        0.30931
+      ],
+      "local_size": [
+        1.17121,
+        1.7584,
+        0.60824
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v09.glb",
+      "bytes": 1377208,
+      "sha256": "2df33222e53cc6a6f1cb97d27b87e198122b124ed006e64714673888a52632ad",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.59257,
+        -0.00054,
+        -0.30891
+      ],
+      "local_bounds_max": [
+        0.59282,
+        1.78772,
+        0.31708
+      ],
+      "local_size": [
+        1.18539,
+        1.78825,
+        0.62599
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "ArtSource/Polish/Originals/tourist_buddy_v10.glb",
+      "bytes": 1423576,
+      "sha256": "a913a1415bdf98caae97aeb1ea89db1a6d62bcf5b0e04f24f47aa39818cf86e4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.58797,
+        -0.00037,
+        -0.30485
+      ],
+      "local_bounds_max": [
+        0.58823,
+        1.77306,
+        0.30939
+      ],
+      "local_size": [
+        1.1762,
+        1.77343,
+        0.61424
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/goofy.glb",
+      "bytes": 4749476,
+      "sha256": "4610419d35c2b7c5d635de415c4510fb00f55ec33b5714e95378866ff9de0e1f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.60745,
+        -0.00025,
+        -0.31616
+      ],
+      "local_bounds_max": [
+        0.6072,
+        1.60082,
+        0.31575
+      ],
+      "local_size": [
+        1.21465,
+        1.60107,
+        0.6319
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/robber.glb",
+      "bytes": 6148396,
+      "sha256": "4549dc36df51a719ea5b2df603c89735db796ff85fffdff21292308f5a3c0364",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 21999,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.47164,
+        0.00012,
+        -0.26275
+      ],
+      "local_bounds_max": [
+        0.47164,
+        1.78,
+        0.26265
+      ],
+      "local_size": [
+        0.94327,
+        1.77988,
+        0.5254
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/sandy.glb",
+      "bytes": 5654108,
+      "sha256": "8c9f932d5f1748613631395d8c8b421364f215ed20719ac0aa33e842ba4bf34f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.44378,
+        6e-05,
+        -0.23217
+      ],
+      "local_bounds_max": [
+        0.44362,
+        1.74021,
+        0.23166
+      ],
+      "local_size": [
+        0.8874,
+        1.74015,
+        0.46383
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/sandy_boss.glb",
+      "bytes": 5667560,
+      "sha256": "498401e3d9d57411ab6d9f91d7cb2d8711a0e42937579b02229528c01da1003d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.45919,
+        5e-05,
+        -0.26844
+      ],
+      "local_bounds_max": [
+        0.45914,
+        1.7397,
+        0.26843
+      ],
+      "local_size": [
+        0.91834,
+        1.73965,
+        0.53687
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple.glb",
+      "bytes": 5086404,
+      "sha256": "3dbc81f236426ea1c30a319707a07d5c52b3101ab6e455b92a8647b7fbc45fb4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.52819,
+        2e-05,
+        -0.22575
+      ],
+      "local_bounds_max": [
+        0.52833,
+        1.6805,
+        0.22557
+      ],
+      "local_size": [
+        1.05652,
+        1.68049,
+        0.45132
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v01.glb",
+      "bytes": 1362724,
+      "sha256": "b3e3fc177b695e94d7ae2d5664572118d74006b7c1d6a1e1a72f959543b922e6",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.51012,
+        4e-05,
+        -0.22666
+      ],
+      "local_bounds_max": [
+        0.51025,
+        1.6312,
+        0.21778
+      ],
+      "local_size": [
+        1.02037,
+        1.63116,
+        0.44444
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v02.glb",
+      "bytes": 1369476,
+      "sha256": "c8b93490686d12526124ba8e3fd0510e5940f68a776d88b597f0653ede6d4bec",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53794,
+        -0.00142,
+        -0.23405
+      ],
+      "local_bounds_max": [
+        0.53808,
+        1.71543,
+        0.24091
+      ],
+      "local_size": [
+        1.07601,
+        1.71685,
+        0.47496
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v03.glb",
+      "bytes": 1323388,
+      "sha256": "b6aab6e368a0f7f9b32ebfafee3b562946812dc23dfd5dd0997aecc44c85ff82",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53341,
+        4e-05,
+        -0.23102
+      ],
+      "local_bounds_max": [
+        0.53354,
+        1.69997,
+        0.22517
+      ],
+      "local_size": [
+        1.06695,
+        1.69993,
+        0.45619
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v04.glb",
+      "bytes": 1424260,
+      "sha256": "266fedd6be963dc7b02ae2eb251550b4610a3c100ad519c0eee28ca4f1d01f6d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55037,
+        4e-05,
+        -0.22847
+      ],
+      "local_bounds_max": [
+        0.55051,
+        1.74464,
+        0.24276
+      ],
+      "local_size": [
+        1.10088,
+        1.7446,
+        0.47124
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v05.glb",
+      "bytes": 1324604,
+      "sha256": "146376e71551e34fa6404f14687f443f43d2bd4e54b4f7de216d0f5ba5aff33d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.51807,
+        -0.00156,
+        -0.2232
+      ],
+      "local_bounds_max": [
+        0.5182,
+        1.64997,
+        0.22209
+      ],
+      "local_size": [
+        1.03626,
+        1.65153,
+        0.44529
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v06.glb",
+      "bytes": 1379472,
+      "sha256": "15aea17c2cab7b461e77d9817a332c70d80cf262cda40d5b1a6b7b9212bd4b4c",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.5281,
+        4e-05,
+        -0.23333
+      ],
+      "local_bounds_max": [
+        0.52823,
+        1.68744,
+        0.22273
+      ],
+      "local_size": [
+        1.05634,
+        1.6874,
+        0.45606
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v07.glb",
+      "bytes": 1371808,
+      "sha256": "5edf64b3c98ef46eb7c279a14ef118bf5a16c4c090d633d9e7a5997d39c53e19",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.50967,
+        -0.00183,
+        -0.21583
+      ],
+      "local_bounds_max": [
+        0.5098,
+        1.61965,
+        0.21543
+      ],
+      "local_size": [
+        1.01946,
+        1.62148,
+        0.43126
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v08.glb",
+      "bytes": 1321600,
+      "sha256": "10007db655792f74ac14865b757713b2ae3b18c5a3d0abada3a5d127b77f8697",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55979,
+        -0.0009,
+        -0.2421
+      ],
+      "local_bounds_max": [
+        0.55993,
+        1.78373,
+        0.24165
+      ],
+      "local_size": [
+        1.11972,
+        1.78462,
+        0.48375
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v09.glb",
+      "bytes": 1303436,
+      "sha256": "9ae1269d10d7adce55d2f1c5ae1c486ce268869cdce44dac40feb5e5c5629e1b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.49692,
+        4e-05,
+        -0.21836
+      ],
+      "local_bounds_max": [
+        0.49704,
+        1.58667,
+        0.21616
+      ],
+      "local_size": [
+        0.99396,
+        1.58663,
+        0.43452
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_purple_v10.glb",
+      "bytes": 1446924,
+      "sha256": "6d987cd00e918541b710ccf721d8e30f052e7b31fffd2dafaa35408408a2591d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55355,
+        -0.00163,
+        -0.22854
+      ],
+      "local_bounds_max": [
+        0.55369,
+        1.75353,
+        0.24583
+      ],
+      "local_size": [
+        1.10724,
+        1.75516,
+        0.47436
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red.glb",
+      "bytes": 5155680,
+      "sha256": "ca58b39569ed65574fad276e0b016be5f0943644acb4f8618bb3f3fd60a282f8",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.47436,
+        -0.0,
+        -0.21153
+      ],
+      "local_bounds_max": [
+        0.47429,
+        1.68,
+        0.21135
+      ],
+      "local_size": [
+        0.94865,
+        1.68,
+        0.42288
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v01.glb",
+      "bytes": 1291172,
+      "sha256": "4d720b7ef5501b0cdf850db42f5fb65567b588729a934158a184d525d540c230",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.49528,
+        0.00015,
+        -0.228
+      ],
+      "local_bounds_max": [
+        0.49517,
+        1.75106,
+        0.22431
+      ],
+      "local_size": [
+        0.99045,
+        1.7509,
+        0.45232
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v02.glb",
+      "bytes": 1282336,
+      "sha256": "86519279e4a93050a2b41152a7783d9f294e5a47e76ea4984b4019c2d9b71717",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.45571,
+        0.00015,
+        -0.21026
+      ],
+      "local_bounds_max": [
+        0.45559,
+        1.61548,
+        0.20812
+      ],
+      "local_size": [
+        0.91129,
+        1.61534,
+        0.41837
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v03.glb",
+      "bytes": 1305016,
+      "sha256": "02128b6a22aa401091d69c437d3161c66e7fc56e0193541d56c6d14b040bec30",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.45461,
+        -0.00275,
+        -0.20655
+      ],
+      "local_bounds_max": [
+        0.45465,
+        1.61224,
+        0.20712
+      ],
+      "local_size": [
+        0.90926,
+        1.61499,
+        0.41367
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v04.glb",
+      "bytes": 1310192,
+      "sha256": "1b03f90488156ad5d6ed3533057dd4e299f237ea18c464a203bb0f4b7626ec1e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.50301,
+        0.00011,
+        -0.23519
+      ],
+      "local_bounds_max": [
+        0.50293,
+        1.78801,
+        0.23048
+      ],
+      "local_size": [
+        1.00593,
+        1.7879,
+        0.46567
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v05.glb",
+      "bytes": 1261636,
+      "sha256": "931d847b89be4600c586ea184fdcc9cb04b4cb8a014728f8de8ef0b8346035ea",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.48272,
+        0.00015,
+        -0.2192
+      ],
+      "local_bounds_max": [
+        0.4826,
+        1.71177,
+        0.21772
+      ],
+      "local_size": [
+        0.96532,
+        1.71161,
+        0.43692
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v06.glb",
+      "bytes": 1277420,
+      "sha256": "c65acc54caab9e6f7dcfd8b88e76ca4fef1cc663a5631b05115c0c5609cd32d4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.46645,
+        0.00014,
+        -0.21238
+      ],
+      "local_bounds_max": [
+        0.46635,
+        1.64817,
+        0.21011
+      ],
+      "local_size": [
+        0.93281,
+        1.64803,
+        0.4225
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v07.glb",
+      "bytes": 1260176,
+      "sha256": "ec154ad6df861e919f55b54d2e39fe50cdd7ae444c0780109ac9480ab303730b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.4446,
+        0.00013,
+        -0.19252
+      ],
+      "local_bounds_max": [
+        0.44451,
+        1.57176,
+        0.19593
+      ],
+      "local_size": [
+        0.88911,
+        1.57162,
+        0.38846
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v08.glb",
+      "bytes": 1269792,
+      "sha256": "09632638a81536190a1f5c370106c20f8b41ce7b984fded46a2a4bef5f2ff92e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.48915,
+        -0.0002,
+        -0.22714
+      ],
+      "local_bounds_max": [
+        0.4891,
+        1.72678,
+        0.2259
+      ],
+      "local_size": [
+        0.97825,
+        1.72699,
+        0.45305
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v09.glb",
+      "bytes": 1261800,
+      "sha256": "591f8ad072939ee1029b3b5da564ae37b0b9cec2461257ec4250ec6db902755c",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.48989,
+        -0.00162,
+        -0.21334
+      ],
+      "local_bounds_max": [
+        0.48988,
+        1.73332,
+        0.21417
+      ],
+      "local_size": [
+        0.97977,
+        1.73494,
+        0.42751
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_red_v10.glb",
+      "bytes": 1284948,
+      "sha256": "0a6fb80d4442ddd0a7791c58ac171b3da7544ae64e13f41d536f153e73e0ec38",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.4498,
+        0.00015,
+        -0.19551
+      ],
+      "local_bounds_max": [
+        0.44968,
+        1.59125,
+        0.19785
+      ],
+      "local_size": [
+        0.89948,
+        1.5911,
+        0.39336
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty.glb",
+      "bytes": 5236820,
+      "sha256": "aab043adb68f9927c352af1cda6f96751784311d37ab6aaf9262fa587b5f5346",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55016,
+        0.00017,
+        -0.20209
+      ],
+      "local_bounds_max": [
+        0.55014,
+        1.72031,
+        0.20183
+      ],
+      "local_size": [
+        1.1003,
+        1.72015,
+        0.40392
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v01.glb",
+      "bytes": 3739548,
+      "sha256": "743bb84c4ae004bd3138f70c4b3dc6be2b19dd5f18ef88d27d6c68a5a5d02380",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.56936,
+        -0.0008,
+        -0.20232
+      ],
+      "local_bounds_max": [
+        0.56933,
+        1.77292,
+        0.20875
+      ],
+      "local_size": [
+        1.13869,
+        1.77371,
+        0.41107
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v02.glb",
+      "bytes": 4132244,
+      "sha256": "93283baa66b90550fd84229919046222cdf4fd5f597d3bb7510f821fa5f7e064",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55501,
+        0.00024,
+        -0.19975
+      ],
+      "local_bounds_max": [
+        0.55498,
+        1.73098,
+        0.21279
+      ],
+      "local_size": [
+        1.10999,
+        1.73074,
+        0.41254
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v03.glb",
+      "bytes": 3869336,
+      "sha256": "d0dbb6650dc72330f7f9db5c60165921baffc41363ed50e09c8feb212ca8a5ea",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53393,
+        0.00024,
+        -0.2002
+      ],
+      "local_bounds_max": [
+        0.53391,
+        1.67398,
+        0.19265
+      ],
+      "local_size": [
+        1.06784,
+        1.67374,
+        0.39284
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v04.glb",
+      "bytes": 3276240,
+      "sha256": "90c07c908b7ca619af1f1de3157ba53817ce740bae3a0e00a3e6bcf9bbe43139",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.52323,
+        -0.0027,
+        -0.18785
+      ],
+      "local_bounds_max": [
+        0.52321,
+        1.63137,
+        0.19137
+      ],
+      "local_size": [
+        1.04644,
+        1.63407,
+        0.37923
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v05.glb",
+      "bytes": 4344092,
+      "sha256": "7d7356c65450407daf641571c09a780296fe4ab19c77dbb4dfa36dfa92232a39",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.57799,
+        -0.00161,
+        -0.21802
+      ],
+      "local_bounds_max": [
+        0.57796,
+        1.81353,
+        0.21125
+      ],
+      "local_size": [
+        1.15595,
+        1.81514,
+        0.42927
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v06.glb",
+      "bytes": 3981316,
+      "sha256": "f23de872598da4a8462694b79af5e135553bec9903f467842c8033c8c1ffbc88",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.52575,
+        -0.001,
+        -0.1928
+      ],
+      "local_bounds_max": [
+        0.52572,
+        1.64361,
+        0.19651
+      ],
+      "local_size": [
+        1.05147,
+        1.64461,
+        0.3893
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v07.glb",
+      "bytes": 4228816,
+      "sha256": "e4082c761b1f29454c014fcaf98292e4db3522e2be9c474f75b9e676863f56bb",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54566,
+        0.00029,
+        -0.20723
+      ],
+      "local_bounds_max": [
+        0.54564,
+        1.71363,
+        0.20034
+      ],
+      "local_size": [
+        1.0913,
+        1.71334,
+        0.40758
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v08.glb",
+      "bytes": 3337480,
+      "sha256": "34bedadd17b83fb105d15bc1ca080b87ce6e9418af0b5a8cca0d2a15939839a7",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.5635,
+        0.00028,
+        -0.20973
+      ],
+      "local_bounds_max": [
+        0.56348,
+        1.765,
+        0.20893
+      ],
+      "local_size": [
+        1.12698,
+        1.76472,
+        0.41866
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v09.glb",
+      "bytes": 4672164,
+      "sha256": "cc00af8ab342bbe6f7513444148cd23104d41f9e63a640cd1de6ea7cd5e0db9b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54508,
+        0.00029,
+        -0.20054
+      ],
+      "local_bounds_max": [
+        0.54506,
+        1.70478,
+        0.20755
+      ],
+      "local_size": [
+        1.09014,
+        1.70449,
+        0.40809
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_bikini_sporty_v10.glb",
+      "bytes": 3835372,
+      "sha256": "89f0f5314ef2c51427059f4154a5ab8cd816e32b848653f9bb9e31a61d2f9204",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 23,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.56172,
+        -0.0023,
+        -0.2076
+      ],
+      "local_bounds_max": [
+        0.56169,
+        1.75781,
+        0.20754
+      ],
+      "local_size": [
+        1.12341,
+        1.76011,
+        0.41513
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy.glb",
+      "bytes": 6128804,
+      "sha256": "02f7817d2cbbd0e4fe8e041327ce901849e234b049931631e365dfab8366d639",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.59218,
+        0.0,
+        -0.30397
+      ],
+      "local_bounds_max": [
+        0.59244,
+        1.78006,
+        0.30318
+      ],
+      "local_size": [
+        1.18462,
+        1.78006,
+        0.60715
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v01.glb",
+      "bytes": 1419848,
+      "sha256": "8e0bb9cc3bc8467c85c6c1816abe5756affcccb7f435f95a13e4c9832f95e0cb",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.58902,
+        0.0002,
+        -0.28213
+      ],
+      "local_bounds_max": [
+        0.58929,
+        1.77797,
+        0.31632
+      ],
+      "local_size": [
+        1.17832,
+        1.77778,
+        0.59845
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v02.glb",
+      "bytes": 1413192,
+      "sha256": "66b276b81a0257f4f6f94fe3321b95798eb0ca2c0d0a2922ae7633f7c71d2c1a",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.61946,
+        -0.00016,
+        -0.31985
+      ],
+      "local_bounds_max": [
+        0.61973,
+        1.86934,
+        0.34184
+      ],
+      "local_size": [
+        1.23918,
+        1.86951,
+        0.66169
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v03.glb",
+      "bytes": 1354136,
+      "sha256": "50c963ff057bb3faa07ef5038c7eb1c38e1d27a38f7812e0cbd0290ffaef9c51",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.59395,
+        -0.00214,
+        -0.32222
+      ],
+      "local_bounds_max": [
+        0.5942,
+        1.78806,
+        0.33127
+      ],
+      "local_size": [
+        1.18815,
+        1.7902,
+        0.65349
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v04.glb",
+      "bytes": 1390212,
+      "sha256": "8077b2435fb4c9bebdfc4061f4ee8a198aeb840390465186eec8e48ed1c46997",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.58926,
+        -0.0005,
+        -0.30657
+      ],
+      "local_bounds_max": [
+        0.58951,
+        1.7758,
+        0.31211
+      ],
+      "local_size": [
+        1.17877,
+        1.7763,
+        0.61868
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v05.glb",
+      "bytes": 1373916,
+      "sha256": "fc0024970a20d556399e6c50260b91da80c10f71bc53c4803763822dffd99694",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.55689,
+        -0.00171,
+        -0.29898
+      ],
+      "local_bounds_max": [
+        0.55712,
+        1.6635,
+        0.28451
+      ],
+      "local_size": [
+        1.11401,
+        1.66521,
+        0.58349
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v06.glb",
+      "bytes": 1343828,
+      "sha256": "d63e94a611021e4afff586a258601d18e2d1e87a380fd207ef796be8f59b0489",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.62947,
+        -0.00071,
+        -0.32919
+      ],
+      "local_bounds_max": [
+        0.62974,
+        1.88952,
+        0.34497
+      ],
+      "local_size": [
+        1.25921,
+        1.89023,
+        0.67416
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v07.glb",
+      "bytes": 1400252,
+      "sha256": "bb69219c2779beaf34c060a261880f4bb096aed60db4094a610d4bbb7ddcca9b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.57027,
+        -0.00091,
+        -0.30006
+      ],
+      "local_bounds_max": [
+        0.57051,
+        1.71085,
+        0.30054
+      ],
+      "local_size": [
+        1.14078,
+        1.71176,
+        0.6006
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v08.glb",
+      "bytes": 1388716,
+      "sha256": "0cc5d364b7cf3c7f3f7154dff7901d087bd572c27c2198faa86b1bdac77897a0",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.58548,
+        8e-05,
+        -0.29893
+      ],
+      "local_bounds_max": [
+        0.58573,
+        1.75847,
+        0.30931
+      ],
+      "local_size": [
+        1.17121,
+        1.7584,
+        0.60824
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v09.glb",
+      "bytes": 1377260,
+      "sha256": "38aa5e99858ead3a70da35ad6b7fb10352e7c2b7604a6e9161bcbc4fd1634fea",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.59257,
+        -0.00054,
+        -0.30891
+      ],
+      "local_bounds_max": [
+        0.59282,
+        1.78772,
+        0.31708
+      ],
+      "local_size": [
+        1.18539,
+        1.78825,
+        0.62599
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Characters/tourist_buddy_v10.glb",
+      "bytes": 1423692,
+      "sha256": "7206d983af1986b1ff445d387f4671aa443b6a6dbcda472e539be16cb86cc17a",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 21,
+      "skins": 1,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 22000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.58797,
+        -0.00037,
+        -0.30485
+      ],
+      "local_bounds_max": [
+        0.58823,
+        1.77306,
+        0.30939
+      ],
+      "local_size": [
+        1.1762,
+        1.77343,
+        0.61424
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/flamingo.glb",
+      "bytes": 1044764,
+      "sha256": "c571916248ac76558b8c879499b55657d01826ebda13dacd41c7dd5d636d1e53",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 18000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95054,
+        0.00016,
+        -0.95105
+      ],
+      "local_bounds_max": [
+        0.95056,
+        1.73881,
+        0.95087
+      ],
+      "local_size": [
+        1.9011,
+        1.73865,
+        1.90191
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/jetski.glb",
+      "bytes": 628904,
+      "sha256": "cee2c949984704cc9f91946d81ec02f88fd392bec9ddfd5b4d5b5363b6d8a51c",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          1024,
+          192
+        ]
+      ],
+      "triangles": 6000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.53678,
+        -0.00087,
+        -1.50042
+      ],
+      "local_bounds_max": [
+        0.53674,
+        1.08115,
+        1.49775
+      ],
+      "local_size": [
+        1.07353,
+        1.08202,
+        2.99817
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/lifeguard.glb",
+      "bytes": 6658456,
+      "sha256": "a356c5e6f4117dcf78891ea192279417ea19902fdd624664c64a6f3727499b72",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 75200,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.48613,
+        -0.95157,
+        -0.20711
+      ],
+      "local_bounds_max": [
+        0.4834,
+        0.94773,
+        0.20931
+      ],
+      "local_size": [
+        0.96953,
+        1.8993,
+        0.41641
+      ],
+      "exact_copies": [
+        "ArtSource/Meshy/lifeguard.glb"
+      ]
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/palm_tall.glb",
+      "bytes": 5775704,
+      "sha256": "ff60be619426dbb53ee0eb4fd2750828bdb1ccc810672826157faaacd84db170",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 13999,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54418,
+        -0.95167,
+        -0.55987
+      ],
+      "local_bounds_max": [
+        0.53672,
+        0.95032,
+        0.55723
+      ],
+      "local_size": [
+        1.08089,
+        1.90199,
+        1.1171
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/pirate_boat.glb",
+      "bytes": 5593796,
+      "sha256": "338737ddfd6e17d27be0bf39936bbbde5766fe7db90fd51c0a72a93a7508f9b4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 15999,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -1.38117,
+        -0.0107,
+        -3.50603
+      ],
+      "local_bounds_max": [
+        1.37904,
+        2.01067,
+        3.4987
+      ],
+      "local_size": [
+        2.76021,
+        2.02138,
+        7.00473
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/robber_backpack.glb",
+      "bytes": 2260908,
+      "sha256": "4efa510f5921cbd35dd26b6dfdf77e4e98eb5a06e50ebf5dca86c23c2c57d6e9",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 2,
+      "image_sizes": [
+        [
+          1024,
+          1024
+        ],
+        [
+          1024,
+          1024
+        ]
+      ],
+      "triangles": 3491,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.18752,
+        0.00044,
+        -0.14499
+      ],
+      "local_bounds_max": [
+        0.18891,
+        0.45929,
+        0.1449
+      ],
+      "local_size": [
+        0.37644,
+        0.45885,
+        0.28989
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/shark.glb",
+      "bytes": 4063760,
+      "sha256": "4c3b098f01dc50ce86ec4fb048c800920c513206750599621c75d37fd582ce21",
+      "issues": [],
+      "meshes": 2,
+      "nodes": 2,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 8999,
+      "degenerate_triangles": 0,
+      "primitives": 2,
+      "local_bounds_min": [
+        -1.28618,
+        -0.48289,
+        -0.80186
+      ],
+      "local_bounds_max": [
+        1.28783,
+        1.54164,
+        1.50037
+      ],
+      "local_size": [
+        2.57401,
+        2.02454,
+        2.30223
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/station_rusty.glb",
+      "bytes": 7430856,
+      "sha256": "8b6e1a79aa7142c4cc4e3f102815983988cfa29cde1b1ea9dd1f67b95c38dd36",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 26000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.88127,
+        -0.95692,
+        -0.81875
+      ],
+      "local_bounds_max": [
+        0.8951,
+        0.94601,
+        0.82753
+      ],
+      "local_size": [
+        1.77637,
+        1.90292,
+        1.64627
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/tower.glb",
+      "bytes": 7462716,
+      "sha256": "952941ff3592eff0a6b0153c9258ce2e0000cb6559789bc167358e6f4f06688f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 3,
+      "image_sizes": [
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ],
+        [
+          2048,
+          2048
+        ]
+      ],
+      "triangles": 24000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.54301,
+        -0.95287,
+        -0.78636
+      ],
+      "local_bounds_max": [
+        0.53879,
+        0.8009,
+        0.84375
+      ],
+      "local_size": [
+        1.0818,
+        1.75377,
+        1.63011
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/umbrella_red.glb",
+      "bytes": 1131236,
+      "sha256": "13084438f57353123c82d6f7af0d644b70d6f901a0e94e424ee54598c6e52674",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          1024,
+          1024
+        ]
+      ],
+      "triangles": 5000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -1.17432,
+        0.00024,
+        -1.17433
+      ],
+      "local_bounds_max": [
+        1.17305,
+        2.3482,
+        1.17363
+      ],
+      "local_size": [
+        2.34737,
+        2.34796,
+        2.34796
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/umbrella_teal.glb",
+      "bytes": 1063052,
+      "sha256": "9d694d330a16f57a1ceb83fb79453f6ec91c7517b64bab796c694bdeeff69ce6",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          1024,
+          1024
+        ]
+      ],
+      "triangles": 5000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -1.17432,
+        0.00024,
+        -1.17433
+      ],
+      "local_bounds_max": [
+        1.17305,
+        2.3482,
+        1.17363
+      ],
+      "local_size": [
+        2.34737,
+        2.34796,
+        2.34796
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Meshy/umbrella_yellow.glb",
+      "bytes": 1119568,
+      "sha256": "02b48f783431bea8ed32e75db7e82b5b54795543a82352204679bd241813b647",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 1,
+      "image_sizes": [
+        [
+          1024,
+          1024
+        ]
+      ],
+      "triangles": 5000,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -1.17432,
+        0.00024,
+        -1.17433
+      ],
+      "local_bounds_max": [
+        1.17305,
+        2.3482,
+        1.17363
+      ],
+      "local_size": [
+        2.34737,
+        2.34796,
+        2.34796
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/baggie.glb",
+      "bytes": 14044,
+      "sha256": "a98259a0320e9b00acd404a77fd99748e5bb32c2f035f3d5ef94d472a37ab8ee",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 404,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.046,
+        -0.01153,
+        -0.036
+      ],
+      "local_bounds_max": [
+        0.046,
+        0.01201,
+        0.036
+      ],
+      "local_size": [
+        0.092,
+        0.02354,
+        0.072
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/banana_boat.glb",
+      "bytes": 38888,
+      "sha256": "83d1c923f65800ae0cee965017f086cc7c660cc94ecda8b13d5631c391f1ec99",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1432,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -0.71455,
+        6e-05,
+        -2.52
+      ],
+      "local_bounds_max": [
+        0.71455,
+        1.00366,
+        2.52727
+      ],
+      "local_size": [
+        1.42911,
+        1.0036,
+        5.04727
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/basketball.glb",
+      "bytes": 232924,
+      "sha256": "f6b2337105998c9300a46e7e6da22ae105cbeaac108f1cf5b6f52ac14897064b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 2,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 8736,
+      "degenerate_triangles": 0,
+      "primitives": 2,
+      "local_bounds_min": [
+        -0.12145,
+        -0.12146,
+        -0.12147
+      ],
+      "local_bounds_max": [
+        0.12146,
+        0.12145,
+        0.12146
+      ],
+      "local_size": [
+        0.24291,
+        0.24291,
+        0.24292
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/basketball_hoop.glb",
+      "bytes": 36740,
+      "sha256": "f11def137b519a7d240897a31d468238f287ed5d18406fca8f74b94d730e1a1d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1040,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -0.905,
+        0.0,
+        -1.35
+      ],
+      "local_bounds_max": [
+        0.905,
+        3.965,
+        0.62195
+      ],
+      "local_size": [
+        1.81,
+        3.965,
+        1.97195
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/basketball_net.glb",
+      "bytes": 24344,
+      "sha256": "6e79f2f22c9ce9b3fb1905d43c7d4c01c333d4532a9dce17aa442f6a0acf6abe",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 544,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.22853,
+        -0.42574,
+        -0.22853
+      ],
+      "local_bounds_max": [
+        0.22853,
+        0.0014,
+        0.22853
+      ],
+      "local_size": [
+        0.45706,
+        0.42714,
+        0.45706
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/beach_ball.glb",
+      "bytes": 15364,
+      "sha256": "c1ed550e3a822db5a5982c10e7b0242bdedbaf49ff0e8f4b5a5b6b48ff03b2de",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 572,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.275,
+        -0.275,
+        -0.275
+      ],
+      "local_bounds_max": [
+        0.275,
+        0.283,
+        0.275
+      ],
+      "local_size": [
+        0.55,
+        0.558,
+        0.55
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/beach_bar.glb",
+      "bytes": 604460,
+      "sha256": "a429a1493740e2c9dfe8a8a3717aa25bae066945974318ce329e747dd2324bd3",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 24,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 12362,
+      "degenerate_triangles": 0,
+      "primitives": 24,
+      "local_bounds_min": [
+        -2.70064,
+        0.0,
+        -2.09755
+      ],
+      "local_bounds_max": [
+        2.70107,
+        3.81,
+        2.09529
+      ],
+      "local_size": [
+        5.40171,
+        3.81,
+        4.19284
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/beach_hut.glb",
+      "bytes": 98780,
+      "sha256": "805d791717f8e474a2a14a73e8929dfe946565d73e30f42814c4e0af6f41ea7b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 7,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 2900,
+      "degenerate_triangles": 0,
+      "primitives": 7,
+      "local_bounds_min": [
+        -1.575,
+        0.0,
+        -1.45
+      ],
+      "local_bounds_max": [
+        1.575,
+        3.37528,
+        1.77
+      ],
+      "local_size": [
+        3.15,
+        3.37528,
+        3.22
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/beach_toilets.glb",
+      "bytes": 278576,
+      "sha256": "2fa5ea8c46b0b208908d1bd640c1996716e93a01ab204f96a05e2c59bdf5c19f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 13,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 6532,
+      "degenerate_triangles": 0,
+      "primitives": 13,
+      "local_bounds_min": [
+        -2.9712,
+        0.0,
+        -1.5
+      ],
+      "local_bounds_max": [
+        2.55,
+        2.87,
+        2.14718
+      ],
+      "local_size": [
+        5.5212,
+        2.87,
+        3.64718
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/beer_bottle.glb",
+      "bytes": 19744,
+      "sha256": "72d2682e16525b0f8c7ee4c980716ca0c8500a62884e7b66bfe8ae778dedcc8d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 656,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.04109,
+        -0.1495,
+        -0.04109
+      ],
+      "local_bounds_max": [
+        0.04109,
+        0.156,
+        0.04109
+      ],
+      "local_size": [
+        0.08218,
+        0.3055,
+        0.08218
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/bell.glb",
+      "bytes": 26900,
+      "sha256": "11d9d69c8cd6853c0cccd9bcf1521f435e45da755be9b6aa61c3d6088a40ac39",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 944,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.14025,
+        -0.844,
+        -0.14025
+      ],
+      "local_bounds_max": [
+        0.14025,
+        0.00767,
+        0.14025
+      ],
+      "local_size": [
+        0.2805,
+        0.85167,
+        0.2805
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/bell_post.glb",
+      "bytes": 15268,
+      "sha256": "578a2672426c14c5d0b5490e4b449974ccb88af79b1baee00ed5c3813d805e12",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 380,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.1,
+        0.0,
+        -0.1
+      ],
+      "local_bounds_max": [
+        0.46135,
+        2.355,
+        0.1
+      ],
+      "local_size": [
+        0.56135,
+        2.355,
+        0.2
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/buoy.glb",
+      "bytes": 19420,
+      "sha256": "2b99b42cba46811d61d761c83905b82ba7d1fbe5293303f2ade4aa4464159ebc",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 628,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -0.2462,
+        -0.50106,
+        -0.25
+      ],
+      "local_bounds_max": [
+        0.2462,
+        0.31299,
+        0.25
+      ],
+      "local_size": [
+        0.4924,
+        0.81405,
+        0.5
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/cannon_barrel.glb",
+      "bytes": 31104,
+      "sha256": "4a8c8fc0bde16174951c8b3616525c38d9bc6e353e94efa3c0896cf68b116aca",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1014,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.5,
+        -0.41641,
+        -1.1097
+      ],
+      "local_bounds_max": [
+        0.5,
+        0.61318,
+        2.05
+      ],
+      "local_size": [
+        1.0,
+        1.02958,
+        3.1597
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/cannon_wheel.glb",
+      "bytes": 24176,
+      "sha256": "ce11fd3ad14b933d8eb94108fa7a340f021155f6fa48e4cf5da4aa267b1ef7cf",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 696,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.08,
+        -0.48408,
+        -0.48308
+      ],
+      "local_bounds_max": [
+        0.08,
+        0.485,
+        0.48476
+      ],
+      "local_size": [
+        0.16,
+        0.96908,
+        0.96784
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/cannon_wheel_small.glb",
+      "bytes": 24192,
+      "sha256": "cfa371ad955fd1b6f745be693fdbb0eb08dfea8404f6405ab715cd47ffc13f6f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 696,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.08,
+        -0.32408,
+        -0.32308
+      ],
+      "local_bounds_max": [
+        0.08,
+        0.325,
+        0.32476
+      ],
+      "local_size": [
+        0.16,
+        0.64908,
+        0.64784
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/coconut.glb",
+      "bytes": 13544,
+      "sha256": "4bb059ff1e72f543b44dd6d531269a9af6e2f28ff31ef53ccb395d54fa33ec00",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 450,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.1004,
+        -0.11302,
+        -0.09858
+      ],
+      "local_bounds_max": [
+        0.10091,
+        0.11469,
+        0.09976
+      ],
+      "local_size": [
+        0.2013,
+        0.22771,
+        0.19834
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/cooler.glb",
+      "bytes": 46456,
+      "sha256": "c5fc2468e79289758af057726b2072911e7ae64882ad42ccd9051336b12e5a36",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1464,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -0.30672,
+        -0.19,
+        -0.196
+      ],
+      "local_bounds_max": [
+        0.30687,
+        0.31902,
+        0.1925
+      ],
+      "local_size": [
+        0.61358,
+        0.50902,
+        0.3885
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/crate.glb",
+      "bytes": 87016,
+      "sha256": "3a4c42428a5feda3410bb77eb7094a1064e89f7cadf010220095e9a70b52c740",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1444,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.36354,
+        -0.3,
+        -0.314
+      ],
+      "local_bounds_max": [
+        0.36373,
+        0.3,
+        0.314
+      ],
+      "local_size": [
+        0.72727,
+        0.6,
+        0.628
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/defibrillator.glb",
+      "bytes": 75936,
+      "sha256": "01176339a76642f8dcaf9d546fd3f3b366f5d489fad76d9ca339f93911f14402",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 7,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1904,
+      "degenerate_triangles": 0,
+      "primitives": 7,
+      "local_bounds_min": [
+        -0.1725,
+        -0.06,
+        -0.19082
+      ],
+      "local_bounds_max": [
+        0.1725,
+        0.11007,
+        0.1325
+      ],
+      "local_size": [
+        0.345,
+        0.17007,
+        0.32332
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/diving_board.glb",
+      "bytes": 13196,
+      "sha256": "a6191e9a2d8a8ea7adf9b50b2ccedbb1458f424107e92d639fc2eff719259eb4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 264,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.345,
+        0.0,
+        -0.1
+      ],
+      "local_bounds_max": [
+        0.345,
+        1.0208,
+        2.6
+      ],
+      "local_size": [
+        0.69,
+        1.0208,
+        2.7
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/dock.glb",
+      "bytes": 468736,
+      "sha256": "2b3470000abbed115c951fcf4e5556dcc0cb1fbe49bc1be6f3a0481f95bb98bd",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 8248,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -1.25348,
+        -4.6,
+        -19.01725
+      ],
+      "local_bounds_max": [
+        1.25336,
+        0.56,
+        5.95
+      ],
+      "local_size": [
+        2.50684,
+        5.16,
+        24.96725
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/drill_board.glb",
+      "bytes": 12496,
+      "sha256": "67f1249e563694843cab604777d38ee903e21bd67936ccf6b41dd27b23b640a7",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 308,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.8,
+        0.0,
+        -0.055
+      ],
+      "local_bounds_max": [
+        0.8,
+        2.055,
+        0.145
+      ],
+      "local_size": [
+        1.6,
+        2.055,
+        0.2
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/first_aid_kit.glb",
+      "bytes": 17108,
+      "sha256": "ce6c55f0cbd6b46c45f9c42cf1745728d2503b973fffb0a4f7f83f02e7142ab9",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 500,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.152,
+        -0.08,
+        -0.102
+      ],
+      "local_bounds_max": [
+        0.152,
+        0.11274,
+        0.105
+      ],
+      "local_size": [
+        0.304,
+        0.19274,
+        0.207
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/human_cannon.glb",
+      "bytes": 13528,
+      "sha256": "bed2aa8f673d03aaad40d8abf0766b573a61e1e241b5e464308cfe7fde3278ec",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 288,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.6,
+        0.16336,
+        -1.55691
+      ],
+      "local_bounds_max": [
+        0.6,
+        1.2,
+        0.8
+      ],
+      "local_size": [
+        1.2,
+        1.03664,
+        2.35691
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/jet_ski_keys.glb",
+      "bytes": 24892,
+      "sha256": "c7da4e4cb67550120a5c9a621d4ff952bbbca10a2067caa69314c6bfc7f4681b",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 772,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.026,
+        -0.0155,
+        -0.05
+      ],
+      "local_bounds_max": [
+        0.026,
+        0.0155,
+        0.122
+      ],
+      "local_size": [
+        0.052,
+        0.031,
+        0.172
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/life_ring.glb",
+      "bytes": 57212,
+      "sha256": "f008d98f5e909a7cb0f7f5aa1eb71d85337bf0519b48088603dcecac36804e48",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 2048,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.4107,
+        -0.088,
+        -0.4107
+      ],
+      "local_bounds_max": [
+        0.41019,
+        0.088,
+        0.41019
+      ],
+      "local_size": [
+        0.8209,
+        0.176,
+        0.8209
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/lost_box.glb",
+      "bytes": 19036,
+      "sha256": "c5647aa3fe0895b3c7f471c137c40f0e1a2aab22df390116310c62de2c4c76c0",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 7,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 468,
+      "degenerate_triangles": 0,
+      "primitives": 7,
+      "local_bounds_min": [
+        -0.2525,
+        0.0,
+        -0.1725
+      ],
+      "local_bounds_max": [
+        0.2525,
+        0.36587,
+        0.19476
+      ],
+      "local_size": [
+        0.505,
+        0.36587,
+        0.36726
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/parrot.glb",
+      "bytes": 38128,
+      "sha256": "e422e3e1b65a208a7bb9073df049a86c404d52de883f72819043cc9e02f10b2f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 7,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1452,
+      "degenerate_triangles": 0,
+      "primitives": 7,
+      "local_bounds_min": [
+        -0.1082,
+        -0.12325,
+        -0.30599
+      ],
+      "local_bounds_max": [
+        0.11094,
+        0.52616,
+        0.20372
+      ],
+      "local_size": [
+        0.21913,
+        0.64941,
+        0.50971
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/parrot_wing.glb",
+      "bytes": 8680,
+      "sha256": "df3def6e8a26e77e8d54c08ad707a5127fcc58d5e006e0a57c48cc84170c89b7",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 240,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.05382,
+        -0.2101,
+        -0.25951
+      ],
+      "local_bounds_max": [
+        0.00898,
+        0.02829,
+        0.06761
+      ],
+      "local_size": [
+        0.0628,
+        0.23839,
+        0.32711
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/phone.glb",
+      "bytes": 45680,
+      "sha256": "c4e4e5bd9c051406c53f649ce0afcb3a2350bf78ed0f5951e44771690c4c54ef",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 10,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1184,
+      "degenerate_triangles": 0,
+      "primitives": 10,
+      "local_bounds_min": [
+        -0.0415,
+        -0.0097,
+        -0.08
+      ],
+      "local_bounds_max": [
+        0.0415,
+        0.0073,
+        0.08
+      ],
+      "local_size": [
+        0.083,
+        0.017,
+        0.16
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/radio.glb",
+      "bytes": 31376,
+      "sha256": "173eef35f16fdcb4eb2d7fdc9a34023a5fe9bbb50d9046dd15bdddca7585fbc0",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 6,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 824,
+      "degenerate_triangles": 0,
+      "primitives": 6,
+      "local_bounds_min": [
+        -0.2652,
+        -0.1,
+        -0.08
+      ],
+      "local_bounds_max": [
+        0.18,
+        0.406,
+        0.102
+      ],
+      "local_size": [
+        0.4452,
+        0.506,
+        0.182
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/rock.glb",
+      "bytes": 24900,
+      "sha256": "0921b3cf883a9f294448a6c35b2efd5c4baa7341751105026b94334947f78196",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 320,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.48853,
+        -0.51065,
+        -0.53281
+      ],
+      "local_bounds_max": [
+        0.47518,
+        0.47128,
+        0.47719
+      ],
+      "local_size": [
+        0.96371,
+        0.98193,
+        1.01
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/roof_sign.glb",
+      "bytes": 6132,
+      "sha256": "7ecd76f0d752f229984610f77ef16da49acd666f85503179505829e0ce480787",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 2,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 132,
+      "degenerate_triangles": 0,
+      "primitives": 2,
+      "local_bounds_min": [
+        -1.20587,
+        -0.06,
+        -0.025
+      ],
+      "local_bounds_max": [
+        1.20587,
+        0.70106,
+        0.075
+      ],
+      "local_size": [
+        2.41174,
+        0.76106,
+        0.1
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/shack.glb",
+      "bytes": 374336,
+      "sha256": "38c6e1068745b7bf47ef56ad22454507cb8dede75e0903b78a9e7cbcfcb1ec9e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 10,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 10852,
+      "degenerate_triangles": 0,
+      "primitives": 10,
+      "local_bounds_min": [
+        -3.16636,
+        -0.27726,
+        -2.16962
+      ],
+      "local_bounds_max": [
+        1.74022,
+        5.37,
+        2.71937
+      ],
+      "local_size": [
+        4.90658,
+        5.64726,
+        4.88899
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/shelf.glb",
+      "bytes": 9344,
+      "sha256": "273536e959b736820fe819eb541cecf09e2700b221b2acf3b6de029daf8e469e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 220,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -0.7,
+        -0.005,
+        -0.21
+      ],
+      "local_bounds_max": [
+        0.7,
+        1.08,
+        0.21
+      ],
+      "local_size": [
+        1.4,
+        1.085,
+        0.42
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/sign_frame.glb",
+      "bytes": 15352,
+      "sha256": "755a6697686f1e04297b61a1e54795c2cd2be67423dcba838fc7a561295e8f40",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 396,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -1.0,
+        0.0,
+        -0.045
+      ],
+      "local_bounds_max": [
+        1.0,
+        2.345,
+        0.105
+      ],
+      "local_size": [
+        2.0,
+        2.345,
+        0.15
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/stool.glb",
+      "bytes": 17680,
+      "sha256": "7de9d3191de93f24dc77df3e5b0d7cee0d6175bf21b4d1d94530d38194a97826",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 444,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.18635,
+        -0.00259,
+        -0.18635
+      ],
+      "local_bounds_max": [
+        0.18635,
+        0.755,
+        0.18635
+      ],
+      "local_size": [
+        0.3727,
+        0.75759,
+        0.3727
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/sunglasses.glb",
+      "bytes": 28768,
+      "sha256": "4cc82e47a5a528ff25a1266ed38f4698da0907e49845776c193abcf52c879bfd",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 2,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 832,
+      "degenerate_triangles": 0,
+      "primitives": 2,
+      "local_bounds_min": [
+        -0.08057,
+        -0.03917,
+        -0.0047
+      ],
+      "local_bounds_max": [
+        0.08057,
+        0.01248,
+        0.14433
+      ],
+      "local_size": [
+        0.16114,
+        0.05165,
+        0.14903
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/towel.glb",
+      "bytes": 34664,
+      "sha256": "bd1049aac2a13b681203ea877f47c859d8000fce6456951db6604efc7594d6fe",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 2,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1296,
+      "degenerate_triangles": 0,
+      "primitives": 2,
+      "local_bounds_min": [
+        -0.47521,
+        0.006,
+        -0.97514
+      ],
+      "local_bounds_max": [
+        0.47523,
+        0.12611,
+        0.97512
+      ],
+      "local_size": [
+        0.95045,
+        0.12011,
+        1.95026
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/trampoline.glb",
+      "bytes": 70528,
+      "sha256": "bce5c9346905f9719e639ea7f66373e2ab5912b9d0b42ea0fd1bf6819e25741d",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 3,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 2216,
+      "degenerate_triangles": 0,
+      "primitives": 3,
+      "local_bounds_min": [
+        -1.48889,
+        0.00759,
+        -1.48625
+      ],
+      "local_bounds_max": [
+        1.4865,
+        0.86,
+        1.48785
+      ],
+      "local_size": [
+        2.97539,
+        0.85241,
+        2.97411
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/wallet.glb",
+      "bytes": 28020,
+      "sha256": "76bb6977dc0ccf239e9d20097373f1c4476613fb3ad99ee5716add461a47904f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 902,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -0.06,
+        -0.0135,
+        -0.05
+      ],
+      "local_bounds_max": [
+        0.06,
+        0.0195,
+        0.0565
+      ],
+      "local_size": [
+        0.12,
+        0.033,
+        0.1065
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/watch.glb",
+      "bytes": 44216,
+      "sha256": "9028e1a24d30856eb672cbe27e567a8fb6a5c062b1c08e2d76d205a4e30ce3d2",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 7,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 1050,
+      "degenerate_triangles": 0,
+      "primitives": 7,
+      "local_bounds_min": [
+        -0.03,
+        -0.01082,
+        -0.08
+      ],
+      "local_bounds_max": [
+        0.02469,
+        0.0082,
+        0.09118
+      ],
+      "local_size": [
+        0.05469,
+        0.01902,
+        0.17118
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/watch_tower.glb",
+      "bytes": 560068,
+      "sha256": "36516b254048075d9461103e9ddd746d0afb3c16d82789b11eee7fbaf096b87c",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 14,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 17020,
+      "degenerate_triangles": 0,
+      "primitives": 14,
+      "local_bounds_min": [
+        -2.843,
+        -0.3,
+        -2.91
+      ],
+      "local_bounds_max": [
+        2.843,
+        7.412,
+        3.3
+      ],
+      "local_size": [
+        5.686,
+        7.712,
+        6.21
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/zipline_handle.glb",
+      "bytes": 10700,
+      "sha256": "1d7ed0eb8b32673c2b7301471a52550df849fefd55332aa41b2b5bc7fbff34d2",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 200,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.3,
+        -0.575,
+        -0.15
+      ],
+      "local_bounds_max": [
+        0.3,
+        0.10796,
+        0.15
+      ],
+      "local_size": [
+        0.6,
+        0.68296,
+        0.3
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Props/zipline_post.glb",
+      "bytes": 21196,
+      "sha256": "a4c8f6b6d7dbc92d4b37820c7dcf79b075ad29619ad66d9d13b6b2b30eccc0f4",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 732,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -0.6,
+        0.0,
+        -0.18353
+      ],
+      "local_bounds_max": [
+        0.6,
+        7.0,
+        0.23
+      ],
+      "local_size": [
+        1.2,
+        7.0,
+        0.41353
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Weapons/pistol.glb",
+      "bytes": 807556,
+      "sha256": "7876f170f7bbc0d5743c6c9c7f68446e235f6bd6048bb81002fb5fc01f029314",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 34286,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95129,
+        -0.69152,
+        -0.1712
+      ],
+      "local_bounds_max": [
+        0.94654,
+        0.69267,
+        0.17745
+      ],
+      "local_size": [
+        1.89783,
+        1.38419,
+        0.34866
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Weapons/rifle.glb",
+      "bytes": 681844,
+      "sha256": "cf21d510269d3138318e98d9226c346307aea83e13da28212c711332a1effbcf",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 28726,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95145,
+        -0.31975,
+        -0.06729
+      ],
+      "local_bounds_max": [
+        0.9472,
+        0.31866,
+        0.06972
+      ],
+      "local_size": [
+        1.89864,
+        0.63841,
+        0.13701
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Weapons/shotgun.glb",
+      "bytes": 126164,
+      "sha256": "a95afa68c6630b5298c7f71952d2f73467e569ae8dc48c6d07e911239f42230f",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 5,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 6148,
+      "degenerate_triangles": 0,
+      "primitives": 5,
+      "local_bounds_min": [
+        -0.449,
+        -0.1,
+        -0.027
+      ],
+      "local_bounds_max": [
+        0.6235,
+        0.0615,
+        0.027
+      ],
+      "local_size": [
+        1.0725,
+        0.1615,
+        0.054
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Weapons/smg.glb",
+      "bytes": 184532,
+      "sha256": "7d087abe462253c1a7989d50c49ab27a6130fd94b4f6c833fc3794062d2d8d6c",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 4,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 9436,
+      "degenerate_triangles": 0,
+      "primitives": 4,
+      "local_bounds_min": [
+        -0.272,
+        -0.11326,
+        -0.023
+      ],
+      "local_bounds_max": [
+        0.26,
+        0.072,
+        0.0242
+      ],
+      "local_size": [
+        0.532,
+        0.18526,
+        0.0472
+      ],
+      "exact_copies": []
+    },
+    {
+      "path": "Assets/_Game/Art/Weapons/sniper.glb",
+      "bytes": 511152,
+      "sha256": "e4483559e8e454647b986326b0a78fce201c366a033eb0dd305e423e1d85e68e",
+      "issues": [],
+      "meshes": 1,
+      "nodes": 1,
+      "skins": 0,
+      "animations": 0,
+      "materials": 1,
+      "images": 0,
+      "image_sizes": [],
+      "triangles": 21526,
+      "degenerate_triangles": 0,
+      "primitives": 1,
+      "local_bounds_min": [
+        -0.95136,
+        -0.26205,
+        -0.06653
+      ],
+      "local_bounds_max": [
+        0.94728,
+        0.25799,
+        0.07465
+      ],
+      "local_size": [
+        1.89863,
+        0.52004,
+        0.14118
+      ],
+      "exact_copies": []
+    }
+  ]
+}

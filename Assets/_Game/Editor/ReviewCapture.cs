@@ -245,6 +245,7 @@ namespace PleaseDontDrown.Editor
                 "sandycode" => CodeBuilt(Story.StoryDirector.SandyLook),
                 "receptionist" => Story.StoryDirector.ReceptionistLook,
                 "robber" => Story.StoryDirector.RobberLook,
+                "barista" => Fun.Barista.MockLook,
                 "pirate" => Story.StoryDirector.PirateLook(seed),
                 _ => AvatarLook.Lifeguard
             };
@@ -360,6 +361,52 @@ namespace PleaseDontDrown.Editor
                 AvatarAnimator.TimeOverride = 100f + i / 30f;
                 animator.Tick(1f / 30f);
             }
+            // "bottle" / "drink": a beer in the right hand as someone else sees it (BottleHold's remote offset from the
+            // eyes, shrunk like PlayerHands does), or tipped up at the lips (PlayerHands' drinking), the hand on its grip.
+            if (pose.StartsWith("bottle") || pose.StartsWith("drink"))
+            {
+                // bottle:<fingers yaw>:<palm 1 in, -1 out>:<grip height>: try a grip before baking it.
+                string[] gripTry = pose.Split(':');
+                var beerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Items/Prefabs/Beer.prefab");
+                GameObject beer = Object.Instantiate(beerPrefab);
+                Spawned.Add(beer);
+                if (beer.TryGetComponent(out Rigidbody beerBody)) beerBody.isKinematic = true;
+                var beerItem = beer.GetComponent<Items.Item>();
+                var drink = beer.GetComponent<Items.Edible>();
+                Quaternion view = Quaternion.Euler(0f, yaw, 0f);
+                Vector3 eye = go.transform.position + Vector3.up * 1.5f;
+                bool drinking = pose.StartsWith("drink");
+                if (gripTry.Length > 2)
+                {
+                    float gy = float.Parse(gripTry[1], CultureInfo.InvariantCulture), flip = float.Parse(gripTry[2], CultureInfo.InvariantCulture);
+                    float gh = gripTry.Length > 3 ? float.Parse(gripTry[3], CultureInfo.InvariantCulture) : -0.045f;
+                    Vector3 outward = Quaternion.Euler(0f, gy, 0f) * new Vector3(1f, 0f, 0f);
+                    Transform gt = beerItem.GripRight;
+                    gt.localPosition = outward * 0.036f + new Vector3(0f, gh, 0f);
+                    gt.localRotation = Quaternion.LookRotation(Quaternion.Euler(0f, gy, 0f) * Vector3.forward * flip, outward);
+                }
+                m.Holding = true;
+                m.Eating = m.Drinking = drinking;
+                for (int i = 0; i < 45; i++)
+                {
+                    if (drinking)
+                    {
+                        Quaternion tipped = Quaternion.Euler(-119f, 0f, 0f);
+                        beer.transform.rotation = view * tipped;
+                        beer.transform.position = animator.Lips - beer.transform.rotation * drink.Lip;
+                    }
+                    else
+                    {
+                        beer.transform.SetPositionAndRotation(eye + view * Vector3.Scale(new Vector3(0.26f, -0.74f, 0.5f), new Vector3(0.9f, 0.85f, 0.66f)),
+                            view * Quaternion.Euler(-6f, 0f, -4f));
+                    }
+                    Transform g = beerItem.GripRight;
+                    m.GripRight = new HandGrip(g.position, g.forward, -g.up, beerItem.GripPose);
+                    animator.Motion = m;
+                    AvatarAnimator.TimeOverride = 104f + i / 30f;
+                    animator.Tick(1f / 30f);
+                }
+            }
             // Optional 8th value: tick on this many more seconds (walk-cycle phases for a filmstrip).
             if (p.Length > 7)
             {
@@ -400,12 +447,12 @@ namespace PleaseDontDrown.Editor
             {
                 "throw" => AvatarGesture.Throw, "wave" => AvatarGesture.Wave, "interact" => AvatarGesture.Interact, "punch" => AvatarGesture.Punch,
                 "kiss" => AvatarGesture.Breath, "zap" => AvatarGesture.Zap, "shoot" => AvatarGesture.Shoot, "jumpshot" => AvatarGesture.JumpShot,
-                "pump" => AvatarGesture.Pump, _ => AvatarGesture.None
+                "pump" => AvatarGesture.Pump, "burp" => AvatarGesture.Burp, "burpwind" => AvatarGesture.Burp, _ => AvatarGesture.None
             };
             if (gesture != AvatarGesture.None)
             {
                 // Caught part-way through (the punch at full reach, the kiss with the lips down).
-                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Breath => 0.55f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, AvatarGesture.JumpShot => 0.3f, AvatarGesture.Pump => 0.06f, _ => 0.12f };
+                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Breath => 0.55f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, AvatarGesture.JumpShot => 0.3f, AvatarGesture.Pump => 0.06f, AvatarGesture.Burp => pose == "burpwind" ? 0.2f : 0.55f, _ => 0.12f };
                 float now = AvatarAnimator.TimeOverride ?? 103f;
                 AvatarAnimator.TimeOverride = now;
                 Vector3 point = gesture switch

@@ -35,6 +35,8 @@ namespace PleaseDontDrown.Vehicles
         [SerializeField] private Transform[] _backSeats;
         [Tooltip("Riders sit astride (legs either side): a banana, a jet ski's back seat.")]
         [SerializeField] private bool _straddle;
+        [Tooltip("Hands rest open on the float rather than closing around handlebars.")]
+        [SerializeField] private bool _restHands;
         [Tooltip("Needed in the driver's inventory to start it (item display name). Empty = no key.")]
         [SerializeField] private string _keyItem = "";
         [Header("Driving")]
@@ -96,6 +98,7 @@ namespace PleaseDontDrown.Vehicles
 
         public int BackSeatCount => _backSeats == null ? 0 : Mathf.Min(_backSeats.Length, 2);
         public bool Straddle => _straddle;
+        public bool RestHands => _restHands;
 
         /// <summary>Who sits on back seat <paramref name="i"/> (0 or 1).</summary>
         public PlayerHub Rider(int i) => i == 0 ? _rider1.Value : i == 1 ? _rider2.Value : null;
@@ -518,8 +521,9 @@ namespace PleaseDontDrown.Vehicles
         {
             left = right = default;
             if (_gripLeft == null || _gripRight == null) return false;
-            left = new HandGrip(_gripLeft.position, _gripLeft.forward, -_gripLeft.up, HandPose.LooseFist);
-            right = new HandGrip(_gripRight.position, _gripRight.forward, -_gripRight.up, HandPose.LooseFist);
+            HandPose pose = _restHands ? HandPose.Flat : HandPose.LooseFist;
+            left = new HandGrip(_gripLeft.position, _gripLeft.forward, -_gripLeft.up, pose);
+            right = new HandGrip(_gripRight.position, _gripRight.forward, -_gripRight.up, pose);
             return true;
         }
 

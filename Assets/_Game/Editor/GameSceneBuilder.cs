@@ -730,6 +730,7 @@ namespace PleaseDontDrown.Editor
             SetRef(surface, "_material", LoadOrCreateMaterial("Ocean", AssetDatabase.LoadAssetAtPath<Shader>(OceanShaderPath)));
             ocean.AddComponent<NetworkObject>();
             ocean.AddComponent<OceanState>();
+            ocean.AddComponent<TsunamiState>();
             ocean.AddComponent<UnderwaterFx>();
             SetRef(ocean.AddComponent<SplashFx>(), "_particleMaterial", GetSplashMaterial());
 
@@ -793,12 +794,13 @@ namespace PleaseDontDrown.Editor
         private static readonly Vector2 IslandHalfSize = new(56f, 24f);
         private const float IslandCornerRadius = 14f;
         // Reaches far west for the dev island (and the sea round its 150 m range target).
-        private const float TerrainMinX = -400f, TerrainMaxX = 160f, TerrainMinZ = -380f, TerrainMaxZ = 150f, TerrainStep = 2f;
+        private const float TerrainMinX = -400f, TerrainMaxX = 300f, TerrainMinZ = -620f, TerrainMaxZ = 150f, TerrainStep = 2f;
 
         // The hotel island (chapter 2), ~200 m south across the channel; its beach faces island 1.
-        private static readonly Vector2 Island2Center = new(20f, -250f);
-        private static readonly Vector2 Island2HalfSize = new(60f, 30f);
-        private const float Island2CornerRadius = 24f;
+        // Keep the arrival shore at z=-220; expand west, east and south for the resort.
+        private static readonly Vector2 Island2Center = new(20f, -350f);
+        private static readonly Vector2 Island2HalfSize = new(180f, 130f);
+        private const float Island2CornerRadius = 48f;
 
         /// <summary>Signed distance outside a rounded box (negative inside).</summary>
         private static float BoxDistanceOut(float x, float z, Vector2 center, Vector2 half, float radius)

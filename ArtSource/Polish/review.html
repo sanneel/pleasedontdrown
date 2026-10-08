@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tourists & guns — Blender polish</title>
+<style>
+body{margin:0;background:#111720;color:#e9edf3;font:16px system-ui,sans-serif}main{max-width:1300px;margin:auto;padding:40px 24px}h1{font-size:38px;letter-spacing:-1px;margin:0 0 8px}p{color:#abb7c7;line-height:1.6}nav{display:flex;gap:12px;margin:24px 0}button{font:inherit;padding:10px 18px;background:#283548;color:white;border:1px solid #52647b;border-radius:7px;cursor:pointer}button.active{background:#c7edc4;color:#162b1a}article{margin:28px 0;padding:20px;background:#1a2330;border-radius:12px}h2{margin:0 0 14px;font-size:21px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}figure{margin:0}img{width:100%;display:block;border-radius:7px}figcaption{padding:8px 0;color:#b4c3d4}.game{display:none}.game img{max-height:650px;object-fit:contain}.game-mode .pair{display:none}.game-mode .game{display:block}.game-mode article:not(.has-game){display:none}footer{color:#97a7ba;margin:30px 0}a{color:#c7edc4}@media(max-width:700px){.pair{grid-template-columns:1fr}main{padding:24px 14px}}
+</style>
+<main><h1>Tourists & guns</h1><p>Blender surface polish · four tourist families, 40 variants, five guns.<br>Compare matching studio renders or inspect the assembled assets in Unity.</p>
+<nav><button id="compare" class="active">Before / after</button><button id="game">In Unity</button></nav><div id="assets"></div>
+<footer>Editable source: <a href="Tourists_and_Guns.blend">Tourists_and_Guns.blend</a> · <a href="README.md">Changes and validation</a></footer></main>
+<script>
+const entries=[['tourist_bikini_red','Red tourist','blender_red_face'],['tourist_bikini_sporty','Sporty tourist','blender_sporty_face'],['tourist_bikini_purple','Purple tourist','blender_purple_face'],['tourist_buddy','Buddy','blender_buddy_face'],['pistol','Pistol','Pistol'],['smg','SMG','SMG'],['shotgun','Shotgun','Shotgun'],['rifle','Rifle','Rifle'],['sniper','Sniper','Sniper']];
+const base='../../Screenshots/Review/BlenderPolish/';
+for(const [file,label,game] of entries){const a=document.createElement('article');a.className='has-game';const gamePath=file.startsWith('tourist')?'../../Screenshots/Review/'+game+'.jpg':'../../Screenshots/GunPolish/After/'+game+'.png';a.innerHTML=`<h2>${label}</h2><div class="pair"><figure><img loading="lazy" src="${base+file}_before.png" alt="${label} before"><figcaption>Original</figcaption></figure><figure><img loading="lazy" src="${base+file}_after.png" alt="${label} polished"><figcaption>Polished in Blender</figcaption></figure></div><figure class="game"><img loading="lazy" src="${gamePath}" alt="${label} in Unity"><figcaption>Updated Unity asset</figcaption></figure>`;document.querySelector('#assets').append(a)}
+for(const id of ['compare','game'])document.getElementById(id).onclick=()=>{document.body.classList.toggle('game-mode',id==='game');for(const b of document.querySelectorAll('button'))b.classList.toggle('active',b.id===id)};
+</script></html>

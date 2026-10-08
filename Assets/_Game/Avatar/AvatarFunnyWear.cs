@@ -6,8 +6,8 @@ namespace PleaseDontDrown.Avatars
 {
     /// <summary>
     /// What the funny lifeguard wears on top of the model: hat, glasses (over the googly eyes), moustache or beard,
-    /// big buck teeth and arm floaties. Built in code to fit this head (measured from the head bone: its top, width, back, the
-    /// googly eyes, nose and teeth), like the robber's disguise. One mesh per look, made once.
+    /// big buck teeth and arm floaties. Blender-authored pieces use the character's head space;
+    /// the procedural meshes remain as a fallback and supply the arm floaties.
     /// </summary>
     public static class AvatarFunnyWear
     {
@@ -27,9 +27,15 @@ namespace PleaseDontDrown.Avatars
         /// <summary>Puts the look's hat, glasses, facial hair and floaties on the rig (added to <paramref name="parts"/>).</summary>
         public static void Dress(AvatarRig rig, AvatarBody body, AvatarLook look, float eyeScale, List<GameObject> parts)
         {
+            // Authored pieces are tinted by the same palettes and follow the existing head-size bone scale.
+            AvatarLook fallback = look;
+            if (look.Hat != HatStyle.None && AvatarWearLibrary.Attach("hat_" + look.Hat, rig[Bone.Head], look, eyeScale, parts)) fallback.Hat = HatStyle.None;
+            if (look.Glasses != GlassesStyle.None && AvatarWearLibrary.Attach("glasses_" + look.Glasses, rig[Bone.Head], look, eyeScale, parts)) fallback.Glasses = GlassesStyle.None;
+            if (look.Face != FacialHair.None && AvatarWearLibrary.Attach("face_" + look.Face, rig[Bone.Head], look, eyeScale, parts)) fallback.Face = FacialHair.None;
+            if (look.Teeth == 1 && AvatarWearLibrary.Attach("teeth_Bucky", rig[Bone.Head], look, eyeScale, parts)) fallback.Teeth = 0;
             ulong key = (ulong)body.Id | (ulong)look.Hat << 8 | (ulong)look.HatColor << 12 | (ulong)look.Glasses << 16 | (ulong)look.Face << 20 |
                         (ulong)look.HairColor << 24 | (ulong)Mathf.RoundToInt(eyeScale * 100f) << 32 | (ulong)(look.Teeth & 3) << 44;
-            if (!_heads.TryGetValue(key, out Mesh head) || head == null) _heads[key] = head = HeadMesh(rig, body, look, eyeScale);
+            if (!_heads.TryGetValue(key, out Mesh head) || head == null) _heads[key] = head = HeadMesh(rig, body, fallback, eyeScale);
             if (head != null) parts.Add(Attach(rig[Bone.Head], head, "FunnyHeadwear"));
             if (!look.Has(AvatarExtras.Floaties)) return;
             int fkey = Mathf.RoundToInt(rig.UpperArmLength * 1000f);

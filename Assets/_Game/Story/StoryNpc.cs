@@ -106,6 +106,7 @@ namespace PleaseDontDrown.Story
         public int Health => _health.Value;
         public int MaxHealth => _maxHealth.Value;
         public bool IsDefeated => _maxHealth.Value > 0 && _health.Value <= 0;
+        public bool IsTalkable => _talkable.Value;
         public Vector3 HeadPosition => _pose.Value switch
         {
             AvatarPose.Down or AvatarPose.Lie or AvatarPose.LieFront => transform.position + Vector3.up * 0.3f,

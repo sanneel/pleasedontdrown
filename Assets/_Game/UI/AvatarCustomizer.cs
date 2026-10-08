@@ -10,6 +10,7 @@ namespace PleaseDontDrown.UI
     /// you can spin by dragging. The look is saved locally and worn in every session (synced by PlayerHub).
     /// Drawn with <see cref="Hud"/> on its 1080-high sheet, like the other menus.
     /// </summary>
+    [DefaultExecutionOrder(210)] // frame the preview after funny head scaling and avatar animation
     public class AvatarCustomizer : MonoBehaviour
     {
         private const string PrefsKey = "pdd.avatar.look";
@@ -26,6 +27,10 @@ namespace PleaseDontDrown.UI
         private Camera _camera;
         private RenderTexture _texture;
         private float _orbit;
+        private int _preset = -1;
+        private bool _framePreview;
+        private Vector3 _previewCenter;
+        private float _previewDistance = 4.2f;
 
         /// <summary>The look this player wears (saved between sessions).</summary>
         public static AvatarLook LocalLook
@@ -105,6 +110,7 @@ namespace PleaseDontDrown.UI
                 GameInput.PushUI();
                 EnsureStage();
                 _rig.Build(LocalLook);
+                _framePreview = true;
                 _stage.SetActive(true);
                 _animator.Play(AvatarGesture.Wave);
             }
@@ -121,6 +127,7 @@ namespace PleaseDontDrown.UI
             PlayerPrefs.SetString(PrefsKey, look.Pack().ToString());
             PlayerPrefs.Save();
             if (_rig != null) _rig.Build(look);
+            _framePreview = true;
             LookChanged?.Invoke(look);
         }
 
@@ -153,10 +160,28 @@ namespace PleaseDontDrown.UI
         private void LateUpdate()
         {
             if (!_open || _camera == null) return;
-            Vector3 center = StagePosition + Vector3.up * 0.95f;
+            if (_framePreview) FramePreview();
+            Vector3 center = _previewCenter;
             // Yaw 0 = in front of the character (it faces +z), a little above.
-            _camera.transform.position = center + Quaternion.Euler(-9f, _orbit, 0f) * new Vector3(0f, 0f, 4.2f);
+            _camera.transform.position = center + Quaternion.Euler(-9f, _orbit, 0f) * new Vector3(0f, 0f, _previewDistance);
             _camera.transform.LookAt(center);
+        }
+
+        private void FramePreview()
+        {
+            _framePreview = false;
+            // The renderer's culling bounds are deliberately huge for swimming. Measure the
+            // actual posed body and accessories once after a change, including tall hats.
+            var mesh = new Mesh();
+            _rig.Renderer.BakeMesh(mesh);
+            Bounds bounds = mesh.bounds;
+            bounds.center += _rig.transform.position;
+            foreach (var part in _rig.GetComponentsInChildren<MeshRenderer>()) bounds.Encapsulate(part.bounds);
+            Destroy(mesh);
+            _previewCenter = bounds.center;
+            float halfWidth = Mathf.Max(bounds.extents.x, bounds.extents.z, .55f);
+            float halfHeight = Mathf.Max(bounds.extents.y, halfWidth / _camera.aspect);
+            _previewDistance = halfHeight * 1.15f / Mathf.Tan(_camera.fieldOfView * .5f * Mathf.Deg2Rad) + halfWidth;
         }
 
         // ------------------------------------------------------------------ panel
@@ -190,16 +215,27 @@ namespace PleaseDontDrown.UI
 
             AvatarLook look = LocalLook;
             bool changed = false;
+            bool presetApplied = false;
             float x = panel.x + 540f, y = panel.y + 92f;
             bool goofy = look.IsGoofy;
             if (Arrows(x, ref y, "CHARACTER", goofy ? "Goofy" : "Classic") != 0)
             {
                 look.Body = goofy ? (byte)0 : AvatarLook.Bodies.Goofy;
                 goofy = !goofy;
+                if (!goofy) look.Glasses = (GlassesStyle)((int)look.Glasses % 4);
+                look = look.Tame();
                 changed = true;
             }
             if (goofy)
             {
+                int direction = Arrows(x, ref y, "OUTFIT PRESET", _preset < 0 ? "Custom" : AvatarPresets.Names[_preset]);
+                if (direction != 0)
+                {
+                    _preset = _preset < 0 ? (direction > 0 ? 0 : AvatarPresets.Names.Length - 1) :
+                        (_preset + direction + AvatarPresets.Names.Length) % AvatarPresets.Names.Length;
+                    look = AvatarPresets.Apply(_preset, look);
+                    changed = presetApplied = true;
+                }
                 // The goofy lifeguard: shape and face first (that's the fun), then colours and things to wear.
                 if (Arrows(x, ref y, "HEAD", AvatarLook.HeadSizeName(look.HeadSize)) != 0)
                 {
@@ -235,7 +271,7 @@ namespace PleaseDontDrown.UI
                 changed |= ColorRow(x, ref y, "SHORTS COLOUR", ref look.BottomColor, AvatarLook.ClothColors);
                 changed |= HatRow(x, ref y, ref look.Hat);
                 changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
-                changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
+                changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses, 4);
                 changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
                 changed |= Toggle(x, ref y, "WHISTLE", ref look.Extras, AvatarExtras.Whistle);
                 changed |= Toggle(x, ref y, "SUNSCREEN NOSE", ref look.Extras, AvatarExtras.Sunscreen);
@@ -246,7 +282,7 @@ namespace PleaseDontDrown.UI
             if (Hud.Button(new Rect(bx, by, 220f, 56f), "RANDOM", centred: true, small: true))
             {
                 AvatarLook random = AvatarLook.Random(new System.Random(Environment.TickCount));
-                if (!goofy) random.Body = 0;
+                if (!goofy) { random.Body = 0; random.Hat = (HatStyle)((int)random.Hat % 8); random.Glasses = (GlassesStyle)((int)random.Glasses % 4); }
                 look = random;
                 changed = true;
             }
@@ -260,7 +296,7 @@ namespace PleaseDontDrown.UI
             bool done = Hud.Button(new Rect(panel.xMax - 276f, by, 240f, 56f), "DONE", centred: true, primary: true);
             GUI.matrix = before;
 
-            if (changed) Set(look);
+            if (changed) { if (!presetApplied) _preset = -1; Set(look); }
             if (done) SetOpen(false);
         }
 
@@ -283,13 +319,14 @@ namespace PleaseDontDrown.UI
             return true;
         }
 
-        private static bool EnumRow<T>(float x, ref float y, string label, ref T field) where T : Enum
+        private static bool EnumRow<T>(float x, ref float y, string label, ref T field, int count = 0) where T : Enum
         {
             T[] values = EnumValues<T>.All;
+            if (count == 0) count = values.Length;
             int index = Array.IndexOf(values, field);
             int dir = Arrows(x, ref y, label, EnumValues<T>.Names[Mathf.Max(0, index)]);
             if (dir == 0) return false;
-            field = values[(index + dir + values.Length) % values.Length];
+            field = values[(index + dir + count) % count];
             return true;
         }
 

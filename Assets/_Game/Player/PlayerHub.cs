@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
+using PleaseDontDrown.Audio;
 using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.UI;
@@ -163,6 +164,8 @@ namespace PleaseDontDrown.Player
             _hands.RefreshLocal();
             DevCommands.Register("spawn", "<item> [count]", "Spawn items in front of you (see 'spawn list').", SpawnCommand, cheat: true, owner: this);
             DevCommands.Register("wave", "", "Wave (also the V key).", _ => Gesture(AvatarGesture.Wave), owner: this);
+            DevCommands.Register("burp", "[seconds]", "Burp now (or in a few seconds, as after a beer).",
+                args => BurpLater(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 0f), cheat: true, owner: this);
             SetLook(AvatarCustomizer.LocalLook);
             AvatarCustomizer.LookChanged += SetLook;
 
@@ -227,11 +230,12 @@ namespace PleaseDontDrown.Player
         private void GestureObservers(AvatarGesture gesture, Vector3 point) => _avatar.OnGesture(gesture, point);
 
         /// <summary>This player pressed a chest for CPR (called on every machine; see VictimBrain).</summary>
-        public void ShowPump(Vector3 chest, Vector3 head = default)
+        /// <param name="reach">How far from the middle of their body to kneel (<see cref="Rescue.VictimBody.KneelReach"/>).</param>
+        public void ShowPump(Vector3 chest, Vector3 head = default, float reach = 0.55f)
         {
-            _avatar.OnPump(chest, head);
+            _avatar.OnPump(chest, head, reach);
             if (_arms != null) _arms.OnPump(chest);
-            if (IsOwner && Look != null) Look.KneelAt(chest, head); // our own view kneels beside them
+            if (IsOwner && Look != null) Look.KneelAt(chest, head, reach); // our own view kneels beside them
         }
 
         /// <summary>The other CPR steps: a rescue breath at the mouth, or a punch to the face (every machine).</summary>
@@ -250,6 +254,60 @@ namespace PleaseDontDrown.Player
                 Look.StayKneeling();
                 if (step == Rescue.CprStep.Breath) Look.LeanIn(point, 1.1f);
             }
+        }
+
+        // ------------------------------------------------------------------ burps
+
+        private readonly List<float> _burpTimes = new();
+        private AudioSource _burpAudio;
+
+        /// <summary>Owner: a beer comes back up <paramref name="seconds"/> from now (several beers, several burps).</summary>
+        public void BurpLater(float seconds)
+        {
+            if (!IsOwner) return;
+            float at = Time.time + Mathf.Max(0f, seconds);
+            foreach (float other in _burpTimes) at = Mathf.Max(at, Mathf.Abs(other - at) < 2.2f ? other + 2.2f : at); // not on top of each other
+            _burpTimes.Add(at);
+        }
+
+        private void UpdateBurps()
+        {
+            for (int i = _burpTimes.Count - 1; i >= 0; i--)
+            {
+                if (Time.time < _burpTimes[i]) continue;
+                _burpTimes.RemoveAt(i);
+                ShowBurp();
+                BurpServer();
+            }
+        }
+
+        [ServerRpc]
+        private void BurpServer() => BurpObservers();
+
+        [ObserversRpc(ExcludeOwner = true)]
+        private void BurpObservers() => ShowBurp();
+
+        /// <summary>The burp itself (every machine): the sound from the mouth, the face and head going with it, and the word.</summary>
+        private void ShowBurp()
+        {
+            if (_avatar != null) _avatar.OnGesture(AvatarGesture.Burp);
+            if (_burpAudio == null)
+            {
+                var go = new GameObject("BurpAudio");
+                go.transform.SetParent(_head, false);
+                _burpAudio = go.AddComponent<AudioSource>();
+                _burpAudio.playOnAwake = false;
+                _burpAudio.spatialBlend = 1f;
+                _burpAudio.rolloffMode = AudioRolloffMode.Linear;
+                _burpAudio.minDistance = 3f;
+                _burpAudio.maxDistance = 45f;
+            }
+            _burpAudio.pitch = UnityEngine.Random.Range(0.9f, 1.08f);
+            _burpAudio.PlayOneShot(BurpSound.Burp(UnityEngine.Random.Range(0, BurpSound.Variants)), 1f);
+            // Above the head for everyone else; just in front of our own eyes for us.
+            Vector3 at = IsOwner ? _head.position + _head.forward * 1.4f + Vector3.up * 0.25f : _head.position + Vector3.up * 0.35f;
+            FloatingText.Spawn(at, UnityEngine.Random.value < 0.75f ? "BUUUURP!" : "BUUURRRP... pardon.", new Color(0.72f, 0.95f, 0.35f), IsOwner ? 0.7f : 1.15f, 1.9f);
+            Debug.Log($"[Player] {DisplayName} burped");
         }
 
         [ServerRpc]
@@ -301,6 +359,7 @@ namespace PleaseDontDrown.Player
         {
             if (IsOwner && GameInput.GameplayActive && GameInput.Emote.WasPressedThisFrame())
                 Gesture(AvatarGesture.Wave);
+            if (IsOwner && _burpTimes.Count > 0) UpdateBurps();
         }
 
         private void LateUpdate()

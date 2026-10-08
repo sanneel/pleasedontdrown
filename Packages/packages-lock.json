@@ -23,6 +23,14 @@
       "dependencies": {},
       "hash": "c21a8f0e31c56ae8707130967faf491f7dd7c0d8"
     },
+    "com.tripo3d.unitybridge": {
+      "version": "file:com.tripo3d.unitybridge",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.modules.jsonserialize": "1.0.0"
+      }
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.14",
       "depth": 0,

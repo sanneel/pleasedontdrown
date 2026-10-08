@@ -443,6 +443,7 @@ namespace PleaseDontDrown.Editor
                     if (t != null && setup.Sights[0].model != part) t.gameObject.SetActive(false);
                 }
                 AttachGunModel(go.transform, setup.Kind);
+                WeaponArtPolish.Apply(go.transform, setup.Kind);
                 // Hip pose, How to Fish's: aiming slides the gun straight across and up (never nearer, never turned), so
                 // at the hip the default sight sits that far right and down of the view axis; the depth puts the right
                 // hand's grip where its gun rig holds it.
@@ -454,6 +455,7 @@ namespace PleaseDontDrown.Editor
                 Require(holdSo, "_holdOffset").vector3Value = new Vector3(sightLine.x - eyeLocal.x, sightLine.y - eyeLocal.y, sightLine.z - gripLocal.z);
                 Require(holdSo, "_holdEuler").vector3Value = Vector3.zero;
                 holdSo.ApplyModifiedPropertiesWithoutUndo();
+                WeaponGripAuthoring.Apply(go.transform, setup.Kind);
                 SetRefs(go.GetComponent<PleaseDontDrown.Interaction.Interactable>(), "_outlineRenderers",
                     go.GetComponentsInChildren<Renderer>(true));
             });

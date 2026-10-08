@@ -8,12 +8,21 @@ namespace PleaseDontDrown.Avatars
     public struct HandPose
     {
         public float Thumb, Index, Middle, Ring, Pinky, Spread;
+        [Tooltip("Lift the index finger toward the trigger while keeping its knuckle connected to the palm.")]
+        public float IndexLift;
+        [Tooltip("Extra index bend in degrees at the three joints. Zero keeps the standard curl.")]
+        public Vector3 IndexBend;
+        [Tooltip("Swing the thumb around the palm to rest along a handle, in degrees.")]
+        public float ThumbSwing;
 
         public HandPose(float fingers, float thumb, float spread)
         {
             Index = Middle = Ring = Pinky = fingers;
             Thumb = thumb;
             Spread = spread;
+            IndexLift = 0f;
+            IndexBend = Vector3.zero;
+            ThumbSwing = 0f;
         }
 
         public static readonly HandPose Relaxed = new(0.34f, 0.26f, 0.02f) { Index = 0.26f, Pinky = 0.42f };
@@ -35,7 +44,10 @@ namespace PleaseDontDrown.Avatars
             Middle = Mathf.Lerp(a.Middle, b.Middle, t),
             Ring = Mathf.Lerp(a.Ring, b.Ring, t),
             Pinky = Mathf.Lerp(a.Pinky, b.Pinky, t),
-            Spread = Mathf.Lerp(a.Spread, b.Spread, t)
+            Spread = Mathf.Lerp(a.Spread, b.Spread, t),
+            IndexLift = Mathf.Lerp(a.IndexLift, b.IndexLift, t),
+            IndexBend = Vector3.Lerp(a.IndexBend, b.IndexBend, t),
+            ThumbSwing = Mathf.Lerp(a.ThumbSwing, b.ThumbSwing, t)
         };
 
         /// <summary>Frame-rate independent move toward a target pose.</summary>
@@ -114,7 +126,8 @@ namespace PleaseDontDrown.Avatars
         private readonly float _scale;
         private readonly Shape _shape;
 
-        /// <summary>Palm surface, in hand space (for putting the palm on a point).</summary>
+        /// <summary>Palm centre and palm surface, in hand space (for putting the palm on a point).</summary>
+        public Vector3 PalmCenter => new Vector3(0f, -0.05f, 0f) * _scale;
         public Vector3 PalmContact => (_shape != null ? Mirror(_shape.Palm) : new Vector3(-Side * 0.02f, -0.052f, 0f)) * _scale;
 
         public static int BoneIndex(int finger, int segment) => finger * Segments + segment;
@@ -178,11 +191,14 @@ namespace PleaseDontDrown.Avatars
                 {
                     int i = BoneIndex(f, s);
                     // Curling bends toward the palm side (about the hand's Z axis); spreading fans the fingers in the palm's plane.
-                    Quaternion bend = Quaternion.Euler(0f, 0f, -Side * curl * Flex[f][s]);
+                    float angle = curl * Flex[f][s] + (f == 1 ? pose.IndexBend[s] : 0f);
+                    Quaternion bend = Quaternion.Euler(0f, 0f, -Side * angle);
                     Quaternion fan = s == 0 ? Quaternion.Euler(SpreadFactor[f] * pose.Spread * 16f, 0f, 0f) : Quaternion.identity;
                     // A modelled thumb stands out to the side: gripping brings it in across the palm first.
                     Quaternion tuck = _shape != null && f == 0 && s == 0 ? Quaternion.Euler(curl * _shape.ThumbTuck, 0f, 0f) : Quaternion.identity;
-                    Bones[i].localRotation = tuck * _rest[i] * fan * bend;
+                    Quaternion lift = f == 1 && s == 0 ? Quaternion.Euler(-pose.IndexLift, 0, 0) : Quaternion.identity;
+                    Quaternion thumbSwing = f == 0 && s == 0 ? Quaternion.Euler(0f, -Side * pose.ThumbSwing, 0f) : Quaternion.identity;
+                    Bones[i].localRotation = thumbSwing * tuck * _rest[i] * fan * lift * bend;
                 }
             }
         }
@@ -203,6 +219,11 @@ namespace PleaseDontDrown.Avatars
         public void BuildMesh(AvatarMeshKit kit, Color skin, Action<int> on, bool lowPoly = false)
         {
             float k = _scale;
+            if (_smoothStyle)
+            {
+                BuildSmooth(kit, skin, on);
+                return;
+            }
             int big = lowPoly ? 7 : 12, small = lowPoly ? 6 : 10, rings = lowPoly ? 4 : 7, fingerSides = lowPoly ? 6 : 7;
             float chunk = lowPoly ? 1.22f : 1f;
             on(-1);
@@ -226,6 +247,38 @@ namespace PleaseDontDrown.Avatars
                     if (s == Segments - 1 && !lowPoly)
                         kit.Ellipsoid(Mirror(new Vector3(r1 / k * 0.55f, -Lengths[f][s] * 0.75f, 0f)) * k,
                             new Vector3(0.0035f, r1 / k * 0.75f, r1 / k * 0.7f) * k, nail, segments: 6, rings: 4); // nail on the back
+                }
+            }
+        }
+
+        private bool _smoothStyle;
+
+        /// <summary>
+        /// The first-person look (How to Fish): one soft rounded palm, round sausage fingers, a short wrist that just
+        /// ends. No knuckle bumps, thumb pads or nails, so the smooth shading stays clean. Build with smooth normals.
+        /// </summary>
+        public void BuildSmoothMesh(AvatarMeshKit kit, Color skin, Action<int> on)
+        {
+            _smoothStyle = true;
+            BuildMesh(kit, skin, on);
+            _smoothStyle = false;
+        }
+
+        private void BuildSmooth(AvatarMeshKit kit, Color skin, Action<int> on)
+        {
+            float k = _scale;
+            const float chunk = 0.92f; // slim fingers, like How to Fish
+            on(-1);
+            kit.Ellipsoid(new Vector3(0f, -0.054f, 0f) * k, new Vector3(0.017f, 0.054f, 0.045f) * k, skin, segments: 18, rings: 12);
+            kit.Limb(0.05f * k, 0.021f * k, 0.023f * k, skin, new Vector3(0f, 0.035f, 0f) * k, segments: 14, crossSection: new Vector2(0.8f, 1.15f));
+            for (int f = 0; f < Fingers; f++)
+            {
+                for (int s = 0; s < Segments; s++)
+                {
+                    on(BoneIndex(f, s));
+                    float r0 = Radii[f] * k * (1f - s * 0.08f) * chunk;
+                    // Segments overlap a little so bent joints stay round instead of showing a gap.
+                    kit.Limb(Lengths[f][s] * k, r0, r0 * 0.94f, skin, segments: 12);
                 }
             }
         }

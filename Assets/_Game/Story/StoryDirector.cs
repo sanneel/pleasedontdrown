@@ -137,6 +137,8 @@ namespace PleaseDontDrown.Story
         [Serializable]
         private class SaveData
         {
+            public int Version;
+            public bool RentalUnlocked;
             public string Beat;
             public int Money;
             public int Rescued, Lost, Returned, Earned; // this chapter so far (for its report card)
@@ -199,6 +201,8 @@ namespace PleaseDontDrown.Story
             int start = 0;
             if (save != null)
             {
+                if (save.Version < 2 && save.Beat != null && save.Beat.StartsWith("1.") && save.Beat != "1.1" && save.Beat != "1.2")
+                    save.Beat = "1.3"; // old thief/drug checkpoints resume at the new rental introduction
                 int found = _beats.FindIndex(b => b.Id == save.Beat);
                 if (found >= 0) start = found;
                 if (Economy.Instance != null) Economy.Instance.ServerSet(save.Money);
@@ -206,6 +210,7 @@ namespace PleaseDontDrown.Story
                 _chapterLost = save.Lost;
                 _chapterReturned = save.Returned;
                 _chapterEarned = save.Earned;
+                SetRentalAccess(save.RentalUnlocked || save.Beat == "1.10" || save.Beat.StartsWith("2."));
                 Debug.Log($"[Story] continuing from beat {save.Beat} with ${save.Money}");
             }
             _moneySeen = Economy.Money;
@@ -227,11 +232,20 @@ namespace PleaseDontDrown.Story
             if (_receptionist != null) _receptionist.ServerSetTalkable(false);
             if (_reception != null) _reception.ServerSetAvailable(false);
             if (_pirateBoat != null) _pirateBoat.ServerSetLocked(true, "Somebody's boat (not yours... yet)");
+            if (_rentalOperator != null)
+            {
+                _rentalHome = _rentalOperator.transform.position;
+                _rentalOperator.ServerSetup("Milo", NpcRole.Bystander, RentalLook);
+                _rentalOperator.ServerSetTalkable(false);
+            }
+            SetRentalAccess(false);
         }
 
         private void StartAt(int index)
         {
             StopAllCoroutines(); // the beat and anything it started (waving, delayed lines...)
+            ResetTsunamiActors();
+            SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2."));
             _hints = null;
             _waitingForTalk = false;
             foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
@@ -289,6 +303,7 @@ namespace PleaseDontDrown.Story
             {
                 var data = new SaveData
                 {
+                    Version = 2, RentalUnlocked = _rentalUnlocked.Value,
                     Beat = _beat.Value, Money = Economy.Money,
                     Rescued = _chapterRescued, Lost = _chapterLost, Returned = _chapterReturned, Earned = _chapterEarned
                 };

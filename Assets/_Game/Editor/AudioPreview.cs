@@ -8,9 +8,47 @@ using UnityEngine;
 
 namespace PleaseDontDrown.Editor
 {
-    /// <summary>Exports the original runtime sounds as WAVs for listening and checks for silent/broken clips.</summary>
+    /// <summary>Exports the runtime sounds as WAVs for listening and checks for silent/broken clips.</summary>
     public static class AudioPreview
     {
+        /// <summary>Build the current scene for listening without regenerating authored scenes or prefabs.</summary>
+        [MenuItem("Tools/PDD/Build audio review player")]
+        public static void BuildReviewBatch()
+        {
+            const string stampPath = "Assets/_Game/Resources/BuildStamp.txt";
+            byte[] originalStamp = File.ReadAllBytes(stampPath);
+            bool failed = false;
+            try
+            {
+                // Review players must not handshake with an older build that has different prefab IDs.
+                File.WriteAllText(stampPath, "audio-" + Guid.NewGuid().ToString("N"));
+                AssetDatabase.ImportAsset(stampPath);
+                const string output = "Builds/AudioReview/PleaseDontDrown.exe";
+                var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = new[] { "Assets/_Game/Scenes/Game.unity" },
+                    locationPathName = output,
+                    target = BuildTarget.StandaloneWindows64,
+                    options = BuildOptions.Development
+                });
+                if (report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+                    throw new InvalidOperationException("Audio review build failed: " + report.summary.result);
+                File.Copy("steam_appid.txt", "Builds/AudioReview/steam_appid.txt", true);
+                Debug.Log("[AudioPreview] BUILD PASS: " + Path.GetFullPath(output));
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[AudioPreview] BUILD FAILED: " + e);
+                failed = true;
+            }
+            finally
+            {
+                File.WriteAllBytes(stampPath, originalStamp);
+                AssetDatabase.ImportAsset(stampPath);
+            }
+            if (failed && Application.isBatchMode) EditorApplication.Exit(1);
+        }
+
         [MenuItem("Tools/PDD/Export audio preview")]
         public static void ExportBatch()
         {
@@ -30,6 +68,14 @@ namespace PleaseDontDrown.Editor
                 Export(dir, "throw", BeachAudio.Throw);
                 Export(dir, "equip", BeachAudio.Equip);
                 Export(dir, "punch-swoosh", BeachAudio.PunchSwoosh);
+                for (int i = 0; i < 3; i++)
+                {
+                    Export(dir, $"coconut-bite-{i}", Audio.ActionFoley.Bite);
+                    Export(dir, $"drink-glug-{i}", Audio.ActionFoley.Gulp);
+                    Export(dir, $"air-punch-{i}", Audio.ActionFoley.Punch);
+                    Export(dir, $"air-throw-{i}", Audio.ActionFoley.Throw);
+                    Export(dir, $"air-blade-{i}", Audio.ActionFoley.Blade);
+                }
                 Export(dir, "menu-hover", BeachAudio.MenuHover);
                 Export(dir, "menu-select", BeachAudio.MenuSelect);
                 Export(dir, "surf-loop", BeachAudio.Surf);
@@ -42,13 +88,94 @@ namespace PleaseDontDrown.Editor
                 Export(dir, "gun-mag-out", ProceduralAudio.MagOut);
                 Export(dir, "gun-mag-in", ProceduralAudio.MagIn);
                 Export(dir, "gun-rack", ProceduralAudio.Rack);
-                Debug.Log("[AudioPreview] Exported 25 sound previews to " + dir);
+                Export(dir, "water-submerge", BeachAudio.Dive);
+                Export(dir, "water-surface", BeachAudio.Emerge);
+                for (int variant = 0; variant < 3; variant++)
+                {
+                    Export(dir, "swim-" + variant, BeachAudio.SwimStroke);
+                    Export(dir, "wade-" + variant, BeachAudio.Wade);
+                    Export(dir, "pickup-" + variant, BeachAudio.Pickup);
+                }
+                for (int size = 0; size < 3; size++)
+                {
+                    var surface = (SurfaceKind)size;
+                    for (int variant = 0; variant < 3; variant++) Export(dir, $"step-{surface}-{variant}", BeachAudio.Footstep(surface));
+                    for (int variant = 0; variant < 3; variant++) Export(dir, $"jump-{surface}-{variant}", BeachAudio.Jump(surface));
+                    for (int variant = 0; variant < 3; variant++) Export(dir, $"land-{surface}-{variant}", BeachAudio.Land(surface));
+                }
+                int waterCount = 0;
+                foreach (var clip in Audio.WaterFoley.AllClips())
+                {
+                    Export(dir, clip.name, clip);
+                    waterCount++;
+                }
+                if (waterCount != 20) throw new InvalidOperationException("Missing recorded water clips");
+                (string name, AudioClip clip)[] interactions =
+                {
+                    ("bell", ProceduralAudio.Bell), ("switch", ProceduralAudio.Click),
+                    ("cough", ProceduralAudio.Cough), ("compression", ProceduralAudio.Thump),
+                    ("crunch", ProceduralAudio.Crunch), ("palm-rustle", ProceduralAudio.Rustle),
+                    ("coconut", ProceduralAudio.Bonk), ("door-open", ProceduralAudio.Creak),
+                    ("door-close", ProceduralAudio.Shut), ("breath", ProceduralAudio.Breath),
+                    ("rescue-breath", ProceduralAudio.Kiss), ("defibrillator", ProceduralAudio.Zap),
+                    ("punch", ProceduralAudio.Punch), ("cash", ProceduralAudio.Cash),
+                    ("engine", ProceduralAudio.Engine), ("knife-swish", ProceduralAudio.KnifeSwish),
+                    ("stab", ProceduralAudio.Stab), ("dry-fire", ProceduralAudio.DryFire),
+                    ("aim-in", ProceduralAudio.AimIn), ("aim-out", ProceduralAudio.AimOut),
+                    ("bullet-impact", ProceduralAudio.BulletImpact), ("legacy-splash", ProceduralAudio.Splash)
+                };
+                foreach (var entry in interactions) Export(dir, entry.name, entry.clip);
+                for (int register = 0; register < Audio.SpeechSynth.Registers; register++)
+                {
+                    Export(dir, "cry-" + register, ProceduralAudio.Cry(register));
+                    var line = Audio.SpeechSynth.Line("Hey! Welcome to the beach. Are you ready?", register);
+                    try { Export(dir, "dialogue-" + register, line); }
+                    finally { UnityEngine.Object.DestroyImmediate(line); }
+                    for (int vowel = 0; vowel < Audio.SpeechSynth.Vowels; vowel++)
+                        for (int hard = 0; hard < 2; hard++)
+                            Export(dir, $"syllable-{register}-{vowel}-{hard}", Audio.SpeechSynth.Syllable(register, vowel, hard == 1));
+                }
+                WriteWaterReview(dir);
+                Debug.Log("[AudioPreview] PASS: effects, movement, 20 recorded water clips and all four voices: " + dir);
             }
             catch (Exception e)
             {
                 Debug.LogError("[AudioPreview] FAILED: " + e);
                 if (Application.isBatchMode) EditorApplication.Exit(1);
             }
+        }
+
+        private static void WriteWaterReview(string dir)
+        {
+            var page = new System.Text.StringBuilder();
+            page.Append("<!doctype html><html lang='en'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>");
+            page.Append("<title>Water sounds - How to Fish</title><style>body{background:#10282e;color:#eff7ec;font:17px system-ui;margin:0 auto;padding:36px 22px;max-width:1100px}h1{font-size:40px;margin-bottom:10px}p{color:#b6d2ce;line-height:1.6}h2{margin-top:36px;color:#f2cd77}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}.card{padding:18px;border:1px solid #31535a;border-radius:16px;background:#18363d}audio{width:100%;margin-top:14px}</style>");
+            page.Append("<h1>Water sounds</h1><p>Replaced with recordings from How to Fish.<br>Swimming, wading, splashes, diving, surfacing and sea ambience. In-game volume and distance are applied separately.</p>");
+            void Group(string title) => page.Append("<h2>" + title + "</h2><div class='grid'>");
+            void Clip(string name, string label)
+            {
+                string data = Convert.ToBase64String(File.ReadAllBytes(Path.Combine(dir, name + ".wav")));
+                page.Append("<div class='card'><strong>" + label + "</strong><audio controls preload='none' src='data:audio/wav;base64," + data + "'></audio></div>");
+            }
+            Group("Swimming and wading");
+            for (int i = 1; i <= 5; i++) Clip("Footstep_Water_V" + i, "Water stroke " + i);
+            page.Append("</div>");
+            Group("Splashes");
+            foreach (string size in new[] { "Light", "Medium", "Heavy" })
+                for (int i = 1; i <= 3; i++) Clip("ItemHitWater" + size + "_V" + i, size + " splash " + i);
+            page.Append("</div>");
+            Group("Diving and surfacing");
+            for (int i = 1; i <= 2; i++)
+            {
+                Clip("UnderwaterOnEnter_" + i.ToString("00"), "Dive under " + i);
+                Clip("UnderwaterOnExit_" + i.ToString("00"), "Surface " + i);
+            }
+            page.Append("</div>");
+            Group("Ambience");
+            Clip("SeaAmbient_Loop_Mono", "Sea ambience");
+            Clip("UnderwaterLoop", "Underwater ambience");
+            page.Append("</div><script>document.addEventListener('play',e=>{if(e.target.tagName==='AUDIO')document.querySelectorAll('audio').forEach(a=>{if(a!==e.target)a.pause()})},true)</script></html>");
+            File.WriteAllText(Path.Combine(dir, "index.html"), page.ToString());
         }
 
         /// <summary>The music loops, the jingles and a spoken line per kind of voice, as WAVs to listen to.</summary>
@@ -83,39 +210,14 @@ namespace PleaseDontDrown.Editor
         /// <summary>A line as <see cref="Audio.SpeechVoice"/> says it (same letter timing, without each speaker's pitch wobble).</summary>
         private static float[] Spoken(string text, int register)
         {
-            const int rate = 44100;
-            var mix = new float[(int)(rate * (text.Length * 0.08f + 1f))];
-            float at = 0.05f;
-            bool afterConsonant = false;
-            for (int i = 0; i < text.Length; i++)
+            var clip = Audio.SpeechSynth.Line(text, register);
+            try
             {
-                char c = text[i];
-                int vowel = Audio.SpeechSynth.VowelOf(c);
-                if (vowel >= 0)
-                {
-                    if (i == 0 || Audio.SpeechSynth.VowelOf(text[i - 1]) < 0)
-                    {
-                        AudioClip clip = Audio.SpeechSynth.Syllable(register, vowel, afterConsonant);
-                        var data = new float[clip.samples];
-                        clip.GetData(data, 0);
-                        int start = (int)(at * rate);
-                        for (int s = 0; s < data.Length && start + s < mix.Length; s++) mix[start + s] += data[s] * 0.8f;
-                    }
-                    afterConsonant = false;
-                    at += 0.058f;
-                }
-                else if (char.IsLetter(c))
-                {
-                    afterConsonant = true;
-                    at += 0.058f;
-                }
-                else
-                {
-                    afterConsonant = false;
-                    at += c is '.' or '!' or '?' ? 0.3f : c == ',' ? 0.17f : 0.045f;
-                }
+                var samples = new float[clip.samples];
+                clip.GetData(samples, 0);
+                return samples;
             }
-            return mix;
+            finally { UnityEngine.Object.DestroyImmediate(clip); }
         }
 
         private static void WriteWav(string dir, string name, float[] samples, int channels, int rate)
@@ -168,6 +270,11 @@ namespace PleaseDontDrown.Editor
             float rms = Mathf.Sqrt((float)(energy / samples.Length));
             if (rms < 0.002f || peak > 0.99f)
                 throw new InvalidOperationException(name + $" has invalid level (RMS {rms:F3}, peak {peak:F3})");
+            bool loop = clip.name.Contains("Loop");
+            if (!loop && (Mathf.Abs(samples[0]) > 0.001f || Mathf.Abs(samples[samples.Length - 1]) > 0.001f))
+                throw new InvalidOperationException(name + " has an abrupt edge");
+            if (loop && Mathf.Abs(samples[0] - samples[samples.Length - 1]) > 0.025f)
+                throw new InvalidOperationException(name + " has an abrupt loop seam");
 
             using var stream = File.Create(Path.Combine(dir, name + ".wav"));
             using var writer = new BinaryWriter(stream);

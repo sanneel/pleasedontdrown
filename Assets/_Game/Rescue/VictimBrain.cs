@@ -616,7 +616,7 @@ namespace PleaseDontDrown.Rescue
                     _body.Pump();
                     // Counted out loud over the chest, so everyone can see the compressions happening.
                     FloatingText.Spawn(_body.ChestPoint + Vector3.up * 0.45f, Counts[Mathf.Clamp(_cprCount.Value, 0, Counts.Length - 1)], new Color(1f, 1f, 1f, 0.95f), 0.9f, 0.55f);
-                    if (player != null) player.ShowPump(_body.ChestPoint, _body.HeadPosition);
+                    if (player != null) player.ShowPump(_body.ChestPoint, _body.HeadPosition, _body.KneelReach);
                     break;
             }
         }

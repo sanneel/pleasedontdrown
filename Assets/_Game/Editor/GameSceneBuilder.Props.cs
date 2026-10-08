@@ -56,9 +56,31 @@ namespace PleaseDontDrown.Editor
             string paint = imported.name;
             Color colour = imported.HasProperty("baseColorFactor") ? imported.GetColor("baseColorFactor")
                 : imported.HasProperty("_BaseColor") ? imported.GetColor("_BaseColor") : imported.color;
-            bool metal = paint is "gold" or "brass" or "brass_dark" or "steel";
-            bool glossy = paint is "screen" or "screen_light" or "lens" or "glass";
-            return GetMaterial("Prop_" + paint, colour, metallic: metal ? 0.7f : 0f, smoothness: metal ? 0.55f : glossy ? 0.8f : 0.12f);
+            if (paint.StartsWith("resort_"))
+            {
+                bool brass = paint.EndsWith("_brass");
+                bool lantern = paint.EndsWith("_lantern");
+                Material resort = GetMaterial("Prop_" + paint, colour, metallic: brass ? .7f : 0,
+                    smoothness: brass ? .65f : paint == "resort_glass" ? .8f : paint.EndsWith("_glass") ? .38f : paint.EndsWith("_countertop") ? .45f : .26f,
+                    emission: lantern ? new Color(1, .45f, .12f) * 2 : null);
+                if (paint.StartsWith("resort_hotel_"))
+                {
+                    Texture texture = null;
+                    foreach (string property in new[] { "baseColorTexture", "_BaseMap", "_MainTex" })
+                        if (imported.HasProperty(property) && imported.GetTexture(property) != null) { texture = imported.GetTexture(property); break; }
+                    if (texture != null) { texture.filterMode = FilterMode.Trilinear; texture.anisoLevel = 8; }
+                    resort.SetTexture("_BaseMap", texture);
+                    resort.SetTexture("_BumpMap", null); resort.DisableKeyword("_NORMALMAP");
+                    resort.SetTexture("_MetallicGlossMap", null); resort.DisableKeyword("_METALLICSPECGLOSSMAP");
+                    if (!paint.EndsWith("_glass") && !brass)
+                    { resort.SetFloat("_SpecularHighlights", 0); resort.EnableKeyword("_SPECULARHIGHLIGHTS_OFF"); }
+                }
+                resort.enableInstancing = true; EditorUtility.SetDirty(resort); return resort;
+            }
+            bool metal = paint is "gold" or "brass" or "brass_dark" or "steel" or "beer_foil";
+            bool glossy = paint is "screen" or "screen_light" or "lens" or "glass" or "beer_glass" or "condensation";
+            return GetMaterial("Prop_" + paint, colour, metallic: metal ? 0.7f : 0f,
+                smoothness: paint == "condensation" ? 0.92f : paint == "coconut_flesh" ? 0.58f : metal ? 0.65f : glossy ? 0.84f : 0.12f);
         }
 
         /// <summary>

@@ -816,6 +816,20 @@ MonoBehaviour:
     Ring: 0.9
     Pinky: 0.9
     Spread: 0
+    IndexLift: 0
+    IndexBend: {x: 0, y: 0, z: 0}
+    ThumbSwing: 0
+  _ownLeftPose: 0
+  _gripPoseLeft:
+    Thumb: 0.7
+    Index: 0.9
+    Middle: 0.9
+    Ring: 0.9
+    Pinky: 0.9
+    Spread: 0
+    IndexLift: 0
+    IndexBend: {x: 0, y: 0, z: 0}
+    ThumbSwing: 0
   _rigidInHand: 0
 --- !u!114 &7793420296876453761
 MonoBehaviour:
