@@ -174,7 +174,15 @@ namespace PleaseDontDrown.Combat
         /// <summary>The left hand's own place: on the fore-end, or (one-handed pistol) down out of view.</summary>
         private HandGrip LeftHome(Transform t)
         {
-            if (_gunLeftGrip != null) return new HandGrip(_gunLeftGrip.position, _gunLeftGrip.forward, -_gunLeftGrip.up, _item.GripPoseLeft);
+            if (_gunLeftGrip != null)
+            {
+                Vector3 point = _gunLeftGrip.position;
+                // The idle support grip follows the pump. Reload waypoints start at its resting position,
+                // because LeftShells supplies the pump stroke itself.
+                if (_slide != null && _gunLeftGrip.IsChildOf(_slide))
+                    point -= _slide.parent.TransformVector(_slide.localPosition - _slideRest);
+                return new HandGrip(point, _gunLeftGrip.forward, -_gunLeftGrip.up, _item.GripPoseLeft);
+            }
             return new HandGrip(t.position - t.up * 0.4f - t.right * 0.14f - t.forward * 0.1f, t.forward, t.right, HandPose.Relaxed);
         }
 

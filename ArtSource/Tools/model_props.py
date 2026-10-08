@@ -1089,12 +1089,22 @@ def basketball():
     seg, rings, r = 48, 28, 0.12
     prof = [(math.sin(math.pi * i / rings) * r, -math.cos(math.pi * i / rings) * r) for i in range(rings + 1)]
     ob = lathe("Ball", (0, 0, 0), prof, "orange", seg=seg, turn=0.0)
-    def pick(c, n):
-        u = c.normalized() if c.length > 1e-6 else c
-        if abs(u.x) < 0.07 or abs(u.y) < 0.07: return "black"
-        if abs(abs(u.z) - 0.62) < 0.07: return "black"
-        return None
-    paint(ob, pick)
+    # Continuous narrow seams instead of assigning whole faces to black; the
+    # latter produced visible stair steps when holding the ball near the camera.
+    for axis in (0, 1):
+        points = []
+        for i in range(128):
+            a = 2 * math.pi * i / 128
+            p = [r * math.cos(a), r * math.sin(a), 0.0]
+            if axis == 0: p = [0.0, p[0], p[1]]
+            else: p = [p[0], 0.0, p[1]]
+            points.append(tuple(p))
+        tube(f"Seam{axis}", points, 0.0015, "black", seg=6, closed=True)
+    for side in (-1, 1):
+        z = side * 0.62 * r
+        radius = math.sqrt(r * r - z * z)
+        points = [(radius * math.cos(2 * math.pi * i / 128), radius * math.sin(2 * math.pi * i / 128), z) for i in range(128)]
+        tube(f"CurvedSeam{side}", points, 0.0015, "black", seg=6, closed=True)
 
 
 @prop

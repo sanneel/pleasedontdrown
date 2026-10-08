@@ -112,6 +112,8 @@ namespace PleaseDontDrown.Player
 
         /// <summary>Fired when touching ground after falling; argument is the downward speed at impact.</summary>
         public event Action<float> Landed;
+        /// <summary>Fired only when a jump is accepted, never for a rejected button press.</summary>
+        public event Action Jumped;
 
         private void Awake()
         {
@@ -424,6 +426,7 @@ namespace PleaseDontDrown.Player
                 _lastJumpPressedTime = float.NegativeInfinity;
                 _lastJumpTime = Time.time;
                 IsGrounded = false;
+                Jumped?.Invoke();
             }
             else
             {

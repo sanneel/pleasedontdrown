@@ -35,6 +35,7 @@ namespace PleaseDontDrown.Avatars
         public Vector3 CprPoint;      // world, the chest being pressed
         public bool Seated;           // on a vehicle seat (hands come from the grips)
         public bool Straddle;         // seated astride a fat seat (a banana boat): knees well apart, feet back down its sides
+        public bool FloatSeat;        // seated on a ring: knees together so the legs fit its opening
         public bool Flying;           // shot through the air (a cannon, a throw, flung off the banana): superman, arms out ahead
         public bool StarJump;         // bounced high (a trampoline): arms and legs flung out in a star
         public AvatarPose Pose;
@@ -641,7 +642,11 @@ namespace PleaseDontDrown.Avatars
             // after the arms, it dragged the hands 40 cm down into the rider's lap and through the banana).
             if (_seat > 0.01f)
             {
-                hips.localPosition = Vector3.Lerp(hips.localPosition, _rig.RestPosition(Bone.Hips) + new Vector3(0f, -0.4f * s, 0f), _seat);
+                Vector3 seatedHip = _rig.RestPosition(Bone.Hips);
+                // The float's anchor is 0.5 m above the player root; match it
+                // independently of body height so short bodies do not sink into the ring.
+                seatedHip.y = Motion.FloatSeat ? 0.5f : seatedHip.y - 0.4f * s;
+                hips.localPosition = Vector3.Lerp(hips.localPosition, seatedHip, _seat);
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(8f, 0f, 0f), _seat);
                 if (Motion.Straddle) // leaning on toward the handle in front, like on a horse
                     B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(14f, 0f, 0f), _seat);
@@ -1174,9 +1179,14 @@ namespace PleaseDontDrown.Avatars
                     // front as on a chair: that bunched the shorts up into a balloon), shins hanging down its sides.
                     Quaternion thighPose = Motion.Straddle ? Quaternion.Euler(-30f, 0f, 58f * side) : Quaternion.Euler(-78f, 0f, 16f * side);
                     Quaternion shinPose = Quaternion.Euler(Motion.Straddle ? 38f : 84f, 0f, Motion.Straddle ? -12f * side : 0f);
+                    if (Motion.FloatSeat)
+                    {
+                        thighPose = Quaternion.Euler(-85f, 0f, 4f * side);
+                        shinPose = Quaternion.Euler(65f, 0f, 0f);
+                    }
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, thighPose, _seat);
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, shinPose, _seat);
-                    foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(Motion.Straddle ? 20f : -6f, 0f, 0f), _seat);
+                    foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(Motion.FloatSeat ? 12f : Motion.Straddle ? 20f : -6f, 0f, 0f), _seat);
                 }
             }
 

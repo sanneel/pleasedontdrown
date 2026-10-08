@@ -1,0 +1,8 @@
+avatar body:3 0 0 19 0 idle
+blender_red_face 0 1.57 20.1 0 1.57 19 35
+avatar body:4 4 0 19 0 idle
+blender_sporty_face 4 1.57 20.1 4 1.57 19 35
+avatar body:5 8 0 19 0 idle
+blender_purple_face 8 1.57 20.1 8 1.57 19 35
+avatar body:6 12 0 19 0 idle
+blender_buddy_face 12 1.57 20.1 12 1.57 19 35

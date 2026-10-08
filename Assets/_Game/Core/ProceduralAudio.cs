@@ -3,7 +3,7 @@ using UnityEngine;
 namespace PleaseDontDrown.Core
 {
     /// <summary>
-    /// Placeholder sounds synthesized at runtime so the prototype has audio feedback without any asset files.
+    /// Original synthesized effects, mastered with click-free edges and peak headroom.
     /// Each clip is generated once and cached.
     /// </summary>
     public static class ProceduralAudio
@@ -15,13 +15,15 @@ namespace PleaseDontDrown.Core
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
-            _bell = _click = _splash = _waterStep = _cough = _thump = null;
+            _bell = _click = _cough = _thump = null;
             _crunch = _rustle = _bonk = _creak = _shut = null;
             _breath = _zap = _punch = _cash = _engine = null;
             _shots = null;
             _suppressed = _dryFire = _aimIn = _aimOut = _magOut = _magIn = _rack = _impact = null;
             _steps = null;
             _cries = null;
+            _kiss = _knifeSwish = _stab = null;
+            _stepVariant = 0;
         }
 
         /// <summary>Brass hand bell: inharmonic partials with individual decay rates.</summary>
@@ -44,30 +46,10 @@ namespace PleaseDontDrown.Core
             return (noise * 0.6f + Mathf.Sin(2f * Mathf.PI * 2100f * t) * 0.4f) * Mathf.Exp(-70f * t) * 0.6f;
         });
 
-        private static AudioClip _splash;
-
-        /// <summary>Water splash: low-passed noise with a fast attack and a bubbly tail.</summary>
-        public static AudioClip Splash
-        {
-            get
-            {
-                if (_splash != null) return _splash;
-                var rng = new System.Random(1234);
-                float low = 0f;
-                _splash = Build("Splash", 0.7f, t =>
-                {
-                    float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
-                    float cutoff = Mathf.Lerp(0.5f, 0.08f, Mathf.Clamp01(t / 0.5f)); // bright at impact, darker tail
-                    low += (noise - low) * cutoff;
-                    float bubbles = 0.3f * Mathf.Sin(2f * Mathf.PI * (380f + 120f * Mathf.Sin(t * 37f)) * t) * Mathf.Exp(-6f * t);
-                    return (low * 1.6f + bubbles) * Mathf.Exp(-5f * t) * Mathf.Clamp01(t / 0.005f);
-                });
-                return _splash;
-            }
-        }
+        /// <summary>Compatibility entry point: always uses the recorded water bank.</summary>
+        public static AudioClip Splash => BeachAudio.WaterImpact(0.5f);
 
         private static AudioClip[] _steps;
-        private static AudioClip _waterStep;
         private static int _stepVariant;
 
         /// <summary>A footstep for the surface, cycling through a few variants so steps don't sound identical.</summary>
@@ -87,7 +69,7 @@ namespace PleaseDontDrown.Core
             return _steps[(int)kind * 3 + _stepVariant];
         }
 
-        public static AudioClip WaterStep => _waterStep != null ? _waterStep : _waterStep = Noise("WaterStep", 0.28f, 77, 0.35f, 0.06f, 9f, 0.5f);
+        public static AudioClip WaterStep => BeachAudio.Wade;
 
         private static AudioClip SandStep(int v) => Noise($"SandStep{v}", 0.14f, 11 + v, 0.22f + 0.04f * v, 0.05f, 28f, 0.55f);
 
@@ -105,50 +87,88 @@ namespace PleaseDontDrown.Core
             });
         }
 
-        private static AudioClip[] _cries;
+        private static AudioClip[,] _cries;
+        private static int _crySequence;
+        private static readonly string[] RescueNames =
+        {
+            "Help", "OverHere", "CantSwim", "MySkis", "ThrowRing", "HaveKeys", "RescueMe", "ImOverHere"
+        };
+        private static readonly string[] RescueWords =
+        {
+            "Help!", "Over here!", "I can't swim!", "My skis!", "A ring! Throw me a ring!",
+            "You can have the keys!", "Rescue me first!", "I'm over here!"
+        };
+        private static AudioClip[,] _rescueBarks;
+
+        /// <summary>Three short, intelligible lines for a general rescue call.</summary>
+        public static string RescueWordsAt(int phrase) => RescueWords[Mathf.Clamp(phrase, 0, 2)];
+
+        /// <summary>Local TTS recording. A missing recording falls back to a wordless cry.</summary>
+        public static AudioClip RescueBark(int voice, string words)
+        {
+            int phrase = -1;
+            for (int i = 0; i < RescueWords.Length; i++)
+                if (string.Equals(words?.Trim(), RescueWords[i], System.StringComparison.OrdinalIgnoreCase))
+                { phrase = i; break; }
+            if (phrase < 0) return Cry(voice);
+            _rescueBarks ??= new AudioClip[2, RescueNames.Length];
+            int register = voice < 2 ? 0 : 1;
+            if (_rescueBarks[register, phrase] == null)
+            {
+                string suffix = register == 0 ? "_low" : "_high";
+                _rescueBarks[register, phrase] = Resources.Load<AudioClip>("Audio/Rescue/" + RescueNames[phrase] + suffix);
+            }
+            return _rescueBarks[register, phrase] != null ? _rescueBarks[register, phrase] : Cry(voice);
+        }
         private static AudioClip _cough;
         private static AudioClip _thump;
 
         /// <summary>
-        /// A wobbly "heeelp!"-ish cry: a voiced tone (harmonics shaped by two vowel formants) that rises and falls,
-        /// with vibrato and a breathy edge. Four voices (low to high).
+        /// Three short wordless distress calls per voice. Subtitles carry the actual words.
+        /// The variation applies to both rescue tourists and story NPCs without stacking voices.
         /// </summary>
         public static AudioClip Cry(int voice)
         {
-            if (_cries == null || _cries[0] == null)
+            _cries ??= new AudioClip[4, 3];
+            int next = _crySequence++;
+            int v = Mathf.Clamp(voice, 0, 3), variant = next % 3;
+            if (_cries[v, variant] == null)
             {
-                _cries = new AudioClip[4];
-                float[] pitches = { 170f, 225f, 290f, 360f };
-                for (int v = 0; v < 4; v++)
-                    _cries[v] = BuildCry(v, pitches[v]);
+                float[] pitches = { 135f, 170f, 220f, 255f };
+                _cries[v, variant] = BuildCry(v, variant, pitches[v]);
             }
-            return _cries[Mathf.Clamp(voice, 0, 3)];
+            return _cries[v, variant];
         }
 
-        private static AudioClip BuildCry(int v, float f0)
+        private static AudioClip BuildCry(int v, int variant, float f0)
         {
-            const float length = 0.85f;
-            var rng = new System.Random(900 + v);
+            float length = variant == 0 ? 0.62f : variant == 1 ? 0.83f : 0.72f;
+            var rng = new System.Random(900 + v * 3 + variant);
             float phase = 0f;
             float breath = 0f;
-            return Build($"Cry{v}", length, t =>
+            return Build($"Cry{v}_{variant}", length, t =>
             {
                 float u = t / length;
-                float glide = 1f + 0.35f * Mathf.Sin(Mathf.PI * Mathf.Min(1f, u * 1.4f)) - 0.25f * u;
-                float f = f0 * glide * (1f + 0.025f * Mathf.Sin(2f * Mathf.PI * 6.5f * t));
+                float glide = variant switch
+                {
+                    0 => 1f + 0.08f * Mathf.Sin(Mathf.PI * u) - 0.06f * u,
+                    1 => 0.93f + 0.18f * Mathf.Sin(Mathf.PI * u) - 0.05f * u,
+                    _ => 1.04f - 0.13f * u + 0.05f * Mathf.Sin(2f * Mathf.PI * u)
+                };
+                float f = f0 * glide * (1f + 0.009f * Mathf.Sin(2f * Mathf.PI * 6.5f * t));
                 phase += 2f * Mathf.PI * f / SampleRate;
-                // Vowel moves from "e" (help) to "a" (aaah).
-                float f1 = Mathf.Lerp(550f, 780f, u), f2 = Mathf.Lerp(1850f, 1200f, u);
+                float f1 = Mathf.Lerp(variant == 2 ? 710f : 550f, variant == 1 ? 800f : 680f, u);
+                float f2 = Mathf.Lerp(1850f, variant == 2 ? 1400f : 1200f, u);
                 float s = 0f;
                 for (int h = 1; h <= 16; h++)
                 {
                     float fh = f * h;
                     float amp = Mathf.Exp(-Sq((fh - f1) / 180f)) + 0.6f * Mathf.Exp(-Sq((fh - f2) / 260f)) + 0.05f / h;
-                    s += amp * Mathf.Sin(phase * h);
+                    s += amp * Mathf.Sin(phase * h) / Mathf.Sqrt(h);
                 }
                 breath += ((float)(rng.NextDouble() * 2.0 - 1.0) - breath) * 0.3f;
-                float envelope = Mathf.Clamp01(t / 0.05f) * Mathf.Clamp01((length - t) / 0.25f);
-                return (s * 0.22f + breath * 0.08f) * envelope;
+                float envelope = Mathf.Clamp01(t / 0.035f) * Mathf.Clamp01((length - t) / 0.17f);
+                return (s * 0.28f + breath * 0.13f) * envelope;
             });
         }
 
@@ -168,8 +188,9 @@ namespace PleaseDontDrown.Core
                     if (local < 0f) return 0f;
                     float env = Mathf.Clamp01(local / 0.01f) * Mathf.Exp(-11f * local);
                     low += ((float)(rng.NextDouble() * 2.0 - 1.0) - low) * 0.25f;
-                    float grunt = Mathf.Sin(2f * Mathf.PI * 140f * t) * 0.4f;
-                    return (low * 1.4f + grunt) * env * 0.7f;
+                    float rasp = low * (0.8f + 0.2f * Mathf.Sin(2f * Mathf.PI * 105f * local));
+                    float grunt = Mathf.Sin(2f * Mathf.PI * 125f * local) * Mathf.Exp(-28f * local) * 0.08f;
+                    return (rasp * 1.7f + grunt) * env * 0.65f;
                 });
                 return _cough;
             }
@@ -211,12 +232,20 @@ namespace PleaseDontDrown.Core
         });
 
         /// <summary>Old door hinge.</summary>
-        public static AudioClip Creak => _creak != null ? _creak : _creak = Build("Creak", 0.55f, t =>
+        public static AudioClip Creak => _creak != null ? _creak : _creak = Build("Creak", 0.55f, CreakWave());
+
+        private static System.Func<float, float> CreakWave()
         {
-            float f = 170f + 55f * Mathf.Sin(t * 7f) + 20f * Mathf.Sin(t * 31f);
-            float saw = 2f * (t * f - Mathf.Floor(t * f + 0.5f));
-            return saw * 0.22f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.55f));
-        });
+            var rng = new System.Random(163);
+            float phase = 0f, friction = 0f;
+            return t =>
+            {
+                phase += 2f * Mathf.PI * (180f + 38f * Mathf.Sin(t * 9f) + 8f * Mathf.Sin(t * 51f)) / SampleRate;
+                friction += ((float)(rng.NextDouble() * 2 - 1) - friction) * 0.2f;
+                float strain = Mathf.Sin(phase) * 0.1f + Mathf.Sin(phase * 2.01f) * 0.04f;
+                return (strain + friction * 0.35f) * Mathf.Sin(Mathf.PI * t / 0.55f) * (0.7f + 0.3f * Mathf.Sin(t * 35f));
+            };
+        }
 
         /// <summary>Wooden door closing.</summary>
         public static AudioClip Shut => _shut != null ? _shut : _shut = Build("Shut", 0.25f, t =>
@@ -244,36 +273,30 @@ namespace PleaseDontDrown.Core
 
         private static AudioClip _kiss;
 
-        /// <summary>Mouth-to-mouth: a long muffled "MMMMPPPH" through pressed lips (a hum with a puff of air), then a smack.</summary>
+        /// <summary>Mouth-to-mouth: a controlled breath with a soft seal and release.</summary>
         public static AudioClip Kiss => _kiss != null ? _kiss : _kiss = Build("Kiss", 1.0f, KissWave());
 
         private static System.Func<float, float> KissWave()
         {
             var rng = new System.Random(733);
-            float air = 0f, hum = 0f, phase = 0f;
-            float rate = SampleRate;
+            float air = 0f, low = 0f;
             return t =>
             {
                 float s = 0f;
                 if (t < 0.82f)
                 {
-                    // The hum: a low voice (rising a little, wobbling) through closed lips, so only the low harmonics.
-                    float f0 = 150f + 25f * (t / 0.82f) + 6f * Mathf.Sin(t * 19f);
-                    phase += 2f * Mathf.PI * f0 / rate;
-                    float voice = Mathf.Sin(phase) + 0.45f * Mathf.Sin(2f * phase) + 0.2f * Mathf.Sin(3f * phase);
-                    hum += (voice - hum) * 0.18f; // muffled
                     air += ((float)(rng.NextDouble() * 2.0 - 1.0) - air) * 0.08f;
+                    low += (air - low) * 0.03f;
                     float env = Mathf.Clamp01(t / 0.07f) * Mathf.Clamp01((0.82f - t) / 0.06f);
                     float pressure = 0.8f + 0.35f * (t / 0.82f); // pushing harder toward the end
-                    s = (hum * 0.55f + air * 0.9f) * env * pressure;
+                    s = (air - low) * 1.2f * env * pressure;
                 }
                 float u = t - 0.84f;
                 if (u > 0f)
                 {
-                    // The smack: a sharp lip pop and a wet click.
                     float pop = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-u * 90f);
                     float click = Mathf.Sin(2f * Mathf.PI * 1900f * u) * Mathf.Exp(-u * 140f);
-                    s += pop * 0.7f + click * 0.5f;
+                    s += (pop * 0.09f + click * 0.025f) * Mathf.Clamp01(u / 0.004f);
                 }
                 return s;
             };
@@ -473,13 +496,7 @@ namespace PleaseDontDrown.Core
 
         private static AudioClip Build(string name, float seconds, System.Func<float, float> wave)
         {
-            int count = Mathf.CeilToInt(seconds * SampleRate);
-            var data = new float[count];
-            for (int i = 0; i < count; i++)
-                data[i] = Mathf.Clamp(wave(i / (float)SampleRate), -1f, 1f);
-            AudioClip clip = AudioClip.Create(name, count, 1, SampleRate, false);
-            clip.SetData(data, 0);
-            return clip;
+            return Audio.SoundClip.Build(name, seconds, wave);
         }
     }
 }

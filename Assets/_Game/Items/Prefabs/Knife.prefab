@@ -137,7 +137,6 @@ GameObject:
   - component: {fileID: 6957780967792211473}
   - component: {fileID: 355348650888473648}
   - component: {fileID: 256652155022519128}
-  - component: {fileID: 391845579139604296}
   - component: {fileID: 1900621968640150499}
   - component: {fileID: 5226380051201938608}
   m_Layer: 0
@@ -337,6 +336,20 @@ MonoBehaviour:
     Ring: 0.92
     Pinky: 0.92
     Spread: 0
+    IndexLift: 0
+    IndexBend: {x: 0, y: 0, z: 0}
+    ThumbSwing: 0
+  _ownLeftPose: 0
+  _gripPoseLeft:
+    Thumb: 0.7
+    Index: 0.9
+    Middle: 0.9
+    Ring: 0.9
+    Pinky: 0.9
+    Spread: 0
+    IndexLift: 0
+    IndexBend: {x: 0, y: 0, z: 0}
+    ThumbSwing: 0
   _rigidInHand: 1
 --- !u!114 &256652155022519128
 MonoBehaviour:
@@ -353,21 +366,6 @@ MonoBehaviour:
   _colliders: []
   _outlineRenderers: []
   _maxDistance: 3
---- !u!114 &391845579139604296
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4873307540144495875}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c18f2c9c90aa0b04faee3a6eb9523d54, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Items.ItemSkin
-  _componentIndexCache: 255
-  _addedNetworkObject: {fileID: 2764699923568687260}
-  _networkObjectCache: {fileID: 0}
 --- !u!82 &1900621968640150499
 AudioSource:
   m_ObjectHideFlags: 0

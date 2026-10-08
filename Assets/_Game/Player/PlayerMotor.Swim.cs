@@ -144,6 +144,7 @@ namespace PleaseDontDrown.Player
                     return;
                 _hopUntil = Time.time + 0.45f;
                 _rb.linearVelocity = new Vector3(_rb.linearVelocity.x, _surfaceHopSpeed, _rb.linearVelocity.z);
+                Jumped?.Invoke();
                 return;
             }
 
@@ -156,7 +157,7 @@ namespace PleaseDontDrown.Player
             if (wish.sqrMagnitude > 1f) wish.Normalize();
 
             float speed = (IsSprinting ? _swimSprintSpeed : _swimSpeed) * SpeedMultiplier * HungerSpeedScale * CarryFactor(0.06f);
-            Vector3 target = wish * speed;
+            Vector3 target = wish * speed + TsunamiState.CurrentAt(_rb.position);
 
             bool verticalIntent = dive || (rise && IsHeadUnderwater);
             if (_gasping && IsHeadUnderwater)

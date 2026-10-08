@@ -48,7 +48,7 @@ namespace PleaseDontDrown.Dev
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
         {
-            if (!DevLaunchArgs.Has("-pdd-autoplay")) return;
+            if (!DevLaunchArgs.Has("-pdd-autoplay") && !DevLaunchArgs.Has("-pdd-crew")) return;
             var go = new GameObject("StoryAutoplay");
             DontDestroyOnLoad(go);
             go.AddComponent<StoryAutoplay>();
@@ -81,6 +81,22 @@ namespace PleaseDontDrown.Dev
 
         private IEnumerator Start()
         {
+            if (DevLaunchArgs.Has("-pdd-crew"))
+            {
+                while (PlayerHub.Local == null || StoryDirector.Instance == null) yield return null;
+                DevCommands.Output += line => Debug.Log($"[Console] {line}");
+                bool observedWave = false;
+                while (true)
+                {
+                    if (!observedWave && TsunamiState.Age > 20f && TsunamiState.Age < 40f)
+                    {
+                        observedWave = true;
+                        Say($"client sees synchronized tsunami: age {TsunamiState.Age:F2}, dock height {WaterSurface.HeightAt(32f, -8f):F2}");
+                    }
+                    if (StoryDirector.Instance.BeatId == "1.10") yield return RideToIsland2(PlayerHub.Local);
+                    yield return new WaitForSeconds(0.3f);
+                }
+            }
             string last = DevLaunchArgs.Value("-pdd-autoplay");
             if (string.IsNullOrEmpty(last) || Array.IndexOf(Beats, last) < 0) last = "1.10";
             if (float.TryParse(DevLaunchArgs.Value("-pdd-timescale"), NumberStyles.Float, CultureInfo.InvariantCulture, out float scale))
@@ -184,6 +200,22 @@ namespace PleaseDontDrown.Dev
         {
             PlayerHub me = PlayerHub.Local;
             bool island2 = me.transform.position.z < -120f;
+            if (beat == "1.10") { yield return RideToIsland2(me); yield break; }
+            if (beat == "1.3") { yield return TalkRental(me); yield break; }
+            if (beat == "1.4")
+            {
+                me.Motor.Teleport(new Vector3(2f, 2f, 32f));
+                me.Look.LookAt(new Vector3(20f, 1f, -30f));
+                yield return new WaitForSeconds(1f);
+                yield break;
+            }
+            if (beat == "1.9")
+            {
+                if (Carries(me, "Fleet Key Case")) yield return TalkRental(me);
+                else foreach (Item item in Item.All)
+                    if (item.DisplayName == "Fleet Key Case" && !item.IsHeld) { yield return PickUp(me, item); break; }
+                yield break;
+            }
 
             // Someone in trouble comes first.
             foreach (VictimBrain v in VictimBrain.All)
@@ -242,6 +274,20 @@ namespace PleaseDontDrown.Dev
 
             if (beat == "1.8") yield return WadeToFalseAlarm(me);
             if (beat == "1.10") yield return RideToIsland2(me);
+        }
+
+        private IEnumerator TalkRental(PlayerHub me)
+        {
+            foreach (StoryNpc npc in StoryNpc.All)
+                if (npc.Name == "Milo" && npc.IsTalkable)
+                {
+                    me.Motor.Teleport(npc.transform.position + Vector3.back * 1.5f + Vector3.up * 0.2f);
+                    me.Look.LookAt(npc.HeadPosition);
+                    yield return new WaitForSeconds(0.4f);
+                    npc.OnInteract(me);
+                    yield return new WaitForSeconds(0.5f);
+                    break;
+                }
         }
 
         /// <summary>The false alarm: walk up to whoever is screaming in the shallows (the marker is on them).</summary>
@@ -410,14 +456,17 @@ namespace PleaseDontDrown.Dev
             {
                 Vehicle ski = null;
                 foreach (Vehicle v in Vehicle.All)
-                    if (v.DisplayName == "Jet Ski" && v.transform.position.z > -120f && v.transform.position.x > -150f) // the robber's (the story's)
+                    if (v.DisplayName.StartsWith("Rental Jet Ski") && !v.IsLocked && v.Driver == null && v.transform.position.z > -120f)
                         ski = v;
                 if (ski == null)
                 {
                     Warn("no jet ski on island 1");
                     yield break;
                 }
-                Exec($"goto {FirstWord(ski.DisplayName)}");
+                Vector3 boarding = ski.transform.position + ski.transform.right * 1.6f;
+                boarding.y = WaterSurface.HeightAt(boarding) - 1.0f;
+                me.Motor.Teleport(boarding);
+                me.Look.LookAt(ski.transform.position + Vector3.up * 0.6f);
                 yield return new WaitForSeconds(0.6f);
                 Exec("use");
                 yield return new WaitForSeconds(1f);

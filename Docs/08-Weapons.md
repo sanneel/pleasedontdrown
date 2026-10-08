@@ -2,7 +2,110 @@
 
 > 2026-09-28. Five guns with the handling of How to Fish's guns (feature parity, our own code: nothing copied from
 > its decompiled source, models or sounds). Code: `Assets/_Game/Combat/Weapons/`, `UI/WeaponHud.cs`; models are
-> greybox, built by `Editor/GameSceneBuilder.Weapons.cs`.
+> fitted GLB bodies with baked surface details, assembled by `Editor/GameSceneBuilder.Weapons.cs`.
+
+## Visual detail pass (1 October 2026)
+
+All five gun prefabs include an additional finish pass:
+
+* Pistol: front slide serrations, diamond grip checks, frame pins and small steel highlights.
+* SMG: receiver panels, vents, grip grooves, selector mark and ribbed magazines.
+* Shotgun: receiver fasteners, restrained walnut grain, stock checks and metal collars on the moving pump.
+* Rifle: grip checks, curved magazine flutes, receiver fasteners and a selector mark.
+* Sniper: receiver plates, fore-end vents, grip grooves and rings around its integrated scope.
+* Attachments: suppressor collars and dark muzzle recesses, brake ports, scope rings and turret marks,
+  reflex-sight fittings, magazine floorplates and witness marks.
+
+`Editor/WeaponArtPolish.cs` samples the actual imported body surfaces to fit the small details. Geometry is
+combined by material and moving part into assets in `Art/Weapons/Details`. Pump and magazine details are
+children of their original moving/swappable parts. There are no new runtime scripts or colliders.
+
+**PLEASE DON'T DROWN > Polish gun prefabs** updates only the five existing gun prefabs. Full scene rebuilds
+also include this pass. The focused command checks that the weapon and item settings and collider counts
+remain unchanged. Batch entry: `PleaseDontDrown.Editor.WeaponArtPolish.ApplyBatch`.
+Review renders are written to `Screenshots/GunPolish/After` (both sides and first person).
+
+## Smooth finish and grip correction (2 October 2026)
+
+`WeaponSurfaceFinish` bakes smooth normals across coincident imported vertices while keeping sharp
+edges above 65 degrees. The pistol, rifle and sniper use a consistent satin material instead of the
+source model's triangle-by-triangle paint tones. Original GLBs are preserved; the fitted copies live
+in `Art/Weapons/Surfaces`. Each bake starts from the original import, so rerunning it is repeatable.
+
+The sniper's irregular integrated scope is replaced with a round optic, two receiver mounts, inset
+lenses, adjustment knobs and ridged rings. Added receiver ports, frame pins, stock grooves and small
+selector markings complement the earlier details. Colored skins preserve this contrasting hardware.
+
+First-person hands use the existing rounded hand builder with smooth shading and slimmer fingers.
+The pistol palm sits lower and its thumb curl is reduced to clear the back of the slide. Other item
+grips and third-person hand geometry retain their existing settings.
+The long guns also use a more open right thumb so its tip stays outside the receiver.
+
+Run `PleaseDontDrown.Editor.WeaponSurfaceFinish.BuildBatch` to update the five prefabs, render the
+review views and build the saved scene. `skin <index>` previews a finish on the locally held item
+without changing its saved preference; index 5 is Bubblegum.
+
+Verified in the Windows player: all five guns equipped, aimed, inspected, fired and reloaded, with
+matching host/client ammo counts. The Bubblegum pistol was checked at hip, aim and inspect poses.
+After the final thumb adjustment, all four long guns were checked again during inspection and after
+reloading; the visible thumb intersections were removed. Captures are in
+`Builds/Win64/Screenshots/GunGrips` (`Smooth_Pistol_pink*` and `Final_*`). Logs:
+`Logs/weapon-thumb-final-build.log`, `Logs/weapon-smooth-runtime.log`, `Logs/weapon-thumb-runtime.log`.
+
+## Support thumb correction (2 October 2026)
+
+The support thumb previously curled upright beside the barrel, exaggerating its visible length.
+`HandPose.ThumbSwing` now rotates it at the base to sit along the fore-end. The four two-handed
+gun grips use a 65-degree swing; the value blends with the rest of the pose during animation.
+Thumb geometry and other item poses retain their existing dimensions and defaults.
+
+Verified in the visible Windows player on the shotgun, SMG, rifle and sniper, including shotgun
+inspection and return from firing/reloading. Build: `Logs/weapon-thumb-build.log`; runtime:
+`Logs/weapon-support-thumb-runtime.log`. Final-frame captures: `Builds/Win64/Screenshots/GunGrips/Thumb_*.png`.
+
+## Non-glowing weapon finishes (2 October 2026)
+
+All opaque gun materials now use `PleaseDontDrown/Weapon`. Its soft directional shading stays within
+0..1 linear brightness, with no emission, HDR reflection probes or unbounded specular peaks. The
+factory finish, colored skins, metal details and inactive attachments use this same treatment.
+World lighting and bloom settings are unchanged. Chrome and gold retain their colors with subdued
+highlights. Non-weapon items retain their original skin shader.
+
+`WeaponSurfaceFinish.BuildBatch` checks all opaque material slots before building. Validated 228 slots
+across the five prefabs. Runtime checks cycled all nine skins on all five guns, looked toward the
+ground and sky, and fired/reloaded each gun. Factory, chrome and Bubblegum were also checked in the
+visible player window on every gun: 15 final-frame captures confirmed readable guns without glow.
+Evidence: `Logs/weapon-noglow-build.log`, `Logs/weapon-noglow-runtime.log`, and
+`Logs/weapon-noglow-display.log`; screenshots are `Builds/Win64/Screenshots/GunGrips/Display_*.png`.
+
+For visual approval, use `frameshot <name>` in a visible game window. It waits until the end of the
+frame and captures the displayed image, including post-processing and HUD. Hidden-window frame
+captures can be black. `viewshot` submits an HDR camera render request for diagnostics, excludes
+the screen-overlay HUD, and its off-screen color output is not a substitute for displayed frames.
+
+## Hand fitting (1 October 2026)
+
+Each gun now has its own right palm position, grip angle, trigger-finger bend and support-hand pose.
+The index finger has separate joint bends and a lift angle; its knuckle stays attached to the palm.
+These extra pose values blend through reloads and other gestures and default to zero on existing non-gun items.
+The shotgun's support grip is parented to the pump so the hand follows the firing cycle; reload waypoints
+compensate for the pump's movement to avoid applying the stroke twice.
+
+`Editor/WeaponGripAuthoring.cs` contains the fitted values. They are applied by the scene builder after the
+gun's hold position is calculated, keeping the existing framing. `WeaponGripAuthoring.SaveBatch` updates
+only the five gun prefabs and renders hand close-ups into `Screenshots/GunGrips/After`.
+`WeaponGripReview.BuildSavedGameBatch` builds the saved level without regenerating it.
+
+For live checks, `viewshot <name>` renders the running player's camera to
+`Builds/Win64/Screenshots/GunGrips/<name>.png`, including the live hands and weapon motion.
+It works while the window is hidden; screen-overlay HUD elements are excluded.
+
+Verified in the Windows development build on 1 October: all five guns were equipped, aimed,
+inspected, fired once and reloaded. Ammo changed 10/9/10 (pistol), 30/29/30 (SMG and rifle),
+2/1/2 (shotgun), and 5/4/5 (sniper), with client and host counts matching. The run saved 30
+live camera captures covering hip, aim, inspect, fire, reload and ready states. The build
+and runtime logs are `Logs/grip-final-build.log` and `Logs/grip-runtime-final.log`.
+The sniper's screen-overlay scope mask is not included in these camera-only captures.
 
 ## Controls
 | Key | What |

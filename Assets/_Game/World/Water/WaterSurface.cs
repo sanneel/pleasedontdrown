@@ -97,7 +97,7 @@ namespace PleaseDontDrown.World.Water
             float h = 0f;
             for (int i = 0; i < w._count; i++)
                 h += w._amp[i] * Mathf.Sin(w._k[i].x * x + w._k[i].y * z + w._omega[i] * t + w._phase[i]);
-            return w._waterLevel + h * scale * Seabed.WaveFactor(x, z, w._waterLevel);
+            return w._waterLevel + h * scale * Seabed.WaveFactor(x, z, w._waterLevel) + TsunamiState.HeightAt(x, z);
         }
 
         /// <summary>Surface normal at a world position.</summary>
@@ -111,6 +111,8 @@ namespace PleaseDontDrown.World.Water
             for (int i = 0; i < w._count; i++)
                 slope += w._k[i] * (w._amp[i] * Mathf.Cos(w._k[i].x * position.x + w._k[i].y * position.z + w._omega[i] * t + w._phase[i]));
             slope *= scale * Seabed.WaveFactor(position.x, position.z, w._waterLevel);
+            slope.x += (TsunamiState.HeightAt(position.x + 0.25f, position.z) - TsunamiState.HeightAt(position.x - 0.25f, position.z)) * 2f;
+            slope.y += (TsunamiState.HeightAt(position.x, position.z + 0.25f) - TsunamiState.HeightAt(position.x, position.z - 0.25f)) * 2f;
             return new Vector3(-slope.x, 1f, -slope.y).normalized;
         }
 
@@ -178,16 +180,23 @@ namespace PleaseDontDrown.World.Water
             Shader.SetGlobalVector(PhasesId, _gpuPhases);
             Shader.SetGlobalFloat(TimeId, WaveTime);
             Shader.SetGlobalFloat(LevelId, _waterLevel);
+            Shader.SetGlobalVector("_PDD_SurgeRegion", TsunamiState.Region);
+            Shader.SetGlobalVector("_PDD_SurgeField", TsunamiState.Field);
 
             if (_grid == null) return;
             Camera cam = Camera.main;
             Vector3 focus = cam != null ? cam.transform.position : transform.position;
-            float step = _gridSize / _gridResolution;
+            // Enlarge the tessellated patch during the event so the incoming crest is visible offshore.
+            float visualScale = TsunamiState.Active ? 2.4f : 1f;
+            _grid.localScale = new Vector3(visualScale, 1f, visualScale);
+            _far.localScale = new Vector3(visualScale, 1f, visualScale);
+            float size = _gridSize * visualScale;
+            float step = size / _gridResolution;
             var center = new Vector3(Mathf.Round(focus.x / step) * step, 0f, Mathf.Round(focus.z / step) * step);
             _grid.position = center;
             _far.position = center;
             // Waves fade out toward the grid edge so it meets the flat far ring without a seam.
-            Shader.SetGlobalVector(CenterId, new Vector4(center.x, center.z, _gridSize * 0.32f, _gridSize * 0.49f));
+            Shader.SetGlobalVector(CenterId, new Vector4(center.x, center.z, size * 0.32f, size * 0.49f));
         }
 
         // ------------------------------------------------------------------ meshes

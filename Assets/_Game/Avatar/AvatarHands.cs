@@ -8,12 +8,21 @@ namespace PleaseDontDrown.Avatars
     public struct HandPose
     {
         public float Thumb, Index, Middle, Ring, Pinky, Spread;
+        [Tooltip("Lift the index finger toward the trigger while keeping its knuckle connected to the palm.")]
+        public float IndexLift;
+        [Tooltip("Extra index bend in degrees at the three joints. Zero keeps the standard curl.")]
+        public Vector3 IndexBend;
+        [Tooltip("Swing the thumb around the palm to rest along a handle, in degrees.")]
+        public float ThumbSwing;
 
         public HandPose(float fingers, float thumb, float spread)
         {
             Index = Middle = Ring = Pinky = fingers;
             Thumb = thumb;
             Spread = spread;
+            IndexLift = 0f;
+            IndexBend = Vector3.zero;
+            ThumbSwing = 0f;
         }
 
         public static readonly HandPose Relaxed = new(0.34f, 0.26f, 0.02f) { Index = 0.26f, Pinky = 0.42f };
@@ -35,7 +44,10 @@ namespace PleaseDontDrown.Avatars
             Middle = Mathf.Lerp(a.Middle, b.Middle, t),
             Ring = Mathf.Lerp(a.Ring, b.Ring, t),
             Pinky = Mathf.Lerp(a.Pinky, b.Pinky, t),
-            Spread = Mathf.Lerp(a.Spread, b.Spread, t)
+            Spread = Mathf.Lerp(a.Spread, b.Spread, t),
+            IndexLift = Mathf.Lerp(a.IndexLift, b.IndexLift, t),
+            IndexBend = Vector3.Lerp(a.IndexBend, b.IndexBend, t),
+            ThumbSwing = Mathf.Lerp(a.ThumbSwing, b.ThumbSwing, t)
         };
 
         /// <summary>Frame-rate independent move toward a target pose.</summary>
@@ -179,11 +191,14 @@ namespace PleaseDontDrown.Avatars
                 {
                     int i = BoneIndex(f, s);
                     // Curling bends toward the palm side (about the hand's Z axis); spreading fans the fingers in the palm's plane.
-                    Quaternion bend = Quaternion.Euler(0f, 0f, -Side * curl * Flex[f][s]);
+                    float angle = curl * Flex[f][s] + (f == 1 ? pose.IndexBend[s] : 0f);
+                    Quaternion bend = Quaternion.Euler(0f, 0f, -Side * angle);
                     Quaternion fan = s == 0 ? Quaternion.Euler(SpreadFactor[f] * pose.Spread * 16f, 0f, 0f) : Quaternion.identity;
                     // A modelled thumb stands out to the side: gripping brings it in across the palm first.
                     Quaternion tuck = _shape != null && f == 0 && s == 0 ? Quaternion.Euler(curl * _shape.ThumbTuck, 0f, 0f) : Quaternion.identity;
-                    Bones[i].localRotation = tuck * _rest[i] * fan * bend;
+                    Quaternion lift = f == 1 && s == 0 ? Quaternion.Euler(-pose.IndexLift, 0, 0) : Quaternion.identity;
+                    Quaternion thumbSwing = f == 0 && s == 0 ? Quaternion.Euler(0f, -Side * pose.ThumbSwing, 0f) : Quaternion.identity;
+                    Bones[i].localRotation = thumbSwing * tuck * _rest[i] * fan * lift * bend;
                 }
             }
         }

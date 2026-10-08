@@ -60,14 +60,11 @@ namespace PleaseDontDrown.Story
             // Three rescues per island (1.2, 1.5, 1.6 and 2.3, 2.4, 2.5); the rest is the story and its jokes.
             Add("1.1", "Meet Sandy", MeetSandy);
             Add("1.2", "First rescue", FirstShift);
-            Add("1.3", "The thief", Thief);
-            Add("1.4", "Return the loot", ReturnLoot);
-            Add("1.5", "Another one", AnotherOne);
-            Add("1.6", "The silent one", SilentOne);
-            Add("1.7", "Drugs?", DrugReveal);
-            Add("1.8", "False alarm", FalseAlarm);
-            Add("1.9", "The thief again", ThiefAgain);
-            Add("1.10", "Leave the island", LeaveIsland);
+            Add("1.3", "The rental dock", RentalTheft);
+            Add("1.4", "Tsunami!", IncomingTsunami);
+            Add("1.5", "Rescue the beach", TsunamiRescue);
+            Add("1.9", "Recover the fleet keys", RecoverFleetKeys);
+            Add("1.10", "The crew heads south", FleetDeparture);
             Add("2.1", "Check in", CheckIn);
             Add("2.2", "Buy a weapon", BuyWeapon);
             Add("2.3", "Harder work", HarderWork);
@@ -171,7 +168,7 @@ namespace PleaseDontDrown.Story
             NoMarker();
             // One tourist, a man or a woman; the next rescue (1.5) is the other, so both kinds of CPR come up. Sandy
             // shouts tips the first time each thing happens, through both.
-            _firstFigure = Random.Range(0, 2);
+            _firstFigure = 1; // one staged CPR introduction, with the optional hut invitation afterwards
             StartHints();
             yield return GagRescue(_island1, PickGag(Island1Gags, _firstFigure), Profile(_island1, _firstFigure), _sandy, "(shouting) ", "Rescue the tourist");
             yield return Say(_sandy, "(shouting) You did it! See? Nothing to it!");

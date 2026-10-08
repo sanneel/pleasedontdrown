@@ -127,7 +127,7 @@ namespace PleaseDontDrown.Avatars
         private void ClearParts()
         {
             foreach (GameObject part in _parts)
-                if (part != null) Kill(part);
+                if (part != null) { part.SetActive(false); Kill(part); }
             _parts.Clear();
             _eyes.Clear();
             if (_rig != null && _rig.IsBuilt) _rig[AvatarRig.Bone.Head].localScale = Vector3.one;

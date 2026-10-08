@@ -16,6 +16,8 @@ namespace PleaseDontDrown.World.Water
         /// <summary>The soft round particle (other effects tint it: blood).</summary>
         public static Material ParticleMaterial => _instance != null ? _instance._particleMaterial : null;
         private ParticleSystem _system;
+        private readonly AudioSource[] _sounds = new AudioSource[8];
+        private int _soundFrame, _soundsThisFrame;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => _instance = null;
@@ -24,6 +26,20 @@ namespace PleaseDontDrown.World.Water
         {
             _instance = this;
             _system = BuildSystem();
+            for (int i = 0; i < _sounds.Length; i++)
+            {
+                var go = new GameObject("Water impact " + i);
+                go.transform.SetParent(transform, false);
+                var source = go.AddComponent<AudioSource>();
+                source.playOnAwake = false;
+                source.spatialBlend = 1f;
+                source.dopplerLevel = 0f;
+                source.rolloffMode = AudioRolloffMode.Linear;
+                source.minDistance = 2f;
+                source.maxDistance = 32f;
+                source.priority = 160;
+                _sounds[i] = source;
+            }
         }
 
         private void OnDestroy()
@@ -43,7 +59,25 @@ namespace PleaseDontDrown.World.Water
                 startSize = Mathf.Lerp(0.12f, 0.28f, strength)
             };
             _instance._system.Emit(emit, Mathf.RoundToInt(Mathf.Lerp(10f, 70f, strength)));
-            AudioSource.PlayClipAtPoint(BeachAudio.WaterImpact(strength), position, Mathf.Lerp(0.25f, 1f, strength));
+            _instance.PlayImpact(position, strength);
+        }
+
+        private void PlayImpact(Vector3 position, float strength)
+        {
+            if (_soundFrame != Time.frameCount) { _soundFrame = Time.frameCount; _soundsThisFrame = 0; }
+            // A pile of floating objects can cross the surface together; keep that from becoming a noise wall.
+            if (_soundsThisFrame >= 3) return;
+            foreach (var source in _sounds)
+            {
+                if (source.isPlaying) continue;
+                source.transform.position = position;
+                source.clip = BeachAudio.WaterImpact(strength);
+                source.volume = Mathf.Lerp(0.22f, 0.72f, strength);
+                source.pitch = Random.Range(0.96f, 1.04f);
+                source.Play();
+                _soundsThisFrame++;
+                break;
+            }
         }
 
         private ParticleSystem BuildSystem()

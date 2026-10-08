@@ -13,7 +13,7 @@ namespace PleaseDontDrown.Items
     /// Weapon skins (How to Fish's [Z/C]): the holder flicks through finishes for the item in their hands, everyone
     /// sees it (the host keeps the choice), and your last pick for that kind of item is remembered and put on the
     /// next one you pick up. Skin 0 is the item as modelled; the others repaint every surface except glass and
-    /// effects (lenses, flashes, lasers).
+    /// effects (lenses, flashes, lasers), and the guns' contrasting hardware details.
     /// </summary>
     [RequireComponent(typeof(Item))]
     public class ItemSkin : NetworkBehaviour
@@ -89,6 +89,7 @@ namespace PleaseDontDrown.Items
         {
             if (r is ParticleSystemRenderer || r is LineRenderer || r is TrailRenderer) return false;
             string n = r.name.ToLowerInvariant();
+            if (n.StartsWith("finishdetails_")) return false;
             if (n.Contains("flash") || n.Contains("laser") || n.Contains("glass") || n.Contains("lens") || n.Contains("beam")) return false;
             foreach (Material m in r.sharedMaterials)
                 if (m != null && (m.renderQueue >= 3000 || m.name.ToLowerInvariant().Contains("glass"))) return false;
@@ -126,6 +127,14 @@ namespace PleaseDontDrown.Items
 
         private string PrefKey => "pdd.skin." + _item.DisplayName;
 
+        /// <summary>Choose a finish for the locally held item without changing the saved preference.</summary>
+        public void PreviewFinish(int skin)
+        {
+            var holder = _item.Holder;
+            if (holder == null || holder != PlayerHub.Local || !_item.IsConfirmedHolder(holder)) return;
+            Request(Mathf.Clamp(skin, 0, Finishes.Length - 1), announce: false);
+        }
+
         private void Request(int skin, bool announce)
         {
             Apply(skin); // show it now; the host confirms
@@ -158,22 +167,23 @@ namespace PleaseDontDrown.Items
                     continue;
                 }
                 var mats = new Material[_original[i].Length];
-                for (int m = 0; m < mats.Length; m++) mats[m] = MaterialFor(skin);
+                for (int m = 0; m < mats.Length; m++) mats[m] = MaterialFor(skin, _item.GetComponent<Combat.Weapon>() != null);
                 r.sharedMaterials = mats;
             }
         }
 
-        private static Material MaterialFor(int skin)
+        private static Material MaterialFor(int skin, bool weapon)
         {
-            if (_materials.TryGetValue(skin, out Material mat) && mat != null) return mat;
+            int key = skin + (weapon ? Finishes.Length : 0);
+            if (_materials.TryGetValue(key, out Material mat) && mat != null) return mat;
             Finish f = Finishes[skin];
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            Shader shader = Shader.Find(weapon ? "PleaseDontDrown/Weapon" : "Universal Render Pipeline/Lit");
             mat = new Material(shader) { name = "Skin_" + f.Name };
             mat.SetColor("_BaseColor", f.Camo.Length > 0 ? Color.white : f.Color);
             mat.SetFloat("_Metallic", f.Metallic);
             mat.SetFloat("_Smoothness", f.Smoothness);
             if (f.Camo.Length > 0) mat.SetTexture("_BaseMap", CamoTexture(f, skin));
-            _materials[skin] = mat;
+            _materials[key] = mat;
             return mat;
         }
 

@@ -87,6 +87,7 @@ namespace PleaseDontDrown.Story
         private bool _allowWater;
         private float _teleportedAt = -10f;
         private string _gaveUp;
+        private Rigidbody _walksWith;
         private float _nextUnstick;
         private readonly RaycastHit[] _sweepHits = new RaycastHit[12];
         private readonly Collider[] _overlapHits = new Collider[12];
@@ -417,6 +418,9 @@ namespace PleaseDontDrown.Story
             _path.Clear();
         }
 
+        /// <summary>The player led by the hand must not block this walk.</summary>
+        [Server] public void ServerWalkWith(Rigidbody body) => _walksWith = body;
+
         /// <summary>Host: turn toward a point (null: face whoever is near).</summary>
         [Server] public void ServerFace(Vector3? point) => _facePoint = point;
 
@@ -457,8 +461,12 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void ShoutObservers(string text, bool cry)
         {
-            FloatingText.Spawn(HeadPosition + Vector3.up * 0.4f, text, new Color(1f, 0.95f, 0.75f), 0.9f, 1.6f);
-            if (cry && _audio != null) _audio.PlayOneShot(ProceduralAudio.Cry(_rig != null && _rig.Look.Feminine ? 3 : 1), 1f);
+            FloatingText.SpawnSpeech(this, text, 1.8f, 0.9f);
+            if (cry && _audio != null)
+            {
+                int voice = _rig != null && _rig.Look.Feminine ? 3 : 1;
+                _audio.PlayOneShot(ProceduralAudio.RescueBark(voice, text), 0.8f);
+            }
             OnSpeak(0.8f, cry ? null : text);
         }
 
@@ -473,7 +481,7 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void SayObservers(string text, float seconds)
         {
-            FloatingText.Spawn(HeadPosition + Vector3.up * 0.4f, text, SpeechColor, 0.75f, seconds);
+            FloatingText.SpawnSpeech(this, text, seconds, 0.85f);
             OnSpeak(seconds * 0.8f, text, 0.5f); // beach chatter: a murmur next to the story's own lines
         }
 
@@ -963,7 +971,7 @@ namespace PleaseDontDrown.Story
                 if (h.distance <= 0f || h.distance >= bestDistance) continue; // already overlapping: let them walk out of it
                 Collider c = h.collider;
                 Rigidbody body = c.attachedRigidbody;
-                if (IsGround(c) || (body != null && (body == _rigidbody || (_ride != null && body == _ride.Body)))) continue; // ourselves, our boat
+                if (IsGround(c) || (body != null && (body == _rigidbody || body == _walksWith || (_ride != null && body == _ride.Body)))) continue; // ourselves, our boat
                 if (body == null && c.bounds.max.y <= p.y + StepHeight) continue; // a step up (dock deck, kerb): Grounded climbs it
                 if (body != null && IsCharacter(body)) continue;                   // other characters: steered round (Avoid)
                 bestDistance = h.distance;

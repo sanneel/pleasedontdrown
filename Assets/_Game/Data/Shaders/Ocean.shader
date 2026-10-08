@@ -59,6 +59,19 @@ Shader "PleaseDontDrown/Ocean"
             float _PDD_WaveTime;
             float _PDD_WaterLevel;
             float4 _PDD_OceanCenter;  // xy grid center (world x,z), z fade start, w fade end (half extents)
+            float4 _PDD_SurgeRegion;
+            float4 _PDD_SurgeField;
+
+            // MUST match TsunamiState.HeightAt. The surge can inundate shallow ground.
+            float SurgeHeight(float2 p)
+            {
+                float4 r = _PDD_SurgeRegion, f = _PDD_SurgeField;
+                float side = 1.0 - smoothstep(r.y * 0.75, r.y, abs(p.x - r.x));
+                float coast = smoothstep(r.z, r.z + 16.0, p.y) * (1.0 - smoothstep(r.w - 14.0, r.w, p.y));
+                float d = (p.y - f.x) / 9.0;
+                float behind = 1.0 - smoothstep(f.x - 8.0, f.x + 5.0, p.y);
+                return side * coast * (exp(-d*d) * f.y + behind * f.z - f.w);
+            }
             // Set by Seabed.cs: ground heights under the sea. Waves calm down in the shallows and vanish under the island.
             TEXTURE2D(_PDD_Seabed);
             SAMPLER(sampler_PDD_Seabed);
@@ -133,6 +146,9 @@ Shader "PleaseDontDrown/Ocean"
                 float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 float2 slope;
                 float h = Waves(positionWS.xz, slope);
+                h += SurgeHeight(positionWS.xz);
+                slope.x += (SurgeHeight(positionWS.xz + float2(0.25,0)) - SurgeHeight(positionWS.xz - float2(0.25,0))) * 2.0;
+                slope.y += (SurgeHeight(positionWS.xz + float2(0,0.25)) - SurgeHeight(positionWS.xz - float2(0,0.25))) * 2.0;
                 positionWS.y = _PDD_WaterLevel + h;
                 output.positionWS = positionWS;
                 output.normalWS = normalize(float3(-slope.x, 1.0, -slope.y));

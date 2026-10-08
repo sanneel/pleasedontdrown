@@ -4,32 +4,25 @@ using UnityEngine;
 
 namespace PleaseDontDrown.Core
 {
-    /// <summary>Original beach foley inspired by the reference game's short, varied sound cues.</summary>
+    /// <summary>Beach foley with recorded water sounds from the requested How to Fish reference.</summary>
     public static class BeachAudio
     {
         private const int Rate = 44100;
-        private static AudioClip[] _water, _pickup, _swim, _footsteps;
-        private static AudioClip _drop, _throw, _equip, _swoosh, _menu, _hover, _bird, _surf, _dive, _emerge;
+        private static AudioClip[] _pickup, _footsteps, _jump, _land;
+        private static AudioClip _drop, _throw, _equip, _swoosh, _menu, _hover, _bird;
         private static AudioSource _local;
-        private static int _waterIndex, _pickupIndex, _swimIndex, _footstepIndex;
+        private static int _pickupIndex, _footstepIndex;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Reset()
         {
-            _water = _pickup = _swim = _footsteps = null;
-            _drop = _throw = _equip = _swoosh = _menu = _hover = _bird = _surf = _dive = _emerge = null;
+            _pickup = _footsteps = _jump = _land = null;
+            _drop = _throw = _equip = _swoosh = _menu = _hover = _bird = null;
             _local = null;
-            _waterIndex = _pickupIndex = _swimIndex = _footstepIndex = 0;
+            _pickupIndex = _footstepIndex = 0;
         }
 
-        public static AudioClip WaterImpact(float strength)
-        {
-            _water ??= new AudioClip[9];
-            int size = strength < 0.3f ? 0 : strength < 0.72f ? 1 : 2;
-            int variant = (_waterIndex++ + UnityEngine.Random.Range(0, 2)) % 3;
-            int index = size * 3 + variant;
-            return _water[index] != null ? _water[index] : _water[index] = MakeWater(size, variant);
-        }
+        public static AudioClip WaterImpact(float strength) => Audio.WaterFoley.Impact(strength);
 
         public static AudioClip Pickup
         {
@@ -50,14 +43,34 @@ namespace PleaseDontDrown.Core
                 _footsteps[index] = MakeFootstep((int)surface, variant);
         }
 
-        public static AudioClip SwimStroke
+        public static AudioClip SwimStroke => Audio.WaterFoley.Stroke;
+        public static AudioClip Wade => Audio.WaterFoley.Step;
+
+        public static AudioClip Jump(World.SurfaceKind surface) => Movement(surface, false);
+        public static AudioClip Land(World.SurfaceKind surface) => Movement(surface, true);
+
+        private static AudioClip Movement(World.SurfaceKind surface, bool landing)
         {
-            get
+            _jump ??= new AudioClip[9];
+            _land ??= new AudioClip[9];
+            int variant = _footstepIndex++ % 3;
+            int material = Mathf.Clamp((int)surface, 0, 2);
+            int index = material * 3 + variant;
+            var bank = landing ? _land : _jump;
+            if (bank[index] != null) return bank[index];
+            var rng = new System.Random(731 + index + (landing ? 30 : 0));
+            float low = 0f, air = 0f;
+            return bank[index] = Build($"{(landing ? "Land" : "Jump")}{material}_{variant}", landing ? 0.48f : 0.29f, t =>
             {
-                _swim ??= new AudioClip[3];
-                int i = _swimIndex++ % 3;
-                return _swim[i] != null ? _swim[i] : _swim[i] = MakeSwim(i);
-            }
+                float n = (float)(rng.NextDouble() * 2 - 1);
+                low += (n - low) * 0.045f;
+                air += (n - air) * (material == 0 ? 0.28f : 0.5f);
+                float body = low * (landing ? 2.3f : 0.65f) * Mathf.Exp(-t * 18f);
+                float grit = (air - low) * (material == 0 ? 0.7f : 0.38f) * Mathf.Exp(-t * (landing ? 13f : 20f));
+                float knock = material == 0 ? 0f : Mathf.Sin(2f * Mathf.PI * (material == 1 ? 128f : 210f) * t) * Mathf.Exp(-t * 38f) * (landing ? 0.2f : 0.07f);
+                float cloth = air * 0.13f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.26f));
+                return body + grit + knock + cloth;
+            });
         }
 
         public static AudioClip Drop => _drop != null ? _drop : _drop = MakeImpact("ItemDrop", 0.34f, 140f, 0.26f);
@@ -69,9 +82,9 @@ namespace PleaseDontDrown.Core
             Mathf.Sin(2f * Mathf.PI * (510f * t + 80f * t * t)) *
             Mathf.Sin(Mathf.PI * t / 0.13f) * 0.11f);
         public static AudioClip Bird => _bird != null ? _bird : _bird = MakeBird();
-        public static AudioClip Surf => _surf != null ? _surf : _surf = MakeSurf();
-        public static AudioClip Dive => _dive != null ? _dive : _dive = MakeWater(2, 2);
-        public static AudioClip Emerge => _emerge != null ? _emerge : _emerge = MakeWater(0, 1);
+        public static AudioClip Surf => Audio.WaterFoley.SeaLoop;
+        public static AudioClip Dive => Audio.WaterFoley.Enter;
+        public static AudioClip Emerge => Audio.WaterFoley.Exit;
 
         public static void PlayLocal(AudioClip clip, float volume = 1f)
         {
@@ -87,33 +100,6 @@ namespace PleaseDontDrown.Core
             _local.PlayOneShot(clip, volume);
         }
 
-        private static AudioClip MakeWater(int size, int variant)
-        {
-            float length = new[] { 0.55f, 1.05f, 1.55f }[size];
-            var rng = new System.Random(190 + size * 17 + variant);
-            float low = 0f, high = 0f;
-            return Build($"Water{size}_{variant}", length, t =>
-            {
-                float n = (float)(rng.NextDouble() * 2 - 1);
-                low += (n - low) * (0.18f + 0.06f * size);
-                high += (n - high) * 0.55f;
-                float impact = (low * 0.95f + high * 0.25f) * Mathf.Exp(-(9f - size * 1.9f) * t);
-                float wash = low * 0.6f * Mathf.Exp(-(3.5f - size * 0.7f) * t) * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / length));
-                float bubbles = 0f;
-                for (int b = 0; b < 4 + size * 2; b++)
-                {
-                    float at = 0.09f + b * (0.065f + 0.02f * size) + variant * 0.009f;
-                    float u = t - at;
-                    if (u >= 0f && u < 0.08f)
-                    {
-                        float f = 250f + b * 62f + variant * 35f;
-                        bubbles += Mathf.Sin(2f * Mathf.PI * (f * u + 260f * u * u)) * Mathf.Exp(-38f * u) * 0.12f;
-                    }
-                }
-                return (impact + wash + bubbles) * Mathf.Clamp01(t / 0.002f) * (0.7f + size * 0.13f);
-            });
-        }
-
         private static AudioClip MakePickup(int variant)
         {
             var rng = new System.Random(511 + variant);
@@ -124,7 +110,7 @@ namespace PleaseDontDrown.Core
                 filtered += (n - filtered) * 0.25f;
                 float rustle = filtered * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.24f)) * (t < 0.24f ? 0.28f : 0f);
                 float u = t - 0.105f;
-                float snap = u >= 0f ? Mathf.Sin(2f * Mathf.PI * (540f + variant * 45f) * u) * Mathf.Exp(-32f * u) * 0.24f : 0f;
+                float snap = u >= 0f ? (filtered * 0.65f + Mathf.Sin(2f * Mathf.PI * (240f + variant * 25f) * u) * 0.08f) * Mathf.Clamp01(u / 0.003f) * Mathf.Exp(-48f * u) : 0f;
                 return rustle + snap;
             });
         }
@@ -149,20 +135,6 @@ namespace PleaseDontDrown.Core
             });
         }
 
-        private static AudioClip MakeSwim(int variant)
-        {
-            var rng = new System.Random(814 + variant);
-            float low = 0f;
-            return Build($"SwimStroke{variant}", 0.63f, t =>
-            {
-                float n = (float)(rng.NextDouble() * 2 - 1);
-                low += (n - low) * 0.17f;
-                float pull = Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.5f)) * (0.55f + 0.2f * Mathf.Sin(t * 21f));
-                float droplets = t > 0.24f ? n * Mathf.Exp(-16f * (t - 0.24f)) * 0.11f : 0f;
-                return low * pull * 0.65f + droplets;
-            });
-        }
-
         private static AudioClip MakeImpact(string name, float length, float frequency, float noiseGain)
         {
             var rng = new System.Random((int)frequency);
@@ -171,8 +143,8 @@ namespace PleaseDontDrown.Core
             {
                 float n = (float)(rng.NextDouble() * 2 - 1);
                 low += (n - low) * 0.24f;
-                float hit = Mathf.Sin(2f * Mathf.PI * (frequency * t - frequency * 0.9f * t * t)) * Mathf.Exp(-22f * t);
-                return (hit * 0.48f + low * noiseGain * Mathf.Exp(-14f * t)) * Mathf.Clamp01(t / 0.002f);
+                float hit = (Mathf.Sin(2f * Mathf.PI * frequency * t) + 0.24f * Mathf.Sin(2f * Mathf.PI * frequency * 2.37f * t)) * Mathf.Exp(-35f * t);
+                return (hit * 0.19f + low * noiseGain * 2f * Mathf.Exp(-18f * t)) * Mathf.Clamp01(t / 0.002f);
             });
         }
 
@@ -196,38 +168,24 @@ namespace PleaseDontDrown.Core
             return (ping + overtone) * Mathf.Exp(-17f * t) * Mathf.Clamp01(t / 0.003f) * 0.22f;
         });
 
-        private static AudioClip MakeBird() => Build("BeachBird", 0.72f, t =>
-        {
-            float local = t < 0.27f ? t : t - 0.34f;
-            if (local < 0f || local > 0.27f) return 0f;
-            float phase = 1050f * local + 340f * local * local + 35f * Mathf.Sin(local * 37f);
-            return Mathf.Sin(2f * Mathf.PI * phase) * Mathf.Sin(Mathf.PI * local / 0.27f) * 0.16f;
-        });
+        private static AudioClip MakeBird() => Build("BeachBird", 0.92f, BirdWave());
 
-        private static AudioClip MakeSurf()
+        private static Func<float, float> BirdWave()
         {
-            var rng = new System.Random(942);
-            float low = 0f, slow = 0f;
-            const float length = 12f;
-            return Build("BeachSurfLoop", length, t =>
+            float phase = 0f;
+            return t =>
             {
-                float n = (float)(rng.NextDouble() * 2 - 1);
-                low += (n - low) * 0.12f;
-                slow += (n - slow) * 0.008f;
-                float swell = 0.48f + 0.3f * Mathf.Sin(2f * Mathf.PI * t / 6f - 0.7f);
-                float seam = Mathf.Clamp01(t / 0.25f) * Mathf.Clamp01((length - t) / 0.25f);
-                return (low * 0.31f + slow * 0.62f) * swell * seam;
-            });
+                float local = t < 0.36f ? t : t - 0.49f;
+                if (local < 0f || local > 0.36f) return 0f;
+                float u = local / 0.36f;
+                phase += 2f * Mathf.PI * (870f + 240f * Mathf.Sin(Mathf.PI * u) + 18f * Mathf.Sin(local * 43f)) / Rate;
+                return (Mathf.Sin(phase) + 0.17f * Mathf.Sin(phase * 2f)) * Mathf.Pow(Mathf.Max(0f, Mathf.Sin(Mathf.PI * u)), 1.4f) * 0.13f;
+            };
         }
 
         private static AudioClip Build(string name, float seconds, Func<float, float> wave)
         {
-            var samples = new float[Mathf.CeilToInt(seconds * Rate)];
-            for (int i = 0; i < samples.Length; i++)
-                samples[i] = Mathf.Clamp(wave(i / (float)Rate), -1f, 1f);
-            AudioClip clip = AudioClip.Create(name, samples.Length, 1, Rate, false);
-            clip.SetData(samples, 0);
-            return clip;
+            return Audio.SoundClip.Build(name, seconds, wave);
         }
     }
 
