@@ -310,7 +310,8 @@ namespace PleaseDontDrown.Story
             AvatarLook look = v.Look;
             Color voice = VoiceColor(v);
             Vector3 at = v.transform.position;
-            Vector3 face = hero.transform.position - at;
+            Vector3 door = hut.Outside.position;
+            Vector3 face = door - at; // facing the hut, ready to go
             face.y = 0f;
             Despawn(v.gameObject); // up she gets: the floppy tourist becomes a walking one
             StoryNpc her = SpawnNpc(name, NpcRole.Guest, look, at, face.sqrMagnitude > 0.01f ? Quaternion.LookRotation(face).eulerAngles.y : 0f);
@@ -322,10 +323,9 @@ namespace PleaseDontDrown.Story
             // Hand in hand to the door (the lifeguard has no say in it).
             hut.ServerLead(hero, her);
             her.ServerFace(null);
-            her.ServerMoveTo(hut.Outside.position, 1.7f);
-            float giveUp = Time.time + 45f;
-            while (her != null && Time.time < giveUp && (her.transform.position - hut.Outside.position).sqrMagnitude > 1.2f * 1.2f)
-                yield return QuarterWait;
+            her.ServerWalkWith(hero.GetComponent<Rigidbody>());
+            yield return WalkToHut(her, door, hut.Outside.eulerAngles.y);
+            if (her != null) her.ServerWalkWith(null);
             if (her == null || hero == null)
             {
                 if (hero != null) hut.ServerLead(hero, null);
@@ -369,6 +369,48 @@ namespace PleaseDontDrown.Story
             }
             yield return new WaitForSeconds(1f);
             hut.ServerDoor(false);
+        }
+
+        /// <summary>
+        /// To the hut door, whatever is in the way: a route that ends early is set off again, and if she still makes
+        /// no headway she is put at the door (the hand-held lifeguard is pulled after her). The lifeguard can't move
+        /// meanwhile, so this never takes long.
+        /// </summary>
+        private IEnumerator WalkToHut(StoryNpc her, Vector3 door, float doorYaw)
+        {
+            const float arrive = 1.6f, headway = 0.3f, patience = 4f, limit = 20f;
+            float giveUp = Time.time + limit;
+            float best = float.MaxValue, bestAt = Time.time;
+            int retries = 0;
+            her.ServerMoveTo(door, 1.7f, water: true); // revived in the shallows: the first steps are through water
+            while (her != null)
+            {
+                Vector3 to = door - her.transform.position;
+                to.y = 0f;
+                float distance = to.magnitude;
+                if (distance <= arrive) yield break;
+                if (distance < best - headway)
+                {
+                    best = distance;
+                    bestAt = Time.time;
+                }
+                string why = Time.time > giveUp ? "took too long"
+                    : Time.time - bestAt > patience ? "no headway"
+                    : !her.IsMoving && retries >= 2 ? "no way through"
+                    : null;
+                if (why != null)
+                {
+                    Debug.Log($"[Story] {her.Name} put at the hut door ({why}, {distance:F1} m away)");
+                    her.ServerTeleport(door, doorYaw);
+                    yield break;
+                }
+                if (!her.IsMoving)
+                {
+                    retries++;
+                    her.ServerMoveTo(door, 1.7f, water: true);
+                }
+                yield return QuarterWait;
+            }
         }
 
         // ------------------------------------------------------------------ island 1: the false alarm

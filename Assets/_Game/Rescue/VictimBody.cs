@@ -779,18 +779,24 @@ namespace PleaseDontDrown.Rescue
         {
             Vector3 p = _rb.position;
             Vector3 v = _rb.linearVelocity;
-            float lift = Mathf.Clamp((_groundY + 1.2f - p.y) * 65f - v.y * 17f + 10f, -30f, 55f);
+            Quaternion rotation = _rb.rotation;
+            Vector3 up = rotation * Vector3.up, forward = rotation * Vector3.forward;
+            // Held high enough that the feet clear the sand: dragging feet tipped the body forward into a stoop.
+            float lift = Mathf.Clamp((_groundY + 1.24f - p.y) * 90f - v.y * 20f + 10f, -30f, 55f);
             _rb.AddForce(Vector3.up * lift, ForceMode.Acceleration);
 
-            Vector3 tilt = Vector3.Cross(transform.up, Vector3.up);
-            if (tilt.sqrMagnitude < 0.001f && transform.up.y < 0f)
-                tilt = transform.right; // an upside-down body needs a direction to start rolling
-            float turn = Vector3.SignedAngle(transform.forward, _wadeDirection, Vector3.up) * Mathf.Deg2Rad;
-            _rb.AddTorque(tilt * 78f + Vector3.up * (turn * 22f) - _rb.angularVelocity * 14f, ForceMode.Acceleration);
+            Vector3 tilt = Vector3.Cross(up, Vector3.up);
+            if (tilt.sqrMagnitude < 0.001f && up.y < 0f)
+                tilt = rotation * Vector3.right; // an upside-down body needs a direction to start rolling
+            // Turning toward the beach waits for the body to come upright (lying down, it only spun them on the sand).
+            Vector3 ahead = Vector3.ProjectOnPlane(forward, Vector3.up);
+            ahead = ahead.sqrMagnitude > 1e-4f ? ahead.normalized : _wadeDirection;
+            float turn = Vector3.SignedAngle(ahead, _wadeDirection, Vector3.up) * Mathf.Deg2Rad * Mathf.Clamp01(up.y);
+            _rb.AddTorque(tilt * 170f + Vector3.up * (turn * 22f) - _rb.angularVelocity * 14f, ForceMode.Acceleration);
 
-            // They walk the way they face: turn toward the beach first, then set off (no shuffling off backwards or sideways).
-            Vector3 ahead = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
-            float go = Mathf.Clamp01((Vector3.Dot(ahead, _wadeDirection) - 0.3f) / 0.5f);
+            // They walk the way they face: stand up straight, turn toward the beach, then set off (no shuffling off
+            // backwards or sideways, no setting off half bent over).
+            float go = Mathf.Clamp01((Vector3.Dot(ahead, _wadeDirection) - 0.3f) / 0.5f) * Mathf.InverseLerp(0.9f, 0.98f, up.y);
             Vector3 target = moving ? _wadeDirection * ((_wading ? 1.1f : 1.35f) * go) : Vector3.zero;
             Vector3 horizontal = new(v.x, 0f, v.z);
             _rb.AddForce((target - horizontal) * 8f, ForceMode.Acceleration);
@@ -998,7 +1004,7 @@ namespace PleaseDontDrown.Rescue
                                 ? ArmPose(limb, 125f + 15f * Mathf.Sin(t * 7f), 10f)
                                 : ArmPose(limb, 14f, -30f * stride));
                         else
-                            SetTarget(limb.Joint, LegPose(limb, 30f * stride, 5f));
+                            SetTarget(limb.Joint, LegPose(limb, 22f * stride, 5f)); // inside the hip's 25 degrees back
                         break;
                     case VictimState.Saved when _brain.HasBeenRescued && !_brain.HasLostLeg:
                         // A short standing wave after reaching dry sand.

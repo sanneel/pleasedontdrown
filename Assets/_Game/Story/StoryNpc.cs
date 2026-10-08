@@ -87,6 +87,7 @@ namespace PleaseDontDrown.Story
         private bool _allowWater;
         private float _teleportedAt = -10f;
         private string _gaveUp;
+        private Rigidbody _walksWith;
         private float _nextUnstick;
         private readonly RaycastHit[] _sweepHits = new RaycastHit[12];
         private readonly Collider[] _overlapHits = new Collider[12];
@@ -415,6 +416,9 @@ namespace PleaseDontDrown.Story
             _moveTarget = null;
             _path.Clear();
         }
+
+        /// <summary>Host: someone walking with us (hand in hand): never a wall in our way.</summary>
+        [Server] public void ServerWalkWith(Rigidbody body) => _walksWith = body;
 
         /// <summary>Host: turn toward a point (null: face whoever is near).</summary>
         [Server] public void ServerFace(Vector3? point) => _facePoint = point;
@@ -967,7 +971,7 @@ namespace PleaseDontDrown.Story
                 if (h.distance <= 0f || h.distance >= bestDistance) continue; // already overlapping: let them walk out of it
                 Collider c = h.collider;
                 Rigidbody body = c.attachedRigidbody;
-                if (IsGround(c) || (body != null && (body == _rigidbody || (_ride != null && body == _ride.Body)))) continue; // ourselves, our boat
+                if (IsGround(c) || (body != null && (body == _rigidbody || body == _walksWith || (_ride != null && body == _ride.Body)))) continue; // ourselves, our boat, our partner
                 if (body == null && c.bounds.max.y <= p.y + StepHeight) continue; // a step up (dock deck, kerb): Grounded climbs it
                 if (body != null && IsCharacter(body)) continue;                   // other characters: steered round (Avoid)
                 bestDistance = h.distance;
