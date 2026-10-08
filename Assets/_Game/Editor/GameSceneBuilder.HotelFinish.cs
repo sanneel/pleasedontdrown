@@ -15,6 +15,15 @@ namespace PleaseDontDrown.Editor
     {
         private static bool IsHotelBuilding(LODGroup g) => g.name is "CentralTower" or "WestWing" or "EastWing" or "GardenWing";
 
+        public static void FinishHotelIslandBatch()
+        {
+            if (!Application.isBatchMode) throw new InvalidOperationException("Use this entry point only in a separate batch editor");
+            EditorSceneManager.OpenScene(ScenePath);
+            FinishOneHotel();
+            BuildResortPlayer();
+            File.WriteAllText("Logs/hotel-island-build-result.txt", "PASS: hotel island finished and Windows development build succeeded.");
+        }
+
         // Shared by the full generator and the live scene update, so later rebuilds retain the finish.
         private static Material FinishedHotelMaterial()
         {
@@ -80,14 +89,31 @@ namespace PleaseDontDrown.Editor
             keep.fadeMode = LODFadeMode.None; keep.animateCrossFading = false; keep.ForceLOD(-1);
             RestoreMissingHotelReception(hotel);
             BuildFinishedHotelEntrance(hotel);
+            RemoveDuplicateHotelCollisions(hotel);
+            BuildRichResortBeach(hotel);
             CheckHotelEntranceGeometry(hotel, keep);
+            CheckResortBar(hotel);
             VerifyResort(hotel, GameObject.Find("Environment/BeachTerrain"));
             if (hotel.GetComponentsInChildren<LODGroup>(true).Count(IsHotelBuilding) != 1) throw new InvalidOperationException("Extra hotel remains");
             BakeNavMeshes(true); AssignSceneIds(scene);
             EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene); AssetDatabase.SaveAssets();
             TripoHotelReview.ReportScene(); CaptureResort();
-            File.WriteAllText("Logs/hotel-finish-result.txt", $"PASS: one hotel; removed {removed} extra hotel instances; clean facade and stable filtered textures; reception objects/links restored; lobby and entrance geometry/collision checks passed; navigation and scene saved.");
+            File.WriteAllText("Logs/hotel-finish-result.txt", $"PASS: one hotel; removed {removed} extra hotel instances; clean facade and stable filtered textures; reception objects/links restored; coloured Tripo bar placed; lobby, entrance and bar collision checks passed; navigation and scene saved.");
             Debug.Log("[HotelFinish] One polished hotel with a walkable reception entrance saved.");
+        }
+
+        private static void RemoveDuplicateHotelCollisions(Transform hotel)
+        {
+            var shells = hotel.GetComponentsInChildren<BoxCollider>(true)
+                .Where(c => c.name is "HotelUpperShell" or "HotelGroundSide" or "HotelGroundBack").ToArray();
+            for (int i = 0; i < shells.Length; i++)
+                if (shells[i] != null)
+                    for (int j = i + 1; j < shells.Length; j++)
+                        if (shells[j] != null && shells[j].name == shells[i].name &&
+                            (shells[j].bounds.center - shells[i].bounds.center).sqrMagnitude < .0001f &&
+                            (shells[j].bounds.size - shells[i].bounds.size).sqrMagnitude < .0001f &&
+                            Quaternion.Angle(shells[j].transform.rotation, shells[i].transform.rotation) < .01f)
+                            Object.DestroyImmediate(shells[j].gameObject);
         }
 
         private static void RestoreMissingHotelReception(Transform hotel)
@@ -154,6 +180,24 @@ namespace PleaseDontDrown.Editor
             if (hotel.Find("Floor")?.GetComponent<Renderer>() is Renderer floor) floor.sharedMaterial = stone;
             if (hotel.Find("ReceptionDesk")?.GetComponent<Renderer>() is Renderer desk) desk.sharedMaterial = ivory;
             if (hotel.Find("DeskTop")?.GetComponent<Renderer>() is Renderer top) top.sharedMaterial = timber;
+            // A reception lounge and a readable backdrop make the only enterable hotel room feel finished.
+            var teal = GetMaterial("HotelFinishedTeal", new Color(.10f, .32f, .35f), smoothness: .18f);
+            ResortBox(root, "ReceptionBackdrop", new Vector3(-6, 2.0f, -5.80f), new Vector3(8, 2.2f, .06f), teal, false);
+            WorldText(root, "ReceptionBrand", new Vector3(-6, 2.45f, -5.74f), "GRAND CORAL", 90, .043f, ivory.color)
+                .transform.localRotation = Quaternion.Euler(0, 180, 0);
+            WorldText(root, "ReceptionWelcome", new Vector3(-6, 1.8f, -5.74f), "ISLAND RESORT", 70, .026f, ivory.color)
+                .transform.localRotation = Quaternion.Euler(0, 180, 0);
+            ResortBox(root, "DeskBrassInlay", new Vector3(-6, 1.25f, 2.615f), new Vector3(3.18f, .035f, .025f), brass, false);
+            ResortBox(root, "DeskTimberPlinth", new Vector3(-6, .42f, 2.615f), new Vector3(3.18f, .20f, .025f), timber, false);
+            var lounge = BeachProp(root, "ReceptionLounge", "resort_lounge_set", new Vector3(1.8f, .30f, -3.4f), 180);
+            lounge.transform.localScale = Vector3.one * .75f;
+            foreach (float x in new[] { -1.1f, 1.1f })
+                Collider(lounge.transform, "LobbySeat", new Vector3(x, .4f, 0), new Vector3(.9f, .8f, 2.3f));
+            foreach (float x in new[] { -10f, 10f })
+                BeachProp(root, "LobbyPlanter", "resort_planter", new Vector3(x, .30f, 4.1f));
+            var lampMaterial = GetMaterial("HotelCeilingLamp", new Color(1, .89f, .71f), emission: new Color(1, .71f, .35f)*.7f);
+            foreach (float x in new[] { -6f, 0, 6f })
+                Primitive(PrimitiveType.Cylinder, "LobbyCeilingLamp", root, new Vector3(x, 3.46f, 0), new Vector3(.65f, .025f, .65f), lampMaterial, false);
             // A 10m vestibule joins the imported front face to the original reception door.
             ResortBox(root, "EntranceDeck", new Vector3(0, .15f, 11), new Vector3(4, .30f, 10), stone);
             for (int i = 0; i < 3; i++)

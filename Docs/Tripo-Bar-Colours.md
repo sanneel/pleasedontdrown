@@ -20,4 +20,6 @@ The GLBs carry their colours directly; no texture downloads are required. `GameS
 
 `PLEASE DON'T DROWN → Import coloured Tripo beach bar` creates `Assets/_Game/Art/Props/TripoBeachBar.prefab` with three distance levels and shared URP materials. A one-shot request is queued at `Logs/tripo-bar-colour-import-request.txt`; refresh Unity to import the new script. The completion report is `Logs/tripo-bar-colour-import-result.txt`.
 
-The prefab is a visual asset. This import does not replace objects in the user's active scene or attach bartender interactions. Scene placement, collision matching and runtime checks remain separate work.
+The prefab is also placed in Game under `Environment/Hotel/ResortBeachLife/LargeBeachBar/ColouredTripoBar`. It replaces the earlier placeholder pavilion. The surrounding bar root adds deck, U-shaped counter, chair and post collisions; bartender interactions; four serving spots; and beer/coconut racks. The deck is about 26cm high and serving spots sit just above the counter. The rear staff aisle stays open.
+
+`Finish one hotel and open reception` rebuilds this beach setup and checks the customer approaches, staff aisle and bartender interaction distance. The live scene update reports PASS in `Logs/hotel-finish-result.txt`. A visual Unity review is saved at `Screenshots/Review/Resort/beach-club.png`.

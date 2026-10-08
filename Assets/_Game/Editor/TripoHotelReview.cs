@@ -106,7 +106,10 @@ namespace PleaseDontDrown.Editor
             foreach (var group in hotel.GetComponentsInChildren<LODGroup>(true))
                 report += $"Building {group.name}, active={group.gameObject.activeInHierarchy}, position={group.transform.localPosition:F3}, scale={group.transform.localScale:F3}\n";
             foreach (var box in hotel.GetComponentsInChildren<BoxCollider>(true))
-                if (box.name.Contains("Shell") || box.name.Contains("Ground")) report += $"Collider {box.name}: {box.bounds}\n";
+                if (box.name.Contains("Shell") || box.name.Contains("Ground") || box.name is "PoolBasin" or "CabanaDeck") report += $"Collider {box.name}: {box.bounds}\n";
+            foreach (var renderer in hotel.GetComponentsInChildren<Renderer>(true))
+                if (renderer.name is "PoolWater" or "PoolTerrace" || renderer.name.StartsWith("Cabana"))
+                    report += $"Resort layout {renderer.name}: {renderer.bounds}\n";
             foreach (var root in UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects())
                 foreach (var filter in root.GetComponentsInChildren<MeshFilter>(true))
                 {

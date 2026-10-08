@@ -260,6 +260,7 @@ namespace PleaseDontDrown.Editor
                 ("arrival", new Vector3(-12, 7, -183), new Vector3(20, 12, -267)),
                 ("gardens", new Vector3(-147, 42, -423), new Vector3(20, 12, -300)),
                 ("reception", new Vector3(20, 2, -233), new Vector3(17, 1.7f, -246)),
+                ("lobby", new Vector3(20, 2, -240), new Vector3(14, 1.6f, -246)),
                 ("beach-club", new Vector3(-90, 7, -224), new Vector3(-48, 2.6f, -254)),
                 ("beach-cabanas", new Vector3(135, 6, -225), new Vector3(85, 1.5f, -252)) };
             try
