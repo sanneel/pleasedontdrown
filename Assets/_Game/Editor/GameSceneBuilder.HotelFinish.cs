@@ -229,7 +229,11 @@ namespace PleaseDontDrown.Editor
         private static void Tick()
         {
             const string path="Logs/hotel-finish-request.txt";
-            if (!File.Exists(path)||EditorApplication.isCompiling||EditorApplication.isUpdating||EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (!File.Exists(path)||EditorApplication.isCompiling||EditorApplication.isUpdating) return;
+            // Finishing the user's requested scene update requires the editable scene.
+            // Stop a running preview, then process the same request once edit mode returns.
+            if (EditorApplication.isPlaying) { EditorApplication.isPlaying=false; return; }
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             File.Delete(path);
             try { GameSceneBuilder.FinishOneHotel(); }
             catch(Exception e) { Debug.LogException(e); File.WriteAllText("Logs/hotel-finish-result.txt","FAIL "+e); }
