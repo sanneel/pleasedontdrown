@@ -8,7 +8,9 @@ scale=40/.780731201
 report=[]
 for level in range(3):
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=str(ROOT/('Assets/_Game/Art/Props/resort_hotel_reception_lod'+str(level)+'.glb')))
+    clean=ROOT/('Assets/_Game/Art/Props/resort_hotel_clean_reception_lod'+str(level)+'.glb')
+    path=clean if clean.exists() else ROOT/('Assets/_Game/Art/Props/resort_hotel_reception_lod'+str(level)+'.glb')
+    bpy.ops.import_scene.gltf(filepath=str(path))
     trees=[]
     for o in bpy.context.scene.objects:
         if o.type=='MESH':
