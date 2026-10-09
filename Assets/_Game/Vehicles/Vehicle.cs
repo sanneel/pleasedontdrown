@@ -91,9 +91,19 @@ namespace PleaseDontDrown.Vehicles
         public static Vehicle RideOf(PlayerHub player)
         {
             if (player == null) return null;
+            // Our own player: what our own machine says (off at once on getting off, before the host has caught up).
+            if (player == PlayerHub.Local && player.Motor != null) return player.Motor.Seat;
             foreach (Vehicle v in _all)
                 if (v.SeatIndexOf(player) >= 0) return v;
             return null;
+        }
+
+        /// <summary>Host: aboard any vehicle by the synced seats (not a machine's own view of itself).</summary>
+        private static bool AboardAny(PlayerHub player)
+        {
+            foreach (Vehicle v in _all)
+                if (v.SeatIndexOf(player) >= 0) return true;
+            return false;
         }
 
         public int BackSeatCount => _backSeats == null ? 0 : Mathf.Min(_backSeats.Length, 2);
@@ -186,7 +196,7 @@ namespace PleaseDontDrown.Vehicles
         {
             if (IsAboard(player))
             {
-                ExitServer();
+                ExitNow();
                 return;
             }
             bool backSeat = _driver.Value != null;
@@ -209,7 +219,7 @@ namespace PleaseDontDrown.Vehicles
         [ServerRpc(RequireOwnership = false)]
         private void EnterBackServer(PlayerHub player, NetworkConnection caller = null)
         {
-            if (player == null || player.Owner != caller || _locked.Value || RideOf(player) != null) return;
+            if (player == null || player.Owner != caller || _locked.Value || AboardAny(player)) return;
             if ((player.transform.position - transform.position).sqrMagnitude > 6f * 6f) return;
             int seat = FreeBackSeat();
             if (seat < 0) return;
@@ -257,6 +267,41 @@ namespace PleaseDontDrown.Vehicles
             GiveOwnership(caller); // the driver simulates it
             Debug.Log($"[Vehicle] {player.DisplayName} drives the {_displayName}");
             ServerDriverEntered?.Invoke(this, player);
+        }
+
+        /// <summary>
+        /// Getting off, on our own machine: off at once (into the water beside it, the view gliding down), not after
+        /// the host has answered (a round trip of sitting there on a friend's machine), then the host is told. The
+        /// seat change coming back finds us already off.
+        /// </summary>
+        private void ExitNow()
+        {
+            PlayerHub local = PlayerHub.Local;
+            int index = SeatIndexOf(local);
+            if (local != null && local.Motor != null && local.Motor.Seat == this && index >= 0)
+            {
+                LocalGetOff(local, SeatTransform(index));
+                if (index == 0)
+                {
+                    // The engine cuts out here and now (this machine is simulating it while we drive).
+                    _throttle = 0f;
+                    _brakeUntil = Time.time + 2.5f;
+                }
+            }
+            _exitSentAt = Time.time;
+            ExitServer();
+        }
+
+        private float _exitSentAt = float.NegativeInfinity;
+
+        /// <summary>Off locally but the host still has us aboard (the message got lost): ask again.</summary>
+        private void ResendExitIfIgnored()
+        {
+            PlayerHub local = PlayerHub.Local;
+            if (local == null || local.Motor == null || local.Motor.Seat == this || !IsAboard(local)) return;
+            if (Time.time - _exitSentAt < 1f) return;
+            _exitSentAt = Time.time;
+            ExitServer();
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -330,7 +375,10 @@ namespace PleaseDontDrown.Vehicles
 
         private void OnDriverChanged(PlayerHub prev, PlayerHub next, bool asServer)
         {
-            if (asServer && IsClientStarted) return; // a host handles it once, as a client
+            // Once per machine: a host in its server callback (FishNet hands a host's client-side callback
+            // prev == next, so "the driver who just got off" was never seen there and the host sat frozen on the seat
+            // until CheckSeat gave up), everybody else in the client one.
+            if (asServer != IsServerStarted) return;
             // Seated bodies don't bump into their own vehicle. Getting off, they stay ghosts to it until they are
             // really clear of the hull, so a hull still drifting (or bobbing on a wave) can't trap, shove or launch
             // them while they swim away.
@@ -381,7 +429,7 @@ namespace PleaseDontDrown.Vehicles
         /// <summary>A back seat changed hands: the same as the driver's seat, without the driving.</summary>
         private void OnRiderChanged(PlayerHub prev, PlayerHub next, bool asServer, int seat)
         {
-            if (asServer && IsClientStarted) return;
+            if (asServer != IsServerStarted) return; // once per machine (see OnDriverChanged)
             if (prev != null && prev != next && !IsAboard(prev)) StartCoroutine(RestoreCollisionWhenClear(prev));
             SetIgnore(next, true);
             PlayerHub local = PlayerHub.Local;
@@ -581,6 +629,8 @@ namespace PleaseDontDrown.Vehicles
             {
                 PlayerHub rider = index == 0 ? _driver.Value : Rider(index - 1);
                 if (rider == null) continue;
+                // Already off on our own machine (ExitNow), the host not caught up yet: not back onto the seat.
+                if (rider == PlayerHub.Local && rider.Motor != null && rider.Motor.Seat != this) continue;
                 Vector3 feet = SeatTransform(index).position - Vector3.up * 0.5f;
                 rider.transform.position = feet;
                 if (rider.TryGetComponent(out Rigidbody body) && body.isKinematic) body.position = feet;
@@ -625,7 +675,7 @@ namespace PleaseDontDrown.Vehicles
             }
 
             float throttle = 0f, steer = 0f;
-            if (driver != null && driver == PlayerHub.Local && driver.IsOwner)
+            if (driver != null && driver == PlayerHub.Local && driver.IsOwner && driver.Motor != null && driver.Motor.Seat == this)
             {
                 Vector2 input = Time.time < _scriptedUntil ? _scriptedInput : GameInput.GameplayActive ? GameInput.Move.ReadValue<Vector2>() : Vector2.zero;
                 throttle = input.y;
@@ -730,9 +780,10 @@ namespace PleaseDontDrown.Vehicles
             }, cheat: true, owner: this);
             DevCommands.Register("getoff", "", "Get off the vehicle you're on, as if pressing Interact (automated tests).", _ =>
             {
-                Vehicle v = SeatOf(PlayerHub.Local);
+                PlayerHub me = PlayerHub.Local;
+                Vehicle v = me != null && me.Motor != null && me.Motor.Seat != null ? me.Motor.Seat : SeatOf(me);
                 if (v == null) throw new System.InvalidOperationException("not on anything");
-                v.ExitServer();
+                v.ExitNow();
             }, cheat: true, owner: this);
             DevCommands.Register("vehicles", "", "List vehicles.", _ =>
             {
@@ -762,19 +813,20 @@ namespace PleaseDontDrown.Vehicles
             }
             // A rider: Interact always means "get off" too.
             PlayerHub me = PlayerHub.Local;
-            if (me != null && me != driver && SeatIndexOf(me) > 0 && GameInput.GameplayActive && GameInput.Interact.WasPressedThisFrame()
-                && Time.time > _nextEnterRequest)
+            if (me != null && me != driver && SeatIndexOf(me) > 0 && me.Motor != null && me.Motor.Seat == this && GameInput.GameplayActive
+                && GameInput.Interact.WasPressedThisFrame() && Time.time > _nextEnterRequest)
             {
                 _nextEnterRequest = Time.time + 0.5f;
-                ExitServer();
+                ExitNow();
             }
             // Our driver: Interact always means "get off" (whatever the crosshair is on).
-            if (driver != null && driver == PlayerHub.Local && GameInput.GameplayActive && GameInput.Interact.WasPressedThisFrame()
-                && Time.time > _nextEnterRequest) // not the same press that just got us on
+            if (driver != null && driver == PlayerHub.Local && driver.Motor != null && driver.Motor.Seat == this && GameInput.GameplayActive
+                && GameInput.Interact.WasPressedThisFrame() && Time.time > _nextEnterRequest) // not the same press that just got us on
             {
                 _nextEnterRequest = Time.time + 0.5f;
-                ExitServer();
+                ExitNow();
             }
+            ResendExitIfIgnored();
             GlueDriver(true);
         }
     }
