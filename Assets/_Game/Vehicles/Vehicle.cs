@@ -359,14 +359,22 @@ namespace PleaseDontDrown.Vehicles
             }
         }
 
-        /// <summary>Off beside the hull, drifting with it a little and a small push away, so we don't start in its path.</summary>
+        /// <summary>
+        /// Off beside the hull, on the side we're looking to: straight into the water at swimming depth (or onto the
+        /// sand, the seabed or a deck), drifting on with it a little and a small push away so we don't start in its
+        /// path. The view glides down from the seat instead of jumping.
+        /// </summary>
         private void LocalGetOff(PlayerHub local, Transform seat)
         {
+            Vector3 eyeBefore = local.Look != null && local.Look.Camera != null ? local.Look.Camera.transform.position : local.Head.position;
             Vector3 feet = ExitPosition(seat);
+            bool inWater = WaterSurface.Exists && WaterSurface.HeightAt(feet) - feet.y > 0.6f;
             Vector3 away = Vector3.ProjectOnPlane(feet - transform.position, Vector3.up);
-            Vector3 drift = _rb != null && !_rb.isKinematic ? Vector3.ProjectOnPlane(_rb.linearVelocity, Vector3.up) * 0.3f : Vector3.zero;
-            Vector3 push = away.sqrMagnitude > 1e-4f ? away.normalized * 1.2f : Vector3.zero;
+            Vector3 drift = _rb != null && !_rb.isKinematic ? Vector3.ProjectOnPlane(_rb.linearVelocity, Vector3.up) * (inWater ? 0.15f : 0.3f) : Vector3.zero;
+            drift = Vector3.ClampMagnitude(drift, 3f);
+            Vector3 push = away.sqrMagnitude > 1e-4f ? away.normalized * (inWater ? 0.8f : 1.2f) : Vector3.zero;
             local.Motor.SetSeat(null, feet, drift + push);
+            if (local.Look != null) local.Look.GlideFrom(eyeBefore);
             PlayerHud.ShowToast($"Off the {_displayName}.", 1.5f);
         }
 
@@ -454,23 +462,51 @@ namespace PleaseDontDrown.Vehicles
             Vector3 forward = Vector3.ProjectOnPlane(seat.forward, Vector3.up).normalized;
             Vector3 start = seat.position + Vector3.up * 0.2f;
             PlayerHub local = PlayerHub.Local;
+            // The side we're looking to first.
+            Transform eye = local != null && local.Look != null && local.Look.Camera != null ? local.Look.Camera.transform : null;
+            Vector3 side = eye != null && Vector3.Dot(eye.forward, right) < 0f ? -right : right;
 
             var candidates = new List<Vector3>
             {
-                start + right * 1.3f, start - right * 1.3f, start - forward * 2.2f, start + forward * 2.4f
+                start + side * 1.3f, start - side * 1.3f, start - forward * 2.2f, start + forward * 2.4f
             };
             foreach (float distance in new[] { 2f, 3f, 4.5f, 6f, 8f })
                 for (int i = 0; i < 12; i++)
-                    candidates.Add(start + Quaternion.Euler(0f, i * 30f, 0f) * right * distance);
+                    candidates.Add(start + Quaternion.Euler(0f, i * 30f, 0f) * side * distance);
 
-            foreach (Vector3 feet in candidates)
+            foreach (Vector3 spot in candidates)
+            {
+                Vector3 feet = Settle(spot, local);
                 if (ExitFree(feet, local))
                     return feet;
+            }
             // Nowhere free at all (packed in by the dock, rocks and people): straight up off the seat. We stay a
             // ghost to this hull until clear of it, so we drop through it into the water and swim out, never stuck.
             Debug.LogWarning($"[Vehicle] no free spot to get off the {_displayName}: dropping through it");
             return seat.position + Vector3.up * 0.3f;
         }
+
+        /// <summary>
+        /// The right height for a spot beside the seat: in deep water, low enough to be swimming straight away (not
+        /// dropped from seat height into it); else standing on whatever is under it (sand, the seabed, a deck).
+        /// </summary>
+        private Vector3 Settle(Vector3 spot, PlayerHub local)
+        {
+            float ground = float.NegativeInfinity;
+            foreach (RaycastHit hit in Physics.RaycastAll(spot + Vector3.up * 1.2f, Vector3.down, 8f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider.transform.IsChildOf(transform)) continue;
+                if (local != null && hit.collider.transform.IsChildOf(local.transform)) continue;
+                if (hit.collider.attachedRigidbody != null && !hit.collider.attachedRigidbody.isKinematic) continue; // a ball, a crate
+                ground = Mathf.Max(ground, hit.point.y);
+            }
+            float water = WaterSurface.Exists ? WaterSurface.HeightAt(spot) : float.NegativeInfinity;
+            if (water > ground + 0.3f) spot.y = Mathf.Max(ground + 0.02f, water - SwimDepth);
+            else if (!float.IsNegativeInfinity(ground)) spot.y = ground + 0.02f;
+            return spot;
+        }
+
+        private const float SwimDepth = 1.35f; // feet this far under the surface: swimming (the motor starts at 1.25)
 
         private bool ExitFree(Vector3 feet, PlayerHub local)
         {
@@ -692,6 +728,12 @@ namespace PleaseDontDrown.Vehicles
                 v._scriptedUntil = Time.time + DevCommands.ParseFloat(args, 0);
                 v._scriptedInput = new Vector2(args.Length > 1 ? DevCommands.ParseFloat(args, 1) : 0f, args.Length > 2 ? DevCommands.ParseFloat(args, 2) : 1f);
             }, cheat: true, owner: this);
+            DevCommands.Register("getoff", "", "Get off the vehicle you're on, as if pressing Interact (automated tests).", _ =>
+            {
+                Vehicle v = SeatOf(PlayerHub.Local);
+                if (v == null) throw new System.InvalidOperationException("not on anything");
+                v.ExitServer();
+            }, cheat: true, owner: this);
             DevCommands.Register("vehicles", "", "List vehicles.", _ =>
             {
                 foreach (Vehicle v in _all)
@@ -703,6 +745,7 @@ namespace PleaseDontDrown.Vehicles
         {
             base.OnStopClient();
             DevCommands.Unregister("drive", this);
+            DevCommands.Unregister("getoff", this);
             DevCommands.Unregister("vehicles", this);
         }
 

@@ -163,6 +163,15 @@ namespace PleaseDontDrown.Player
         private float _kneelReach = 0.55f;
         private Vector3 _viewFrom;
         private int _viewFrame = -10;
+        private Vector3 _glide; // the eye still on its way from where it was (getting off a vehicle), easing to zero
+
+        /// <summary>The eye was just at <paramref name="eyeBefore"/> and the body jumped: glide there instead of cutting.</summary>
+        public void GlideFrom(Vector3 eyeBefore)
+        {
+            if (_camera == null) return;
+            _glide = eyeBefore - _camera.transform.position;
+            if (_glide.sqrMagnitude > 9f) _glide = Vector3.zero; // a long way (a teleport): just cut
+        }
 
         /// <summary>
         /// This frame the eye is at <paramref name="position"/> instead of in our head (still looking where we look):
@@ -297,6 +306,11 @@ namespace PleaseDontDrown.Player
 
             _camera.transform.localPosition = _delayedBob + _head.InverseTransformVector(Vector3.up * (settle - ExtraDrop));
             _camera.transform.localRotation = Quaternion.Euler(_fallTilt, 0f, _roll + ExtraRoll);
+            if (_glide.sqrMagnitude > 1e-6f)
+            {
+                _glide *= Mathf.Exp(-12f * dt);
+                _camera.transform.position += _glide;
+            }
 
             // Kneeling for CPR: the eye goes down beside the chest, on our side of them (the look stays ours).
             _kneel = Mathf.MoveTowards(_kneel, Time.time < _kneelUntil ? 1f : 0f, Time.deltaTime * 3.5f);
