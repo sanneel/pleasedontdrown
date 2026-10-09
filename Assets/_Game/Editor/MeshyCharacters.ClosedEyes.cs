@@ -148,6 +148,31 @@ namespace PleaseDontDrown.Editor
                 }
                 float lineMid = 0.5f * (wx0 + wx1);
                 float lineHalf = Mathf.Clamp(0.5f * (wx1 - wx0) * 1.08f, 0.3f, 0.75f);
+                // Where the lashes end above this eye: over the eye the painting comes in layers, the lashes and
+                // eyeliner low, then bare skin, then the brow (and hair). Everything above the start of that bare
+                // band is kept (a fixed height cut short brows that start low and kept lashes that reach high).
+                var paint = new int[30]; // millimetres over the whites
+                var all = new int[30];
+                foreach (int k in samples)
+                {
+                    if (!OnFace(k)) continue;
+                    float bx = (positions[k].x - o.x) / o.z, by = (positions[k].y - o.y) / o.w;
+                    float h = (by - wyTop) * o.w;
+                    if (Mathf.Abs(bx - lineMid) >= lineHalf || h <= 0f || h >= 0.03f) continue;
+                    int bin = (int)(h / 0.001f);
+                    all[bin]++;
+                    if (Distance(source[k], median) > 0.15f) paint[bin]++;
+                }
+                bool Bare(int bin) => all[bin] > 0 && paint[bin] <= 0.2f * all[bin];
+                // (The widest bare band: a thin one can lie between the whites and the lash line too.)
+                float browCut = 0.012f;
+                int bestRun = 1;
+                for (int bin = 2, run = 0; bin < 30; bin++)
+                {
+                    run = Bare(bin) ? run + 1 : 0;
+                    if (run > bestRun) { bestRun = run; browCut = 0.001f * (bin - run + 2); }
+                }
+                Debug.Log($"[FaceRepair] {file}: eye at x {o.x:F3}: lashes end {browCut * 1000f:F1} mm over the whites");
                 float outer = Mathf.Sign(o.x); // the outer corner is away from the nose
                 foreach (int k in samples)
                 {
@@ -155,17 +180,16 @@ namespace PleaseDontDrown.Editor
                     if (!OnFace(k)) continue;
                     float x = (positions[k].x - o.x) / o.z, y = (positions[k].y - o.y) / o.w;
                     // Long upper lashes reach out of the oval and were left as broken dark strokes over the closed
-                    // lid: dark texels hugging the eye (along it, above its middle, under the brows) go too.
+                    // lid: what isn't skin hugging the eye (along it, above its middle, under the brow) goes too.
                     bool strayLash = q >= 0.92f && q < 2.4f && Mathf.Abs(x - lineMid) < 1.25f * lineHalf && y > wyMid &&
-                        (y - wyTop) * o.w < 0.012f && ((Color)source[k]).grayscale < 0.25f;
+                        (y - wyTop) * o.w < browCut && Distance(color[k], median) > 0.15f;
                     if (q >= 1f && !strayLash) continue;
                     // Outside the eye itself, leave non-skin features (hair, brows) intact.
                     if (!strayLash && q > 0.95f && Distance(color[k], median) > 0.25f) continue;
                     if (!strayLash && hasHair && q > 0.45f && !White(source[k]) && Distance(color[k], hair) < 0.14f && Distance(color[k], median) > 0.18f) continue;
-                    // Up where the brows are (over 12 mm above the whites; the upper lashes and eyeliner, which must
-                    // go, reach 10) only skin is painted: the oval reaches into the brows, and painting their lower
+                    // Up in the brow only skin is painted: the oval reaches into the brows, and painting their lower
                     // half over left square blocks of brow.
-                    if ((y - wyTop) * o.w > 0.012f && Distance(color[k], median) > 0.15f) continue;
+                    if ((y - wyTop) * o.w > browCut && Distance(color[k], median) > 0.15f) continue;
                     Color lid = mean + slopeX*(x-mx) + slopeY*(y-my);
                     float u = (x - lineMid) / lineHalf;
                     float au = Mathf.Abs(u);

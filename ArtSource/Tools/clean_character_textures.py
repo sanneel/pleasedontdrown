@@ -527,7 +527,7 @@ class Cleaner:
 
     def smooth_face(self, lin, name, base_lin=None):
         """The face and neck smooth: where hair meets skin a clean anti-aliased line (no saw teeth of hair in the
-        forehead, pale fringes, blobs of hair colour), specks and blotches off the skin, its noise softened. Only
+        forehead, pale fringes, blobs of hair colour), specks and blotches off the skin, the head a touch sharper. Only
         texels that are skin or hair there; the painted eyes, brows and mouth, sunglasses, hair ties... are kept.
         A look-alike (base_lin: the base's texture) first has its head's skin and hair put right from the base:
         make_variants.py took the skin-coloured rim of the hair for hair and turned it a pale beige, which drew a
@@ -605,13 +605,24 @@ class Cleaner:
         x = lin[idx]
         out = lin.copy()
         res = x.copy()
-        # Skin: specks and blotches go, the rest keeps 40% of its own variation (soft, still shaded).
+        # Skin: specks and blotches go; the rest keeps its own painting (softening it too made the faces blurry).
         on_skin = pure & (ws > 0.98) & ~band
         off = delta_e(to_lab(to_srgb(x)), to_lab(to_srgb(skin_c))) > 7.0
-        res[on_skin] = np.where(off[on_skin, None], skin_c[on_skin], skin_c[on_skin] + 0.4 * (x[on_skin] - skin_c[on_skin]))
+        on_skin &= off
+        res[on_skin] = skin_c[on_skin]
         out[idx] = res
-        self.log(f'[clean]   {name}: face smoothed ({mended} skin/hair texels mended, {on_skin.sum()} skin texels, '
-                 f'{band.sum()} hairline texels), '
+        # The whole head a touch sharper (lashes, brows, lips): its texture is about a millimetre a texel, so close
+        # up (CPR, the kiss of life) it is magnified and soft. An unsharp mask over the surface in 3D, not the atlas,
+        # so it never reaches across a UV seam.
+        tree = cKDTree(self.pc[idx])
+        dist, near = tree.query(self.pc[idx], k=16, distance_upper_bound=0.002, workers=-1)
+        ok = np.isfinite(dist)
+        w = np.where(ok, np.exp(-0.5 * (np.where(ok, dist, 0) / 0.0008) ** 2), 0.0)
+        cur = out[idx]
+        blur = (w[..., None] * cur[np.where(ok, near, 0)]).sum(1) / np.maximum(w.sum(1, keepdims=True), 1e-9)
+        out[idx] = cur + 0.6 * (cur - blur)
+        self.log(f'[clean]   {name}: face smoothed ({mended} skin/hair texels mended, {on_skin.sum()} skin specks, '
+                 f'{band.sum()} hairline texels, sharpened), '
                  f'{time.time() - t0:.0f} s')
         return np.clip(out, 0, 1)
 
