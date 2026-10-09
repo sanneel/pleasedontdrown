@@ -10,6 +10,8 @@ namespace PleaseDontDrown.Audio
         private AudioSource _audio;
         private AudioClip _line;
         private float _gain;
+        // The line being made on a worker thread (played as soon as it's ready, a frame or two later).
+        private System.Threading.Tasks.Task<float[]> _making;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => _local = null;
@@ -56,14 +58,41 @@ namespace PleaseDontDrown.Audio
             Stop();
             if (string.IsNullOrWhiteSpace(text) || SoundSettings.Voice <= 0.001f || Application.isBatchMode) return;
             if (_audio == null) Setup(null);
+            // Nobody near enough to hear it (beach chatter across the island): don't make the sound at all.
+            if (_audio.spatialBlend > 0.5f && Listener() is { } ear &&
+                (ear.position - transform.position).sqrMagnitude > Sq(_audio.maxDistance + 2f)) return;
             _gain = Mathf.Clamp01(gain);
-            _line = SpeechSynth.Line(text, register, pitch);
+            _making = System.Threading.Tasks.Task.Run(() => SoundClip.Master("Dialogue", SpeechSynth.LineSamples(text, register, pitch)));
+            enabled = true;
+        }
+
+        /// <summary>Main thread: the made line becomes a clip and plays.</summary>
+        private void PlayMade()
+        {
+            System.Threading.Tasks.Task<float[]> made = _making;
+            _making = null;
+            if (made.IsFaulted || made.IsCanceled)
+            {
+                Debug.LogWarning($"[Speech] line failed: {made.Exception?.GetBaseException().Message}");
+                Stop();
+                return;
+            }
+            _line = SoundClip.FromMastered("Dialogue", made.Result);
             _audio.clip = _line;
             _audio.pitch = 1f;
             _audio.volume = SoundSettings.Voice * _gain;
             _audio.Play();
-            enabled = true;
         }
+
+        private static AudioListener _listener;
+
+        private static Transform Listener()
+        {
+            if (_listener == null || !_listener.isActiveAndEnabled) _listener = FindAnyObjectByType<AudioListener>();
+            return _listener != null ? _listener.transform : null;
+        }
+
+        private static float Sq(float x) => x * x;
 
         public void Stop()
         {
@@ -73,6 +102,7 @@ namespace PleaseDontDrown.Audio
 
         private void Release()
         {
+            _making = null; // (a line still being made is dropped when it's done)
             if (_audio != null)
             {
                 _audio.Stop();
@@ -87,6 +117,11 @@ namespace PleaseDontDrown.Audio
 
         private void Update()
         {
+            if (_making != null)
+            {
+                if (_making.IsCompleted) PlayMade();
+                return;
+            }
             _audio.volume = SoundSettings.Voice * _gain;
             if (!_audio.isPlaying && !AudioListener.pause) Stop();
         }

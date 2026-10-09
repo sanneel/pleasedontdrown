@@ -15,7 +15,18 @@ namespace PleaseDontDrown.Audio
             return Create(name, samples);
         }
 
-        public static AudioClip Create(string name, float[] samples)
+        public static AudioClip Create(string name, float[] samples) => FromMastered(name, Master(name, samples));
+
+        /// <summary>The finished samples as a clip (main thread only).</summary>
+        public static AudioClip FromMastered(string name, float[] samples)
+        {
+            var clip = AudioClip.Create(name, samples.Length, 1, Rate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        /// <summary>The mastering, in place: pure maths, so it also runs on a worker thread.</summary>
+        public static float[] Master(string name, float[] samples)
         {
             float previous = 0f, dc = 0f, peak = 0f;
             int fade = Mathf.Min(220, samples.Length / 4);
@@ -34,9 +45,7 @@ namespace PleaseDontDrown.Audio
             // Attenuate the entire waveform instead of flattening individual peaks.
             float gain = peak > 0.82f ? 0.82f / peak : 1f;
             for (int i = 0; i < samples.Length; i++) samples[i] *= gain;
-            var clip = AudioClip.Create(name, samples.Length, 1, Rate, false);
-            clip.SetData(samples, 0);
-            return clip;
+            return samples;
         }
     }
 }

@@ -248,8 +248,40 @@ namespace PleaseDontDrown.Avatars
             PoseHead();
             PoseSpecial();
             KeepHandsOutOfHead();
+            KeepHandsOutOfOthers();
             PoseFace();
         }
+
+        /// <summary>
+        /// Never a hand inside somebody else: a punch stops on the face, CPR hands rest on the chest, arms round a
+        /// carried friend's legs hug them instead of passing through. Whatever the pose wanted, a hand that would end
+        /// up inside another character (see <see cref="BodySpace"/>) is moved out to their skin by bending the arm,
+        /// and keeps the way it was turned.
+        /// </summary>
+        private void KeepHandsOutOfOthers()
+        {
+            if (BodySpace.Rigs.Count < 2) return;
+            float s = _rig.Scale;
+            float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+            for (int i = 0; i < 2; i++)
+            {
+                bool right = i == 1;
+                Transform upper = B(right ? Bone.UpperArmR : Bone.UpperArmL), fore = B(right ? Bone.ForearmR : Bone.ForearmL), hand = B(right ? Bone.HandR : Bone.HandL);
+                if (upper == null || fore == null || hand == null) continue;
+                // The middle of the palm (limbs point down their -Y).
+                Vector3 palm = hand.position - hand.up * (_rig.HandLength * 0.5f);
+                Vector3 target = palm;
+                if (!BodySpace.PushOut(ref target, 0.035f * s, _rig, IgnoreBody)) continue;
+                Quaternion turned = hand.rotation;
+                // Bend the elbow the way it already points.
+                Vector3 elbow = fore.position - (upper.position + target) * 0.5f;
+                IK.Solve(upper, fore, la, lb, target, elbow, 1f, false);
+                hand.rotation = turned;
+            }
+        }
+
+        /// <summary>A body this one's hands may be inside of (somebody being carried on the shoulder, held for a kiss...). Null: none.</summary>
+        public AvatarRig IgnoreBody { get; set; }
 
         /// <summary>
         /// A raised hand never goes into the head: the goofy lifeguard's head is as wide as his shoulders and his arms

@@ -67,6 +67,8 @@ namespace PleaseDontDrown.Avatars
         public HandBones RightHand { get; private set; }
         public HandBones Hand(bool right) => right ? RightHand : LeftHand;
         public bool IsBuilt => _built;
+        /// <summary>Goes up with every (re)build (BodySpace re-measures a rebuilt body).</summary>
+        public int BuildVersion { get; private set; }
         /// <summary>Raised after every (re)build, so animators can re-read lengths.</summary>
         public event System.Action Rebuilt;
 
@@ -90,8 +92,12 @@ namespace PleaseDontDrown.Avatars
             if (_buildOnAwake && !_built) Build(Look);
         }
 
+        private void OnEnable() => BodySpace.Add(this);
+        private void OnDisable() => BodySpace.Remove(this);
+
         private void OnDestroy()
         {
+            BodySpace.Forget(_mesh);
             if (_mesh != null) Destroy(_mesh);
         }
 
@@ -181,6 +187,7 @@ namespace PleaseDontDrown.Avatars
             if (GeneratedBody != null) UseBody(GeneratedBody);
             else BuildMesh(look);
             _built = true;
+            BuildVersion++;
             ResetPose();
             // The players' funny body: their own colours, shape, googly eyes and hats (AvatarFunny).
             if (GeneratedBody != null && GeneratedBody.IsFunny) AvatarFunny.Attach(this, GeneratedBody, look);

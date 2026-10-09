@@ -630,6 +630,9 @@ namespace PleaseDontDrown.Player
             // A gun pulls itself back from walls; its hands stay on it.
             bool onGun = state == State.Item && _rigidGrip;
             if (state is not (State.Reach or State.Cpr or State.Punch or State.Breath or State.Slap) && !onGun) palm = KeepOutOfWalls(eye, palm);
+            // Never inside another person, whatever the hand is doing: a punch or a slap lands on the skin, pressing
+            // a chest stays on it, a hand held out stops at whoever stands in front. (Not on a gun: its grip holds the hand.)
+            if (!onGun) BodySpace.PushOut(ref palm, 0.045f, _hub.Avatar != null ? _hub.Avatar.Rig : null);
             hand.Wrist.SetPositionAndRotation(palm - hand.Rot * hand.Bones.PalmContact, hand.Rot);
             hand.Bones.Pose(hand.Pose);
         }
@@ -637,8 +640,9 @@ namespace PleaseDontDrown.Player
         private readonly RaycastHit[] _wallHits = new RaycastHit[8];
 
         /// <summary>
-        /// Standing against a wall (or a counter, a tree), the hands pull back toward the eye so they end at its
-        /// surface instead of sinking into it. Only static things count: held items and bodies are handled by physics.
+        /// Standing against a wall (or a counter, a tree, a parked jet ski, a ball on the sand), the hands pull back
+        /// toward the eye so they end at its surface instead of sinking into it. People are left to BodySpace (their
+        /// colliders are rounder than they are), and our own body, what we hold and what we ride never count.
         /// </summary>
         private Vector3 KeepOutOfWalls(Vector3 eye, Vector3 palm)
         {
@@ -652,11 +656,26 @@ namespace PleaseDontDrown.Player
             for (int i = 0; i < count; i++)
             {
                 RaycastHit h = _wallHits[i];
-                if (h.distance <= 0f || h.collider.attachedRigidbody != null) continue;
+                if (h.distance <= 0f || !Solid(h.collider.attachedRigidbody)) continue;
                 nearest = Mathf.Min(nearest, h.distance);
             }
             if (nearest >= distance + fingers) return palm;
             return eye + dir * Mathf.Max(0.12f, nearest - fingers);
+        }
+
+        private readonly Dictionary<Rigidbody, bool> _personBodies = new();
+
+        /// <summary>Does this moving thing stop our hands? (Null: a static collider, which always does.)</summary>
+        private bool Solid(Rigidbody body)
+        {
+            if (body == null) return true;
+            if (!_personBodies.TryGetValue(body, out bool person))
+                _personBodies[body] = person = body.GetComponentInParent<PlayerHub>() != null || body.GetComponent<Story.StoryNpc>() != null ||
+                                               body.GetComponentInParent<Rescue.VictimBody>() != null || body.GetComponent<Rescue.VictimBrain>() != null;
+            if (person) return false;
+            if (body.TryGetComponent(out Item item) && (item.Holder == _hub || body.linearVelocity.sqrMagnitude > 1f)) return false; // ours, or flying past
+            if (Vehicles.Vehicle.RideOf(_hub) is { } ride && body.transform.IsChildOf(ride.transform)) return false;
+            return true;
         }
 
         private Vector3 FrameForward => Quaternion.Euler(0f, _frameYaw, 0f) * Vector3.forward;

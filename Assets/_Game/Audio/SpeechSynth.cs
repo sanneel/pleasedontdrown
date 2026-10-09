@@ -21,9 +21,45 @@ namespace PleaseDontDrown.Audio
         private static readonly float[] F2 = { 1250f, 1850f, 2250f, 900f, 820f };
 
         private static AudioClip[] _clips;
+        // The raw samples of every syllable, worked out on a worker thread at start (a line is mixed from these;
+        // synthesizing them on the spot cost a hitch every time somebody new spoke).
+        private static float[][] _samples;
+        private static System.Threading.Tasks.Task _warming;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => _clips = null;
+        private static void ResetStatics()
+        {
+            _clips = null;
+            _samples = null;
+            _warming = null;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void Warm()
+        {
+            if (Application.isBatchMode) return; // (batch runs never speak)
+            var samples = new float[Registers * Vowels * 2][];
+            _samples = samples;
+            _warming = System.Threading.Tasks.Task.Run(() =>
+            {
+                for (int i = 0; i < samples.Length; i++)
+                    if (samples[i] == null) samples[i] = Samples(i / 2 / Vowels, i / 2 % Vowels, (i & 1) == 1);
+            });
+        }
+
+        private static int IndexOf(int register, int vowel, bool hard) =>
+            (Mathf.Clamp(register, 0, Registers - 1) * Vowels + Mathf.Clamp(vowel, 0, Vowels - 1)) * 2 + (hard ? 1 : 0);
+
+        /// <summary>A syllable's samples (shared: don't write to them).</summary>
+        private static float[] SyllableSamples(int register, int vowel, bool hard)
+        {
+            _samples ??= new float[Registers * Vowels * 2][];
+            int index = IndexOf(register, vowel, hard);
+            float[] data = _samples[index];
+            if (data != null) return data;
+            if (_warming != null && !_warming.IsCompleted) _warming.Wait(); // nearly done by the time anybody talks
+            return _samples[index] ??= Samples(Mathf.Clamp(register, 0, Registers - 1), Mathf.Clamp(vowel, 0, Vowels - 1), hard);
+        }
 
         /// <summary>The vowel a letter stands for (0..4), or -1.</summary>
         public static int VowelOf(char c) => c switch
@@ -35,14 +71,14 @@ namespace PleaseDontDrown.Audio
         public static AudioClip Syllable(int register, int vowel, bool hard)
         {
             _clips ??= new AudioClip[Registers * Vowels * 2];
-            register = Mathf.Clamp(register, 0, Registers - 1);
-            vowel = Mathf.Clamp(vowel, 0, Vowels - 1);
-            int index = (register * Vowels + vowel) * 2 + (hard ? 1 : 0);
+            int index = IndexOf(register, vowel, hard);
             if (_clips[index] != null) return _clips[index]; // explicit: Unity can unload a clip behind a "??="
-            return _clips[index] = Build(register, vowel, hard);
+            float[] data = (float[])SyllableSamples(register, vowel, hard).Clone(); // (SoundClip.Create filters in place)
+            return _clips[index] = SoundClip.Create($"Syllable{Mathf.Clamp(register, 0, Registers - 1)}_{Mathf.Clamp(vowel, 0, Vowels - 1)}{(hard ? "h" : "")}", data);
         }
 
-        private static AudioClip Build(int register, int vowel, bool hard)
+        /// <summary>Pure maths (no Unity objects): safe on a worker thread.</summary>
+        private static float[] Samples(int register, int vowel, bool hard)
         {
             int count = Mathf.CeilToInt(Seconds * Rate);
             var data = new float[count];
@@ -83,16 +119,25 @@ namespace PleaseDontDrown.Audio
             // Every voice and vowel equally loud (a deep voice has more harmonics under the same resonances).
             float level = 0.36f / Mathf.Max(loudest, 1e-4f);
             for (int i = 0; i < count; i++) data[i] *= level;
-            return SoundClip.Create($"Syllable{register}_{vowel}{(hard ? "h" : "")}", data);
+            return data;
         }
 
         /// <summary>Pitch and timing belong to each syllable, never to overlapping sources.</summary>
-        public static AudioClip Line(string text, int register, float pitch = 1f)
+        public static AudioClip Line(string text, int register, float pitch = 1f) =>
+            SoundClip.Create("Dialogue" + register, LineSamples(text, register, pitch));
+
+        /// <summary>
+        /// A line's samples, not yet mastered. Pure maths (no Unity objects), so a line can be made on a worker
+        /// thread: made on the spot, a long line froze the game for a moment every time somebody spoke.
+        /// </summary>
+        public static float[] LineSamples(string text, int register, float pitch = 1f)
         {
             text = System.Text.RegularExpressions.Regex.Replace(text ?? string.Empty, "<[^>]*>", string.Empty);
             pitch = Mathf.Clamp(pitch, 0.65f, 1.5f);
             bool question = text.TrimEnd().EndsWith("?");
-            var samples = new System.Collections.Generic.List<float>();
+            // (Sized generously up front: growing a list a sample at a time was a big part of each line's cost.)
+            var samples = new float[Mathf.CeilToInt((0.3f + text.Length * 0.25f / pitch) * Rate)];
+            int used = 0;
             float at = 0.035f, voiceEnd = 0f;
             bool consonant = false, previousVowel = false;
             for (int i = 0; i < text.Length; i++)
@@ -106,11 +151,10 @@ namespace PleaseDontDrown.Audio
                     float progress = i / (float)Mathf.Max(1, text.Length - 1);
                     float contour = question ? Mathf.Lerp(0.98f, 1.07f, progress * progress) : Mathf.Lerp(1.025f, 0.96f, progress);
                     float rate = pitch * variation * contour;
-                    AudioClip syllable = Syllable(register, vowel, consonant);
-                    var source = new float[syllable.samples];
-                    syllable.GetData(source, 0);
+                    float[] source = SyllableSamples(register, vowel, consonant);
                     int start = Mathf.RoundToInt(at * Rate), count = Mathf.CeilToInt(source.Length / rate);
-                    while (samples.Count < start + count) samples.Add(0f);
+                    if (start + count > samples.Length) System.Array.Resize(ref samples, (start + count) * 2);
+                    used = Mathf.Max(used, start + count);
                     float gain = 0.77f + ((i * 17) % 5) * 0.025f;
                     for (int s = 0; s < count; s++)
                     {
@@ -133,8 +177,9 @@ namespace PleaseDontDrown.Audio
                     at = Mathf.Max(at, voiceEnd) + (c is '.' or '!' or '?' ? 0.23f : c is ',' or ';' or ':' ? 0.13f : 0.05f);
                 }
             }
-            while (samples.Count < Mathf.CeilToInt((Mathf.Max(at, voiceEnd) + 0.04f) * Rate)) samples.Add(0f);
-            return SoundClip.Create("Dialogue" + register, samples.ToArray());
+            int length = Mathf.Max(used, Mathf.CeilToInt((Mathf.Max(at, voiceEnd) + 0.04f) * Rate));
+            if (length != samples.Length) System.Array.Resize(ref samples, length);
+            return samples;
         }
 
         private static float Sq(float x) => x * x;
