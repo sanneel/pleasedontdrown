@@ -23,13 +23,19 @@ namespace PleaseDontDrown.Fun
         [SerializeField] private float _ropeLength = 6f;
 
         public const string TugName = "Lifeguard Jet Ski";
-        private const float FlingSpeed = 6f, FlingTurn = 55f; // m/s and degrees a second
+        // Only a really big swing throws the riders off: the jet ski towing it swung FlingSweep degrees round within
+        // FlingWindow seconds (a full turnaround) while the banana goes faster than FlingSpeed m/s. A quick jink or an
+        // ordinary hard turn doesn't (it used to, on every turn: a 1.2 s turn at full lock swings it ~90 degrees). (The jet
+        // ski's heading, not the banana's: lagging on its rope, the banana's own swing is small and wobbly.)
+        private const float FlingSpeed = 6f, FlingSweep = 170f, FlingWindow = 4f;
 
         private readonly SyncVar<NetworkObject> _towedBy = new SyncVar<NetworkObject>();
         private Rigidbody _body;
         private float _nextThink, _nextFling, _unmannedSince = -1f;
         private Vector3 _lastPos;
         private float _lastYaw, _speed, _yawRate;
+        private float _turnedTotal, _lastTugYaw = float.NaN; // the jet ski's heading, unwrapped (degrees)
+        private readonly System.Collections.Generic.Queue<(float time, float turned)> _headings = new();
 
         private void Awake() => _body = GetComponent<Rigidbody>();
 
@@ -86,16 +92,38 @@ namespace PleaseDontDrown.Fun
             Vector3 p = transform.position;
             _speed = Mathf.Lerp(_speed, new Vector2(p.x - _lastPos.x, p.z - _lastPos.z).magnitude / dt, 0.2f);
             float yaw = transform.eulerAngles.y;
-            _yawRate = Mathf.Lerp(_yawRate, Mathf.DeltaAngle(_lastYaw, yaw) / dt, 0.2f);
+            float turned = Mathf.DeltaAngle(_lastYaw, yaw);
+            _yawRate = Mathf.Lerp(_yawRate, turned / dt, 0.2f);
+            // How far round the jet ski has swung in the last few seconds (the biggest swing either way in the window).
+            Vehicle towing = Tug;
+            float tugYaw = towing != null ? towing.transform.eulerAngles.y : float.NaN;
+            float tugTurned = towing != null && !float.IsNaN(_lastTugYaw) ? Mathf.DeltaAngle(_lastTugYaw, tugYaw) : 0f;
+            _lastTugYaw = tugYaw;
+            if (towing == null || Mathf.Abs(tugTurned) > 30f) // not towed, or snapped round (put back on the water): not a turn
+            {
+                tugTurned = 0f;
+                _headings.Clear();
+            }
+            _turnedTotal += tugTurned;
+            _headings.Enqueue((Time.time, _turnedTotal));
+            while (_headings.Count > 0 && Time.time - _headings.Peek().time > FlingWindow) _headings.Dequeue();
+            float lowest = _turnedTotal, highest = _turnedTotal;
+            foreach ((float _, float t) in _headings)
+            {
+                lowest = Mathf.Min(lowest, t);
+                highest = Mathf.Max(highest, t);
+            }
+            float sweep = highest - lowest;
             _lastPos = p;
             _lastYaw = yaw;
 
-            // Too sharp a turn too fast: everyone on the banana goes flying (the back riders furthest: they're
-            // on the end of the whip).
+            // Swung right round at speed: everyone on the banana goes flying (the back riders furthest: they're on
+            // the end of the whip).
             var riders = _vehicle != null ? _vehicle.Aboard() : null;
-            if (riders != null && riders.Count > 0 && _speed > FlingSpeed && Mathf.Abs(_yawRate) > FlingTurn && Time.time > _nextFling)
+            if (riders != null && riders.Count > 0 && sweep >= FlingSweep && _speed > FlingSpeed && Time.time > _nextFling)
             {
                 _nextFling = Time.time + 4f;
+                _headings.Clear();
                 Vector3 outward = -transform.right * Mathf.Sign(_yawRate);
                 for (int i = 0; i < riders.Count; i++)
                 {
@@ -104,7 +132,7 @@ namespace PleaseDontDrown.Fun
                     else _vehicle.ServerKickRider(rider);
                     FlingTarget(rider.Owner, outward * (6f + i * 1.5f) + Vector3.up * (5f + i));
                     FlungObservers(rider.DisplayName, p + Vector3.up);
-                    Debug.Log($"[Banana] {rider.DisplayName} flung off at {_speed:F1} m/s, turning {_yawRate:F0} deg/s");
+                    Debug.Log($"[Banana] {rider.DisplayName} flung off at {_speed:F1} m/s, turning {_yawRate:F0} deg/s, swung {sweep:F0} deg round in {FlingWindow:F0} s");
                 }
             }
 
