@@ -157,12 +157,29 @@ namespace PleaseDontDrown.Rescue
             BoneWeight[] weights = skin.sharedMesh.boneWeights;
             Transform[] bones = skin.bones;
             Matrix4x4 toWorld = skin.transform.localToWorldMatrix;
+            // Women: the hands go on the lower breastbone, under the bust. Pressing between the breasts, the
+            // rescuer's hands covered them and the bounce of each compression couldn't be seen.
+            Transform bustL = _avatar[AvatarRig.Bone.BustL], bustR = _avatar[AvatarRig.Bone.BustR];
+            bool feminine = _avatar.Look.Feminine && bustL != null && bustR != null;
+            float bustLow = float.MaxValue;
+            if (feminine)
+                for (int i = 0; i < vertices.Length && i < weights.Length; i++)
+                {
+                    BoneWeight w = weights[i];
+                    if (w.weight0 < 0.5f || w.boneIndex0 >= bones.Length) continue;
+                    Transform owner = bones[w.boneIndex0];
+                    if (owner != bustL && owner != bustR) continue;
+                    Vector3 d = toWorld.MultiplyPoint3x4(vertices[i]) - bone;
+                    if (Vector3.Dot(d, front) > 0.02f * s) bustLow = Mathf.Min(bustLow, Vector3.Dot(d, along));
+                }
+            // The hands lie across the body and are some 14 cm wide along it: their middle 6 cm under the bust's lower edge.
+            float down = feminine && bustLow < 0.15f * s && bustLow > -0.25f * s ? Mathf.Max(0f, 0.06f * s - bustLow) : 0f;
             float depth = float.MinValue, half = 0f;
             for (int i = 0; i < vertices.Length; i++)
             {
                 Vector3 d = toWorld.MultiplyPoint3x4(vertices[i]) - bone;
                 float a = Vector3.Dot(d, along), f = Vector3.Dot(d, front), x = Vector3.Dot(d, side);
-                if (Mathf.Abs(a) < 0.05f * s && Mathf.Abs(x) < 0.035f * s) depth = Mathf.Max(depth, f);
+                if (Mathf.Abs(a + down) < 0.03f * s && Mathf.Abs(x) < 0.035f * s) depth = Mathf.Max(depth, f);
                 // The torso's own skin (not the arms lying beside it), from the hips up to the chest.
                 if (i < weights.Length && a > -0.45f * s && a < 0.1f * s)
                 {
@@ -172,9 +189,11 @@ namespace PleaseDontDrown.Rescue
                 }
             }
             if (Application.isPlaying) Destroy(baked); else DestroyImmediate(baked);
-            if (depth > 0.04f * s && depth < 0.6f * s) _chestSkinLocal = chest.InverseTransformPoint(bone + front * (depth + 0.01f * s));
+            Vector3 at = bone - along * down;
+            // (Under the bust the belly lies lower than the chest: its skin may be only a centimetre in front of the bone.)
+            if (depth > (down > 0f ? -0.04f : 0.04f) * s && depth < 0.6f * s) _chestSkinLocal = chest.InverseTransformPoint(at + front * (depth + 0.01f * s));
             if (half > 0.08f * s && half < 0.8f * s) _chestHalfWidth = half;
-            Debug.Log($"[Victim] {name}: chest skin {depth * 100f:F1} cm out from the bones, torso {half * 200f:F0} cm wide");
+            Debug.Log($"[Victim] {name}: chest skin {depth * 100f:F1} cm out from the bones{(down > 0f ? $", {down * 100f:F0} cm down, under the bust" : "")}, torso {half * 200f:F0} cm wide");
         }
         /// <summary>
         /// Where a rescuer kneels beside them: level with a point some 40% of the way from the chest to the head, from

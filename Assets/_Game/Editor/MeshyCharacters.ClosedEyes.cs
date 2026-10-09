@@ -125,25 +125,67 @@ namespace PleaseDontDrown.Editor
                     slopeX[channel] = Mathf.Clamp(slopeX[channel], -0.08f, 0.08f);
                     slopeY[channel] = Mathf.Clamp(slopeY[channel], -0.08f, 0.08f);
                 }
+                // Hair that reaches into the oval (the temples, a fringe): its colour, from the ring's non-skin texels.
+                // The lid is never painted over it (skin cut wedges into the hair at the temples).
+                var hairRing = samples.Where(k => frontFacing[k] && Radius(k) > 0.85f && Radius(k) < 2.3f && OnFace(k) &&
+                    Distance(source[k], skin) > 0.25f && !White(source[k]) && ((Color)source[k]).grayscale > 0.1f).ToArray();
+                bool hasHair = hairRing.Length >= 30;
+                Color hair = hasHair
+                    ? new Color(Median(hairRing.Select(k => color[k].r)), Median(hairRing.Select(k => color[k].g)), Median(hairRing.Select(k => color[k].b)))
+                    : Color.clear;
+
+                // The closed lid's line: as long as the painted eye itself (its whites), not the whole box round the
+                // lashes (a 5 cm cut across the face), a little below its middle and sagging like a relaxed lid.
+                float wx0 = -0.55f, wx1 = 0.55f, wyMid = 0f, wyTop = 0.35f;
+                if (whites.Length >= 8)
+                {
+                    var wx = whites.Select(k => (positions[k].x - o.x) / o.z).OrderBy(v => v).ToList();
+                    var wy = whites.Select(k => (positions[k].y - o.y) / o.w).OrderBy(v => v).ToList();
+                    wx0 = wx[Mathf.FloorToInt(0.03f * (wx.Count - 1))];
+                    wx1 = wx[Mathf.CeilToInt(0.97f * (wx.Count - 1))];
+                    wyMid = wy[wy.Count / 2];
+                    wyTop = wy[Mathf.CeilToInt(0.97f * (wy.Count - 1))];
+                }
+                float lineMid = 0.5f * (wx0 + wx1);
+                float lineHalf = Mathf.Clamp(0.5f * (wx1 - wx0) * 1.08f, 0.3f, 0.75f);
+                float outer = Mathf.Sign(o.x); // the outer corner is away from the nose
                 foreach (int k in samples)
                 {
                     float q = Radius(k);
-                    if (q >= 1f || !OnFace(k)) continue;
+                    if (!OnFace(k)) continue;
                     float x = (positions[k].x - o.x) / o.z, y = (positions[k].y - o.y) / o.w;
+                    // Long upper lashes reach out of the oval and were left as broken dark strokes over the closed
+                    // lid: dark texels hugging the eye (along it, above its middle, under the brows) go too.
+                    bool strayLash = q >= 0.92f && q < 2.4f && Mathf.Abs(x - lineMid) < 1.25f * lineHalf && y > wyMid &&
+                        (y - wyTop) * o.w < 0.012f && ((Color)source[k]).grayscale < 0.25f;
+                    if (q >= 1f && !strayLash) continue;
                     // Outside the eye itself, leave non-skin features (hair, brows) intact.
-                    if (q > 0.95f && Distance(color[k], median) > 0.25f) continue;
+                    if (!strayLash && q > 0.95f && Distance(color[k], median) > 0.25f) continue;
+                    if (!strayLash && hasHair && q > 0.45f && !White(source[k]) && Distance(color[k], hair) < 0.14f && Distance(color[k], median) > 0.18f) continue;
+                    // Up where the brows are (over 12 mm above the whites; the upper lashes and eyeliner, which must
+                    // go, reach 10) only skin is painted: the oval reaches into the brows, and painting their lower
+                    // half over left square blocks of brow.
+                    if ((y - wyTop) * o.w > 0.012f && Distance(color[k], median) > 0.15f) continue;
                     Color lid = mean + slopeX*(x-mx) + slopeY*(y-my);
-                    float u = x / 0.77f;
-                    float curve = -(0.08f + 0.25f*(1f-u*u));
-                    float d = y-curve;
-                    float thick = 0.065f*Mathf.Sqrt(Mathf.Max(0f, 1f-u*u)) + 0.008f;
-                    float stroke = Mathf.Abs(u) < 1f ? (1f-Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(thick*0.35f, thick, Mathf.Abs(d)))) *
-                        Mathf.SmoothStep(0f, 1f, (1f-Mathf.Abs(u))/0.10f) : 0f;
-                    float shadow = d > 0f ? Mathf.Exp(-d*d/0.13f)*Mathf.Max(0,1f-u*u)*0.035f : 0f;
-                    lid *= 1f-shadow;
-                    lid = Color.Lerp(lid, lash, stroke);
+                    float u = (x - lineMid) / lineHalf;
+                    float au = Mathf.Abs(u);
+                    // In metres, then into the oval's units: up to 1.8 mm thick in the middle, tapering to a point.
+                    float curve = wyMid - 0.12f - 0.2f * Mathf.Max(0f, 1f - u * u);
+                    float d = (y - curve) * o.w;
+                    float thick = au < 1f ? 0.0009f * Mathf.Sqrt(1f - u * u) + 0.00025f : 0f;
+                    // The outer end flicks up a touch into a short lash, like a sleeping cartoon eye.
+                    if (u * outer > 0.55f && au < 1.12f) d -= (au - 0.55f) * (au - 0.55f) * 0.012f;
+                    float along = Mathf.SmoothStep(0f, 1f, (1.12f - au) / 0.18f);
+                    float stroke = !strayLash && (thick > 0f || au < 1.12f)
+                        ? (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(Mathf.Max(thick, 0.00025f) * 0.45f, Mathf.Max(thick, 0.00025f) * 1.25f, Mathf.Abs(d)))) * along
+                        : 0f;
+                    // A soft crease of the lid above the line, and the lid itself a shade darker than the cheek.
+                    float above = Mathf.Max(0f, d);
+                    float shade = au < 1.1f ? Mathf.Exp(-above * above / (0.004f * 0.004f)) * (1f - Mathf.Min(1f, au) * 0.5f) * 0.07f : 0f;
+                    lid *= 1f - shade;
+                    lid = Color.Lerp(lid, Color.Lerp(lash, mean, 0.12f), stroke);
                     lid.a = 1f;
-                    float blend = 1f-Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.92f, 1f, q));
+                    float blend = strayLash ? 1f : 1f-Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.92f, 1f, q));
                     color[k] = Color.Lerp(color[k], lid, blend);
                     painted[k] = true;
                 }
