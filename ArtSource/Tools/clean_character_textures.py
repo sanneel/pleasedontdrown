@@ -259,6 +259,7 @@ class Cleaner:
         self.shape = (H, W)
         cov, pos, nrm, tid = rasterize(UV, P, N, T, W, H)
         isl = island_ids(tid, T, UV)
+        self.isl = isl
         edge = np.zeros((H, W), bool)
         for dy, dx in ((0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (-1, -1), (1, -1), (-1, 1)):
             edge |= np.roll(np.roll(isl, dy, 0), dx, 1) != isl
@@ -353,11 +354,16 @@ class Cleaner:
                 dist, _ = cKDTree(pc[w]).query(pc[cand], distance_upper_bound=0.011)
                 self.eye_paint[cand[np.isfinite(dist)]] = True
             self.eye_paint &= delta_e(lab, skin_lab) > 12.0
+            # The eye's opening by distance alone: within 8 mm of its whites in 3D, facing forward. The iris's lower
+            # crescent and the lashes' tips reach past the box above (3-7 mm from the whites); hair is 16 mm or more
+            # away, the brows over 12 mm above.
+            near_whites = cKDTree(pc[whites]).query(pc, distance_upper_bound=0.008)[0] < 0.008
+            self.eye_open = eye & near_whites & (nc[:, 2] > 0.2) & (delta_e(lab, skin_lab) > 12.0)
             self.iris_shade = np.clip(luminance(to_linear(base)) / 0.12, 0.15, 1.6)
         else:
             self.hair_mat = -1
             self.iris_region = np.zeros(len(label), bool)
-            self.eye_paint = self.iris_region
+            self.eye_paint = self.eye_open = self.iris_region
         log(f'[clean] {os.path.basename(base_path)}: {W}x{H}, {materials} materials, '
             f'{"eyes found" if face is not None else "NO EYES FOUND"}, {time.time() - t0:.0f} s')
 
@@ -523,6 +529,66 @@ class Cleaner:
         self.log(f'[clean]   {name}: repainted from the base {100 * use.mean():.2f}% + {100 * mixed.mean():.2f}% '
                  f'unmixed borders; '
                  f'(fit dE median/p90 per material {" ".join(notes)}), {time.time() - t0:.0f} s')
+        # The painted eyes rebuilt from the base's: make_variants.py only gave them a new iris colour (iris colour x
+        # the base's brightness, over everything dark and not skin in the eye: iris, pupil, lashes), but its masks
+        # left the eyes ragged (hair colour in the iris, half-recoloured lashes), which crisp edges show. Whites and
+        # the rest from the base as they are; the eye's skin stays the look-alike's.
+        if self.face is not None:
+            iris_mat = self.materials - 1
+            painted = self.eye & (self.label == iris_mat)
+            whites = self.eye & (self.label == self.materials - 2)
+            region = self.iris_region & self.trusted
+            hair = np.median(own[(self.label == self.hair_mat) & self.trusted], axis=0) if self.hair_mat >= 0 else None
+            if region.sum() > 50:
+                ratio = own[region] / self.iris_shade[region, None]
+                if hair is not None:
+                    ratio = ratio[delta_e(to_lab(to_srgb(own[region])), to_lab(to_srgb(hair[None]))) > 18.0]
+                if len(ratio) > 30:
+                    k = np.median(ratio, axis=0)
+                    # Everything of the eye that isn't its white or iris (lashes, pupil, eyeliner, the skin between
+                    # them and their soft edges): the base's, in the look-alike's skin tone (black stays black).
+                    skin = (self.label == self.skin_mat) & self.trusted & (self.mouth | self.brow)
+                    tone = np.median(own[skin], axis=0) / np.maximum(np.median(base_clean_lin[skin], axis=0), 1e-4)
+                    # (Not hair reaching the outer corner: the base's hair isn't the look-alike's.)
+                    base_lab = to_lab(self.base_srgb)
+                    hair_lab = base_lab[(self.label == self.hair_mat) & self.trusted].mean(0) if self.hair_mat >= 0 else np.full(3, 1e3)
+                    # (Inside the eye's opening nothing is hair: the red base's lower iris is her hair's brown, and
+                    # left as the look-alike's own it showed as orange specks and torn rims in the eye.)
+                    opening = self.eye_paint | self.eye_open
+                    hairish = ((self.label == self.hair_mat) | (delta_e(base_lab, hair_lab) < 20.0)) & ~opening
+                    rest = self.eye & ~whites & ~hairish
+                    out[rest] = np.clip(base_clean_lin[rest] * tone[None], 0, 1)
+                    # The iris (not the near-black lashes and pupil, and only in the eye's opening).
+                    # (Coloured in the base: the eyeliner's wing at the outer corner is as light as an iris there,
+                    # but grey.)
+                    chroma = np.hypot(base_lab[:, 1], base_lab[:, 2])
+                    iris = opening & painted & (luminance(base_clean_lin) > 0.02) & (chroma > 12.0)
+                    # (And inside the iris's disc: the whites' bluish shading round their rim is coloured too. Its
+                    # middle is the densest coloured patch by the eye; these cartoon eyes glance sideways.)
+                    disc = np.zeros(len(iris), bool)
+                    for c in self.face['eyes']:
+                        cand = np.nonzero(iris & (np.hypot(self.pc[:, 0] - c[0], self.pc[:, 1] - c[1]) < 0.025))[0]
+                        if len(cand) < 30:
+                            continue
+                        xy = self.pc[cand, :2]
+                        density = np.array([len(n) for n in cKDTree(xy).query_ball_point(xy, 0.003)])
+                        centre = xy[density.argmax()]
+                        d = np.hypot(*(xy - centre).T)
+                        r = min(0.0075, np.percentile(d[d < 0.009], 90))
+                        disc[cand[d < r]] = True
+                    iris &= disc
+                    # Iris colour the recolour spilt outside the iris, near the eyes (blue blots at a corner): back
+                    # to the base's painting in the look-alike's skin tone, wherever the base isn't iris.
+                    near_eyes = np.zeros(len(iris), bool)
+                    for c in self.face['eyes']:
+                        near_eyes |= np.hypot(self.pc[:, 0] - c[0], self.pc[:, 1] - c[1]) < 0.035
+                    own_lab = to_lab(to_srgb(own))
+                    as_iris = delta_e(own_lab, to_lab(to_srgb(np.clip(k[None] * self.iris_shade[:, None], 0, 1)))) < 12.0
+                    as_base = delta_e(own_lab, to_lab(to_srgb(np.clip(base_clean_lin * tone[None], 0, 1)))) < 15.0
+                    spilt = near_eyes & ~iris & ~whites & ~hairish & as_iris & ~as_base & (self.nc[:, 2] > 0.2)
+                    out[spilt] = np.clip(base_clean_lin[spilt] * tone[None], 0, 1)
+                    out[iris] = np.clip(k[None] * self.iris_shade[iris, None], 0, 1)
+                    out[whites] = base_clean_lin[whites]
         return out
 
     def smooth_face(self, lin, name, base_lin=None):
@@ -546,7 +612,9 @@ class Cleaner:
         lab_h = b_lab[self.label[idx] == self.hair_mat].mean(0)
         d = lab_h - lab_s
         t = np.clip(((b_lab - lab_s) * d).sum(1) / (d * d).sum(), 0, 1)
-        off_line = delta_e(b_lab, lab_s + t[:, None] * d) > 12.0
+        # (Looser in the brows: their reddish dark outline is off the line, and left as the look-alike's own it stayed
+        # as dark specks round a light-haired look-alike's rebuilt brows.)
+        off_line = delta_e(b_lab, lab_s + t[:, None] * d) > np.where(self.brow[idx], 25.0, 12.0)
         kind = np.where(off_line, 2, np.where(t < 0.5, 0, 1))
         field = Field(self.pc[idx], self.nc[idx], kind, 3, 0.0025, k=30)
         share, _ = field.shares(self.pc[idx], self.nc[idx])
@@ -611,20 +679,17 @@ class Cleaner:
         on_skin &= off
         res[on_skin] = skin_c[on_skin]
         out[idx] = res
-        # The whole head a touch sharper (lashes, brows, lips): its texture is about a millimetre a texel, so close
-        # up (CPR, the kiss of life) it is magnified and soft. An unsharp mask over the surface in 3D, not the atlas,
-        # so it never reaches across a UV seam.
-        tree = cKDTree(self.pc[idx])
-        dist, near = tree.query(self.pc[idx], k=16, distance_upper_bound=0.002, workers=-1)
-        ok = np.isfinite(dist)
-        w = np.where(ok, np.exp(-0.5 * (np.where(ok, dist, 0) / 0.0008) ** 2), 0.0)
-        cur = out[idx]
-        blur = (w[..., None] * cur[np.where(ok, near, 0)]).sum(1) / np.maximum(w.sum(1, keepdims=True), 1e-9)
-        out[idx] = cur + 0.6 * (cur - blur)
         self.log(f'[clean]   {name}: face smoothed ({mended} skin/hair texels mended, {on_skin.sum()} skin specks, '
-                 f'{band.sum()} hairline texels, sharpened), '
+                 f'{band.sum()} hairline texels), '
                  f'{time.time() - t0:.0f} s')
         return np.clip(out, 0, 1)
+
+    def features_mask(self):
+        """The painted eyes, brows and mouth (a little round them), per atlas texel: what the upscale makes crisp."""
+        H, W = self.shape
+        m = np.zeros((H, W), bool)
+        m[self.cov] = self.eye | self.brow | self.mouth
+        return ndimage.binary_dilation(m, iterations=3)
 
     def image(self, lin_cov):
         H, W = self.shape
@@ -632,6 +697,41 @@ class Cleaner:
         out[self.cov] = to_srgb(lin_cov)
         iy, ix = self.pad
         return out[iy, ix]
+
+
+def upscale_inked(rgb, isl, features, scale=2):
+    """The atlas at twice the resolution with its painted edges redrawn crisp at that resolution: Meshy's 2048 gives
+    the face only ~2 texels a millimetre, so close up (CPR, the kiss of life) the game magnifies it 2-3 times and
+    every edge goes soft. Smooth upscale (bicubic), then a shock filter: each pixel near an edge takes the colour of
+    the darker or the lighter side round it, whichever it is nearer (cartoon painting is flat colours with inked
+    edges, so this adds the crispness a bigger texture would have had; it adds no other detail). Only in the painted
+    eyes, brows and mouth (features: per texel) and only on strong edges: everywhere else (stubble, a moustache, the
+    hairline, the nose) it drew dots, ragged edges and outlines."""
+    from PIL import Image
+    H, W = rgb.shape[:2]
+    big = np.asarray(Image.fromarray(np.clip(rgb * 255 + 0.5, 0, 255).astype(np.uint8)).resize(
+        (W * scale, H * scale), Image.BICUBIC)).astype(np.float64) / 255.0
+    # Only where the whole window lies in one UV island (isl: island id per texel, -1 empty): across a seam the
+    # darkest and lightest colours round a pixel belong to another part of the body, which drew outlines along
+    # every seam and round the face.
+    isl_big = np.kron(isl, np.ones((scale, scale), isl.dtype))
+    size = 2 * scale + 1
+    same = (ndimage.minimum_filter(isl_big, size) == ndimage.maximum_filter(isl_big, size)) & (isl_big >= 0)
+    same &= np.kron(features, np.ones((scale, scale), bool))
+    for _ in range(1):
+        lum = big @ np.array([0.299, 0.587, 0.114])
+        lo = ndimage.minimum_filter(lum, size)
+        hi = ndimage.maximum_filter(lum, size)
+        # The colour of the darkest and lightest pixel round each one.
+        dark = np.stack([ndimage.minimum_filter(big[..., c], size) for c in range(3)], -1)
+        light = np.stack([ndimage.maximum_filter(big[..., c], size) for c in range(3)], -1)
+        t = (lum - lo) / np.maximum(hi - lo, 1e-6)
+        s = np.clip((t - 0.3) / 0.4, 0, 1)
+        s = s * s * (3 - 2 * s)
+        # Only real edges (a clear step); gentle shading and flat areas stay.
+        e = (np.clip((hi - lo - 0.15) / 0.15, 0, 1) * same)[..., None]
+        big = big + e * (dark + s[..., None] * (light - dark) - big)
+    return np.clip(big, 0, 1)
 
 
 def write_glb(src_path, out_path, rgb):
@@ -646,6 +746,7 @@ if __name__ == '__main__':
     ap.add_argument('variants', nargs='*')
     ap.add_argument('--out-dir', required=True)
     ap.add_argument('--radius', type=float, default=0.005)
+    ap.add_argument('--upscale', type=int, default=1, help='2: write the atlas at twice the size, edges redrawn crisp')
     a = ap.parse_args()
     cleaner = Cleaner(a.base, radius=a.radius)
     os.makedirs(a.out_dir, exist_ok=True)
@@ -659,4 +760,7 @@ if __name__ == '__main__':
             out = cleaner.smooth_face(base_clean, name)
         else:
             out = cleaner.smooth_face(cleaner.resynth(rgb, base_clean, name), name, base_lin=base_clean)
-        write_glb(path, os.path.join(a.out_dir, name), cleaner.image(out))
+        img = cleaner.image(out)
+        if a.upscale > 1:
+            img = upscale_inked(img, cleaner.isl, cleaner.features_mask(), a.upscale)
+        write_glb(path, os.path.join(a.out_dir, name), img)

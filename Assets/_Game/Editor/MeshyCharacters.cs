@@ -140,6 +140,9 @@ namespace PleaseDontDrown.Editor
         private static Material BodyMaterial(Material imported, string file)
         {
             Texture baseColor = FindBaseColor(imported);
+            // A 4096 atlas (the tourists' faces, upscaled with crisp edges: clean_character_textures.py --upscale 2)
+            // would sit uncompressed in memory as the GLB imports it (85 MB each): a compressed copy instead.
+            if (baseColor != null && baseColor.width > 2048) baseColor = CompressedCopy(baseColor, $"{OutputDir}/{file}_color.jpg");
             string path = $"{OutputDir}/{file}_material.mat";
             Shader lit = Shader.Find("Universal Render Pipeline/Lit");
             var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -440,6 +443,33 @@ namespace PleaseDontDrown.Editor
             public Vector3 P, N;
             public Vector2 Uv;
             public Color C;
+        }
+
+        /// <summary>A texture saved as a JPEG asset, imported block-compressed (high quality) at its own size.</summary>
+        private static Texture2D CompressedCopy(Texture source, string path)
+        {
+            int size = source.width;
+            var copy = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            copy.SetPixels32(ReadPixels(source, size));
+            copy.Apply();
+            File.WriteAllBytes(path, copy.EncodeToJPG(95));
+            Object.DestroyImmediate(copy);
+            ImportCompressed(path, size);
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        private static void ImportCompressed(string path, int size)
+        {
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer)
+            {
+                importer.sRGBTexture = true;
+                importer.mipmapEnabled = true;
+                importer.alphaSource = TextureImporterAlphaSource.None;
+                importer.maxTextureSize = size;
+                importer.textureCompression = TextureImporterCompression.CompressedHQ;
+                importer.SaveAndReimport();
+            }
         }
 
         private static Texture FindBaseColor(Material imported)

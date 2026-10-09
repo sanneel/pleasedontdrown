@@ -30,7 +30,7 @@ namespace PleaseDontDrown.Editor
             IReadOnlyList<Rect> eyes, Color skin, Color lash, string file)
         {
             _closedEyes = null;
-            int size = Mathf.Clamp(texture.width, 512, 2048);
+            int size = Mathf.Clamp(texture.width, 512, 4096);
             Color32[] source = ReadPixels(texture, size);
             var color = source.Select(c => (Color)c).ToArray();
             var occupied = new bool[source.Length];
@@ -243,22 +243,17 @@ namespace PleaseDontDrown.Editor
         private static Material SaveClosedEyes(string file, Material open)
         {
             if (_closedEyes == null || open == null) return null;
-            string texturePath = $"{OutputDir}/{file}_eyes_closed.png";
+            // (4096 ones as JPEG: as PNG each would add some 12 MB to the repository.)
+            bool big = _closedEyesSize > 2048;
+            string texturePath = $"{OutputDir}/{file}_eyes_closed.{(big ? "jpg" : "png")}";
+            string other = $"{OutputDir}/{file}_eyes_closed.{(big ? "png" : "jpg")}";
+            if (File.Exists(other)) AssetDatabase.DeleteAsset(other);
             var texture = new Texture2D(_closedEyesSize, _closedEyesSize, TextureFormat.RGBA32, false);
             texture.SetPixels32(_closedEyes);
             texture.Apply();
-            File.WriteAllBytes(texturePath, texture.EncodeToPNG());
+            File.WriteAllBytes(texturePath, big ? texture.EncodeToJPG(95) : texture.EncodeToPNG());
             Object.DestroyImmediate(texture);
-            AssetDatabase.ImportAsset(texturePath, ImportAssetOptions.ForceUpdate);
-            if (AssetImporter.GetAtPath(texturePath) is TextureImporter importer)
-            {
-                importer.sRGBTexture = true;
-                importer.mipmapEnabled = true;
-                importer.alphaSource = TextureImporterAlphaSource.None;
-                importer.maxTextureSize = 2048;
-                importer.textureCompression = TextureImporterCompression.CompressedHQ;
-                importer.SaveAndReimport();
-            }
+            ImportCompressed(texturePath, _closedEyesSize);
             var baseMap = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
             string materialPath = $"{OutputDir}/{file}_eyes_closed.mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
