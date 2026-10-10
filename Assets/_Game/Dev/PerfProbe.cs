@@ -70,9 +70,98 @@ namespace PleaseDontDrown.Dev
         {
             DevCommands.Unregister("perf", this);
             DevCommands.Unregister("bodycheck", this);
+            DevCommands.Unregister("spinwatch", this);
         }
 
-        private void Start() =>
+        private void Start()
+        {
+            DevCommands.Register("spinwatch", "<seconds>", "On any machine (host or client): log [Spin] for characters whose drawn body turns round and round on the spot.", args =>
+                StartCoroutine(SpinWatch(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 60f)), owner: this);
+            DevCommands.Register("legcheck", "<seconds>", "Log [Legs]: knees buckling and legs crossing on upright characters, per body id.", args =>
+                StartCoroutine(LegCheck(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 60f)), owner: this);
+            Register();
+        }
+
+        /// <summary>Per body id: how often an upright, dry character's knee is bent past 0.85 or its feet cross.</summary>
+        private IEnumerator LegCheck(float seconds)
+        {
+            var stats = new Dictionary<int, (int samples, int buckled, int crossed, float worstKnee, string worstAt)>();
+            var endOfFrame = new WaitForEndOfFrame();
+            float end = Time.realtimeSinceStartup + seconds;
+            while (Time.realtimeSinceStartup < end)
+            {
+                yield return endOfFrame;
+                foreach (Story.StoryNpc npc in Story.StoryNpc.All)
+                {
+                    if (npc == null || !npc.IsUpright || npc.IsSwimming || npc.Ride != null) continue;
+                    Avatars.AvatarRig rig = npc.GetComponentInChildren<Avatars.AvatarRig>();
+                    if (rig == null || !rig.IsBuilt || rig.GeneratedBody == null) continue;
+                    if (!Application.isBatchMode && (rig.Renderer == null || !rig.Renderer.isVisible)) continue;
+                    float knee = 1f;
+                    foreach (var (thigh, foot) in new[] { (Avatars.AvatarRig.Bone.ThighL, Avatars.AvatarRig.Bone.FootL), (Avatars.AvatarRig.Bone.ThighR, Avatars.AvatarRig.Bone.FootR) })
+                        knee = Mathf.Min(knee, Vector3.Distance(rig[thigh].position, rig[foot].position) / (rig.ThighLength + rig.ShinLength));
+                    Transform root = rig.transform;
+                    float apart = root.InverseTransformPoint(rig[Avatars.AvatarRig.Bone.FootR].position).x - root.InverseTransformPoint(rig[Avatars.AvatarRig.Bone.FootL].position).x;
+                    int body = rig.GeneratedBody.Id;
+                    stats.TryGetValue(body, out var st);
+                    st.samples++;
+                    if (st.samples == 1) st.worstKnee = 1f;
+                    if (knee < 0.8f) st.buckled++;
+                    if (apart < 0.03f) st.crossed++;
+                    if (knee < st.worstKnee) { st.worstKnee = knee; st.worstAt = $"{npc.Name} {npc.Activity} at {npc.transform.position:F1}, moving {npc.IsMoving}"; }
+                    stats[body] = st;
+                }
+            }
+            foreach (var (body, st) in stats.OrderBy(k => k.Key))
+                Debug.Log($"[Legs] body {body}: {st.samples} samples, knees buckled {100f * st.buckled / Mathf.Max(1, st.samples):F1}%, feet crossed {100f * st.crossed / Mathf.Max(1, st.samples):F1}%, worst knee {st.worstKnee:F2} ({st.worstAt})");
+        }
+
+        /// <summary>
+        /// Every character's drawn body, sampled 10 times a second: over a full turn within 4 s while moving under
+        /// 1.5 m is spinning. Also counts, per body id, how much the drawn bodies turn while standing still.
+        /// </summary>
+        private IEnumerator SpinWatch(float seconds)
+        {
+            var last = new Dictionary<Story.StoryNpc, (float yaw, Vector3 from, float turn, float start)>();
+            var stillTurn = new Dictionary<int, (float turn, float time)>();
+            int spins = 0;
+            float end = Time.realtimeSinceStartup + seconds;
+            var wait = new WaitForSeconds(0.1f);
+            while (Time.realtimeSinceStartup < end)
+            {
+                yield return wait;
+                foreach (Story.StoryNpc npc in Story.StoryNpc.All)
+                {
+                    if (npc == null || !npc.IsUpright || npc.IsSwimming) { if (npc != null) last.Remove(npc); continue; }
+                    float yaw = npc.DrawnYaw;
+                    Vector3 p = npc.transform.position;
+                    if (!last.TryGetValue(npc, out var s)) { last[npc] = (yaw, p, 0f, Time.time); continue; }
+                    float d = Mathf.Abs(Mathf.DeltaAngle(s.yaw, yaw));
+                    s.turn += d;
+                    int body = npc.Look.Body;
+                    stillTurn.TryGetValue(body, out var st);
+                    if (Vector3.Distance(new Vector3(p.x, 0f, p.z), new Vector3(s.from.x, 0f, s.from.z)) < 0.05f * (Time.time - s.start + 0.1f))
+                        stillTurn[body] = (st.turn + d, st.time + 0.1f);
+                    s.yaw = yaw;
+                    if (Time.time - s.start >= 4f)
+                    {
+                        float moved = Vector3.Distance(p, s.from);
+                        if (s.turn > 360f && moved < 1.5f)
+                        {
+                            spins++;
+                            Debug.Log($"[Spin] {npc.Name} (body {body}, {npc.Activity}) at {p:F1}: turned {s.turn:F0} degrees in 4 s, moved {moved:F2} m, moving {npc.IsMoving}");
+                        }
+                        s = (yaw, p, 0f, Time.time);
+                    }
+                    last[npc] = s;
+                }
+            }
+            var line = new StringBuilder($"[Spin] done: {spins} spinning; turning while standing (deg/s) per body:");
+            foreach (var (body, st) in stillTurn.OrderBy(k => k.Key)) line.Append($" {body}:{(st.time > 0f ? st.turn / st.time : 0f):F0}");
+            Debug.Log(line.ToString());
+        }
+
+        private void Register() =>
             DevCommands.Register("bodycheck", "<seconds> [label]", "Watch every hand for a while: log [BodyCheck] how often one was inside somebody else.", args =>
                 StartCoroutine(BodyCheck(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 5f, args.Length > 1 ? args[1] : "bodycheck")), owner: this);
 

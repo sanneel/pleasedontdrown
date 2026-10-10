@@ -106,11 +106,27 @@ namespace PleaseDontDrown.Avatars
         /// chest and the arm is weighted to them (prepare_character.py), so it never blends two bones more than half
         /// a raised arm apart: straight blending across 160 degrees pinched the armpits into a hard fold.
         /// </summary>
-        private void LateUpdate()
+        private void LateUpdate() => DriveShoulders();
+
+        /// <summary>Turns the shoulder helpers after the arms (the animator calls it too: review renders run no LateUpdate).</summary>
+        public void DriveShoulders()
         {
             if (!_built || GeneratedBody == null) return;
-            this[Bone.ShoulderL].localRotation = Quaternion.Slerp(Quaternion.identity, this[Bone.UpperArmL].localRotation * _armUnbindL, 0.5f);
-            this[Bone.ShoulderR].localRotation = Quaternion.Slerp(Quaternion.identity, this[Bone.UpperArmR].localRotation * _armUnbindR, 0.5f);
+            this[Bone.ShoulderL].localRotation = ShoulderTurn(Bone.UpperArmL, _armUnbindL);
+            this[Bone.ShoulderR].localRotation = ShoulderTurn(Bone.UpperArmR, _armUnbindR);
+        }
+
+        /// <summary>
+        /// Half the arm's swing away from the model's own pose, without its twist about its own length. Models made with
+        /// the palms facing forward (the Tripo women) have arms twisted a quarter turn in their pose; half of that undone
+        /// twist screwed the shoulder skin round with every arm swing.
+        /// </summary>
+        private Quaternion ShoulderTurn(Bone upper, Quaternion unbind)
+        {
+            Quaternion turn = this[upper].localRotation * unbind;
+            Vector3 along = Quaternion.Inverse(unbind) * Vector3.down; // the arm as the model holds it (chest space)
+            Quaternion swing = Quaternion.FromToRotation(along, turn * along);
+            return Quaternion.Slerp(Quaternion.identity, swing, 0.5f);
         }
 
         /// <summary>

@@ -250,6 +250,7 @@ namespace PleaseDontDrown.Avatars
             KeepHandsOutOfHead();
             KeepHandsOutOfOthers();
             PoseFace();
+            _rig.DriveShoulders();
         }
 
         /// <summary>

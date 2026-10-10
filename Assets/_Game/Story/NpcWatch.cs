@@ -31,6 +31,9 @@ namespace PleaseDontDrown.Story
             public readonly Dictionary<string, float> Reported = new();
             public readonly Dictionary<string, float> Since = new();   // when a lasting-problem check first failed
             public readonly HashSet<string> Seen = new();
+            // Spinning: how far the drawn body turned since SpinStart, and from where.
+            public float LastDrawn = float.NaN, SpinTurn, SpinStart;
+            public Vector3 SpinFrom;
         }
 
         private readonly Dictionary<StoryNpc, Track> _tracks = new();
@@ -198,6 +201,25 @@ namespace PleaseDontDrown.Story
             }
 
             if (npc.BodyProblem(out string body)) Lasting(npc, t, "body", body);
+
+            // Spinning on the spot: the drawn body turning round and round (over a full turn in 4 s) without going anywhere.
+            float drawnYaw = npc.DrawnYaw;
+            if (float.IsNaN(t.LastDrawn) || teleported || !npc.IsUpright || swimming)
+            {
+                t.SpinTurn = 0f;
+                t.SpinStart = Time.time;
+                t.SpinFrom = p;
+            }
+            else t.SpinTurn += Mathf.Abs(Mathf.DeltaAngle(t.LastDrawn, drawnYaw));
+            t.LastDrawn = drawnYaw;
+            if (Time.time - t.SpinStart >= 4f)
+            {
+                if (t.SpinTurn > 360f && Vector3.Distance(p, t.SpinFrom) < 1.5f)
+                    Report(npc, t, "spinning", $"turned {t.SpinTurn:F0} degrees in {Time.time - t.SpinStart:F1} s, moved {Vector3.Distance(p, t.SpinFrom):F2} m ({npc.PathInfo}, moving {npc.IsMoving})");
+                t.SpinTurn = 0f;
+                t.SpinStart = Time.time;
+                t.SpinFrom = p;
+            }
         }
 
         /// <summary>A problem only counts once it has lasted (pose blends and a wave passing are not problems).</summary>
@@ -226,7 +248,7 @@ namespace PleaseDontDrown.Story
             _counts[kind] = _counts.TryGetValue(kind, out int c) ? c + 1 : 1;
             if (t.Reported.TryGetValue(kind, out float last) && Time.time - last < 10f) return;
             t.Reported[kind] = Time.time;
-            Debug.Log($"[NpcWatch] PROBLEM {kind,-11} {npc.Name} ({npc.Activity}, {npc.Pose}) at {npc.transform.position:F1}: {detail}");
+            Debug.Log($"[NpcWatch] PROBLEM {kind,-11} {npc.Name} (body {npc.Look.Body}, {npc.Activity}, {npc.Pose}) at {npc.transform.position:F1}: {detail}");
         }
 
         private void Summary()
