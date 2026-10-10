@@ -261,7 +261,7 @@ namespace PleaseDontDrown.UI
             string info = (host ? "Host" : "Client") + "   " + _connection.Mode + "   " + players + (players == 1 ? " player" : " players");
             if (!SteamLobbyService.InLobby && SteamBootstrap.IsReady)
                 info += "\nOffline session: friends can't join it. Leave and press PLAY to host through Steam.";
-            int rows = 6 + (SteamLobbyService.InLobby ? 1 : 0) + (travel ? 1 : 0) + (story ? 1 : 0);
+            int rows = 8 + (SteamLobbyService.InLobby ? 1 : 0) + (travel ? 1 : 0) + (story ? 1 : 0);
             float top = Header("PAUSED", info, rows, ButtonWidth, out _);
 
             if (Hud.Button(Row(x, ref top), "RESUME", centred: true, primary: true)) SetPause(false);
@@ -269,6 +269,8 @@ namespace PleaseDontDrown.UI
             if (Hud.Button(Row(x, ref top), "CHARACTER", centred: true)) AvatarCustomizer.Open();
             if (Hud.Button(Row(x, ref top), "OPTIONS", centred: true)) _page = Page.Options;
             if (Hud.Button(Row(x, ref top), GameDisplay.IsFullscreen ? "WINDOWED" : "FULLSCREEN", centred: true)) GameDisplay.Toggle();
+            if (Hud.Button(Row(x, ref top), Player.GodMode.On ? "GOD MODE: ON" : "GOD MODE: OFF", centred: true, selected: Player.GodMode.On)) Player.GodMode.Toggle();
+            if (Hud.Button(Row(x, ref top), Player.GodMode.Flying ? "FLY: ON" : "FLY: OFF", centred: true, selected: Player.GodMode.Flying)) Player.GodMode.ToggleFly();
             if (travel && Hud.Button(Row(x, ref top), "TRAVEL", centred: true)) _page = Page.Travel;
             if (story && Hud.Button(Row(x, ref top), "RESTART STORY", centred: true))
             {

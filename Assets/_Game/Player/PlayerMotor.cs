@@ -133,9 +133,7 @@ namespace PleaseDontDrown.Player
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             DevCommands.Register("noclip", "", "Fly through everything.", _ =>
             {
-                Noclip = !Noclip;
-                _rb.isKinematic = Noclip;
-                _rb.linearVelocity = Vector3.zero;
+                SetNoclip(!Noclip);
                 DevCommands.Print($"noclip {(Noclip ? "ON" : "OFF")}");
             }, cheat: true, owner: this);
             DevCommands.Register("speed", "<multiplier>", "Movement speed multiplier (1 = normal).", args =>
@@ -302,7 +300,7 @@ namespace PleaseDontDrown.Player
         /// </summary>
         public void Knockback(Vector3 velocityChange)
         {
-            if (_rb.isKinematic) return;
+            if (_rb.isKinematic || GodMode.On) return;
             _moveVelocity += new Vector3(velocityChange.x, 0f, velocityChange.z);
             _rb.linearVelocity += velocityChange;
         }
@@ -310,7 +308,7 @@ namespace PleaseDontDrown.Player
         /// <summary>Knockback / explosion / boat hit: an instant velocity change plus a moment of reduced control.</summary>
         public void AddImpulse(Vector3 velocityChange)
         {
-            if (_rb.isKinematic) return;
+            if (_rb.isKinematic || GodMode.On) return;
             _rb.linearVelocity += velocityChange;
             _controlLossUntil = Time.time + Mathf.Clamp(velocityChange.magnitude * 0.05f, 0.15f, 0.8f);
             IsGrounded = false;
@@ -620,6 +618,14 @@ namespace PleaseDontDrown.Player
         }
 
         // ------------------------------------------------------------------ noclip
+
+        /// <summary>Fly through everything (dev command, or Fly in god mode).</summary>
+        public void SetNoclip(bool on)
+        {
+            Noclip = on;
+            _rb.isKinematic = on;
+            if (!on) _rb.linearVelocity = Vector3.zero;
+        }
 
         private void FlyNoclip(float dt)
         {

@@ -10,6 +10,7 @@ blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- <in.glb>
   --helpers 1              ShoulderL/R bones that turn half as far as the upper arm (the game drives them)
   --armsmooth 40           smoothing passes over the arm/chest split round the shoulders (0 = off)
   --preview <prefix>       also render front/side pictures with the skeleton drawn in
+  --turn -90               degrees to turn the model about the vertical first (Tripo's decoded models face +X: -90)
 
 What it does: keeps one figure (drops other figures and floating text), stands it on the origin facing -Y
 (glTF +Z), finds the joints from the front silhouette, builds a skeleton named like AvatarRig.Bone
@@ -31,7 +32,7 @@ from mathutils.kdtree import KDTree
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, DST = argv[0], argv[1]
-opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'armsmooth': 40, 'preview': ''}
+opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'armsmooth': 40, 'preview': '', 'turn': 0.0}
 i = 2
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -56,6 +57,10 @@ if len(meshes) > 1:
     bpy.ops.object.join()
 body = bpy.context.view_layer.objects.active
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+if opts['turn']:
+    body.rotation_mode = 'XYZ'  # (the glTF importer leaves objects in quaternion mode, which ignores rotation_euler)
+    body.rotation_euler = (0.0, 0.0, math.radians(opts['turn']))
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
 for o in list(bpy.context.scene.objects):
     if o != body:
         bpy.data.objects.remove(o, do_unlink=True)

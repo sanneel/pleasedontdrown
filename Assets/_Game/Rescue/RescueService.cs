@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using FishNet.Connection;
 using FishNet.Object;
+using PleaseDontDrown.Audio;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Items;
 using PleaseDontDrown.Player;
@@ -153,6 +154,18 @@ namespace PleaseDontDrown.Rescue
             var brain = instance.GetComponent<VictimBrain>();
             brain.ServerSetup(null, Random.Range(1, int.MaxValue), state, panic, air);
             return brain;
+        }
+
+        /// <summary>Host: a floating landing reward in the world with a celebratory sound.</summary>
+        [Server]
+        public void ServerCallout(Vector3 at, string text, bool big) => CalloutObservers(at, text, big);
+
+        [ObserversRpc]
+        private void CalloutObservers(Vector3 at, string text, bool big)
+        {
+            FloatingText.Spawn(at + Vector3.up * 0.8f, text, new Color(1f, 0.9f, 0.3f), 1.2f, big ? 1.8f : 1.2f);
+            AudioSource.PlayClipAtPoint(FunSounds.Whoop, at, 1f);
+            if (big) AudioSource.PlayClipAtPoint(FunSounds.Cheer, at, 0.9f);
         }
 
         [ObserversRpc]

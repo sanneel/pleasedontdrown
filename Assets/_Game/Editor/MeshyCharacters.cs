@@ -28,9 +28,15 @@ namespace PleaseDontDrown.Editor
         {
             (AvatarLook.Bodies.Sandy, "Sandy", "sandy"),
             (AvatarLook.Bodies.SandyBoss, "Sandy (boss)", "sandy_boss"),
-            (AvatarLook.Bodies.TouristRed, "Tourist (red bikini)", "tourist_bikini_red"),
-            (AvatarLook.Bodies.TouristSporty, "Tourist (sporty)", "tourist_bikini_sporty"),
-            (AvatarLook.Bodies.TouristPurple, "Tourist (purple bikini)", "tourist_bikini_purple"),
+            (AvatarLook.Bodies.Lola, "Lola", "tourist_lola"),
+            (AvatarLook.Bodies.GirlRed, "Tourist (red bikini)", "tourist_girl_red"),
+            (AvatarLook.Bodies.GirlBlonde, "Tourist (blonde)", "tourist_girl_blonde"),
+            (AvatarLook.Bodies.GirlRedhead, "Tourist (redhead)", "tourist_girl_redhead"),
+            (AvatarLook.Bodies.GirlBlack, "Tourist (black hair)", "tourist_girl_black"),
+            (AvatarLook.Bodies.GirlPink, "Tourist (pink bikini)", "tourist_girl_pink"),
+            (AvatarLook.Bodies.GirlLavender, "Tourist (lavender bikini)", "tourist_girl_lavender"),
+            (AvatarLook.Bodies.BaristaGirl, "Barista", "tourist_girl_barista"),
+            (AvatarLook.Bodies.Bartender, "Bartender", "tourist_girl_bartender"),
             (AvatarLook.Bodies.TouristBuddy, "Tourist (sunburnt dad)", "tourist_buddy"),
             (AvatarLook.Bodies.Robber, "Robber", "robber"),
             (AvatarLook.Bodies.Goofy, "Goofy lifeguard", "goofy"),
@@ -38,6 +44,15 @@ namespace PleaseDontDrown.Editor
 
         /// <summary>Bodies that keep their painted face as it is: the robber's eyes are behind sunglasses (lids would blink on the lenses).</summary>
         private static readonly HashSet<string> PaintedFaceOnly = new() { "robber" };
+
+        /// <summary>
+        /// The Tripo women keep their eyes as Tripo painted them, never shut: their eyes are modelled (bulging or sunk
+        /// in sockets) and every closed-eye texture painted over them left smears, cut irises and black lines.
+        /// Their face is still found (the mouth for the kiss of life).
+        /// </summary>
+        private static readonly HashSet<string> OpenEyesOnly = new()
+            { "tourist_lola", "tourist_girl_red", "tourist_girl_blonde", "tourist_girl_redhead", "tourist_girl_black",
+              "tourist_girl_pink", "tourist_girl_lavender", "tourist_girl_barista", "tourist_girl_bartender" };
 
         private static readonly int BoneTotal = (int)Bone.Count + 2 * HandBones.BoneCount;
 
@@ -110,6 +125,7 @@ namespace PleaseDontDrown.Editor
             var all = new List<(byte id, string name, string file)>(Bodies);
             foreach (byte baseId in AvatarLook.Bodies.VariantBases)
             {
+                if (!Bodies.Any(b => b.id == baseId)) continue; // a retired tourist
                 var (_, baseName, baseFile) = Bodies.First(b => b.id == baseId);
                 for (int n = 1; n <= 16; n++)
                     all.Add((AvatarLook.Bodies.Variant(baseId, n), $"{baseName} #{n}", $"{baseFile}_v{n:00}"));
@@ -432,6 +448,25 @@ namespace PleaseDontDrown.Editor
 
         private static readonly Dictionary<string, FaceFit> BaseFaces = new();
 
+        /// <summary>
+        /// Tripo girls that are one mesh with another texture (vertex for vertex the same): their eyes and mouth are
+        /// where the first one's are. Found in their own textures, pale blonde hair passed for skin and the eyes
+        /// came out 22 cm apart.
+        /// </summary>
+        private static readonly Dictionary<string, string> SameMeshAs = new()
+        {
+            { "tourist_girl_blonde", "tourist_girl_red" },
+            { "tourist_girl_redhead", "tourist_girl_red" },
+            { "tourist_girl_black", "tourist_girl_red" },
+            { "tourist_girl_pink", "tourist_girl_red" },
+            { "tourist_girl_lavender", "tourist_girl_red" },
+            { "tourist_girl_barista", "tourist_girl_red" },
+            { "tourist_girl_bartender", "tourist_girl_red" },
+        };
+
+        /// <summary>The model whose found face this one takes: a look-alike's base, or the girl it shares a mesh with.</summary>
+        private static string FaceBaseOf(string file) => SameMeshAs.TryGetValue(file, out string same) ? same : BaseOf(file);
+
         private static string BaseOf(string file)
         {
             int at = file.LastIndexOf("_v", StringComparison.Ordinal);
@@ -633,7 +668,7 @@ namespace PleaseDontDrown.Editor
             eyeR = new Rect(eyeR.center - eyeSize * 0.5f, eyeSize);
 
             float faceFloor = headJoint.y - 0.03f;
-            string baseFile = BaseOf(file);
+            string baseFile = FaceBaseOf(file);
             FaceFit basis = null;
             string eyeNote = "";
             if (baseFile != file && BaseFaces.TryGetValue(baseFile, out basis) && basis.VertexCount == vertices.Length &&
@@ -812,8 +847,8 @@ namespace PleaseDontDrown.Editor
             Rect Both(Rect eye, Rect other) => Rect.MinMaxRect(Mathf.Min(eye.xMin, -other.xMax), Mathf.Min(eye.yMin, other.yMin),
                 Mathf.Max(eye.xMax, -other.xMin), Mathf.Max(eye.yMax, other.yMax));
             Color lashColor = Color.Lerp(At(darkUv), Color.black, 0.35f);
-            if (PaintClosedEyes(texture, vertices, normals, uvs, triangles, headJoint.y - 0.03f, new[] { Both(eyeL, eyeR), Both(eyeR, eyeL) },
-                    SkinRoundColor(eyeL), lashColor, file))
+            if (OpenEyesOnly.Contains(file) || PaintClosedEyes(texture, vertices, normals, uvs, triangles, headJoint.y - 0.03f,
+                    new[] { Both(eyeL, eyeR), Both(eyeR, eyeL) }, SkinRoundColor(eyeL), lashColor, file))
             {
                 lidL = new Vector3(eyeL.center.x, eyeL.yMax, SurfaceZ(new Vector2(eyeL.center.x, eyeL.yMax)));
                 lidR = new Vector3(eyeR.center.x, eyeR.yMax, SurfaceZ(new Vector2(eyeR.center.x, eyeR.yMax)));
@@ -1080,7 +1115,7 @@ namespace PleaseDontDrown.Editor
                 else EditorUtility.SetDirty(mesh);
                 body.Mesh = mesh;
                 body.Material = BodyMaterial(skin.sharedMaterial, file);
-                body.ClosedEyesMaterial = body.HasFace ? SaveClosedEyes(file, body.Material) : null; // (MeshyCharacters.ClosedEyes.cs)
+                body.ClosedEyesMaterial = body.HasFace && !OpenEyesOnly.Contains(file) ? SaveClosedEyes(file, body.Material) : null; // (MeshyCharacters.ClosedEyes.cs)
                 if (funny != null) ApplyFunny(body, funny, file, P(Bone.Head));
 
                 string bodyPath = $"{OutputDir}/{file}.asset";

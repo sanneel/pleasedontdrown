@@ -299,7 +299,9 @@ namespace PleaseDontDrown.Editor
                 out Transform infirmary, out Transform firstAid, out Transform hotelDoor);
             Transform jetSkiDock2 = Point(story, "JetSkiDock2", OnWater(JetSkiDock2), 180f);
             Transform arrival = Point(story, "Island2Arrival", Island2Arrival, 0f);
-            Transform island2Spawn = Point(story, "Island2Spawn", Island2Spawn, 0f);
+            // On the sand in front of the hotel: island 2 was raised to a 1.5 m plateau and a fixed 0.3 m put arrivals
+            // under the ground, into the sea.
+            Transform island2Spawn = Point(story, "Island2Spawn", OnGround(Island2Spawn) + Vector3.up * 0.3f, 0f);
             Transform pirateLanding = Point(story, "PirateLanding", OnGround(PirateLanding), 0f);
             Transform pirateStart = Point(story, "PirateBoatStart", OnWater(PirateBoatStart),
                 Quaternion.LookRotation(PirateLanding - PirateBoatStart).eulerAngles.y);
@@ -344,7 +346,7 @@ namespace PleaseDontDrown.Editor
             var so = new SerializedObject(director);
             // Island 1: everyone pulled out collapses and needs CPR (the design wants every CPR moment seen).
             SetIsland(Require(so, "_island1"), "The first island", new Vector2(-20f, 16f), new Vector2(-36f, -18f), Vector3.forward,
-                seconds: 20f, condition: 60f, flatline: 0f, land: new Rect(-45f, 6f, 90f, 42f), robberSpawn, null, needsCpr: true);
+                seconds: 20f, condition: 60f, flatline: 0f, land: Island1Land, robberSpawn, null, needsCpr: true);
             SetIsland(Require(so, "_island2"), "The hotel island", new Vector2(-20f, 58f), new Vector2(-194f, -181f), Vector3.back,
                 seconds: 10f, condition: 45f, flatline: 12f, land: new Rect(-35f, -276f, 110f, 54f), null, arrival, needsCpr: false);
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -380,8 +382,10 @@ namespace PleaseDontDrown.Editor
         /// Bakes a navmesh per island from the scene's static colliders (terrain, buildings, counters, trunks, dock
         /// posts, rocks; nothing with a rigidbody) and adds a loader, so story characters walk around things.
         /// </summary>
-        private static void BakeNavMeshes(bool resortOnly = false)
+        /// <param name="only">Bake just this island (the loader is left alone: a new island adds its own asset to it).</param>
+        private static void BakeNavMeshes(bool resortOnly = false, string only = null)
         {
+            only ??= resortOnly ? "Island2" : null;
             Directory.CreateDirectory(NavMeshDir);
             // Objects were created and moved by script: bring the physics scene up to date, or collecting the
             // colliders (a physics query) misses the ones built far from where they were created.
@@ -397,15 +401,18 @@ namespace PleaseDontDrown.Editor
             {
                 ("Island1", new Bounds(new Vector3(0f, 0f, 8f), new Vector3(130f, 40f, 124f))),
                 ("Island2", new Bounds(new Vector3(20f, 15f, -345f), new Vector3(392f, 70f, 330f))),
-                ("DevIsland", new Bounds(new Vector3(-230f, 0f, -60f), new Vector3(110f, 40f, 90f)))
+                ("DevIsland", new Bounds(new Vector3(-230f, 0f, -60f), new Vector3(110f, 40f, 90f))),
+                ("Island3", new Bounds(new Vector3(20f, 25f, -900f), new Vector3(440f, 90f, 500f)))
             };
             var baked = new List<Object>();
             foreach ((string name, Bounds bounds) in areas)
             {
-                if (resortOnly && name != "Island2") continue;
+                if (only != null && name != only) continue;
                 var sources = new List<NavMeshBuildSource>();
                 UnityEngine.AI.NavMeshBuilder.CollectSources(bounds, ~0, NavMeshCollectGeometry.PhysicsColliders, 0, new List<NavMeshBuildMarkup>(), sources);
                 sources.RemoveAll(s => s.component is Collider c && (c.attachedRigidbody != null || c.isTrigger));
+                // Island 3's shack doors open: the way in stays on the navmesh with the door shut.
+                sources.RemoveAll(s => s.component is Collider c && c.GetComponentInParent<PleaseDontDrown.World.Door>() is { } d && d.name.StartsWith("PirateHouse"));
                 // Under a dock (the seabed between the posts) is off limits: swimmers and waders used to be routed
                 // through there with their heads in the planks. The deck itself stays walkable (it's above the box).
                 foreach (Collider deck in Object.FindObjectsByType<Collider>(FindObjectsSortMode.None))
@@ -449,7 +456,7 @@ namespace PleaseDontDrown.Editor
                 else { AssetDatabase.CreateAsset(data, path); baked.Add(data); }
                 Debug.Log($"[Build] navmesh {name}: {sources.Count} sources");
             }
-            if (resortOnly) return; // Existing loader retains its stable Island2 asset reference.
+            if (only != null) return; // The existing loader keeps its stable asset references.
             var loader = new GameObject("Navigation").AddComponent<NavMeshLoader>();
             SetRefs(loader, "_data", baked.ToArray());
         }
@@ -458,7 +465,9 @@ namespace PleaseDontDrown.Editor
         // The beach crowd
         // =====================================================================
 
-        private static readonly float[] Island1TowelXs = { -41f, -37f, -33f, -29f, -25f, -21f, -17f, 15.5f, 19f, 22.5f, 26f, 30f, 34f, 38f, 42f };
+        private static readonly float[] Island1TowelXs = { -15f, -11f, 15.5f, 19f, 22.5f, 26f, 30f, 34f, 38f, 42f };
+        /// <summary>Island 1's sand, for the robber to run about on (x, z, width, depth).</summary>
+        private static readonly Rect Island1Land = new(-17f, 8f, 59f, 34f);
         private static readonly float[] Island2TowelXs = { -24f, -19f, -13f, 6f, 10f, 14f, 26f, 30f, 34f, 39f, 44f, 49f };
 
         /// <summary>Things towels must keep clear of on island 1 (x, z, radius).</summary>

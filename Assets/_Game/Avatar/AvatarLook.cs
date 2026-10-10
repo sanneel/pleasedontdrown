@@ -70,13 +70,29 @@ namespace PleaseDontDrown.Avatars
         {
             public const byte Sandy = 1;
             public const byte SandyBoss = 2;
-            public const byte TouristRed = 3;      // red bikini
-            public const byte TouristSporty = 4;   // turquoise sports bikini
-            public const byte TouristPurple = 5;   // purple bikini, curvy
+            // 3-5 (and their look-alikes) were the Meshy bikini tourists, retired 2026-10-10 for the Tripo women below.
+            public const byte TouristRed = 3;
+            public const byte TouristSporty = 4;
+            public const byte TouristPurple = 5;
             public const byte TouristBuddy = 6;    // sunburnt dad in flowery trunks
             public const byte Robber = 7;          // the thief: his own model, hands taken out of his pockets (ArtSource/Tools/robber_arms.py)
             /// <summary>The players' funny lifeguard (googly eyes, buck teeth, pot belly): recoloured and reshaped per look.</summary>
             public const byte Goofy = 8;
+
+            /// <summary>
+            /// The tourist women (Tripo, ArtSource/Tripo/Tourists): Lola, and four girls sharing one Smart Mesh body with
+            /// their own painted faces, hair and bikinis. Every woman on the beach is one of these.
+            /// </summary>
+            public const byte Lola = 16;           // brunette, red bikini
+            public const byte GirlRed = 17;        // long brown waves, red bikini, white sunglasses
+            public const byte GirlBlonde = 18;     // blonde, turquoise bikini
+            public const byte GirlRedhead = 19;    // ginger, green bikini
+            public const byte GirlBlack = 20;      // black hair, brown skin, magenta bikini
+            public const byte BaristaGirl = 21;    // island 1's beach bar barista: crop top, black apron
+            public const byte Bartender = 22;      // the hotel island's bar: teal resort waistcoat
+            public const byte GirlPink = 23;       // platinum blonde, pink polka-dot bikini
+            public const byte GirlLavender = 24;   // jet black hair, lavender bikini
+            public static readonly byte[] TouristWomen = { Lola, GirlRed, GirlBlonde, GirlRedhead, GirlBlack, GirlPink, GirlLavender };
 
             /// <summary>
             /// Look-alikes of the tourists (ArtSource/Tools/make_variants.py): other skin, hair, eyes, outfit colour, face
@@ -95,7 +111,7 @@ namespace PleaseDontDrown.Avatars
             /// <summary>The base tourist or one of its look-alikes (a missing body falls back to the code-built one).</summary>
             /// <summary>Women's bodies (the look's Figure should say feminine: bust jiggle, CPR lines).</summary>
             public static bool IsFeminine(byte body) =>
-                body is >= Sandy and <= TouristPurple || body >= VariantFirst && body < VariantFirst + 48;
+                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender || body >= VariantFirst && body < VariantFirst + 48;
 
             public static byte PickVariant(System.Random rng, byte baseBody) => Variant(baseBody, rng.Next(VariantsPerBase + 1));
         }
@@ -193,7 +209,7 @@ namespace PleaseDontDrown.Avatars
             // Every tourist is a generated model (a base or one of its look-alikes); the code-built fields above are only
             // the fallback if the model library is missing.
             look.Body = feminine
-                ? Bodies.PickVariant(rng, (byte)Pick(rng, Bodies.TouristRed, Bodies.TouristSporty, Bodies.TouristPurple))
+                ? Bodies.TouristWomen[rng.Next(Bodies.TouristWomen.Length)]
                 : Bodies.PickVariant(rng, Bodies.TouristBuddy);
             return look;
         }

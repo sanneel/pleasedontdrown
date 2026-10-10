@@ -39,3 +39,6 @@ crashlytics-build.properties
 
 /Builds/
 *.rar
+
+# A stray scratch Unity project (not part of the game)
+/My project/

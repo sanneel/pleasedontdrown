@@ -28,7 +28,7 @@ namespace PleaseDontDrown.Story
         {
             Figure = 1, Build = 1, Height = 1, Skin = 4, Hair = HairStyle.Long, HairColor = 0,
             Top = TopStyle.TShirt, TopColor = 7, Bottom = BottomStyle.Trousers, BottomColor = 14,
-            Body = AvatarLook.Bodies.Variant(AvatarLook.Bodies.TouristSporty, 2) // generated model (own model later)
+            Body = AvatarLook.Bodies.GirlBlonde // generated model (own model later)
         };
 
         // The robber has his own model (sunglasses, headband, striped shirt); the pirates are look-alikes of the only
@@ -265,7 +265,7 @@ namespace PleaseDontDrown.Story
             robber.ServerSetMood(AvatarMood.Scared);
             robber.ServerSetHealth(0, 0);
             robber.ServerFlee(false, _island1.LandArea);
-            robber.ServerMoveTo(new Vector3(-44f, 0f, 40f), run: true); // off to the far corner of the island
+            robber.ServerMoveTo(new Vector3(-12f, 0f, 38f), run: true); // off to the far corner of the island
             victim.ServerSetPose(AvatarPose.Normal);
             victim.ServerSetMood(AvatarMood.Happy);
             yield return Say(victim, "My wallet! Could you give it to Sandy at the Lost & Found? I'll pick it up there.");
@@ -466,7 +466,7 @@ namespace PleaseDontDrown.Story
             NoMarker();
             robber.ServerSetPose(AvatarPose.Normal);
             robber.ServerSetHealth(0, 0);
-            robber.ServerMoveTo(new Vector3(44f, 0f, 40f), run: true);
+            robber.ServerMoveTo(new Vector3(38f, 0f, 38f), run: true);
             robber.ServerShout("Thank you! You'll never see me again!", false);
             StartCoroutine(RemoveLater(robber, 12f));
             yield return new WaitForSeconds(1f);
@@ -738,7 +738,7 @@ namespace PleaseDontDrown.Story
             SetChapter("End of chapter 2");
             SetObjective("To be continued...");
             yield return ChapterReport("CHAPTER 2 COMPLETE");
-            TitleObservers("TO BE CONTINUED", "Thanks for playing chapters 1 and 2");
+            TitleObservers("THE SEA NEVER CLOSES", "Open shift: fish them out, trickshot them back, as long as you like");
         }
     }
 }

@@ -446,6 +446,7 @@ namespace PleaseDontDrown.Editor
             var items = new List<Object> { crate, ball, ring, cooler, coconut, tourist };
             items.AddRange(BuildStoryItems(torus));
             items.AddRange(BuildFunItems()); // basketball (GameSceneBuilder.Fun.cs)
+            items.AddRange(BuildBarFoodItems()); // fries, cola, cocktail for the bars (GameSceneBuilder.BarFood.cs)
             SetRefs(catalog, "_items", items.ToArray());
             EditorUtility.SetDirty(catalog);
             return catalog;
@@ -672,6 +673,7 @@ namespace PleaseDontDrown.Editor
             BuildStoryWorld(env);
             BuildIsland1Fun(env); // hoop, ring table, beach hut (GameSceneBuilder.Fun.cs)
             BuildDevIsland(env); // guns, range, test buttons, the model gallery (GameSceneBuilder.DevIsland.cs)
+            BuildIsland3(env); // Skull Cove, the pirates' island (GameSceneBuilder.Island3.cs)
             Transform[] spawns = BuildSpawnPoints();
 
             // Rescues: drills now, the emergency director later.
@@ -706,7 +708,6 @@ namespace PleaseDontDrown.Editor
         {
             Material sand = GetMaterial("Sand", new Color(0.93f, 0.84f, 0.62f));
             Material wood = GetMaterial("Wood", new Color(0.55f, 0.36f, 0.22f));
-            Material rock = GetMaterial("Rock", new Color(0.5f, 0.5f, 0.52f), smoothness: 0.1f);
             Material buoyYellow = GetMaterial("BallYellow", new Color(1f, 0.83f, 0.2f));
 
             // Terrain: dry beach (y = 0) shelving into the sea toward -z.
@@ -745,16 +746,6 @@ namespace PleaseDontDrown.Editor
                     Primitive(PrimitiveType.Cube, "Post", dock, new Vector3(x, -2.2f, z), new Vector3(0.22f, 4.8f, 0.22f), wood);
             DressProp(dock, "dock"); // planks, beams and round posts over the same deck and post colliders
 
-            // Rocks to swim to.
-            GameObject rockA = Primitive(PrimitiveType.Sphere, "Rock", env, new Vector3(14f, -3.2f, -30f), new Vector3(7f, 5f, 6f), rock);
-            rockA.transform.rotation = Quaternion.Euler(8f, 30f, -5f);
-            TagSurface(rockA, SurfaceKind.Rock);
-            DressRock(rockA, 0f);
-            GameObject rockB = Primitive(PrimitiveType.Sphere, "Rock", env, new Vector3(-20f, -4.5f, -44f), new Vector3(9f, 6f, 7f), rock);
-            rockB.transform.rotation = Quaternion.Euler(-6f, 70f, 4f);
-            TagSurface(rockB, SurfaceKind.Rock);
-            DressRock(rockB, 140f);
-
             // Swim-zone buoy line.
             var buoys = new GameObject("SwimZoneBuoys").transform;
             buoys.SetParent(env, false);
@@ -777,24 +768,17 @@ namespace PleaseDontDrown.Editor
             }
         }
 
-        /// <summary>The greybox ball stays as the rock's collider; the modelled boulder (1 m across, like Unity's sphere) takes its place to look at.</summary>
-        private static void DressRock(GameObject rock, float yaw)
-        {
-            if (PropModel("rock", rock.transform, yaw: yaw) == null) return;
-            Object.DestroyImmediate(rock.GetComponent<MeshRenderer>());
-            Object.DestroyImmediate(rock.GetComponent<MeshFilter>());
-        }
-
         private const float WaterLevel = -0.35f;
         private const string OceanShaderPath = "Assets/_Game/Data/Shaders/Ocean.shader";
 
         // The island: a rounded rectangle of sand whose long side (the station beach) faces the open sea toward -z.
-        // Island 1: 112 x 48 m (it was 160 x 68: lots of empty sand); the station beach's front edge is still z = 4.
-        private static readonly Vector2 IslandCenter = new(0f, 28f);
-        private static readonly Vector2 IslandHalfSize = new(56f, 24f);
+        // Island 1: 75 x 44 m, x -25..50 (it was 160 x 68, then 112 x 48: lots of empty sand; the user's map cut the
+        // west end and the north corners); the station beach's front edge is still z = 4.
+        private static readonly Vector2 IslandCenter = new(12.5f, 26f);
+        private static readonly Vector2 IslandHalfSize = new(37.5f, 22f);
         private const float IslandCornerRadius = 14f;
-        // Reaches far west for the dev island (and the sea round its 150 m range target).
-        private const float TerrainMinX = -400f, TerrainMaxX = 300f, TerrainMinZ = -620f, TerrainMaxZ = 150f, TerrainStep = 2f;
+        // Reaches far west for the dev island (and the sea round its 150 m range target), and south past island 3.
+        private const float TerrainMinX = -400f, TerrainMaxX = 300f, TerrainMinZ = -1290f, TerrainMaxZ = 150f, TerrainStep = 2f;
 
         // The hotel island (chapter 2), ~200 m south across the channel; its beach faces island 1.
         // Keep the arrival shore at z=-220; expand west, east and south for the resort.
@@ -839,11 +823,15 @@ namespace PleaseDontDrown.Editor
 
         /// <summary>
         /// Beach height at a point: flat sand inland, a curvy shoreline all round, shelving to ~9 m deep offshore.
-        /// Two islands: the station island and the hotel island to the south (flat, no dunes, so the hotel sits level).
+        /// The station island, the hotel island to the south (flat, no dunes, so the hotel sits level), the dev island and
+        /// island 3 (cliffs, crags and a river: <see cref="Island3Height"/>).
         /// </summary>
-        private static float BeachHeight(float x, float z) =>
-            Mathf.Max(Mathf.Max(ProfileHeight(ShoreCoordinate(x, z), x, z, true), ProfileHeight(Island2Shore(x, z), x, z, false)),
-                ProfileHeight(DevIslandShore(x, z), x, z, false));
+        private static float BeachHeight(float x, float z)
+        {
+            float height = Mathf.Max(Mathf.Max(ProfileHeight(ShoreCoordinate(x, z), x, z, true), Island2Ground(x, z)),
+                Mathf.Max(ProfileHeight(DevIslandShore(x, z), x, z, false), Island3Height(x, z)));
+            return BasketballGroundHeight(x, z, height);
+        }
 
         private static float ProfileHeight(float shore, float x, float z, bool dunesInland)
         {
@@ -876,19 +864,20 @@ namespace PleaseDontDrown.Editor
                 for (int ix = 0; ix < nx; ix++)
                 {
                     float x = minX + ix * step, z = minZ + iz * step;
-                    vertices[iz * nx + ix] = new Vector3(x, BeachHeight(x, z), z);
+                    // Island 3's patch is drawn by its own mesh; here it only gives the seabed (waves) its heights.
+                    vertices[iz * nx + ix] = new Vector3(x, Island3Seabed(x, z), z);
                     uvs[iz * nx + ix] = new Vector2(x, z) * 0.25f;
                 }
             }
-            var triangles = new int[(nx - 1) * (nz - 1) * 6];
-            int t = 0;
+            var triangles = new List<int>((nx - 1) * (nz - 1) * 6);
             for (int iz = 0; iz < nz - 1; iz++)
             {
                 for (int ix = 0; ix < nx - 1; ix++)
                 {
+                    if (InIsland3Patch(minX + ix * step, minZ + iz * step)) continue;
                     int a = iz * nx + ix, b = a + nx;
-                    triangles[t++] = a; triangles[t++] = b; triangles[t++] = a + 1;
-                    triangles[t++] = a + 1; triangles[t++] = b; triangles[t++] = b + 1;
+                    triangles.Add(a); triangles.Add(b); triangles.Add(a + 1);
+                    triangles.Add(a + 1); triangles.Add(b); triangles.Add(b + 1);
                 }
             }
 
@@ -901,7 +890,7 @@ namespace PleaseDontDrown.Editor
             mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.vertices = vertices;
             mesh.uv = uvs;
-            mesh.triangles = triangles;
+            mesh.SetTriangles(triangles, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             if (isNew) AssetDatabase.CreateAsset(mesh, path);

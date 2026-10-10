@@ -26,6 +26,8 @@ namespace PleaseDontDrown.Avatars
         public bool Sprinting;
         public bool Holding;          // hands on an item (grips below)
         public bool TwoHanded;
+        public bool Basketball;      // exact palm contact on the ball; keep both grips during shot charging
+        public bool Shouldered;       // a long gun up in the shoulder: right elbow out, left elbow under the barrel
         public bool CarryingPerson;
         public HandGrip GripLeft, GripRight; // world palm points, finger/palm directions, finger curls
         public float Charge;          // 0..1 throw wind-up
@@ -78,6 +80,7 @@ namespace PleaseDontDrown.Avatars
         private float _air;
         private float _crouch;
         private float _hold;
+        private float _shoulder, _shoulderRaw; // a long gun up in the shoulder (bladed stance)
         private float _charge;
         private float _eat;
         private float _cpr;
@@ -295,6 +298,8 @@ namespace PleaseDontDrown.Avatars
             // (CPR and the kiss of life put our own head right down by the hands on the chest, forehead and chin.)
             if (_eat > 0.01f || _actWeight > 0.01f || _cpr > 0.01f || GestureActive(AvatarGesture.Breath, 1.1f) || _rig.HeadTop <= 0f) return;
             if (Motion.CarryingPerson && _hold > 0.01f) return; // (arms round the legs of someone on our shoulder, right under our chin)
+            if (Motion.Shouldered && _hold > 0.01f) return; // (the trigger hand of a shouldered gun is right under the chin)
+            if (Motion.Basketball && _hold > 0.01f) return; // ball grips already place the palms; swinging them breaks contact
             Transform head = B(Bone.Head);
             float s = _rig.Scale;
             // The head as a box-ish ellipsoid: as wide as it is, as far forward as the face (and its googly eyes),
@@ -367,6 +372,7 @@ namespace PleaseDontDrown.Avatars
             _air = Mathf.MoveTowards(_air, airborne ? 1f : 0f, dt * 7f);
             _crouch = Mathf.Lerp(_crouch, m.Crouch, k(12f));
             _hold = Eased(ref _holdRaw, m.Holding, 6f, dt);
+            _shoulder = Eased(ref _shoulderRaw, m.Holding && m.Shouldered, 5f, dt);
             _charge = Mathf.MoveTowards(_charge, m.Charge, dt * 8f);
             _eat = Eased(ref _eatRaw, m.Eating, 5f, dt);
             _cpr = Eased(ref _cprRaw, m.Cpr, 4f, dt);
@@ -600,6 +606,9 @@ namespace PleaseDontDrown.Avatars
             if (normal.y < 0.75f) normal = Vector3.up;
         }
 
+        /// <summary>Degrees the chest turns to the right holding a long gun up in the shoulder.</summary>
+        private const float BladeTwist = 15f;
+
         private float GestureT(float duration) => Mathf.Clamp01((Now - _gestureStart) / duration);
         private const float BurpSeconds = 1.7f;
 
@@ -670,6 +679,14 @@ namespace PleaseDontDrown.Avatars
             // The chest takes a share of looking around (before the arms, which hang off it).
             B(Bone.Chest).localRotation = Quaternion.Euler(lean * 0.3f + LookPitch * 0.15f + _variety.Slouch * 0.5f * standing,
                 -Wave(_phase) * 5f * _move * land + LookYaw * 0.25f + _turnLag.Value * 0.5f * standing, stroke * 1.5f - tip * 0.3f);
+            // A long gun up in the shoulder: side on to the target, the right shoulder back to take the stock and the
+            // left one forward so that hand reaches out along the barrel (the head turns back to the front, PoseHead).
+            if (_shoulder > 0.01f)
+            {
+                float blade = BladeTwist * _shoulder * standing;
+                B(Bone.Spine).localRotation *= Quaternion.Euler(0f, blade * 0.4f, 0f);
+                B(Bone.Chest).localRotation *= Quaternion.Euler(0f, blade * 0.6f, 0f);
+            }
 
             // Seated: the hips go down onto the seat here, before the arms reach for the handlebars or handles (done
             // after the arms, it dragged the hands 40 cm down into the rider's lap and through the banana).
@@ -1073,6 +1090,14 @@ namespace PleaseDontDrown.Avatars
             return Mathf.Lerp(ahead, 1f, t * (0.45f + 0.55f * t)); // starts easy, ends fast
         }
 
+        /// <summary>Where the wrist goes so that, turned the grip's way, the palm sits on the grip.</summary>
+        private Vector3 WristFor(HandGrip grip, bool right)
+        {
+            HandBones hand = _rig.Hand(right);
+            if (hand == null) return grip.Point;
+            return grip.Point - grip.Rotation(right ? 1f : -1f) * Vector3.Scale(hand.PalmContact, hand.Hand.lossyScale);
+        }
+
         /// <summary>Hands on things: held items, the mouth while eating, a chest during CPR, the wind-up of a throw.</summary>
         private void ArmIKLayers()
         {
@@ -1087,19 +1112,37 @@ namespace PleaseDontDrown.Avatars
             {
                 float w = _hold * (1f - _cpr);
                 Vector3 gl = m.GripLeft.Point, gr = m.GripRight.Point;
-                if (!m.TwoHanded && !m.CarryingPerson)
+                if (m.Basketball)
+                {
+                    if (m.GripLeft.Active && m.TwoHanded)
+                        IK.Solve(upperL, foreL, la, _rig.ForearmLength, WristFor(m.GripLeft, false), elbowL, w, false);
+                    if (m.GripRight.Active)
+                        IK.Solve(upperR, foreR, la, _rig.ForearmLength, WristFor(m.GripRight, true), elbowR, w, false);
+                }
+                else if (!m.TwoHanded && !m.CarryingPerson)
                 {
                     // One hand under it, the other relaxed.
                     IK.Solve(upperR, foreR, la, lb, gr, elbowR, w, false);
                 }
                 else
                 {
-                    IK.Solve(upperL, foreL, la, lb, gl, elbowL, w, false);
-                    IK.Solve(upperR, foreR, la, lb, gr, elbowR, w, false);
+                    if (m.Shouldered)
+                    {
+                        // Elbows out and under: the wrists bend a lot, so aim each wrist where the palm lands on its grip.
+                        elbowR = right + up * 0.45f;
+                        elbowL = -up - right * 0.2f;
+                        IK.Solve(upperL, foreL, la, _rig.ForearmLength, WristFor(m.GripLeft, false), elbowL, w, false);
+                        IK.Solve(upperR, foreR, la, _rig.ForearmLength, WristFor(m.GripRight, true), elbowR, w, false);
+                    }
+                    else
+                    {
+                        IK.Solve(upperL, foreL, la, lb, gl, elbowL, w, false);
+                        IK.Solve(upperR, foreR, la, lb, gr, elbowR, w, false);
+                    }
                 }
             }
 
-            if (_charge > 0.01f)
+            if (_charge > 0.01f && !m.Basketball)
             {
                 // Wind-up: throwing hand back behind the shoulder, the other one pointing ahead.
                 Vector3 shoulder = upperR.position;
@@ -1722,6 +1765,11 @@ namespace PleaseDontDrown.Avatars
                 float out_ = b < 0.25f ? 0f : Mathf.Clamp01((b - 0.25f) / 0.08f) * (1f - Mathf.SmoothStep(0f, 1f, (b - 0.9f) / 0.45f));
                 pitch += -16f * wind + (10f + 3f * Mathf.Sin(Now * 31f)) * out_;
             }
+            // Shouldering a gun: facing the target again over the turned chest, cheek down on the stock.
+            float aiming = _shoulder * standing;
+            yaw -= BladeTwist * aiming / 0.75f;
+            pitch = pitch * (1f - 0.4f * aiming) + 3f * aiming; // (bowed all the way, the big head lands on the gun)
+            tilt -= 12f * aiming;
             B(Bone.Neck).localRotation = Quaternion.Euler(pitch * 0.3f + swimTilt * 0.4f, yaw * 0.25f + turn * 0.4f, tilt * 0.4f);
             B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 15f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
         }

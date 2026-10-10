@@ -37,6 +37,8 @@ namespace PleaseDontDrown.Vehicles
         [SerializeField] private bool _straddle;
         [Tooltip("Hands rest open on the float rather than closing around handlebars.")]
         [SerializeField] private bool _restHands;
+        [Tooltip("A seat that never moves (a bar stool): sit down and stand up, no driving. Frozen in place.")]
+        [SerializeField] private bool _chair;
         [Tooltip("Needed in the driver's inventory to start it (item display name). Empty = no key.")]
         [SerializeField] private string _keyItem = "";
         [Header("Driving")]
@@ -71,6 +73,7 @@ namespace PleaseDontDrown.Vehicles
 
         public static IReadOnlyList<Vehicle> All => _all;
         public string DisplayName => _displayName;
+        public bool IsChair => _chair;
         public PlayerHub Driver => _driver.Value;
         public bool IsLocked => _locked.Value;
         public Rigidbody Body => _rb;
@@ -184,6 +187,7 @@ namespace PleaseDontDrown.Vehicles
 
         public string GetPrompt(PlayerHub player)
         {
+            if (_chair) return IsAboard(player) ? "Stand up" : _driver.Value != null ? $"The {_displayName} is taken" : $"Sit on the {_displayName}";
             if (IsAboard(player)) return $"Get off the {_displayName}";
             if (_driver.Value != null && FreeBackSeat() >= 0)
                 return _thrust > 0f ? $"Hop on the back of the {_displayName}" : $"Ride the {_displayName} (seat {FreeBackSeat() + 2})";
@@ -401,6 +405,14 @@ namespace PleaseDontDrown.Vehicles
                     else hands.Drop();
                 }
                 local.Motor.SetSeat(this, Vector3.zero);
+                if (_chair)
+                {
+                    // Sat down facing the way the stool faces (the counter), whichever way we were looking.
+                    Transform seat = SeatTransform(0);
+                    if (local.Look != null) local.Look.AddYaw(Mathf.DeltaAngle(local.Look.Yaw, seat.eulerAngles.y));
+                    PlayerHud.ShowToast($"<b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> to stand up.", 3f);
+                    return;
+                }
                 GameInput.Rebind[] keys = GameInput.Rebindable; // forward, back, left, right come first
                 string Key(int i) => GameInput.KeyLabel(keys[i].Action, keys[i].Binding);
                 PlayerHud.ShowToast($"<b>{Key(0)}/{Key(1)}</b> throttle, <b>{Key(2)}/{Key(3)}</b> steer, <b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> to get off.", 5f);

@@ -41,6 +41,7 @@ namespace PleaseDontDrown.Editor
             Directory.CreateDirectory("Screenshots/Review");
             var camera = GameObject.Find("MenuCamera").GetComponent<Camera>();
             camera.farClipPlane = 2000f;
+            camera.nearClipPlane = 0.02f; // face close-ups (the kiss of life) from a few centimetres away
             foreach (string raw in lines)
             {
                 string line = raw.Trim();

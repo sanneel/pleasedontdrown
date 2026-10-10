@@ -89,6 +89,12 @@ namespace PleaseDontDrown.Player
 
         private void UpdateBreath(float dt)
         {
+            if (GodMode.On)
+            {
+                Air01 = Stamina01 = 1f;
+                _gasping = false;
+                return;
+            }
             if (IsHeadUnderwater)
             {
                 Air01 = Mathf.Max(0f, Air01 - dt / _airSeconds);

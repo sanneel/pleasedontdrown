@@ -239,6 +239,7 @@ namespace PleaseDontDrown.Combat
         private void KnockTarget(NetworkConnection target, Vector3 velocity, string byWhom)
         {
             LastKnockedTime = Time.time;
+            if (GodMode.On) return; // god mode: nothing knocks you about
             if (_hub.Motor != null && _hub.Motor.Seat == null) _hub.Motor.AddImpulse(velocity);
             PlayerHud.ShowToast(string.IsNullOrEmpty(byWhom) ? "OOF!" : $"OOF! {byWhom} got you.", 1.5f);
         }

@@ -176,3 +176,27 @@ Chunky cartoon bolt-action sniper rifle, long dark barrel, brown wooden stock, b
 ```
 Parts (one model each): a small red dot reflex sight; a rifle scope; a cylindrical black suppressor; a stubby
 compensator with side vents; a small black tactical laser module; a long straight magazine; a long curved magazine.
+
+## Guns held by other players (9 October 2026)
+
+Seen from outside, the two-handed guns (rifle, shotgun, sniper, SMG) used to be pulled back along
+the barrel until the left hand reached the forend, which pushed the stock through the right
+shoulder and out the back. Now they are held the way a real gun is, butt on the right shoulder:
+
+- `PlayerHands.StockPocket` puts the butt on the upper round of the right shoulder. On the cartoon
+  bodies the chest sticks out further than the shoulder joint, so that is the one spot where a butt
+  can rest on the shoulder without going into the chest.
+- `ShoulderedStock` then slides the gun forward along its barrel until the butt just touches the
+  holder's real skin there (shoulder, chest, belly; not the arms, which hold the gun). The skin is
+  picked out of the body mesh once per character and skinned with the current pose each frame, so
+  it works for every build. Each gun's butt is measured from its mesh once.
+- `AvatarMotion.Shouldered` puts the body in a shooting stance: the chest turns side on
+  (`BladeTwist`), the head turns back to the target and tips onto the stock, the right elbow goes up
+  and out, the left one under the barrel. The arm IK aims the wrists so the palms land right on
+  their grips, and the rule that keeps raised hands out of the head is off (the trigger hand is
+  meant to be under the chin).
+
+`GunHoldCheck` measures how deep the back 10 cm of each two-handed gun goes into the posed body
+(against the body mesh itself) and fails over 1 cm. It also renders a side view of every hold
+(`Screenshots/Review/gunhold_*_side.jpg`). A shouldered gun may sit close to the face (it fails
+only under 3 cm); everything else still has to stay 6 cm clear.

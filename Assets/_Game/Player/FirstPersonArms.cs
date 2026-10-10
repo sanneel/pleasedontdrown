@@ -201,6 +201,16 @@ namespace PleaseDontDrown.Player
             hand.Bones.Pose(g.Pose);
         }
 
+        /// <summary>Developer capture: distance from each live palm to its held-item grip; -1 for an unused hand.</summary>
+        public Vector2 HeldGripErrors()
+        {
+            if (!_built || _hub?.Hands?.HeldItem == null) return new Vector2(-1f, -1f);
+            var kind = _hub.Hands.GetGrip(out HandGrip left, out HandGrip right);
+            float Error(Hand hand, HandGrip grip) => grip.Active
+                ? Vector3.Distance(hand.Wrist.TransformPoint(hand.Bones.PalmContact), grip.Point) : -1f;
+            return new Vector2(kind == PlayerHands.GripKind.TwoHands ? Error(_left, left) : -1f, Error(_right, right));
+        }
+
         public void Play(AvatarGesture gesture, Vector3 point = default)
         {
             if (gesture is AvatarGesture.ChargeStart or AvatarGesture.ChargeEnd or AvatarGesture.EatStart or AvatarGesture.EatStop or AvatarGesture.Bite)

@@ -99,7 +99,9 @@ namespace PleaseDontDrown.Editor
             // Use existing art, matching the rest of the game. Static garden trees have no network behaviours.
             CombineResortDetails(root);
             BuildFinishedHotelEntrance(hotel);
-            if (LoadProp("resort_beach_bar") != null) BuildRichResortBeach(hotel);
+            // Island two is now hotel + story only, with the user's polished Tripo hotel (GameSceneBuilder.HotelIsland.cs).
+            ApplyRealisticHotel(hotel);
+            BuildHotelBar(hotel); // the beach bar back, west of the hotel (GameSceneBuilder.HotelBar.cs)
         }
 
         private static GameObject ResortBox(Transform parent, string name, Vector3 p, Vector3 size, Material material, bool solid = true) =>
@@ -159,7 +161,7 @@ namespace PleaseDontDrown.Editor
 
         // Bake thousands of facade details into a few persistent meshes per wing/material.
         // Keep solid building/pool colliders separate. Never combine trees, text or the lobby.
-        private static void CombineResortDetails(Transform root)
+        private static void CombineResortDetails(Transform root, string folder = "Resort")
         {
             var details = root.GetComponentsInChildren<MeshFilter>().Where(m =>
                 m.sharedMesh != null && m.GetComponent<Collider>() == null && !m.name.StartsWith("Combined_") &&
@@ -168,7 +170,7 @@ namespace PleaseDontDrown.Editor
             {
                 var mesh = new Mesh { name = root.name + "_" + group.Key.name, indexFormat = IndexFormat.UInt32 };
                 mesh.CombineMeshes(group.Select(m => new CombineInstance { mesh = m.sharedMesh, transform = root.worldToLocalMatrix * m.transform.localToWorldMatrix }).ToArray());
-                string dir = MeshDir + "/Resort"; Directory.CreateDirectory(dir);
+                string dir = MeshDir + "/" + folder; Directory.CreateDirectory(dir);
                 string path = dir + "/" + mesh.name + ".asset";
                 var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
                 if (existing == null) { AssetDatabase.CreateAsset(mesh, path); existing = mesh; }
@@ -192,17 +194,7 @@ namespace PleaseDontDrown.Editor
             if (importedCrown != null) Object.DestroyImmediate(importedCrown);
             Directory.CreateDirectory("Logs");
             EditorSceneManager.SaveScene(scene, "Logs/Game-before-resort-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".unity", true);
-            var mesh = GetBeachMesh();
-            terrain.GetComponent<MeshFilter>().sharedMesh = mesh;
-            terrain.GetComponent<MeshCollider>().sharedMesh = null;
-            terrain.GetComponent<MeshCollider>().sharedMesh = mesh;
-            var so = new SerializedObject(terrain.GetComponent<Seabed>());
-            Require(so, "_grid").objectReferenceValue = mesh;
-            Require(so, "_min").vector2Value = new Vector2(TerrainMinX, TerrainMinZ);
-            Require(so, "_step").floatValue = TerrainStep;
-            Require(so, "_countX").intValue = Mathf.RoundToInt((TerrainMaxX - TerrainMinX) / TerrainStep) + 1;
-            Require(so, "_countZ").intValue = Mathf.RoundToInt((TerrainMaxZ - TerrainMinZ) / TerrainStep) + 1;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            RefreshBeachTerrain(terrain);
             BuildResortExterior(hotel);
             foreach (var imported in scene.GetRootGameObjects())
                 if (AssetDatabase.GetAssetPath(PrefabUtility.GetCorrespondingObjectFromSource(imported)) == TripoHotelReview.ModelPath)
@@ -232,9 +224,19 @@ namespace PleaseDontDrown.Editor
                 throw new InvalidOperationException("Terrain collision/render mismatch");
         }
 
-        private static void CaptureResort()
+        private static void CaptureResort() => CaptureViews("Screenshots/Review/Resort", new[] {
+            ("overview", new Vector3(255, 205, -115), new Vector3(20, 0, -345)),
+            ("arrival", new Vector3(-12, 7, -183), new Vector3(20, 12, -267)),
+            ("gardens", new Vector3(-147, 42, -423), new Vector3(20, 12, -300)),
+            ("reception", new Vector3(20, 2, -233), new Vector3(17, 1.7f, -246)),
+            ("lobby", new Vector3(20, 2, -240), new Vector3(14, 1.6f, -246)),
+            ("beach-club", new Vector3(-90, 7, -224), new Vector3(-48, 2.6f, -254)),
+            ("beach-cabanas", new Vector3(135, 6, -225), new Vector3(85, 1.5f, -252)) });
+
+        /// <summary>Renders review pictures (name, camera, look-at) into <paramref name="folder"/> with a temporary ocean.</summary>
+        private static void CaptureViews(string folder, (string, Vector3, Vector3)[] poses)
         {
-            Directory.CreateDirectory("Screenshots/Review/Resort");
+            Directory.CreateDirectory(folder);
             var camera = new GameObject("Temporary resort review camera").AddComponent<Camera>();
             camera.fieldOfView = 60; camera.farClipPlane = 1200; camera.nearClipPlane = .1f;
             camera.clearFlags = CameraClearFlags.Skybox;
@@ -255,14 +257,6 @@ namespace PleaseDontDrown.Editor
             var oldRect = Shader.GetGlobalVector("_PDD_SeabedRect");
             var oldTexture = Shader.GetGlobalTexture("_PDD_Seabed");
             float fog = RenderSettings.fogDensity;
-            var poses = new[] {
-                ("overview", new Vector3(255, 205, -115), new Vector3(20, 0, -345)),
-                ("arrival", new Vector3(-12, 7, -183), new Vector3(20, 12, -267)),
-                ("gardens", new Vector3(-147, 42, -423), new Vector3(20, 12, -300)),
-                ("reception", new Vector3(20, 2, -233), new Vector3(17, 1.7f, -246)),
-                ("lobby", new Vector3(20, 2, -240), new Vector3(14, 1.6f, -246)),
-                ("beach-club", new Vector3(-90, 7, -224), new Vector3(-48, 2.6f, -254)),
-                ("beach-cabanas", new Vector3(135, 6, -225), new Vector3(85, 1.5f, -252)) };
             try
             {
                 typeof(Seabed).GetMethod("Awake", flags).Invoke(seabed, null);
@@ -271,7 +265,7 @@ namespace PleaseDontDrown.Editor
                 foreach (var pose in poses)
                 {
                     // Aerial review uses less haze so the full layout is visible. Arrival retains the game's haze.
-                    RenderSettings.fogDensity = pose.Item1 == "overview" ? .0012f : fog;
+                    RenderSettings.fogDensity = pose.Item1.StartsWith("overview") ? .0012f : fog;
                     camera.transform.position = pose.Item2; camera.transform.LookAt(pose.Item3);
                     typeof(WaterSurface).GetMethod("LateUpdate", flags).Invoke(water, null);
                     foreach (Transform part in preview.transform) part.position = new Vector3(camera.transform.position.x, 0, camera.transform.position.z);
@@ -282,7 +276,7 @@ namespace PleaseDontDrown.Editor
                     try {
                         camera.targetTexture = target; camera.Render(); camera.Render(); RenderTexture.active = target;
                         texture.ReadPixels(new Rect(0, 0, 1600, 1000), 0, 0); texture.Apply();
-                        File.WriteAllBytes("Screenshots/Review/Resort/" + pose.Item1 + ".png", texture.EncodeToPNG());
+                        File.WriteAllBytes(folder + "/" + pose.Item1 + ".png", texture.EncodeToPNG());
                     }
                     finally { camera.targetTexture = null; RenderTexture.active = previous; Object.DestroyImmediate(texture); target.Release(); Object.DestroyImmediate(target); }
                 }

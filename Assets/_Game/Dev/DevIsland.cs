@@ -16,7 +16,7 @@ using UnityEngine;
 namespace PleaseDontDrown.Dev
 {
     /// <summary>Where the travel pads and the pause menu can take you.</summary>
-    public enum Destination : byte { StationBeach, HotelIsland, DevIsland }
+    public enum Destination : byte { StationBeach, HotelIsland, DevIsland, PirateIsland }
 
     public enum DevAction : byte
     {
@@ -51,6 +51,7 @@ namespace PleaseDontDrown.Dev
         [SerializeField] private Transform _arrival;
         [SerializeField] private Transform _home;
         [SerializeField] private Transform _hotel;
+        [SerializeField] private Transform _pirate;
         [SerializeField] private Transform _seaSpot;
         [SerializeField] private Transform _beachSpot;
 
@@ -58,7 +59,7 @@ namespace PleaseDontDrown.Dev
         public Transform Arrival => _arrival;
         public Transform Home => _home;
 
-        public static readonly string[] DestinationNames = { "Station beach (island 1)", "Hotel island (island 2)", "Dev island" };
+        public static readonly string[] DestinationNames = { "Station beach (island 1)", "Hotel island (island 2)", "Dev island", "Pirate island (island 3)" };
 
         /// <summary>The local player goes to <paramref name="where"/> (players move themselves: nothing to send).</summary>
         public static void Travel(Destination where)
@@ -74,6 +75,7 @@ namespace PleaseDontDrown.Dev
             {
                 Destination.HotelIsland => Instance._hotel,
                 Destination.DevIsland => Instance._arrival,
+                Destination.PirateIsland => Instance._pirate,
                 _ => Instance._home
             };
             Teleport(me, spot);
@@ -81,6 +83,7 @@ namespace PleaseDontDrown.Dev
             {
                 Destination.DevIsland => "Dev island: guns (table and armory), the range, rescue test buttons, the models. Console: ` or F1 / F2.",
                 Destination.HotelIsland => "The hotel island. Purple pads (or Esc > Travel) take you back.",
+                Destination.PirateIsland => "Skull Cove, the pirates' island. The pad by the dock (or Esc > Travel) takes you back.",
                 _ => "The station beach."
             }, 5f);
         }
@@ -105,6 +108,7 @@ namespace PleaseDontDrown.Dev
             DevCommands.Register("devisland", "", "Go to the dev island (guns, range, test buttons, models).", _ => Travel(Destination.DevIsland), owner: this);
             DevCommands.Register("home", "", "Go to the station beach (island 1).", _ => Travel(Destination.StationBeach), owner: this);
             DevCommands.Register("hotel", "", "Go to the hotel island (island 2).", _ => Travel(Destination.HotelIsland), owner: this);
+            DevCommands.Register("island3", "", "Go to the pirates' island (island 3).", _ => Travel(Destination.PirateIsland), owner: this);
             DevCommands.Register("devtest", "<action>", $"Press a dev island test button: {string.Join(", ", Enum.GetNames(typeof(DevAction)))}.", args =>
             {
                 if (args.Length == 0 || !Enum.TryParse(args[0], true, out DevAction action)) throw new ArgumentException("which button?");
@@ -118,6 +122,7 @@ namespace PleaseDontDrown.Dev
             DevCommands.Unregister("devisland", this);
             DevCommands.Unregister("home", this);
             DevCommands.Unregister("hotel", this);
+            DevCommands.Unregister("island3", this);
             DevCommands.Unregister("devtest", this);
         }
 

@@ -133,19 +133,17 @@ namespace PleaseDontDrown.Editor
             {
                 ("Sandy", AvatarLook.Bodies.Sandy, true, new Vector3(-208f, 0f, -80f)),
                 ("Sandy (boss)", AvatarLook.Bodies.SandyBoss, true, new Vector3(-212.5f, 0f, -80f)),
-                ("Tourist: red bikini", AvatarLook.Bodies.TouristRed, true, new Vector3(-217f, 0f, -80f)),
-                ("Tourist: sporty", AvatarLook.Bodies.TouristSporty, true, new Vector3(-221.5f, 0f, -80f)),
-                ("Tourist: purple bikini", AvatarLook.Bodies.TouristPurple, true, new Vector3(-226f, 0f, -80f)),
-                ("Tourist: sunburnt dad", AvatarLook.Bodies.TouristBuddy, false, new Vector3(-230.5f, 0f, -80f)),
+                ("Tourist: sunburnt dad", AvatarLook.Bodies.TouristBuddy, false, new Vector3(-217f, 0f, -80f)),
             };
-            string[] baseNames = { "Red bikini", "Sporty", "Purple bikini", "Sunburnt dad" };
-            for (int b = 0; b < AvatarLook.Bodies.VariantBases.Length; b++)
-            {
-                byte baseBody = AvatarLook.Bodies.VariantBases[b];
-                for (int n = 1; n <= AvatarLook.Bodies.VariantsPerBase; n++)
-                    models.Add(($"{baseNames[b]} #{n}", AvatarLook.Bodies.Variant(baseBody, n), AvatarLook.Bodies.IsFeminine(AvatarLook.Bodies.Variant(baseBody, n)),
-                        new Vector3(-241f - (n - 1) * 2.6f, 0f, -62f - b * 4.5f)));
-            }
+            // The tourist women in a row, then the dad's look-alikes.
+            string[] women = { "Lola", "Red bikini", "Blonde", "Redhead", "Black hair", "Pink bikini", "Lavender bikini" };
+            for (int w = 0; w < women.Length; w++)
+                models.Add(($"Tourist: {women[w]}", AvatarLook.Bodies.TouristWomen[w], true, new Vector3(-241f - w * 2.6f, 0f, -62f)));
+            models.Add(("Barista", AvatarLook.Bodies.BaristaGirl, true, new Vector3(-241f - women.Length * 2.6f, 0f, -62f)));
+            models.Add(("Bartender", AvatarLook.Bodies.Bartender, true, new Vector3(-241f - (women.Length + 1) * 2.6f, 0f, -62f)));
+            for (int n = 1; n <= AvatarLook.Bodies.VariantsPerBase; n++)
+                models.Add(($"Sunburnt dad #{n}", AvatarLook.Bodies.Variant(AvatarLook.Bodies.TouristBuddy, n), false,
+                    new Vector3(-241f - (n - 1) * 2.6f, 0f, -66.5f)));
             var gallery = new List<(string name, byte body, bool feminine, StoryNpc npc)>();
             for (int i = 0; i < models.Count; i++)
             {

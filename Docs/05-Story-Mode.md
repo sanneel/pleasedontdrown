@@ -218,3 +218,35 @@ jet ski, boat, kiosk and hotel are primitives in `GameSceneBuilder.Story.cs`.
 
 **Tuning** lives in the scene (`StoryDirector` island setups: sea boxes, difficulty, land area) and in code constants
 (`Economy` pay, `VictimBrain` CPR gains, pistol price 250).
+
+---
+
+## 7. After the story: the open shift
+
+The fish-them-out-and-launch-them loop is the game, so it doesn't stop at "To be continued". When beat 2.7 ends (or when a
+save with beat `end` is loaded) the director calls `BeginFreePlay` (`Story/StoryDirector.FreePlay.cs`) and the game becomes
+an endless **open shift** around the first island and hotel island:
+
+* **Tourists keep coming.** Every 16-32 s (faster with more lifeguards) a tourist gets into trouble in the sea of whichever
+  island a lifeguard is near (within 140 m of its sea), up to 3 at once (1 + players). Same gags-free profile and
+  difficulty as the island's story rescues; 15 % are silent drowners. Rescues pay as always; lost ones still get the
+  airlift bill.
+* **Everything the story locked is open**: shop, rental fleet, the pirate boat, Sandy's kiosk (lost things keep turning up
+  on island 1).
+* **Trickshots pay** (`Fun/TrickShots.cs`, host, always on, not tied to the story): any tourist someone throws, and any
+  lifeguard who flies (thrown by a friend, cannon, off a vehicle), is timed from launch to landing. 12 m or more pays
+  `1.2 x distance + 2 x height (+20 for a beach-to-sea splash)`, max $150: NICE THROW / LONG SHOT (20 m) / TRICKSHOT (30 m) / ORBITAL (45 m).
+  A tourist thrown again and again pays less each time (x1/(1+0.35 n), floor 30 %, forgotten after 5 minutes).
+  Thrown back into deep water, the tourist is in trouble again: that is the loop. Disabled during the tsunami.
+* **Landing feedback.** The floating reward and cheer are sent by `RescueService.ServerCallout` to all observers.
+  Guns have no tourist air-shot reward or landing multiplier.
+* Joining friends get a short "open shift" welcome instead of the chapter recap. `Esc > Restart the story` still starts
+  over; `story off` stops story spawning, while throw rewards stay available. Stopping the host stops all story
+  coroutines and clears trickshot flights. Starting a new host starts one fresh story/spawn loop.
+
+Not done yet: the basketball hoop and cannon don't give tourists a bonus of their own, and open-shift pay isn't tuned.
+
+Host restart check (separate Development player, no saved scene or story changes):
+`-pdd-freeplaycheck -pdd-nosave -pdd-host-offline -pdd-nosteam -pdd-noinput -pdd-port 7794`.
+It leaves during the open-shift spawner's wait, checks that no tourists spawn while stopped, then rehosts and checks
+that fresh spawning resumes. Look for `[FreePlayLifecycle] RESULT PASS`; the process exits 0 on a clean pass.

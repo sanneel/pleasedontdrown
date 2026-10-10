@@ -177,6 +177,16 @@ namespace PleaseDontDrown.Core
             Apply();
         }
 
+        // The Input System also resets every action during SubsystemRegistration, and its order against Init isn't
+        // fixed: in a build the global keys (Esc, console, Tab) could be switched off for good. Turn them on again after.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        private static void EnableAfterResets()
+        {
+            if (IgnoreDevices) return;
+            _global.Enable();
+            if (_uiBlockers == 0) _gameplay.Enable();
+        }
+
         // After every SubsystemRegistration reset (the console clears its commands in one of those).
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void RegisterCommands()
@@ -250,6 +260,7 @@ namespace PleaseDontDrown.Core
             if (play && !IgnoreDevices) _gameplay.Enable();
             else _gameplay.Disable();
             if (IgnoreDevices) _global.Disable();
+            else _global.Enable();
             Cursor.lockState = play && LocalPlayerExists ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !play || !LocalPlayerExists;
         }

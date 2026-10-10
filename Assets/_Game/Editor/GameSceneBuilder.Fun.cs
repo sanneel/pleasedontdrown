@@ -20,8 +20,9 @@ namespace PleaseDontDrown.Editor
     {
         private static readonly Vector3 HoopSpot = new(-6f, 0f, 30f);
         private static readonly Vector3 RingTableSpot = new(15.5f, 0f, 5.2f);
-        private static readonly Vector3 HutSpot = new(21f, 0f, 19f); // the toilets
-        private static readonly Vector3 BarSpot = new(28.5f, 0f, 17f);
+        // The toilets and the bar stand back from the beach, in the middle of the island (the user's map).
+        private static readonly Vector3 HutSpot = new(14f, 0f, 35f); // the toilets
+        private static readonly Vector3 BarSpot = new(31f, 0f, 35f);
 
         private static IEnumerable<Object> BuildFunItems()
         {
@@ -49,7 +50,7 @@ namespace PleaseDontDrown.Editor
                     return g;
                 }
                 SetRef(item, "_gripRight", Grip("GripRight", new Vector3(0.3f, -0.45f, -0.84f), new Vector3(0f, 1f, 0.35f)));
-                SetRef(item, "_gripLeft", Grip("GripLeft", new Vector3(-1f, 0.12f, -0.1f), new Vector3(0f, 0.7f, 1f)));
+                SetEnum(item, "_grip", (int)ItemGrip.OneHand); // dribbled with the right hand only
                 SetField(item, "_gripPose", p =>
                 {
                     p.FindPropertyRelative("Index").floatValue = p.FindPropertyRelative("Middle").floatValue =
@@ -211,17 +212,104 @@ namespace PleaseDontDrown.Editor
             SetRefs(rack, "_spots", spots.ToArray());
             SetField(rack, "_worldCap", p => p.intValue = 6);
 
-            // The three-point line: white dots on the sand, 6 m out round the hoop.
+            BuildBasketballCourt(root, parent);
+        }
+
+        private static void BuildBasketballCourt(Transform root, Transform parent)
+        {
+            // The court painted on the sand (hoop-local +z is out onto the court): a tinted key with a free-throw
+            // circle, and a solid three-point line (an arc that runs into two straight corner lines). The paint is
+            // meshes sampled from the leveled court terrain, with a small lift to prevent paint flicker.
             Material line = GetMaterial("CourtLine", new Color(0.97f, 0.97f, 0.95f));
-            Vector3 c = root.TransformPoint(new Vector3(0f, 0f, 0.38f));
-            for (int i = 0; i <= 24; i++)
+            Material zone = GetMaterial("CourtZone", new Color(0.16f, 0.45f, 0.72f));
+            var court = new GameObject("Court").transform;
+            court.SetParent(parent, false);
+            const float baseZ = -1.0f, keyHalf = 1.8f, throwZ = 4.2f, arcR = 6.4f, arcZ = 0.38f;
+            // Sample the rendered terrain collider: the beach mesh is coarser than BeachHeight's analytic dunes.
+            // Paint that uses the analytic function alone can disappear beneath a triangle or float above it.
+            Physics.SyncTransforms();
+            Collider terrain = GameObject.Find("Environment/BeachTerrain")?.GetComponent<Collider>();
+            Vector3 World(float x, float z)
             {
-                float a = Mathf.Lerp(-80f, 80f, i / 24f) * Mathf.Deg2Rad;
-                Vector3 p = c + root.rotation * new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 6f;
-                p = Ground(p) + Vector3.up * 0.02f;
-                GameObject dot = Primitive(PrimitiveType.Cylinder, "ThreePointDot", parent, Vector3.zero, new Vector3(0.18f, 0.01f, 0.18f), line, keepCollider: false);
-                dot.transform.position = p;
+                Vector3 w = root.TransformPoint(new Vector3(x, 0f, z));
+                if (terrain != null && terrain.Raycast(new Ray(new Vector3(w.x, 100f, w.z), Vector3.down), out RaycastHit hit, 200f))
+                    return hit.point;
+                return Ground(w);
             }
+
+            // Tinted key: a grid draped over the sand.
+            {
+                int nx = Mathf.CeilToInt(keyHalf * 2f / 0.2f), nz = Mathf.CeilToInt((throwZ - baseZ) / 0.2f);
+                var verts = new List<Vector3>();
+                var tris = new List<int>();
+                for (int zi = 0; zi <= nz; zi++)
+                    for (int xi = 0; xi <= nx; xi++)
+                        verts.Add(World(Mathf.Lerp(-keyHalf, keyHalf, xi / (float)nx), Mathf.Lerp(baseZ, throwZ, zi / (float)nz)) + Vector3.up * 0.025f);
+                for (int zi = 0; zi < nz; zi++)
+                    for (int xi = 0; xi < nx; xi++)
+                    {
+                        int i0 = zi * (nx + 1) + xi, i1 = i0 + 1, i2 = i0 + nx + 1, i3 = i2 + 1;
+                        tris.AddRange(new[] { i0, i2, i1, i1, i2, i3 });
+                    }
+                CourtPaint("CourtKey", court, verts, tris, zone);
+            }
+
+            // Lines: ribbons along a polyline (hoop-local x,z points), each piece cut short so the ribbon hugs the ground.
+            var lineVerts = new List<Vector3>();
+            var lineTris = new List<int>();
+            void Ribbon(List<Vector2> pts, float width)
+            {
+                var dense = new List<Vector2> { pts[0] };
+                for (int i = 1; i < pts.Count; i++)
+                {
+                    int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(pts[i - 1], pts[i]) / 0.2f));
+                    for (int k = 1; k <= steps; k++) dense.Add(Vector2.Lerp(pts[i - 1], pts[i], k / (float)steps));
+                }
+                int start = lineVerts.Count;
+                for (int i = 0; i < dense.Count; i++)
+                {
+                    Vector2 dir = (dense[Mathf.Min(i + 1, dense.Count - 1)] - dense[Mathf.Max(i - 1, 0)]).normalized;
+                    Vector2 side = new Vector2(-dir.y, dir.x) * (width * 0.5f);
+                    lineVerts.Add(World(dense[i].x - side.x, dense[i].y - side.y) + Vector3.up * 0.035f);
+                    lineVerts.Add(World(dense[i].x + side.x, dense[i].y + side.y) + Vector3.up * 0.035f);
+                }
+                for (int i = 0; i < dense.Count - 1; i++)
+                {
+                    int a0 = start + i * 2;
+                    lineTris.AddRange(new[] { a0, a0 + 1, a0 + 2, a0 + 1, a0 + 3, a0 + 2 });
+                }
+            }
+            Ribbon(new List<Vector2> { new(-keyHalf, baseZ), new(-keyHalf, throwZ), new(keyHalf, throwZ), new(keyHalf, baseZ) }, 0.12f);
+            Ribbon(new List<Vector2> { new(-arcR - 0.6f, baseZ), new(arcR + 0.6f, baseZ) }, 0.12f);
+            var circle = new List<Vector2>();
+            for (int i = 0; i <= 32; i++)
+                circle.Add(new Vector2(Mathf.Sin(i * Mathf.PI * 2f / 32f) * keyHalf, throwZ + Mathf.Cos(i * Mathf.PI * 2f / 32f) * keyHalf));
+            Ribbon(circle, 0.1f);
+            var three = new List<Vector2> { new(-arcR, baseZ) };
+            for (int i = 0; i <= 48; i++)
+            {
+                float a = Mathf.Lerp(-90f, 90f, i / 48f) * Mathf.Deg2Rad;
+                three.Add(new Vector2(Mathf.Sin(a) * arcR, arcZ + Mathf.Cos(a) * arcR));
+            }
+            three.Add(new Vector2(arcR, baseZ));
+            Ribbon(three, 0.16f);
+            CourtPaint("CourtLines", court, lineVerts, lineTris, line);
+        }
+
+        /// <summary>A paint mesh (court lines, the tinted key) as a collider-less object under <paramref name="parent"/>; world-space vertices.</summary>
+        private static void CourtPaint(string name, Transform parent, List<Vector3> verts, List<int> tris, Material material)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var mesh = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(verts.ConvertAll(go.transform.InverseTransformPoint));
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterial = material;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         // ------------------------------------------------------------------ rescue rings
@@ -346,7 +434,7 @@ namespace PleaseDontDrown.Editor
             for (int i = 0; i < 4; i++)
                 Solid("Stool", new Vector3(-1.5f + i, 0.4f, 1.85f), new Vector3(0.22f, 0.8f, 0.22f)); // (slim: you can step between them to the counter)
             Solid("Menu", new Vector3(-2.45f, 0.7f, 1.4f), new Vector3(0.1f, 1.4f, 0.7f));
-            BuildBarista(root);
+            BuildBarista(root, AvatarLook.Bodies.BaristaGirl);
 
             root.gameObject.AddComponent<NetworkObject>();
             var rack = root.gameObject.AddComponent<ItemRack>();
@@ -381,7 +469,7 @@ namespace PleaseDontDrown.Editor
         /// The barista behind the counter (Fun/Barista): a stand-in body for now (his own model is coming), wiping the
         /// counter with a rag; Interact orders a beer, put down in front of whichever stool you're at.
         /// </summary>
-        private static void BuildBarista(Transform bar)
+        private static void BuildBarista(Transform bar, byte body = 0)
         {
             var root = new GameObject("Barista").transform;
             root.SetParent(bar, false);
@@ -423,6 +511,7 @@ namespace PleaseDontDrown.Editor
             SetRef(barista, "_wipeFrom", wipeFrom);
             SetRef(barista, "_wipeTo", wipeTo);
             SetRef(barista, "_rag", rag.transform);
+            SetField(barista, "_body", p => p.intValue = body); // 0: the stand-in
             ConfigureInteractable(root.gameObject.AddComponent<Interaction.Interactable>(), new Collider[] { capsule },
                 new Renderer[] { avatarGo.GetComponent<SkinnedMeshRenderer>() }, 3.6f);
         }

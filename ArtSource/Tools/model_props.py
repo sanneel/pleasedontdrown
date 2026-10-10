@@ -38,6 +38,8 @@ PAINT = {  # sRGB, all matte
     "beer_glass": (0.37, 0.15, 0.045), "beer_foil": (0.92, 0.67, 0.24),
     "beer_label": (0.99, 0.95, 0.80), "condensation": (0.64, 0.79, 0.81),
     "coconut_flesh": (0.98, 0.97, 0.90),
+    "fries": (1.0, 0.82, 0.33), "fries_dark": (0.88, 0.6, 0.2), "can_metal": (0.8, 0.82, 0.85),
+    "cocktail": (1.0, 0.42, 0.22), "cocktail_top": (1.0, 0.78, 0.3), "cocktail_glass": (0.8, 0.92, 0.95), "lime": (0.55, 0.85, 0.25),
 }
 
 def srgb_to_linear(c): return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
@@ -48,8 +50,9 @@ def material(name):
     m = bpy.data.materials.new(name); m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*[srgb_to_linear(c) for c in PAINT[name]], 1)
-    b.inputs["Roughness"].default_value = {"beer_glass": 0.16, "beer_foil": 0.24, "condensation": 0.08, "coconut_flesh": 0.42}.get(name, 0.82)
-    b.inputs["Metallic"].default_value = 0.75 if name == "beer_foil" else 0.0
+    b.inputs["Roughness"].default_value = {"beer_glass": 0.16, "beer_foil": 0.24, "condensation": 0.08, "coconut_flesh": 0.42,
+                                           "can_metal": 0.3, "cocktail_glass": 0.1, "cocktail": 0.25}.get(name, 0.82)
+    b.inputs["Metallic"].default_value = 0.75 if name in ("beer_foil", "can_metal") else 0.0
     return m
 
 def B(p):
@@ -467,6 +470,51 @@ def beer_bottle():
         wrap_on_cylinder(sun, 0.0316 * k + 0.0003, turn)
         wave = [(x * 0.001 * k, (-0.0205 + 0.0016 * math.sin(x * 0.9)) * k, 0.0) for x in range(-12, 13)]
         wrap_on_cylinder(tube(f"Wave{side}", wave, 0.0013 * k, "blue", seg=6), 0.0316 * k + 0.0011, turn)
+
+@prop
+def fries():
+    """A red paper carton of chips, wider at the top, a golden bunch of fat fries sticking out at angles
+    (0.22 m tall, cartoon-sized like the beer; centred)."""
+    prism("Carton", rounded_rect(0.09, 0.05, 0.008), -0.105, 0.035, "red", taper=1.3, bevel=0.003)
+    prism("Inside", rounded_rect(0.105, 0.058, 0.006), 0.0, 0.034, "fries_dark")
+    for side, turn in (("F", "+z"), ("B", "-z")):
+        z = 0.034 if side == "F" else -0.034
+        text3d(f"Brand{side}", "FRIES", (0, -0.045, z), 0.018, 0.0015, "yellow", face=turn)
+    rng = random.Random(77)
+    for i in range(26):
+        x, z = rng.uniform(-0.036, 0.036), rng.uniform(-0.014, 0.014)
+        h = rng.uniform(0.09, 0.13)
+        # (Leaning outward a little at most, so none pokes through the carton's walls.)
+        box(f"Fry{i}", (x, h / 2 - 0.004, z), (0.012, h, 0.012), rng.choice(["fries", "fries", "fries_dark"]),
+            rot=(rng.uniform(-6, 6) + z * 200, rng.uniform(0, 90), rng.uniform(-6, 6) - x * 120), bevel=0.003)
+
+@prop
+def cola_can():
+    """A fat red soda can (0.2 m tall, centred): silver top and bottom, a white wave and the made-up "FIZZ" brand."""
+    lathe("Can", (0, 0, 0), [(0.0, -0.1), (0.032, -0.1), (0.04, -0.092), (0.04, 0.085), (0.034, 0.097), (0.0, 0.097)], "red", seg=40)
+    lathe("Bottom", (0, 0, 0), [(0.033, -0.101), (0.0401, -0.093), (0.0401, -0.084)], "can_metal", seg=40, caps=False)
+    lathe("Lid", (0, 0, 0), [(0.0402, 0.078), (0.0402, 0.086), (0.0345, 0.098), (0.031, 0.1), (0.0, 0.098)], "can_metal", seg=40)
+    box("Tab", (0.006, 0.101, 0), (0.024, 0.003, 0.012), "can_metal", bevel=0.001)
+    R = 0.0402
+    for side, turn in (("F", 0.0), ("B", math.pi)):
+        wrap_on_cylinder(text3d(f"Brand{side}", "FIZZ", (0, 0.012, 0), 0.025, 0.0012, "white"), R + 0.0003, turn)
+        wave = [(x * 0.004, -0.03 + 0.006 * math.sin(x * 0.55), 0.0) for x in range(-9, 10)]
+        wrap_on_cylinder(tube(f"Wave{side}", wave, 0.003, "white", seg=6), R + 0.0006, turn)
+
+@prop
+def cocktail():
+    """A tall hurricane glass of orange-to-yellow tropical drink with a lime wheel on the rim, a striped straw and a
+    pink paper umbrella (0.27 m tall to the umbrella, centred)."""
+    glass = [(0.0, -0.11), (0.03, -0.11), (0.03, -0.104), (0.008, -0.098), (0.007, -0.07), (0.026, -0.055),
+             (0.036, -0.02), (0.03, 0.02), (0.034, 0.06), (0.042, 0.09)]
+    lathe("Glass", (0, 0, 0), glass, "cocktail_glass", seg=40, caps=False)
+    lathe("DrinkLow", (0, 0, 0), [(0.0, -0.054), (0.0245, -0.054), (0.0335, -0.02), (0.028, 0.0), (0.0, 0.0)], "cocktail", seg=40)
+    lathe("DrinkHigh", (0, 0, 0), [(0.0, 0.0), (0.028, 0.0), (0.031, 0.02), (0.0345, 0.07), (0.0, 0.07)], "cocktail_top", seg=40)
+    lathe("Lime", (0.04, 0.08, 0), [(0.0, -0.004), (0.022, -0.004), (0.022, 0.004), (0.0, 0.004)], "lime", seg=24, axis='z')
+    tube("Straw", [(-0.012, -0.02, 0.006), (-0.02, 0.13, 0.012), (-0.03, 0.15, 0.012)], 0.004, "white", seg=8)
+    tube("StrawStripe", [(-0.0121, 0.0, 0.0102), (-0.017, 0.09, 0.0142)], 0.0042, "red", seg=8)
+    tube("UmbrellaStick", [(0.012, 0.0, -0.01), (0.03, 0.15, -0.02)], 0.0016, "wood_light", seg=6)
+    lathe("Umbrella", (0.031, 0.152, -0.02), [(0.0, 0.016), (0.035, 0.0), (0.036, -0.002), (0.0, 0.0)], "pink", seg=8)
 
 @prop
 def defibrillator():

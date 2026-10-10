@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -8,8 +9,10 @@ using UnityEngine.Rendering.Universal;
 namespace PleaseDontDrown.Core
 {
     /// <summary>Scene-level developer commands that need a MonoBehaviour (coroutines, frame timing).</summary>
+    [DefaultExecutionOrder(200)] // capture after ball movement, avatar IK and first-person hands
     public class DevTools : MonoBehaviour
     {
+        private readonly Queue<string> _viewRequests = new();
         private void OnEnable()
         {
             DevCommands.Register("screenshot", "[delay seconds]", "Save a PNG to the Screenshots folder.", args =>
@@ -18,7 +21,7 @@ namespace PleaseDontDrown.Core
                 StartCoroutine(Capture(delay));
             }, owner: this);
             DevCommands.Register("viewshot", "<name>", "Render the live player camera to a named PNG (also works in background tests).", args =>
-                StartCoroutine(CaptureView(args.Length > 0 ? args[0] : "view")), owner: this);
+                _viewRequests.Enqueue(args.Length > 0 ? args[0] : "view"), owner: this);
             DevCommands.Register("skin", "<index>", "Preview a finish on the held item without saving a preference.", args =>
             {
                 if (args.Length > 0 && int.TryParse(args[0], out int index))
@@ -30,6 +33,7 @@ namespace PleaseDontDrown.Core
 
         private void OnDisable()
         {
+            _viewRequests.Clear();
             DevCommands.Unregister("screenshot", this);
             DevCommands.Unregister("viewshot", this);
             DevCommands.Unregister("skin", this);
@@ -53,12 +57,16 @@ namespace PleaseDontDrown.Core
             finally { Destroy(frame); }
         }
 
-        private static IEnumerator CaptureView(string name)
+        private void LateUpdate()
         {
-            // Let the held item and fingers settle through their LateUpdates before sampling the live scene.
-            yield return null;
+            if (_viewRequests.Count > 0) CaptureView(_viewRequests.Dequeue());
+        }
+
+        private static void CaptureView(string name)
+        {
+            // Called after their LateUpdates, rather than a coroutine resuming during the next Update.
             Camera camera = Camera.main;
-            if (camera == null) { Debug.LogWarning("[Dev] No player camera to capture."); yield break; }
+            if (camera == null) { Debug.LogWarning("[Dev] No player camera to capture."); return; }
             foreach (char c in Path.GetInvalidFileNameChars()) name = name.Replace(c, '_');
             string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Screenshots", "GunGrips"));
             Directory.CreateDirectory(folder);
@@ -66,8 +74,28 @@ namespace PleaseDontDrown.Core
             var rt = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGBHalf);
             RenderTexture previous = RenderTexture.active, target = camera.targetTexture;
             var image = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            var skins = new List<(SkinnedMeshRenderer skin, GameObject baked, Mesh mesh)>();
             try
             {
+                // An explicit camera render can reuse this frame's pre-LateUpdate GPU skinning.
+                // Bake the current bones for this developer snapshot only.
+                var arms = FindFirstObjectByType<Player.FirstPersonArms>();
+                if (arms != null) Debug.Log("[Dev] Live palm grip errors (m): " + arms.HeldGripErrors().ToString("F4"));
+                foreach (var skin in camera.GetComponentsInChildren<SkinnedMeshRenderer>())
+                {
+                    if (!skin.enabled) continue;
+                    var mesh = new Mesh(); skin.BakeMesh(mesh);
+                    var baked = new GameObject("Temporary live capture skin") { layer = skin.gameObject.layer };
+                    baked.transform.SetPositionAndRotation(skin.transform.position, skin.transform.rotation);
+                    baked.transform.localScale = skin.transform.lossyScale;
+                    baked.AddComponent<MeshFilter>().sharedMesh = mesh;
+                    var renderer = baked.AddComponent<MeshRenderer>();
+                    renderer.sharedMaterials = skin.sharedMaterials;
+                    renderer.shadowCastingMode = skin.shadowCastingMode;
+                    renderer.receiveShadows = skin.receiveShadows;
+                    skins.Add((skin, baked, mesh));
+                    skin.enabled = false;
+                }
                 RenderPipeline.SubmitRenderRequest(camera, new UniversalRenderPipeline.SingleCameraRequest { destination = rt });
                 RenderTexture.active = rt;
                 image.ReadPixels(new Rect(0,0,1280,720),0,0);
@@ -78,6 +106,12 @@ namespace PleaseDontDrown.Core
             }
             finally
             {
+                foreach (var entry in skins)
+                {
+                    entry.skin.enabled = true;
+                    entry.baked.SetActive(false);
+                    Destroy(entry.baked); Destroy(entry.mesh);
+                }
                 camera.targetTexture = target;
                 RenderTexture.active = previous;
                 Destroy(image); rt.Release(); Destroy(rt);

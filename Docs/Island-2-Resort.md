@@ -53,3 +53,58 @@ The earlier imported-hotel review and Windows build passed. That result predates
 - A one-shot request at `Logs/resort-single-polish-request.txt` queues this update for the open editor. Completion is recorded in `Logs/resort-single-polish-result.txt`. Until that file reports PASS, the scene update and current Windows build remain unverified.
 - Blender renders: `Screenshots/Review/ResortBlender/hotel_polished.png`, `resort_beach_bar.png`, `resort_cabana.png`.
 - Tripo replacement-bar prompt: `Docs/Tripo-Coral-Beach-Bar-Prompt.md`; use the hotel screenshot as its style reference.
+
+## Hotel + story only, raised island, polished Tripo hotel (9 October 2026)
+
+- **Decor removed.** Pools, gardens, pavilions, cabanas, loungers, parasols, planters, the beach bar and the resort
+  palms are gone. Kept: the hotel, reception (shop desk, receptionist), infirmary bed, first-aid shelf, dock, towels and
+  beach crowd, story points and the dev travel pad.
+- **Island raised.** Island 2's ground rises from the waterline to a **1.5 m plateau** over ~10 m of beach
+  (`Island2Ground` in `GameSceneBuilder.HotelIsland.cs`, used by `BeachHeight`). Everything standing on the island was
+  lifted by the rise under it; things at sea did not move. Re-running the update does not lift twice.
+- **Hotel = the user's Tripo model** (`ArtSource/Resort/tripo_hotel_upload.glb`, same model as the old FBX), polished by
+  `ArtSource/Tools/build_realistic_hotel.py`: every face is classified from the smeared AI texture into cream wall,
+  sandstone trim, white mouldings, teal surrounds, glass or roof and gets a clean physical material (`HotelReal_*`,
+  reflective tinted glass); wavy walls, slabs and panes are snapped onto true planes; flat faces get flat shading
+  normals. LODs `resort_hotel_real_lod0..2.glb`: 243k / 63k / 60k triangles. Blender master: `hotel_realistic.blend`.
+  Review renders: `Screenshots/Review/HotelRealistic/`.
+- Collision: the LOD1 mesh plus solid cores inside the guest floors; the 24 x 12 m lobby stays open, entered through
+  the porte-cochère (paved approach and steps). The lobby box is painted in the facade's cream render.
+- Apply: **PLEASE DON'T DROWN → Island two: polished hotel, raised island, no decor**, or batch
+  `GameSceneBuilder.RealisticHotelIslandBatch` (add `-pddBuild` to build the Windows player). Result:
+  `Logs/hotel-island-result.txt`; pictures: `Screenshots/Review/HotelIsland/`.
+
+### Full exterior polish and gold lobby (9 October 2026, later)
+
+The user found the first polish still looked like an AI 3D model (jagged windows, rails, slab edges). The Blender
+pipeline now rebuilds every detail as clean geometry where the model has it (`ArtSource/Tools/hotel_windows.py`,
+`hotel_exterior.py`, driven by `build_realistic_hotel.py`; `-- preview cached` re-renders in ~30 s from
+`Logs/hotel_realistic_merged.blend`):
+
+- **Windows** (≈420): found from the glass, snapped to each facade's grid, AI pane and reveal removed; clean glass
+  (dark / lighter tint / drawn curtains), white frame, mullions, transom, sill, reveal lining, teal surround where the
+  facade has one.
+- **Balconies** (≈85): found from their teal/metal rail caps or from the slab in front of a window; the AI slab,
+  balusters, posts and side rails are removed and rebuilt (one slab with drip moulding, handrail, balusters, corner
+  posts, side rails).
+- **Floor bands and cornices** (ledges along each facade) and **roof edges** (cornice, gold line, coping) rebuilt straight.
+- **Porte-cochère** rebuilt: stone plinths, round teal columns with gold rings, entablature, teal fascia with gold
+  band, cornice, coffered soffit; **entrance wall** with a 2.6 m doorway, stone and gold surround, gold-framed
+  shopfronts; **stone podium** along the front with steps (Unity).
+- Box-projected UVs (metres): plaster grain on walls, 1 m limestone paving on stone.
+- Review renders: `Screenshots/Review/HotelRealistic/preview0_*.png` (front, wings, sides, back, roof, eye level).
+
+Unity (`GameSceneBuilder.HotelIsland.cs`): the story lobby is moved 7 m back inside the building (front wall at
+hotel-local z -1; all anchors and the receptionist move with it, once). **Gold lobby**: polished marble floor,
+burgundy runner and desk rug with gold borders, walnut wainscot with gold dado rail, gold crown moulding, cream
+pilasters with gold caps, walnut coffered ceiling with gold edges, five tiered crystal chandeliers with warm lights,
+dark marble reception desk with gold fluting and gold lettering, gold-framed backdrop and paintings, columns at the
+door, lounge with a gold table, palms in gold-rimmed planters, and a baked box-projected reflection probe
+(`hotel_lobby_reflections.exr`). Collision: facade (LOD1) + clean details (LOD0) mesh colliders and solid cores.
+Checks: walk-in sphere cast from the steps through the door into the lobby; anchors present; navigation rebaked.
+Live frames from the Windows build: `Builds/Win64/Screenshots/GunGrips/hotel_f_*.png`.
+
+**Roof terraces** (24 runs): clean balustrades along every open roof edge (none where a taller wall rises), the AI
+balustrade removed. **Gold accents** outside: gold-capped handrails and post finials on balconies and roofs, a gold
+fillet inside every teal window surround, gold lines under floor bands and roof cornices, gold column rings and
+fascia band, gold "GRAND CORAL RESORT" lettering on the canopy, gold door surround and shopfront frames.

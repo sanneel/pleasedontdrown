@@ -42,6 +42,7 @@ namespace PleaseDontDrown.Player
         private void Update()
         {
             if (!_hub.IsOwner) return;
+            if (GodMode.On) Food01 = 1f;
             PlayerMotor motor = _hub.Motor;
             bool active = motor != null && (motor.IsSprinting || motor.IsSwimming);
             Food01 = Mathf.Max(0f, Food01 - Time.deltaTime / _secondsToEmpty * (active ? _activeDrain : 1f));

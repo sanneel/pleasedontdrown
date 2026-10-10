@@ -22,6 +22,7 @@ namespace PleaseDontDrown.Editor
     public static class GunHoldCheck
     {
         private const float HandTolerance = 0.06f;
+        private const float StockSinkTolerance = 0.01f;
 
         public static void RunBatch()
         {
@@ -83,17 +84,23 @@ namespace PleaseDontDrown.Editor
             var item = gunObject.GetComponent<Item>();
             Transform shoulder = rig[AvatarRig.Bone.UpperArmR];
             float reach = rig.UpperArmLength + rig.ForearmLength + rig.HandLength * 0.5f;
-            PlayerHands.ThirdPersonHold(item, shoulder.position, rig[AvatarRig.Bone.UpperArmL].position, reach, look * Vector3.forward,
-                out Vector3 position, out Quaternion rotation);
-            gunObject.transform.SetPositionAndRotation(position, rotation);
             Transform gr = item.GripRight, gl = item.GripLeft;
             motion.Holding = true;
             motion.TwoHanded = gl != null;
-            motion.GripRight = new HandGrip(gr.position, gr.forward, -gr.up, item.GripPose);
-            if (gl != null) motion.GripLeft = new HandGrip(PlayerHands.ReachableLeftGrip(gl.position, gunObject.transform.forward,
-                rig[AvatarRig.Bone.UpperArmL].position, reach), gl.forward, -gl.up, item.GripPoseLeft);
-            animator.Motion = motion;
-            for (int i = 0; i < 60; i++) { AvatarAnimator.TimeOverride = 101f + i / 30f; animator.Tick(1f / 30f); }
+            motion.Shouldered = PlayerHands.Shoulders(item);
+            // Placed again every frame from where the shoulders are now, the way the game does it.
+            for (int i = 0; i < 60; i++)
+            {
+                PlayerHands.ThirdPersonHold(item, shoulder.position, rig[AvatarRig.Bone.UpperArmL].position, reach, look * Vector3.forward,
+                    out Vector3 position, out Quaternion rotation, rig);
+                gunObject.transform.SetPositionAndRotation(position, rotation);
+                motion.GripRight = new HandGrip(gr.position, gr.forward, -gr.up, item.GripPose);
+                if (gl != null) motion.GripLeft = new HandGrip(PlayerHands.ReachableLeftGrip(gl.position, gunObject.transform.forward,
+                    rig[AvatarRig.Bone.UpperArmL].position, reach), gl.forward, -gl.up, item.GripPoseLeft);
+                animator.Motion = motion;
+                AvatarAnimator.TimeOverride = 101f + i / 30f;
+                animator.Tick(1f / 30f);
+            }
             AvatarAnimator.TimeOverride = null;
 
             // The checks.
@@ -118,9 +125,15 @@ namespace PleaseDontDrown.Editor
             // The bug this guards against: a gun up against the face (pointing at the sky beside the head).
             Vector3 face = head.position + head.up * (0.12f * rig.Scale);
             float toFace = DistanceToGun(gunObject.transform, face);
-            if (toFace < 0.06f) problems.Add($"gun against the face ({toFace * 100f:F0} cm)");
+            // (A shouldered gun is meant to be up under the cheek, scope in front of the eye: only touching is wrong.)
+            if (toFace < (motion.Shouldered ? 0.03f : 0.06f)) problems.Add($"gun against the face ({toFace * 100f:F0} cm)");
             if (bounds.center.y > face.y + 0.1f) problems.Add("gun held above the head");
             if (Vector3.Dot(bounds.center - chest.position, flat) < 0.08f) problems.Add("gun not in front of the body");
+            // And the one where a shouldered stock went in through the right shoulder and out the back.
+            Vector3 butt = gunObject.transform.position - gunObject.transform.forward * PlayerHands.StockBack(item);
+            // Measured against the body itself: how deep the back of the gun (the stock) goes into the skin.
+            float sunk = gl != null ? StockDepthInBody(gunObject, butt, rig) : 0f;
+            if (sunk > StockSinkTolerance) problems.Add($"stock {sunk * 100f:F0} cm into the body");
             bool gun = gunObject.TryGetComponent(out Combat.Weapon _);
             float limit = gl != null ? PlayerHands.LongGunMaxPitch : PlayerHands.ThirdPersonMaxPitch;
             Vector3 aimed = Quaternion.Euler(Mathf.Clamp(pitch, -limit, limit), yaw, 0f) * Vector3.forward;
@@ -132,16 +145,89 @@ namespace PleaseDontDrown.Editor
             camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(at + Vector3.up * 1.2f - eye));
             camera.fieldOfView = 40f;
             Render(camera, name);
+            // And straight from the right side, where a stock going into the shoulder shows.
+            eye = at + Quaternion.Euler(0f, yaw, 0f) * new Vector3(2.4f, 1.3f, 0.25f);
+            camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(at + Vector3.up * 1.2f + flat * 0.25f - eye));
+            Render(camera, name + "_side");
             Object.DestroyImmediate(gunObject);
             Object.DestroyImmediate(body);
 
             if (problems.Count == 0)
             {
-                Debug.Log($"[GunHold] PASS {prefab.name} looking {(pitch < 0f ? "up" : pitch > 0f ? "down" : "level")}: palms {missR * 100f:F1} / {missL * 100f:F1} cm");
+                Debug.Log($"[GunHold] PASS {prefab.name} looking {(pitch < 0f ? "up" : pitch > 0f ? "down" : "level")}: palms {missR * 100f:F1} / {missL * 100f:F1} cm, stock {sunk * 100f:F1} cm into the body");
                 return true;
             }
             Debug.LogError($"[GunHold] FAIL {prefab.name} looking {(pitch < 0f ? "up" : pitch > 0f ? "down" : "level")}: {string.Join("; ", problems)} ({name}.jpg)");
             return false;
+        }
+
+        /// <summary>
+        /// The deepest any point of the back 10 cm of the gun goes under the body's skin (0 if none does): each gun
+        /// vertex there against the nearest triangle of the posed body, inside when it's behind that triangle.
+        /// </summary>
+        private static float StockDepthInBody(GameObject gun, Vector3 butt, AvatarRig rig)
+        {
+            if (rig.Renderer == null) return 0f;
+            var baked = new Mesh();
+            rig.Renderer.BakeMesh(baked, true);
+            Transform rt = rig.Renderer.transform;
+            Matrix4x4 toWorld = Matrix4x4.TRS(rt.position, rt.rotation, Vector3.one);
+            Vector3[] bodyVerts = baked.vertices;
+            for (int i = 0; i < bodyVerts.Length; i++) bodyVerts[i] = toWorld.MultiplyPoint3x4(bodyVerts[i]);
+            int[] tris = baked.triangles;
+            Object.DestroyImmediate(baked);
+            var near = new List<int>();
+            for (int i = 0; i < tris.Length; i += 3)
+                if ((bodyVerts[tris[i]] - butt).sqrMagnitude < 0.6f * 0.6f) near.Add(i);
+
+            Vector3 along = gun.transform.forward;
+            float deepest = 0f;
+            foreach (MeshFilter filter in gun.GetComponentsInChildren<MeshFilter>())
+            {
+                if (filter.sharedMesh == null || !filter.TryGetComponent(out Renderer shown) || !shown.enabled) continue;
+                foreach (Vector3 v in filter.sharedMesh.vertices)
+                {
+                    Vector3 p = filter.transform.TransformPoint(v);
+                    if (Vector3.Dot(p - butt, along) > 0.1f) continue;
+                    if (Near(p, rig.Hand(true)) || Near(p, rig.Hand(false))) continue; // (the bits of gun in the hands)
+                    float best = float.MaxValue;
+                    bool inside = false;
+                    foreach (int i in near)
+                    {
+                        Vector3 a = bodyVerts[tris[i]], b = bodyVerts[tris[i + 1]], c = bodyVerts[tris[i + 2]];
+                        Vector3 q = ClosestOnTriangle(p, a, b, c);
+                        float d = (p - q).sqrMagnitude;
+                        if (d >= best) continue;
+                        best = d;
+                        inside = Vector3.Dot(p - q, Vector3.Cross(b - a, c - a)) < 0f;
+                    }
+                    if (inside) deepest = Mathf.Max(deepest, Mathf.Sqrt(best));
+                }
+            }
+            return deepest;
+        }
+
+        private static bool Near(Vector3 p, HandBones hand) => hand != null && (hand.Hand.TransformPoint(hand.PalmContact) - p).sqrMagnitude < 0.08f * 0.08f;
+
+        private static Vector3 ClosestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+        {
+            Vector3 ab = b - a, ac = c - a, ap = p - a;
+            float d1 = Vector3.Dot(ab, ap), d2 = Vector3.Dot(ac, ap);
+            if (d1 <= 0f && d2 <= 0f) return a;
+            Vector3 bp = p - b;
+            float d3 = Vector3.Dot(ab, bp), d4 = Vector3.Dot(ac, bp);
+            if (d3 >= 0f && d4 <= d3) return b;
+            float vc = d1 * d4 - d3 * d2;
+            if (vc <= 0f && d1 >= 0f && d3 <= 0f) return a + ab * (d1 / (d1 - d3));
+            Vector3 cp = p - c;
+            float d5 = Vector3.Dot(ab, cp), d6 = Vector3.Dot(ac, cp);
+            if (d6 >= 0f && d5 <= d6) return c;
+            float vb = d5 * d2 - d1 * d6;
+            if (vb <= 0f && d2 >= 0f && d6 <= 0f) return a + ac * (d2 / (d2 - d6));
+            float va = d3 * d6 - d5 * d4;
+            if (va <= 0f && d4 - d3 >= 0f && d5 - d6 >= 0f) return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+            float denom = 1f / (va + vb + vc);
+            return a + ab * (vb * denom) + ac * (vc * denom);
         }
 
         /// <summary>How close a point comes to the gun's own (oriented) parts: each mesh's box in its own frame.</summary>

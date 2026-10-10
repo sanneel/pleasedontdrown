@@ -163,6 +163,44 @@ def prices_board():
     return img
 
 
+def bar_menu():
+    """The hotel island bar's chalkboard: what you can order sitting at a stool, and for how much."""
+    size = (1024, 768)
+    img = planks(size, 13, WOOD_DARK, WOOD_LIGHT)
+    board = Image.new('RGB', size, (34, 53, 44))
+    smudge = noise(size, 7, 40, 225, 255, blur=16)
+    board = Image.merge('RGB', [ImageChops.multiply(ch, smudge) for ch in board.split()])
+    img.paste(board, (0, 0), rounded_mask(size, 34, 18))
+
+    text = Image.new('L', size, 0)
+    d = ImageDraw.Draw(text)
+    d.text((size[0] / 2, 118), 'MENU', font=font('Roboto-Black.ttf', 120), fill=255, anchor='mm')
+    d.line([(330, 186), (694, 186)], fill=255, width=6)
+    rows = [('1  Fries', '$3'), ('2  Cola', '$2'), ('3  Beer', '$4'), ('4  Cocktail', '$8')]
+    row_font = font('Roboto-Bold.ttf', 66)
+    for i, (item, price) in enumerate(rows):
+        y = 262 + i * 92
+        d.text((96, y), item, font=row_font, fill=255, anchor='lm')
+        d.text((size[0] - 96, y), price, font=row_font, fill=255, anchor='rm')
+        x, end = 96 + row_font.getlength(item) + 24, size[0] - 96 - row_font.getlength(price) - 24
+        while x < end:  # dotted leader
+            d.ellipse([x - 4, y + 14, x + 4, y + 22], fill=255)
+            x += 26
+    d.text((size[0] / 2, 676), 'Take a stool to order', font=font('Roboto-Bold.ttf', 44), fill=255, anchor='mm')
+    mask = chalk(text, 13)
+    header = Image.new('L', size, 0)
+    ImageDraw.Draw(header).rectangle([0, 0, size[0], 200], fill=255)
+    footer = Image.new('L', size, 0)
+    ImageDraw.Draw(footer).rectangle([0, 630, size[0], size[1]], fill=255)
+    yellow = Image.new('RGB', size, (255, 226, 122))
+    white = Image.new('RGB', size, (244, 244, 234))
+    pink = Image.new('RGB', size, (255, 150, 170))
+    img.paste(white, (0, 0), ImageChops.multiply(mask, ImageChops.invert(ImageChops.lighter(header, footer))))
+    img.paste(yellow, (0, 0), ImageChops.multiply(mask, header))
+    img.paste(pink, (0, 0), ImageChops.multiply(mask, footer))
+    return img
+
+
 PURPLE = (108, 78, 190)
 SAND = (243, 228, 190)
 
@@ -251,6 +289,7 @@ def main():
     roof_sign().save(os.path.join(OUT, 'roof_sign.png'), optimize=True)
     lost_and_found_sign().save(os.path.join(OUT, 'lost_and_found_sign.png'), optimize=True)
     prices_board().save(os.path.join(OUT, 'lost_and_found_prices.png'), optimize=True)
+    bar_menu().save(os.path.join(OUT, 'bar_menu.png'), optimize=True)
     for name, img in dev_signs():
         img.save(os.path.join(OUT, name + '.png'), optimize=True)
     print('signs written to', OUT)

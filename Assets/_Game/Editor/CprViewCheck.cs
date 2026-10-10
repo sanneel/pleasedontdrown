@@ -41,6 +41,7 @@ namespace PleaseDontDrown.Editor
             EditorSceneManager.OpenScene("Assets/_Game/Scenes/Game.unity");
             Directory.CreateDirectory("Screenshots/Review");
             var camera = GameObject.Find("MenuCamera").GetComponent<Camera>();
+            camera.nearClipPlane = 0.02f; // the face close-up is ~30 cm from the face
             AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
             var victimPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Items/Prefabs/Tourist.prefab");
             int k = 0;

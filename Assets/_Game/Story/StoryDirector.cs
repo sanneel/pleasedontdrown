@@ -32,7 +32,7 @@ namespace PleaseDontDrown.Story
         public Vector3 Shoreward = Vector3.forward;
         public TouristProfile Profile = new() { Figure = -1, SecondsToUnconscious = 20f, ConditionSeconds = 60f, BleedSeconds = 60f };
         [Tooltip("x/z box the robber runs around in (x, z, width, depth).")]
-        public Rect LandArea = new(-45f, 6f, 90f, 42f);
+        public Rect LandArea = new(-17f, 8f, 59f, 34f);
         public Transform RobberSpawn;
         public Transform Arrival;
     }
@@ -164,6 +164,9 @@ namespace PleaseDontDrown.Story
         {
             base.OnStartServer();
             BuildBeats();
+            var trickShots = GetComponent<Fun.TrickShots>();
+            if (trickShots == null) trickShots = gameObject.AddComponent<Fun.TrickShots>();
+            trickShots.SetServerActive(true); // pays for thrown tourists on every island, story or not
             VictimBrain.ServerEvent += OnVictimEvent;
             LostAndFound.ServerHandedIn += OnHandedIn;
             StoryNpc.ServerTalked += OnTalked;
@@ -176,6 +179,11 @@ namespace PleaseDontDrown.Story
 
         public override void OnStopServer()
         {
+            StopAllCoroutines();
+            _running = false;
+            _freePlay = false;
+            ClearWaits();
+            GetComponent<Fun.TrickShots>()?.SetServerActive(false);
             base.OnStopServer();
             VictimBrain.ServerEvent -= OnVictimEvent;
             LostAndFound.ServerHandedIn -= OnHandedIn;
@@ -212,6 +220,14 @@ namespace PleaseDontDrown.Story
                 _chapterEarned = save.Earned;
                 SetRentalAccess(save.RentalUnlocked || save.Beat == "1.10" || save.Beat.StartsWith("2."));
                 Debug.Log($"[Story] continuing from beat {save.Beat} with ${save.Money}");
+                if (save.Beat == "end")
+                {
+                    // The story is done: straight to the open shift on whichever island the team is on.
+                    _moneySeen = Economy.Money;
+                    _beatIndex = _beats.Count - 1;
+                    BeginFreePlay();
+                    yield break;
+                }
             }
             _moneySeen = Economy.Money;
             StartAt(start);
@@ -244,6 +260,7 @@ namespace PleaseDontDrown.Story
         private void StartAt(int index)
         {
             StopAllCoroutines(); // the beat and anything it started (waving, delayed lines...)
+            _freePlay = false;
             ResetTsunamiActors();
             SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2."));
             _hints = null;
@@ -268,10 +285,10 @@ namespace PleaseDontDrown.Story
                 Save();
                 yield return beat.Run();
             }
-            _running = false;
             _beat.Value = "end";
             Save();
             Debug.Log("[Story] finished");
+            BeginFreePlay();
         }
 
         private void ClearWaits()
@@ -366,9 +383,12 @@ namespace PleaseDontDrown.Story
         private void OnVictimEvent(VictimBrain victim, VictimEvent e, PlayerHub credit)
         {
             bool rescued = e is VictimEvent.Saved or VictimEvent.SelfRescue or VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized;
-            if (rescued && victim.State != VictimState.Injured) _rescued.Add(victim);
-            if (rescued) _howRescued[victim] = e; // what they say afterwards depends on it (kissed, slapped, zapped...)
-            if (rescued && credit != null) _heroOf[victim] = credit;
+            if (!_freePlay)
+            {
+                if (rescued && victim.State != VictimState.Injured) _rescued.Add(victim);
+                if (rescued) _howRescued[victim] = e; // what they say afterwards depends on it (kissed, slapped, zapped...)
+                if (rescued && credit != null) _heroOf[victim] = credit;
+            }
             // For the chapter's report card (someone pulled out and then revived is one rescue, not two).
             if (e is VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized or VictimEvent.SelfRescue ||
                 (e == VictimEvent.Saved && victim.State == VictimState.Saved)) _chapterRescued++;
@@ -380,12 +400,12 @@ namespace PleaseDontDrown.Story
 
         private void OnHandedIn(LostAndFound.HandedIn info)
         {
-            _handedIn.Add(info);
+            if (!_freePlay) _handedIn.Add(info);
             _chapterReturned++;
         }
         private void OnTalked(StoryNpc npc, PlayerHub by)
         {
-            _talks.Add((npc, by));
+            if (!_freePlay) _talks.Add((npc, by));
             if (npc == _sandy && !_waitingForTalk && _running) StartCoroutine(SandyChats(by));
         }
 
@@ -408,8 +428,8 @@ namespace PleaseDontDrown.Story
             }
             yield return Say(_sandy, SandyLines[Random.Range(0, SandyLines.Length)]);
         }
-        private void OnDefeated(StoryNpc npc, PlayerHub by) => _defeated.Add(npc);
-        private void OnPurchased(ShopCounter shop, PlayerHub by, string item) => _purchases.Add(item);
+        private void OnDefeated(StoryNpc npc, PlayerHub by) { if (!_freePlay) _defeated.Add(npc); }
+        private void OnPurchased(ShopCounter shop, PlayerHub by, string item) { if (!_freePlay) _purchases.Add(item); }
 
         // ------------------------------------------------------------------ helpers for beats (host)
 
@@ -640,10 +660,16 @@ namespace PleaseDontDrown.Story
         {
             yield return new WaitForSeconds(2.5f); // their copy has the scene and everyone in it by now
             if (player == null || !_running || _beatIndex < 0 || _beatIndex >= _beats.Count) yield break;
+            if (_freePlay)
+            {
+                WelcomeTarget(player.Owner, "OPEN SHIFT", "Fish them out, trickshot them back",
+                    $"You joined <b>{GetHostName()}</b>'s open shift. Rescue tourists and launch them back into the sea for bonus pay. ${Economy.Money} in the team's wallet.", player.transform.position, false);
+                yield break;
+            }
             Beat beat = _beats[_beatIndex];
             bool second = beat.Id.StartsWith("2.");
             // Next to a teammate who's standing on land; if they're all at sea, the island's own landing.
-            Vector3 at = second && _island2Spawn != null ? _island2Spawn.position : player.transform.position;
+            Vector3 at = second && _island2Spawn != null ? Island2SpawnPoint : player.transform.position;
             foreach (PlayerHub mate in PlayerHub.All)
             {
                 if (mate == player || mate == null || !Shore.IsAshore(mate.transform.position)) continue;
@@ -661,13 +687,18 @@ namespace PleaseDontDrown.Story
                 inChapter++;
                 if (i < _beatIndex) done++;
             }
-            string host = "the host";
-            foreach (PlayerHub p in PlayerHub.All)
-                if (p != null && p.Owner != null && p.Owner.IsLocalClient) host = p.DisplayName;
+            string host = GetHostName();
             string recap = $"You joined <b>{host}</b>'s shift: part {done + 1} of {inChapter}, \"{beat.Title}\". " +
                            $"So far this chapter: {_chapterRescued} rescued, {_chapterLost} lost, ${Economy.Money} in the team's wallet.";
             Debug.Log($"[Story] {player.DisplayName} joined at beat {beat.Id}{(move ? " (moved to the team)" : "")}");
             WelcomeTarget(player.Owner, second ? "CHAPTER 2" : "CHAPTER 1", beat.Title, recap, at, move);
+        }
+
+        private static string GetHostName()
+        {
+            foreach (PlayerHub p in PlayerHub.All)
+                if (p != null && p.Owner != null && p.Owner.IsLocalClient) return p.DisplayName;
+            return "the host";
         }
 
         [TargetRpc]
@@ -687,6 +718,20 @@ namespace PleaseDontDrown.Story
             local.Motor.Teleport(position + new Vector3(Random.Range(-1.5f, 1.5f), 0.2f, Random.Range(-1.5f, 1.5f)));
         }
 
+        /// <summary>
+        /// The island 2 landing, stood on whatever ground is there now: a point saved under the sand (the island was
+        /// raised after it was placed) dropped arrivals through it into the sea.
+        /// </summary>
+        private Vector3 Island2SpawnPoint
+        {
+            get
+            {
+                Vector3 p = _island2Spawn.position;
+                float ground = Shore.GroundHeightAt(p + Vector3.up * 4f);
+                return float.IsNaN(ground) ? p : new Vector3(p.x, Mathf.Max(p.y, ground + 0.2f), p.z);
+            }
+        }
+
         /// <summary>Resuming a save on island 2: bring everyone (and the jet ski) over.</summary>
         private void EnsureOnIsland2()
         {
@@ -695,7 +740,7 @@ namespace PleaseDontDrown.Story
             foreach (PlayerHub p in PlayerHub.All)
                 if ((p.transform.position - _island2Spawn.position).sqrMagnitude > 160f * 160f) anyFar = true;
             if (!anyFar) return;
-            TeleportObservers(_island2Spawn.position);
+            TeleportObservers(Island2SpawnPoint);
             if (_jetSki != null && _jetSkiIsland2Dock != null) _jetSki.ServerPlace(_jetSkiIsland2Dock.position, _jetSkiIsland2Dock.eulerAngles.y);
             // Resuming a save: the keys (handed over in chapter 1) come along too, so the jet ski still goes.
             bool haveKeys = false; // keys in someone's hands or lying on this island (not the dev island's spare set)
@@ -843,6 +888,7 @@ namespace PleaseDontDrown.Story
                     case "off":
                         StopAllCoroutines();
                         _running = false;
+                        _freePlay = false;
                         CleanupActors();
                         SetObjective("Free play (story off)");
                         NoMarker();
