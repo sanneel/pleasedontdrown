@@ -586,7 +586,9 @@ namespace PleaseDontDrown.Story
             {
                 Vector3 to = near.transform.position - transform.position;
                 to.y = 0f;
-                if (to.sqrMagnitude > 0.01f && Vector3.Angle(transform.forward, to) < 110f) yaw = Quaternion.LookRotation(to).eulerAngles.y;
+                // (Not someone practically standing on our feet, the lifeguard who just gave CPR: their direction
+                // swings right round with every small step they take, and we spun round after it.)
+                if (to.sqrMagnitude > 0.7f * 0.7f && Vector3.Angle(transform.forward, to) < 110f) yaw = Quaternion.LookRotation(to).eulerAngles.y;
             }
             // (On the move the body is drawn the way it is really turned, at once: the legs walk where the body faces.)
             _lookYaw = Mathf.LerpAngle(_lookYaw, yaw, 1f - Mathf.Exp(-(flatSpeed > 0.3f ? 18f : 6f) * Time.deltaTime));
@@ -731,7 +733,8 @@ namespace PleaseDontDrown.Story
             p = transform.position;
             if (_moveTarget.HasValue && _pose.Value is AvatarPose.Normal or AvatarPose.Scared)
                 FollowPath(p, dt);
-            if (!_moveTarget.HasValue && _facePoint.HasValue)
+            // (A point right at our feet has no direction worth turning to.)
+            if (!_moveTarget.HasValue && _facePoint.HasValue && FlatDistance(_facePoint.Value, p) > 0.6f)
                 Face(_facePoint.Value - p, dt, 5f);
             // Begging on the knees: to the face of whoever caught him, not to the sand behind him.
             else if (!_moveTarget.HasValue && _pose.Value == AvatarPose.Kneel && NearestPlayer(8f) is { } catcher)
@@ -1044,6 +1047,8 @@ namespace PleaseDontDrown.Story
             }
             return what != null;
         }
+
+        private static float FlatDistance(Vector3 a, Vector3 b) => new Vector2(a.x - b.x, a.z - b.z).magnitude;
 
         private void Face(Vector3 direction, float dt, float rate)
         {

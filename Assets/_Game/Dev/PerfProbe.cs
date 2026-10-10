@@ -79,7 +79,46 @@ namespace PleaseDontDrown.Dev
                 StartCoroutine(SpinWatch(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 60f)), owner: this);
             DevCommands.Register("legcheck", "<seconds>", "Log [Legs]: knees buckling and legs crossing on upright characters, per body id.", args =>
                 StartCoroutine(LegCheck(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 60f)), owner: this);
+            DevCommands.Register("victimspin", "<seconds>", "Log [VictimSpin]: how much each tourist's body turns about the vertical (after CPR they stand up).", args =>
+                StartCoroutine(VictimSpin(args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 20f)), owner: this);
             Register();
+        }
+
+        private IEnumerator VictimSpin(float seconds)
+        {
+            var last = new Dictionary<Rescue.VictimBody, float>();
+            var turned = new Dictionary<Rescue.VictimBody, float>();
+            var from = new Dictionary<Rescue.VictimBody, Vector3>();
+            var net = new Dictionary<Rescue.VictimBody, float>();
+            var trace = new Dictionary<Rescue.VictimBody, StringBuilder>();
+            int tick = 0;
+            float end = Time.realtimeSinceStartup + seconds;
+            var wait = new WaitForSeconds(0.1f);
+            while (Time.realtimeSinceStartup < end)
+            {
+                yield return wait;
+                tick++;
+                foreach (Rescue.VictimBody v in FindObjectsByType<Rescue.VictimBody>(FindObjectsSortMode.None))
+                {
+                    if (v.transform.up.y < 0.8f) { last.Remove(v); continue; } // only once standing
+                    float yaw = Quaternion.LookRotation(Vector3.ProjectOnPlane(v.transform.forward, Vector3.up)).eulerAngles.y;
+                    if (last.TryGetValue(v, out float before))
+                    {
+                        turned[v] = (turned.TryGetValue(v, out float t) ? t : 0f) + Mathf.Abs(Mathf.DeltaAngle(before, yaw));
+                        net[v] = (net.TryGetValue(v, out float n) ? n : 0f) + Mathf.DeltaAngle(before, yaw);
+                    }
+                    if (tick % 5 == 0)
+                    {
+                        if (!trace.TryGetValue(v, out StringBuilder sb)) trace[v] = sb = new StringBuilder();
+                        sb.Append($" {yaw:F0}/{v.transform.up.y:F2}/{v.GetComponent<Rigidbody>().angularVelocity.y:F1}");
+                    }
+                    else if (!from.ContainsKey(v)) from[v] = v.transform.position;
+                    last[v] = yaw;
+                }
+            }
+            foreach (var (v, t) in turned)
+                if (v != null) Debug.Log($"[VictimSpin] {v.name}: turned {t:F0} degrees standing (net {(net.TryGetValue(v, out float n) ? n : 0f):F0}), yaw/up/spin every 0.5 s:{(trace.TryGetValue(v, out StringBuilder sb) ? sb.ToString() : "")}; moved {Vector3.Distance(from[v], v.transform.position):F2} m, at {v.transform.position:F1}");
+            Debug.Log($"[VictimSpin] done ({turned.Count} standing tourists)");
         }
 
         /// <summary>Per body id: how often an upright, dry character's knee is bent past 0.85 or its feet cross.</summary>
@@ -146,9 +185,9 @@ namespace PleaseDontDrown.Dev
                     if (Time.time - s.start >= 4f)
                     {
                         float moved = Vector3.Distance(p, s.from);
-                        if (s.turn > 360f && moved < 1.5f)
+                        if (s.turn > 120f && moved < 1.5f)
                         {
-                            spins++;
+                            if (s.turn > 360f) spins++;
                             Debug.Log($"[Spin] {npc.Name} (body {body}, {npc.Activity}) at {p:F1}: turned {s.turn:F0} degrees in 4 s, moved {moved:F2} m, moving {npc.IsMoving}");
                         }
                         s = (yaw, p, 0f, Time.time);

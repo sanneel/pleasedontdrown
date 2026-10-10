@@ -310,6 +310,12 @@ namespace PleaseDontDrown.Story
             AvatarLook look = v.Look;
             Color voice = VoiceColor(v);
             Vector3 at = v.transform.position;
+            // Up she gets a step away from her hero (who is kneeling right at her side): standing on top of them she
+            // turned round and round trying to face them.
+            Vector3 fromHero = at - hero.transform.position;
+            fromHero.y = 0f;
+            if (fromHero.magnitude < 1f)
+                at = StoryNpc.OnNavMesh(hero.transform.position + (fromHero.sqrMagnitude > 1e-4f ? fromHero.normalized : -hero.transform.forward) * 1f, 1.5f);
             Vector3 door = hut.Outside.position;
             Vector3 face = door - at;
             face.y = 0f;

@@ -841,14 +841,17 @@ namespace PleaseDontDrown.Rescue
             if (!float.IsNaN(ground)) _groundY = ground;
             else if (_wading) _groundY = WaterSurface.HeightAt(p) - depth;
 
-            // Head inland, up the beach slope. Keep the last direction where the beach levels out.
+            // Head inland, up the beach slope. Keep the last direction where the beach levels out: on nearly flat sand
+            // the "slope" is the sand's own bumps, which point somewhere new every step, and a revived tourist chasing
+            // them turned round and round on the spot. Only a real slope (over 2 %) counts, and the way they head
+            // swings round gradually.
             float dx = Shore.GroundHeightAt(p + Vector3.right * 1.5f + Vector3.up * 2f) -
                        Shore.GroundHeightAt(p + Vector3.left * 1.5f + Vector3.up * 2f);
             float dz = Shore.GroundHeightAt(p + Vector3.forward * 1.5f + Vector3.up * 2f) -
                        Shore.GroundHeightAt(p + Vector3.back * 1.5f + Vector3.up * 2f);
             var uphill = new Vector3(dx, 0f, dz);
-            if (!float.IsNaN(uphill.x) && !float.IsNaN(uphill.z) && uphill.sqrMagnitude > 1e-5f)
-                _wadeDirection = uphill.normalized;
+            if (!float.IsNaN(uphill.x) && !float.IsNaN(uphill.z) && uphill.sqrMagnitude > 0.06f * 0.06f)
+                _wadeDirection = Vector3.RotateTowards(_wadeDirection, uphill.normalized, 0.36f, 0f); // (a scan every 0.3 s: 70 degrees a second)
         }
 
         private void WadeAshore() => StandAndWalk(true);
@@ -870,7 +873,8 @@ namespace PleaseDontDrown.Rescue
             // Turning toward the beach waits for the body to come upright (lying down, it only spun them on the sand).
             Vector3 ahead = Vector3.ProjectOnPlane(forward, Vector3.up);
             ahead = ahead.sqrMagnitude > 1e-4f ? ahead.normalized : _wadeDirection;
-            float turn = Vector3.SignedAngle(ahead, _wadeDirection, Vector3.up) * Mathf.Deg2Rad * Mathf.Clamp01(up.y);
+            // (Standing still they stay facing the way they are: only someone setting off turns to where they go.)
+            float turn = moving ? Vector3.SignedAngle(ahead, _wadeDirection, Vector3.up) * Mathf.Deg2Rad * Mathf.Clamp01(up.y) : 0f;
             _rb.AddTorque(tilt * 170f + Vector3.up * (turn * 22f) - _rb.angularVelocity * 14f, ForceMode.Acceleration);
 
             // They walk the way they face: stand up straight, turn toward the beach, then set off (no shuffling off
