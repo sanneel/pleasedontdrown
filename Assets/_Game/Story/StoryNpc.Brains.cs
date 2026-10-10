@@ -20,6 +20,8 @@ namespace PleaseDontDrown.Story
         private static readonly string[] Taunts = { "Can't catch me!", "Too slow, lifeguard!", "Hah!", "Nope!", "Catch me if you can!" };
         private static readonly string[] PirateShouts = { "ARRR!", "Hand over the loot!", "Yarr!", "Get 'em, lads!" };
 
+        private const int PirateFist = 12; // a pirate's punch on a lifeguard (100 health: about eight of them)
+
         private readonly RaycastHit[] _brainHits = new RaycastHit[8];
         private float _nextThink;
         private Vector3 _home;
@@ -156,7 +158,7 @@ namespace PleaseDontDrown.Story
         private void PirateThink()
         {
             Vector3 p = transform.position;
-            PlayerHub target = NearestPlayer(35f);
+            PlayerHub target = NearestStandingPlayer(p, 35f);
             if (target == null)
             {
                 if ((p - _home).sqrMagnitude > 4f && !_moveTarget.HasValue) ServerMoveTo(_home, run: false);
@@ -177,7 +179,10 @@ namespace PleaseDontDrown.Story
             _nextAttack = Time.time + Random.Range(1.1f, 1.6f);
             GestureObservers(AvatarGesture.Punch, target.Head.position);
             if (target.TryGetComponent(out PlayerCombat combat))
+            {
                 combat.ServerKnockback(to.normalized * 6.5f + Vector3.up * 3f, Name);
+                combat.ServerDamage(PirateFist, Name, p);
+            }
         }
     }
 }

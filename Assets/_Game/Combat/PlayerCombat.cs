@@ -42,9 +42,15 @@ namespace PleaseDontDrown.Combat
 
         private void Update()
         {
+            if (IsServerInitialized)
+            {
+                ServerHealthUpdate();
+                ServerAllDownCheck();
+            }
+            if (IsOwner) UpdateHealthOwner();
             UpdateFun();
             if (!IsOwner || !GameInput.GameplayActive || _hub.Motor == null || !_hub.Motor.enabled) return;
-            if (IsDazed) return; // seeing stars: no punching
+            if (IsDazed || IsDowned) return; // seeing stars or down: no punching
             if (_hub.Motor.Seat != null) return;
             if (PlayerCarry.IsCarried(_hub) || PlayerCarry.CarriedBy(_hub) != null) return; // arms full of lifeguard (Primary throws them)
             if (Fun.HumanCannon.IsPushing(_hub) || Fun.HumanCannon.IsInside(_hub)) return; // Primary fires the cannon
@@ -84,12 +90,28 @@ namespace PleaseDontDrown.Combat
                         _forced = (kind, args.Length > 1 ? args[1] == "left" : false);
                     Punch();
                 }, cheat: true, owner: this);
+            if (IsOwner)
+                DevCommands.Register("hurt", "[amount]", "Hurt yourself (test health, going down, getting up).", args =>
+                    HurtSelfServer(args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 30), cheat: true, owner: this);
+            if (IsOwner)
+                DevCommands.Register("cprfriend", "[presses]", "Go to the nearest downed lifeguard and give CPR (tests).", args =>
+                    StartCoroutine(CprFriend(args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 12)), cheat: true, owner: this);
+        }
+
+        [ServerRpc]
+        private void HurtSelfServer(int amount)
+        {
+            if (!DevCommands.CheatsAllowed) return;
+            ServerDamage(Mathf.Clamp(amount, 1, MaxHealth), "Test", transform.position + Vector3.forward);
+            Debug.Log($"[Health] {_hub.DisplayName} hurt {amount}: {Health}/{MaxHealth}{(IsDowned ? " DOWN" : "")}");
         }
 
         public override void OnStopClient()
         {
             base.OnStopClient();
             DevCommands.Unregister("punch", this);
+            DevCommands.Unregister("hurt", this);
+            DevCommands.Unregister("cprfriend", this);
         }
 
         private (PunchKind kind, bool left)? _forced;
@@ -136,7 +158,11 @@ namespace PleaseDontDrown.Combat
             PlayerHub otherPlayer = hit.collider.GetComponentInParent<PlayerHub>();
             bool blade = sound != ProceduralAudio.Punch;
             if (damageable != null && targetObject != null && targetObject.TryGetComponent(out NetworkObject nob))
+            {
                 HitServer(nob, hit.point, dir, damage, blade);
+                PlayerHud.ShowMeleeHit();
+                if (_hub.Look != null) _hub.Look.Shake(0.25f, Random.value < 0.5f ? -1f : 1f); // a little kick back up the arm
+            }
             else if (otherPlayer != null && otherPlayer != _hub)
                 ShovePlayerServer(otherPlayer, dir);
             else if (Item.FromCollider(hit.collider) is { } item && !item.IsHeld)

@@ -180,7 +180,7 @@ namespace PleaseDontDrown.Player
 
             // Knocked flat (three punches, a coconut to the head): down on the sand for everyone to see.
             if (_combat == null) _combat = _hub.GetComponent<Combat.PlayerCombat>();
-            if (_combat != null && _combat.IsDazed && !m.Swimming)
+            if (_combat != null && (_combat.IsDazed || _combat.IsDowned) && !m.Swimming)
             {
                 m.Pose = AvatarPose.Down;
                 m.Mood = AvatarMood.Hurt;

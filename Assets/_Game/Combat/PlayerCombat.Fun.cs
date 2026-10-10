@@ -129,8 +129,18 @@ namespace PleaseDontDrown.Combat
                     k = t < 0.15f ? t / 0.15f : t > 0.8f ? (1f - t) / 0.2f : 1f;
                     k = k * k * (3f - 2f * k);
                 }
-                look.ExtraRoll = k * (55f + Mathf.Sin(Time.time * 3.1f) * 10f);
-                look.ExtraDrop = k * 1.1f;
+                // Down (health gone): lying on the sand, the view on its side and low, breathing slowly.
+                float down = DownedViewK;
+                if (down > k)
+                {
+                    look.ExtraRoll = down * (70f + Mathf.Sin(Time.time * 1.3f) * 3f);
+                    look.ExtraDrop = down * 1.3f;
+                }
+                else
+                {
+                    look.ExtraRoll = k * (55f + Mathf.Sin(Time.time * 3.1f) * 10f);
+                    look.ExtraDrop = k * 1.1f;
+                }
                 if (IsDazed && _hub.Motor != null) _hub.Motor.Stun(0.1f);
             }
             UpdateCannonball();

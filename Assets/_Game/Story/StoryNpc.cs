@@ -638,8 +638,11 @@ namespace PleaseDontDrown.Story
             if (health == _tagHealth && ReferenceEquals(_tagName, _name.Value)) return;
             _tagHealth = health;
             _tagName = _name.Value;
+            // One pip per punch it takes (health is in damage points: a pirate's 100 is four punches), at most ten.
+            int maxPips = Mathf.Clamp(Mathf.CeilToInt(_maxHealth.Value / (float)Combat.Damage.Punch), 1, 10);
+            int pips = health > 0 ? Mathf.Clamp(Mathf.CeilToInt(health / (float)_maxHealth.Value * maxPips), 1, maxPips) : 0;
             _nameTag.text = health > 0
-                ? $"{Name}  {new string('●', health)}{new string('○', Mathf.Max(0, _maxHealth.Value - health))}"
+                ? $"{Name}  {new string('●', pips)}{new string('○', maxPips - pips)}"
                 : Name;
         }
 
@@ -704,6 +707,24 @@ namespace PleaseDontDrown.Story
         }
 
         private PlayerHub NearestPlayer(float range) => NearestPlayer(transform.position, range);
+
+        /// <summary>The nearest lifeguard who is still on their feet (fighters leave downed ones alone).</summary>
+        public static PlayerHub NearestStandingPlayer(Vector3 from, float range)
+        {
+            PlayerHub best = null;
+            float bestSq = range * range;
+            foreach (PlayerHub p in PlayerHub.All)
+            {
+                if (p == null || (p.TryGetComponent(out Combat.PlayerCombat c) && c.IsDowned)) continue;
+                float d = (p.transform.position - from).sqrMagnitude;
+                if (d < bestSq)
+                {
+                    bestSq = d;
+                    best = p;
+                }
+            }
+            return best;
+        }
 
         // ------------------------------------------------------------------ host movement
 

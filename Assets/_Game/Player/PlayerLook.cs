@@ -226,6 +226,17 @@ namespace PleaseDontDrown.Player
         /// <summary>Gun recoil: the view climbs (x right, y up, degrees) quickly and stays there.</summary>
         public void AddRecoil(Vector2 kick) => _recoilTarget += kick;
 
+        // Getting hit: a short jolt of the camera only (aim doesn't move), rolling away from the blow.
+        private float _shake, _shakeSide = 1f, _shakeSeed;
+
+        /// <summary>Jolt the view (about 1 = a punch, 2 = a big hit); <paramref name="side"/> +1 rolls right, -1 left.</summary>
+        public void Shake(float strength, float side = 1f)
+        {
+            _shake = Mathf.Max(_shake, strength);
+            _shakeSide = side >= 0f ? 1f : -1f;
+            _shakeSeed = Random.value * 100f;
+        }
+
         /// <summary>
         /// Aiming down the sights: the field of view eases to <paramref name="fov"/> (smoothing time
         /// <paramref name="smoothTime"/>, the sights' own). Call every frame while aiming.
@@ -305,7 +316,14 @@ namespace PleaseDontDrown.Player
             _seatEyeY = headY + settle;
 
             _camera.transform.localPosition = _delayedBob + _head.InverseTransformVector(Vector3.up * (settle - ExtraDrop));
-            _camera.transform.localRotation = Quaternion.Euler(_fallTilt, 0f, _roll + ExtraRoll);
+            Vector3 jolt = Vector3.zero;
+            if (_shake > 0.001f)
+            {
+                float t = Time.time * 38f + _shakeSeed;
+                jolt = new Vector3((Mathf.PerlinNoise(t, 0f) - 0.5f) * 4f - 1.5f, (Mathf.PerlinNoise(0f, t) - 0.5f) * 4f, 3f * _shakeSide) * _shake;
+                _shake = Mathf.MoveTowards(_shake * Mathf.Exp(-9f * dt), 0f, 0.02f * dt);
+            }
+            _camera.transform.localRotation = Quaternion.Euler(_fallTilt + jolt.x, jolt.y, _roll + ExtraRoll + jolt.z);
             if (_glide.sqrMagnitude > 1e-6f)
             {
                 _glide *= Mathf.Exp(-12f * dt);

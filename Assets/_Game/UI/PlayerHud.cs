@@ -119,6 +119,7 @@ namespace PleaseDontDrown.UI
             }
 
             DrawVitals(local, dt);
+            DrawHurt(local, cx, cy);
 
             _toasts.RemoveAll(t => t.Until < Time.unscaledTime);
             for (int i = 0; i < _toasts.Count; i++)
@@ -245,6 +246,18 @@ namespace PleaseDontDrown.UI
             float x = 50f, y = Hud.Height - 25f - size;
             PlayerMotor motor = local.Motor;
             PlayerVitals vitals = local.Vitals;
+            // Health: only while hurt (it fills back up on its own), first in the row.
+            if (local.TryGetComponent(out Combat.PlayerCombat combat))
+            {
+                float health = combat.Health01;
+                _healthShown = Mathf.MoveTowards(_healthShown, health < 0.999f ? 1f : 0f, dt / 0.25f);
+                Trail(ref _healthTrail, ref _healthDropAt, health, dt);
+                if (_healthShown > 0f)
+                {
+                    Hud.Vital(new Rect(x, y, size, size), health, _healthTrail, HudIcon.Health, new Color(1f, 0.3f, 0.3f), health < 0.3f, _healthShown);
+                    x += (size + gap) * _healthShown;
+                }
+            }
             if (vitals != null)
             {
                 Trail(ref _foodTrail, ref _foodDropAt, vitals.Food01, dt);
@@ -268,6 +281,53 @@ namespace PleaseDontDrown.UI
 
             if (motor.IsOutOfBreath)
                 Hud.Label(new Rect(0f, Hud.Height * 0.3f, Hud.Width, 46f), "<b>OUT OF AIR!</b> Get to the surface!", 34f, new Color(1f, 0.5f, 0.4f), heavy: true);
+        }
+
+        private float _healthShown, _healthTrail = 1f, _healthDropAt;
+        private static float _meleeHitAt = -10f;
+
+        /// <summary>Your punch landed on something that can be hurt: the little hit marker round the crosshair.</summary>
+        public static void ShowMeleeHit() => _meleeHitAt = Time.unscaledTime;
+
+        /// <summary>
+        /// A red flash at the screen's edges when hurt; while down, the screen darkens, says so, and shows how far a
+        /// friend's CPR has got. Also the punch hit marker.
+        /// </summary>
+        private static void DrawHurt(PlayerHub local, float cx, float cy)
+        {
+            float since = Time.unscaledTime - _meleeHitAt;
+            if (since < 0.22f)
+            {
+                float a = 1f - since / 0.22f, gap = 9f + since * 30f, len = 10f;
+                var white = new Color(1f, 1f, 1f, a);
+                for (int i = 0; i < 4; i++)
+                {
+                    float sx = i % 2 == 0 ? -1f : 1f, sy = i < 2 ? -1f : 1f;
+                    Hud.Fill(new Rect(cx + sx * gap - (sx < 0 ? len : 0f), cy + sy * gap - (sy < 0 ? 3f : 0f), len, 3f), white, 1.5f);
+                }
+            }
+
+            if (!local.TryGetComponent(out Combat.PlayerCombat combat)) return;
+            float hurt = Mathf.Clamp01(1f - (Time.time - combat.LastHurtTime) / 0.45f) * (0.35f + combat.LastHurtStrength * 0.4f);
+            float low = combat.IsDowned ? 0f : Mathf.Clamp01((0.35f - combat.Health01) / 0.35f) * (0.18f + 0.06f * Mathf.Sin(Time.time * 6f));
+            float edge = Mathf.Max(hurt, low);
+            if (edge > 0.01f)
+            {
+                const float band = 140f;
+                var red = new Color(0.85f, 0.05f, 0.05f, edge * 0.5f);
+                Hud.Fill(new Rect(0f, 0f, Hud.Width, band), red, 0f);
+                Hud.Fill(new Rect(0f, Hud.Height - band, Hud.Width, band), red, 0f);
+                Hud.Fill(new Rect(0f, band, band, Hud.Height - band * 2f), red, 0f);
+                Hud.Fill(new Rect(Hud.Width - band, band, band, Hud.Height - band * 2f), red, 0f);
+            }
+
+            if (!combat.IsDowned) return;
+            Hud.Fill(new Rect(0f, 0f, Hud.Width, Hud.Height), new Color(0.12f, 0f, 0f, 0.45f), 0f);
+            bool friends = PlayerHub.All.Count > 1;
+            Hud.Label(new Rect(0f, cy - 120f, Hud.Width, 60f), "YOU'RE DOWN", 52f, new Color(1f, 0.45f, 0.4f), heavy: true);
+            Hud.Label(new Rect(0f, cy - 60f, Hud.Width, 36f), friends ? "A friend can bring you back with CPR" : "Catching your breath...", 26f, Hud.Sand);
+            if (combat.Revive01 > 0f)
+                Hud.Bar(new Rect(cx - 160f, cy - 14f, 320f, 14f), combat.Revive01, new Color(0.5f, 1f, 0.6f));
         }
 
         /// <summary>Follows a level up at once; down, it holds a quarter second, then eases after it.</summary>

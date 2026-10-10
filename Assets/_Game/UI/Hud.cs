@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PleaseDontDrown.UI
 {
-    public enum HudIcon { Food, Stamina, Air }
+    public enum HudIcon { Food, Stamina, Air, Health }
 
     /// <summary>
     /// What every screen element is drawn with. The HUD and menus are laid out on a sheet 1080 units high (the sizes
@@ -382,6 +382,8 @@ namespace PleaseDontDrown.UI
             new(0.60f, 0.98f), new(0.20f, 0.44f), new(0.45f, 0.44f), new(0.36f, 0.02f), new(0.80f, 0.58f), new(0.54f, 0.58f)
         };
 
+        private static readonly Vector2[] Heart = { new(0.11f, 0.60f), new(0.50f, 0.10f), new(0.89f, 0.60f), new(0.50f, 0.66f) };
+
         private static bool Inside(HudIcon icon, Vector2 p)
         {
             switch (icon)
@@ -391,6 +393,8 @@ namespace PleaseDontDrown.UI
                            Disc(p, new Vector2(0.13f, 0.25f), 0.09f) || Disc(p, new Vector2(0.23f, 0.14f), 0.09f);
                 case HudIcon.Stamina:
                     return InPolygon(p, Bolt);
+                case HudIcon.Health: // a heart: two round tops and a point at the bottom
+                    return Disc(p, new Vector2(0.32f, 0.64f), 0.22f) || Disc(p, new Vector2(0.68f, 0.64f), 0.22f) || InPolygon(p, Heart);
                 default: // bubbles
                     return Ring(p, new Vector2(0.38f, 0.36f), 0.28f, 0.11f) || Ring(p, new Vector2(0.73f, 0.71f), 0.18f, 0.09f) ||
                            Disc(p, new Vector2(0.30f, 0.84f), 0.09f);

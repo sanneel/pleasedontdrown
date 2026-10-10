@@ -180,6 +180,7 @@ namespace PleaseDontDrown.Story
         public override void OnStopServer()
         {
             StopAllCoroutines();
+            MissionRunning = false;
             _running = false;
             _freePlay = false;
             ClearWaits();
@@ -260,6 +261,7 @@ namespace PleaseDontDrown.Story
         private void StartAt(int index)
         {
             StopAllCoroutines(); // the beat and anything it started (waving, delayed lines...)
+            MissionRunning = false; // a mission it was in is gone with it
             _freePlay = false;
             ResetTsunamiActors();
             SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2."));
@@ -811,6 +813,7 @@ namespace PleaseDontDrown.Story
                 bool flat = Array.IndexOf(args, "flatline") >= 0;
                 CheatServer($"tourist:{figure}:{(silent ? 1 : 0)}:{(flat ? 1 : 0)}", 0);
             }, cheat: true, owner: this);
+            RegisterMissionCommands();
         }
 
         public override void OnStopClient()
@@ -818,6 +821,7 @@ namespace PleaseDontDrown.Story
             base.OnStopClient();
             foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat" })
                 DevCommands.Unregister(c, this);
+            UnregisterMissionCommands();
         }
 
         private static Transform FindByName(string part)
@@ -887,6 +891,7 @@ namespace PleaseDontDrown.Story
                         break;
                     case "off":
                         StopAllCoroutines();
+                        MissionRunning = false;
                         _running = false;
                         _freePlay = false;
                         CleanupActors();
@@ -897,6 +902,7 @@ namespace PleaseDontDrown.Story
                 return;
             }
             if (!DevCommands.CheatsAllowed && !force) return;
+            if (ServerMissionCheat(what, value, by)) return;
             // 6 m ahead on the level (looking down must not put things underground).
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")
