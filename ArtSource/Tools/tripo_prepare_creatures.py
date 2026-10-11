@@ -136,6 +136,48 @@ def split(obj, name, origin):
     return part
 
 
+def close_mouth(names):
+    """Splitting the head from the jaw left both shells open along the cut: with the jaw down you looked into the
+    hollow head and out through the back (the sky). Each hole is closed with a dark red mouth lining."""
+    lining = bpy.data.materials.new("Mouth")
+    lining.use_nodes = True
+    lining.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.3, 0.06, 0.06, 1.0)
+    lining.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.55
+    for name in names:
+        obj = bpy.data.objects.get(name)
+        if obj is None:
+            continue
+        me = obj.data
+        me.materials.append(lining)
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+        # Only the cut's openings (long loops): the model's tiny surface gaps would show as red specks.
+        size = max(max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts) for i in range(3))
+        open_edges = {e for e in bm.edges if e.is_boundary}
+        big = []
+        while open_edges:
+            loop, stack = set(), [open_edges.pop()]
+            while stack:
+                e = stack.pop()
+                loop.add(e)
+                for v in e.verts:
+                    for n in v.link_edges:
+                        if n in open_edges:
+                            open_edges.discard(n)
+                            stack.append(n)
+            if sum(e.calc_length() for e in loop) > 0.25 * size:
+                big.extend(loop)
+        new = bmesh.ops.holes_fill(bm, edges=big, sides=0)["faces"] if big else []
+        for f in new:
+            f.material_index = len(me.materials) - 1
+        bmesh.ops.triangulate(bm, faces=new)
+        bm.to_mesh(me)
+        bm.free()
+        me.update()
+        log(name, "mouth holes closed:", len(new))
+
+
 def skin_neck(body, hinge, neck):
     """The neck between the shell and the head stretches instead of tearing: two bones, NeckBase (stays with the body)
     and NeckTip (at the head's hinge; the game hangs it on the head pivot), and the neck's skin weighted from one to
@@ -210,6 +252,7 @@ def build(name, spec):
         split(obj, "Jaw", hinge)
         split(obj, "Head", Vector((0.0, -u_head, (lo + hi) / 2)))
         split(obj, "Tail", Vector((0.0, -u_tail, (tlo + thi) / 2)))
+        close_mouth(("Head", "Jaw"))
         for o in bpy.context.scene.objects:
             if o.type == "MESH" and "part" in o.data.attributes:
                 o.data.attributes.remove(o.data.attributes["part"])
