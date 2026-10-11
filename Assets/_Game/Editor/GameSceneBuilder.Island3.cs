@@ -413,6 +413,8 @@ namespace PleaseDontDrown.Editor
             BuildGoldVault(root);
             Transform arrival = BuildPirateDock(root, taken);
             BuildIsland3Story(root, arrival.position, taken); // chapter 3's places (before the trees, which keep clear of them)
+            BuildIsland3Night(root); // the night arrival: mountain dock, lookout tower, sleepers (Island3Night)
+            taken.AddRange(NightTaken());
             BuildIsland3Jungle(root, taken);
             BuildIsland3Palms(root, taken);
             var dev = Object.FindFirstObjectByType<DevIsland>();

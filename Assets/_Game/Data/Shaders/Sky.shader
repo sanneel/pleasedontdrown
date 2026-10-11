@@ -20,6 +20,7 @@ Shader "PleaseDontDrown/Sky"
         _CloudScale ("Cloud size", Float) = 2.2
         _CloudPixels ("Cloud pixel grid", Float) = 90
         _CloudSpeed ("Cloud drift", Float) = 0.004
+        _Stars ("Stars (night)", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -51,6 +52,7 @@ Shader "PleaseDontDrown/Sky"
                 float _CloudScale;
                 float _CloudPixels;
                 float _CloudSpeed;
+                float _Stars;
             CBUFFER_END
 
             struct Attributes
@@ -117,6 +119,16 @@ Shader "PleaseDontDrown/Sky"
                 half3 sky = lerp(_HorizonColor.rgb, _TopColor.rgb, up);
                 float down = saturate(-h * 5.0);
                 sky = lerp(sky, _BottomColor.rgb, down);
+
+                // Stars (night only): single bright pixels on a grid over the dome, a few of them twinkling.
+                if (_Stars > 0.001 && h > 0.0)
+                {
+                    float3 cell = floor(d * 150.0); // an even grid over the whole dome (no bunching at the top)
+                    float pick = frac(sin(dot(cell, float3(12.9898, 78.233, 37.719))) * 43758.5453);
+                    float twinkle = 0.65 + 0.35 * sin(_Time.y * (1.5 + pick * 4.0) + pick * 60.0);
+                    float star = step(0.9985, pick) * twinkle * smoothstep(0.02, 0.18, h);
+                    sky += star * _Stars * half3(0.85, 0.9, 1.0);
+                }
 
                 // Sun: a hard disc plus a stepped halo.
                 float sd = dot(d, sunDir);

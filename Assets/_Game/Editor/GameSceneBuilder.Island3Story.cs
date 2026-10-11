@@ -25,8 +25,9 @@ namespace PleaseDontDrown.Editor
             Material rope = GetMaterial("Rope", new Color(0.72f, 0.6f, 0.4f));
             Vector3 Ground(Vector2 p) => new(p.x, BeachHeight(p.x, p.y), p.y);
 
-            // The THIEF's shack: the village house furthest up the lane from the dock (a proper walk past the lookouts).
-            (Vector2 at, float yaw) shack = VillageHouses.OrderByDescending(h => h.at.y).First();
+            // The THIEF's shack: the village house furthest from the night landing under the crags (a proper sneak
+            // past the sleepers: Island3Night).
+            (Vector2 at, float yaw) shack = ThiefHouse();
             Vector2 porch = shack.at + new Vector2(Mathf.Sin(shack.yaw * Mathf.Deg2Rad), Mathf.Cos(shack.yaw * Mathf.Deg2Rad)) * 5f;
             Point(story, "Thief", Ground(porch) + Vector3.up * 0.1f, shack.yaw);
 

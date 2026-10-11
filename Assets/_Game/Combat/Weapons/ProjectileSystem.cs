@@ -45,7 +45,7 @@ namespace PleaseDontDrown.Combat
         private int _holeCount, _holeNext;
         private Mesh _tracerMesh, _holeMesh;
         private Material _tracerMaterial, _holeMaterial;
-        private ParticleSystem _puffs, _flashes, _casings;
+        private ParticleSystem _puffs, _flashes, _casings, _smoke;
         private Light _flashLight;
         private float _flashLightUntil;
 
@@ -84,6 +84,14 @@ namespace PleaseDontDrown.Combat
             _puffs = MakeParticles("ImpactPuffs", soft, 800, 0.9f, false);
             _flashes = MakeParticles("MuzzleFlashes", soft, 200, 0f, false);
             _casings = MakeParticles("Casings", soft, 300, 1.6f, true);
+            _smoke = MakeParticles("GunSmoke", soft, 400, -0.03f, false);
+            ParticleSystem.SizeOverLifetimeModule grow = _smoke.sizeOverLifetime;
+            grow.enabled = true;
+            grow.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 0.35f, 1f, 1f));
+            ParticleSystem.LimitVelocityOverLifetimeModule slow = _smoke.limitVelocityOverLifetime;
+            slow.enabled = true;
+            slow.limit = 0.35f;
+            slow.dampen = 0.12f;
             var lightGo = new GameObject("MuzzleLight");
             lightGo.transform.SetParent(transform, false);
             _flashLight = lightGo.AddComponent<Light>();
@@ -332,6 +340,26 @@ namespace PleaseDontDrown.Combat
             _flashLight.intensity = 3f * size;
             _flashLight.enabled = true;
             _flashLightUntil = Time.time + 0.045f;
+        }
+
+        /// <summary>
+        /// A black powder gun's cloud (the pirates' flintlocks): a thick grey-white puff blown out of the muzzle that
+        /// slows, swells and hangs in the air for a couple of seconds, drifting up.
+        /// </summary>
+        public void GunSmoke(Vector3 point, Vector3 forward, float size)
+        {
+            var emit = new ParticleSystem.EmitParams { applyShapeToPosition = false };
+            for (int i = 0; i < 9; i++)
+            {
+                float along = Random.Range(0f, 1f);
+                emit.position = point + forward * (0.05f + along * 0.45f * size) + Random.insideUnitSphere * 0.05f;
+                emit.velocity = forward * Random.Range(1.5f, 4.5f) * (1f - along * 0.6f) + Random.insideUnitSphere * 0.4f + Vector3.up * 0.15f;
+                emit.startSize = Random.Range(0.45f, 0.8f) * size;
+                emit.startLifetime = Random.Range(1.6f, 2.8f);
+                float grey = Random.Range(0.72f, 0.9f);
+                emit.startColor = new Color(grey, grey, grey * 0.97f, Random.Range(0.35f, 0.55f));
+                _smoke.Emit(emit, 1);
+            }
         }
 
         /// <summary>A spent case flicked out of the ejection port.</summary>

@@ -12,8 +12,8 @@ namespace PleaseDontDrown.Story
 {
     /// <summary>
     /// Fighting characters (host): pirates with fists, cutlasses, pistols or muskets; drunks; the tavern's cage
-    /// fighter. Logic only for now: the blows use the punch / shoot gestures we have, the real moves and weapon
-    /// models come with the pirates' own meshes. What makes a fight fair and readable is all here:
+    /// fighter. The weapon in their hands (flintlock pistol, musket, cutlass) and how it moves is drawn by
+    /// <see cref="NpcWeaponView"/> from the synced gun state; what makes a fight fair and readable is all here:
     ///
     ///  * Turns: at most two fighters swing at one lifeguard at a time (one for a cage fighter, a duel); the rest
     ///    circle at a few metres, facing them, waiting. Gunmen take turns too (two aiming at one lifeguard).
@@ -52,15 +52,24 @@ namespace PleaseDontDrown.Story
         // Tally for tuning.
         private int _swings, _landed, _missed, _shots, _shotsLanded, _blocked, _knockdowns;
 
-        // What's in their hand, on every machine (the weapon models hook onto this when the pirates' meshes arrive).
+        // What's in their hand and what they're doing with it, on every machine (NpcWeaponView draws it).
         private readonly FishNet.Object.Synchronizing.SyncVar<NpcWeaponKind> _weaponKind = new();
         private readonly FishNet.Object.Synchronizing.SyncVar<bool> _armed = new();
+        private readonly FishNet.Object.Synchronizing.SyncVar<NpcGunState> _gunState = new();
+        private readonly FishNet.Object.Synchronizing.SyncVar<Vector3> _aimAt = new();
+        private NpcWeaponView _weaponView;
+
+        /// <summary>What a gunman is doing with the gun (the arms and the gun follow it on every machine).</summary>
+        public enum NpcGunState : byte { Lowered, Aiming, Reloading }
 
         public bool IsFighting => _fighting;
         public FighterProfile Fighter => _fighter;
         /// <summary>Every machine: the weapon this character fights with (only meaningful while <see cref="IsArmed"/>).</summary>
         public NpcWeaponKind WeaponKind => _weaponKind.Value;
         public bool IsArmed => _armed.Value;
+        public NpcGunState GunState => _gunState.Value;
+        /// <summary>Every machine: where the gun points while <see cref="GunState"/> is Aiming.</summary>
+        public Vector3 AimPoint => _aimAt.Value;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetFightStatics()
@@ -95,7 +104,8 @@ namespace PleaseDontDrown.Story
             if (!_fighting) return;
             LogTally("stopped");
             _fighting = false;
-            _armed.Value = false;
+            _armed.Value = _guarding && _guardFights; // a guard keeps carrying his gun
+            SetGunState(NpcGunState.Lowered, Vector3.zero);
             _fightGoal = null;
             _foe = null;
             ReleaseTurns(this);
@@ -110,6 +120,7 @@ namespace PleaseDontDrown.Story
             {
                 if (_fight != FightState.Idle) LogTally("down for good");
                 _fight = FightState.Idle;
+                SetGunState(NpcGunState.Lowered, Vector3.zero);
                 _fightGoal = null;
                 ReleaseTurns(this);
                 return;
@@ -131,9 +142,11 @@ namespace PleaseDontDrown.Story
                 return;
             }
 
+            if (RivalThink(dt)) return; // fighting another character (a grudge, a bar brawl: StoryNpc.Rivals)
             PickFoe();
             if (_foe == null)
             {
+                SetGunState(NpcGunState.Lowered, Vector3.zero);
                 ReleaseTurns(this);
                 _fightGoal = null;
                 _fight = FightState.Idle;
@@ -174,6 +187,7 @@ namespace PleaseDontDrown.Story
                     AfterRecover();
                     return;
                 case FightState.Reload:
+                    SetGunState(NpcGunState.Reloading, Vector3.zero);
                     if (distance < 3f) Goal(p - dir * 1.5f, BackOffSpeed);
                     else _fightGoal = null;
                     TurnToward(dir, 240f, dt);
@@ -193,6 +207,7 @@ namespace PleaseDontDrown.Story
 
         private void ThinkMelee(NpcWeapon w, Vector3 p, Vector3 dir, float distance, bool see, float dt)
         {
+            SetGunState(NpcGunState.Lowered, Vector3.zero);
             if (distance > 9f || !see)
             {
                 Approach();
@@ -224,12 +239,15 @@ namespace PleaseDontDrown.Story
             if (!see || distance > w.MaxRange)
             {
                 ReleaseTurn(ShotTurns, this);
+                SetGunState(NpcGunState.Lowered, Vector3.zero);
                 Approach();
                 return;
             }
             if (_ammo <= 0)
             {
+                // A flintlock is loaded by hand after every shot: the moment to rush them.
                 ReleaseTurn(ShotTurns, this);
+                SetGunState(NpcGunState.Reloading, Vector3.zero);
                 SetFight(FightState.Reload, w.Reload * Random.Range(0.9f, 1.15f));
                 return;
             }
@@ -242,13 +260,14 @@ namespace PleaseDontDrown.Story
             }
             else if (_fight != FightState.Aim) _fightGoal = null;
 
+            Vector3 chest = _foe.transform.position + Vector3.up * 1.15f;
             if (!TakeTurn(ShotTurns, _foe, 2))
             {
-                // Someone else has the shot: drift sideways to a new angle.
+                // Someone else has the shot: drift sideways to a new angle, gun up and on them.
+                SetGunState(NpcGunState.Aiming, chest);
                 Orbit(Mathf.Clamp(distance, w.MinRange, w.MaxRange * 0.7f), dt);
                 return;
             }
-            Vector3 chest = _foe.transform.position + Vector3.up * 1.15f;
             if (_fight != FightState.Aim)
             {
                 SetFight(FightState.Aim, (_burstLeft > 0 ? w.BurstGap : w.AimTime) * Mathf.Lerp(1.25f, 0.8f, _fighter.Skill));
@@ -262,6 +281,7 @@ namespace PleaseDontDrown.Story
             // The aim trails the lifeguard: it catches up over a fraction of a second (better shots catch up faster).
             float lag = Mathf.Lerp(0.38f, 0.16f, _fighter.Skill);
             _aimPoint = Vector3.SmoothDamp(_aimPoint, chest, ref _aimVelocity, lag, Mathf.Infinity, dt);
+            SetGunState(NpcGunState.Aiming, _aimPoint);
             TurnToward(_aimPoint - transform.position, 300f, dt);
             if (Time.time < _fightUntil) return;
             if (AllyInLine(chest))
@@ -292,7 +312,7 @@ namespace PleaseDontDrown.Story
             // The arm goes back now and the jab plays out as the blow lands (the gesture is the punch we have).
             _gestureAt = Mathf.Max(Time.time, _fightUntil - 0.2f);
             _fightGoal = null;
-            WindUpObservers();
+            WindUpObservers(windUp);
         }
 
         private void Strike()
@@ -319,7 +339,7 @@ namespace PleaseDontDrown.Story
             else
             {
                 _missed++;
-                WhiffObservers();
+                if (!StrayBlow(w)) WhiffObservers(); // (or it lands on whoever else is in front)
             }
             float recover = w.Recover * (_fighter.Style == FightStyle.Drunk ? 1.5f : 1f) * (landed ? 1f : 1.25f); // a miss leaves them open longer
             SetFight(FightState.Recover, recover);
@@ -338,7 +358,7 @@ namespace PleaseDontDrown.Story
         {
             _shots++;
             _ammo--;
-            Vector3 muzzle = HeadPosition - Vector3.up * 0.25f + transform.forward * 0.45f;
+            Vector3 muzzle = Muzzle;
             Vector3 aim = _aimPoint - muzzle;
             // Misses grow with distance and with how fast the lifeguard moves (sideways most of all).
             Vector3 foeVelocity = _foe.Motor != null ? _foe.Motor.Velocity : Vector3.zero;
@@ -351,12 +371,14 @@ namespace PleaseDontDrown.Story
             int count = Physics.RaycastNonAlloc(muzzle, dir, _brainHits, w.MaxRange * 1.3f, ~0, QueryTriggerInteraction.Ignore);
             float best = float.MaxValue;
             PlayerHub hitPlayer = null;
+            Collider hitCollider = null;
             for (int i = 0; i < count; i++)
             {
                 RaycastHit h = _brainHits[i];
                 if (h.distance >= best || IsOwnCollider(h.collider)) continue;
                 best = h.distance;
                 end = h.point;
+                hitCollider = h.collider;
                 hitPlayer = h.collider.GetComponentInParent<PlayerHub>();
             }
             if (hitPlayer != null && hitPlayer.TryGetComponent(out PlayerCombat combat) && !combat.IsDowned)
@@ -366,6 +388,7 @@ namespace PleaseDontDrown.Story
                 combat.ServerDamage(w.ShotDamage, Name, muzzle);
                 combat.ServerKnockback(dir * 1.5f, Name);
             }
+            else if (hitPlayer == null) StrayShot(hitCollider, w.ShotDamage, end, dir); // another pirate, an animal
             GestureObservers(AvatarGesture.Shoot, _aimPoint);
             ShotObservers(muzzle, end, (byte)w.Sound, hitFoe);
         }
@@ -476,9 +499,10 @@ namespace PleaseDontDrown.Story
                 if (Shore.WaterDepthAt(next + Vector3.up * 2f) < 1.1f)
                     transform.position = Grounded(MoveChecked(p, step));
             }
-            if (_foe != null)
+            Transform facing = RivalValid() ? _rival.transform : _foe != null ? _foe.transform : null;
+            if (facing != null)
             {
-                Vector3 face = _foe.transform.position - transform.position;
+                Vector3 face = facing.position - transform.position;
                 TurnToward(face, _fight == FightState.WindUp ? WindUpTurnRate : 360f, dt);
             }
             return true;
@@ -572,7 +596,7 @@ namespace PleaseDontDrown.Story
         /// <summary>Another character between our gun and the lifeguard.</summary>
         private bool AllyInLine(Vector3 target)
         {
-            Vector3 muzzle = HeadPosition - Vector3.up * 0.25f;
+            Vector3 muzzle = Muzzle;
             Vector3 d = target - muzzle;
             float length = d.magnitude;
             int count = Physics.SphereCastNonAlloc(muzzle, 0.3f, d / length, _brainHits, length - 0.5f, ~0, QueryTriggerInteraction.Ignore);
@@ -619,9 +643,10 @@ namespace PleaseDontDrown.Story
         // ------------------------------------------------------------------ every machine: sounds only (looks come later)
 
         [ObserversRpc]
-        private void WindUpObservers()
+        private void WindUpObservers(float seconds)
         {
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.KnifeSwish, 0.35f);
+            if (_weaponView != null) _weaponView.OnWindUp(seconds);
         }
 
         [ObserversRpc]
@@ -641,7 +666,42 @@ namespace PleaseDontDrown.Story
         private void ShotObservers(Vector3 muzzle, Vector3 end, byte sound, bool hit)
         {
             AudioSource.PlayClipAtPoint(ProceduralAudio.Shot((GunSound)sound), muzzle, 1f);
-            if (!hit) AudioSource.PlayClipAtPoint(ProceduralAudio.BulletImpact, end, 0.6f);
+            // From the gun this machine draws (it can sit a little off the host's): the flash, a cloud of black powder
+            // smoke and the ball's tracer (with its puff, hole and crack where it lands).
+            Vector3 from = _weaponView != null && _weaponView.Muzzle is { } drawn && (drawn - muzzle).sqrMagnitude < 1f ? drawn : muzzle;
+            if (_weaponView != null) _weaponView.OnShot();
+            Vector3 path = end - from;
+            float length = path.magnitude;
+            if (length < 0.05f) return;
+            Vector3 dir = path / length;
+            ProjectileSystem fx = ProjectileSystem.Instance;
+            fx.MuzzleFlash(from, dir, 1.5f, false);
+            fx.GunSmoke(from, dir, (GunSound)sound == GunSound.Rifle ? 1.3f : 1f);
+            fx.Fire(null, null, false, from, from, new[] { dir }, 140f, 0f, ProjectileKind.Bullet, 0, 0f, length + 0.4f);
+        }
+
+        // ------------------------------------------------------------------ the weapon in hand
+
+        /// <summary>Where this fighter's shots come from: the drawn gun's muzzle, or about there without one.</summary>
+        private Vector3 Muzzle => _weaponView != null && _weaponView.Muzzle is { } m
+            ? m
+            : HeadPosition - Vector3.up * 0.25f + transform.forward * 0.45f;
+
+        /// <summary>Host: what the gun is doing, synced only when it really changes (the aim point moves every frame).</summary>
+        private void SetGunState(NpcGunState state, Vector3 aim)
+        {
+            if (_gunState.Value != state) _gunState.Value = state;
+            if (state != NpcGunState.Aiming) return;
+            if ((_aimAt.Value - aim).sqrMagnitude > 0.12f * 0.12f) _aimAt.Value = aim;
+        }
+
+        /// <summary>Every machine: draw the weapon once there's one to hold.</summary>
+        private void UpdateWeaponView()
+        {
+            if (_weaponView != null || !_armed.Value || _weaponKind.Value == NpcWeaponKind.Fists) return;
+            if (_animator == null || _rig == null) return;
+            _weaponView = gameObject.AddComponent<NpcWeaponView>();
+            _weaponView.Init(this, _animator, _rig);
         }
     }
 }

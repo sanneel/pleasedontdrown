@@ -452,6 +452,7 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void GestureObservers(AvatarGesture gesture, Vector3 point)
         {
+            if (_weaponView != null && _weaponView.PlaysGesture(gesture)) return; // the cutlass slash, the gun's kick
             if (_animator != null) _animator.Play(gesture, point);
         }
 
@@ -531,34 +532,42 @@ namespace PleaseDontDrown.Story
         public bool ServerTakeHit(int damage, DamageKind kind, PlayerHub attacker, Vector3 point, Vector3 direction)
         {
             if (_maxHealth.Value <= 0 || _health.Value <= 0) return false; // can't be hurt / already down
+            bool head = IsHeadshot(kind, point);
+            if (head) damage *= 2; // (StoryNpc.HitFeel)
             damage = FightOnHit(damage, kind, attacker, direction); // a fighter's guard, interrupted blows, knockdowns
             _health.Value = Mathf.Max(0, _health.Value - damage);
+            // The last of their health to a gun or a bite kills them; to fists and blades it knocks them out (StoryNpc.Rivals).
+            bool killed = _health.Value <= 0 && KillsOutright(kind);
             Vector3 push = new Vector3(direction.x, 0f, direction.z).normalized;
             if (FightStaggers())
             {
                 _knock = push * (kind == DamageKind.Bullet ? 2f : 3.5f);
                 _staggerUntil = Time.time + (kind == DamageKind.Bullet ? 0.35f : 0.6f);
             }
-            HitObservers(point, push, _health.Value, kind == DamageKind.Bullet);
+            HitObservers(point, push, _health.Value, kind == DamageKind.Bullet, killed, damage, head, attacker);
             OnServerHit(attacker);
             if (_health.Value <= 0)
             {
                 _moveTarget = null;
                 _pose.Value = AvatarPose.Down;
                 _mood.Value = AvatarMood.Hurt;
-                Debug.Log($"[Npc] {Name} is down ({kind} by {(attacker != null ? attacker.DisplayName : "?")})");
+                if (killed) Die();
+                Debug.Log($"[Npc] {Name} is {(killed ? "dead" : "down")} ({kind} by {(attacker != null ? attacker.DisplayName : "?")})");
                 ServerDefeated?.Invoke(this, attacker);
             }
             return true;
         }
 
         [ObserversRpc]
-        private void HitObservers(Vector3 point, Vector3 push, int healthLeft, bool bullet)
+        private void HitObservers(Vector3 point, Vector3 push, int healthLeft, bool bullet, bool killed, int damage, bool head, PlayerHub attacker)
         {
-            if (_animator != null) _animator.Flinch(push);
-            if (_audio != null) _audio.PlayOneShot(bullet ? ProceduralAudio.Bonk : ProceduralAudio.Punch, 1f);
-            string text = healthLeft <= 0 ? "K.O.!" : bullet ? "OUCH!" : Random.value < 0.5f ? "OW!" : "OOF!";
-            FloatingText.Spawn(HeadPosition + Vector3.up * 0.3f, text, new Color(1f, 0.6f, 0.3f), healthLeft <= 0 ? 1.4f : 0.9f, 1.2f);
+            if (_animator != null) _animator.Flinch(push * (head ? 1.6f : bullet ? 1.3f : 1f));
+            if (_audio != null && !bullet) _audio.PlayOneShot(ProceduralAudio.Punch, 1f);
+            // Words for a punch, the knockout and the kill; a ball shows its damage instead (StoryNpc.HitFeel).
+            string text = killed ? "KILLED!" : healthLeft <= 0 ? "K.O.!" : bullet ? null : Random.value < 0.5f ? "OW!" : "OOF!";
+            Color colour = killed ? new Color(0.9f, 0.15f, 0.12f) : new Color(1f, 0.6f, 0.3f);
+            if (text != null) FloatingText.Spawn(HeadPosition + Vector3.up * 0.55f, text, colour, (healthLeft <= 0 ? 1.4f : 0.9f) * PopupSize(HeadPosition), 1.2f);
+            HitFeel(point, push, damage, bullet, head, killed, healthLeft, attacker);
         }
 
         // ------------------------------------------------------------------ per frame
@@ -574,7 +583,9 @@ namespace PleaseDontDrown.Story
             if (raw.sqrMagnitude > 900f) raw = Vector3.zero;
             _velocity = Vector3.Lerp(_velocity, raw, 1f - Mathf.Exp(-10f * dt));
             _lastPosition = position;
+            UpdateWeaponView();
             UpdateAnimation();
+            UpdateHitFlash();
             UpdateNameTag();
         }
 
@@ -638,17 +649,10 @@ namespace PleaseDontDrown.Story
             // The same size on screen from arm's length out to a few metres (full size beyond that): a world-sized
             // label is a billboard in your face when you stand next to someone.
             _nameTag.transform.localScale = Vector3.one * Mathf.Clamp(Vector3.Distance(cam.transform.position, at) / TagFullSizeAt, 0.22f, 1f);
-            // The words only change with the name or a hit.
-            int health = _maxHealth.Value > 0 ? _health.Value : -1;
-            if (health == _tagHealth && ReferenceEquals(_tagName, _name.Value)) return;
-            _tagHealth = health;
+            // Just the name (health shows as a bar over the head once they're hurt: NpcHealthBar).
+            if (ReferenceEquals(_tagName, _name.Value)) return;
             _tagName = _name.Value;
-            // One pip per punch it takes (health is in damage points: a pirate's 100 is four punches), at most ten.
-            int maxPips = Mathf.Clamp(Mathf.CeilToInt(_maxHealth.Value / (float)Combat.Damage.Punch), 1, 10);
-            int pips = health > 0 ? Mathf.Clamp(Mathf.CeilToInt(health / (float)_maxHealth.Value * maxPips), 1, maxPips) : 0;
-            _nameTag.text = health > 0
-                ? $"{Name}  {new string('●', pips)}{new string('○', maxPips - pips)}"
-                : Name;
+            _nameTag.text = Name;
         }
 
         private const float TagFullSizeAt = 8f;
@@ -658,7 +662,7 @@ namespace PleaseDontDrown.Story
 
         private void UpdateDizzy()
         {
-            bool down = _pose.Value == AvatarPose.Down && _maxHealth.Value > 0 && _ride == null;
+            bool down = _pose.Value == AvatarPose.Down && _maxHealth.Value > 0 && _ride == null && !_dead.Value; // (the dead see no stars)
             if (!down && _stars == null) return;
             if (_stars == null)
             {
@@ -692,7 +696,6 @@ namespace PleaseDontDrown.Story
                 if (cam != null) star.rotation = cam.transform.rotation;
             }
         }
-        private int _tagHealth = int.MinValue;
         private string _tagName;
 
         public static PlayerHub NearestPlayer(Vector3 from, float range)
@@ -743,6 +746,7 @@ namespace PleaseDontDrown.Story
                 transform.rotation = Quaternion.Euler(0f, _ride.transform.eulerAngles.y, 0f);
                 return;
             }
+            if (_held) return; // in an animal's jaws: it moves us (StoryNpc.Rivals)
 
             BrainUpdate(dt);
 

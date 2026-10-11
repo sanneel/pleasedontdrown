@@ -55,7 +55,13 @@ namespace PleaseDontDrown.Story
             if (_patrol.Count == 0) _patrol.Add(transform.position);
             _patrolIndex = 0;
             _guardFights = fighter.HasValue;
-            if (fighter.HasValue) _guardFighter = fighter.Value;
+            if (fighter.HasValue)
+            {
+                // An armed guard carries the gun on watch too (lowered, ready).
+                _guardFighter = fighter.Value;
+                _weaponKind.Value = fighter.Value.Weapon.Kind;
+                _armed.Value = true;
+            }
             _eyes = new Perception(sight ?? SightSettings.Guard, IsOwnCollider);
             _alert.Value = 0;
             _alarmReason = null;
@@ -68,6 +74,7 @@ namespace PleaseDontDrown.Story
         {
             if (!_guarding) return;
             _guarding = false;
+            if (!_fighting) _armed.Value = false;
             Stealth.Unregister(this);
             _alert.Value = 0;
         }
@@ -87,6 +94,7 @@ namespace PleaseDontDrown.Story
         public void ServerHear(Vector3 at, NoiseKind kind, PlayerHub by)
         {
             if (!_guarding || _eyes == null || _eyes.Alarmed || IsDefeated) return;
+            if (SleepHear(at, kind, by)) return; // asleep: noises stir them first (StoryNpc.Sleep)
             float distance = Vector3.Distance(at, HeadPosition);
             switch (kind)
             {

@@ -58,11 +58,19 @@ namespace PleaseDontDrown.Creatures
                     {
                         _nextGatorThink = Time.time + 0.3f;
                         _prey = NearestStanding(p, 14f, h => ByWater(h.transform.position));
+                        // A pirate by the water will do too, whichever is closer (Creature.Prey).
+                        _npcPrey = NearestNpcPrey(p, 14f, n => ByWater(n.transform.position));
+                        if (_prey != null && _npcPrey != null)
+                        {
+                            if (Flat(_npcPrey.transform.position, p) < Flat(_prey.transform.position, p)) _prey = null;
+                            else _npcPrey = null;
+                        }
                     }
-                    if (_prey != null)
+                    Transform quarry = _prey != null ? _prey.transform : _npcPrey != null ? _npcPrey.transform : null;
+                    if (quarry != null)
                     {
                         SetAct(CreatureAct.Move, 0.5f);
-                        Vector3 target = _prey.transform.position;
+                        Vector3 target = quarry.position;
                         float distance = Flat(target, p);
                         Vector3 to = target - p;
                         to.y = 0f;
@@ -85,6 +93,7 @@ namespace PleaseDontDrown.Creatures
                 }
                 case CreatureAct.WindUp:
                     if (_prey != null) Turn(_prey.transform.position - p, 120f, dt);
+                    else if (_npcPrey != null) Turn(_npcPrey.transform.position - p, 120f, dt);
                     if (!ActDone) break;
                     _lungeDir = transform.forward;
                     SetAct(CreatureAct.Lunge, 0.32f);
@@ -99,6 +108,12 @@ namespace PleaseDontDrown.Creatures
                     if (caught != null && Vector3.Angle(transform.forward, caught.transform.position - transform.position) < 50f)
                     {
                         Grab(caught);
+                        break;
+                    }
+                    StoryNpc caughtNpc = NearestNpcPrey(jaws, GatorReach);
+                    if (caughtNpc != null && Vector3.Angle(transform.forward, caughtNpc.transform.position - transform.position) < 50f)
+                    {
+                        GrabNpc(caughtNpc);
                         break;
                     }
                     if (ActDone)
@@ -134,6 +149,11 @@ namespace PleaseDontDrown.Creatures
 
         private void Hold(float dt)
         {
+            if (_grabbed.Value != null && _grabbed.Value.TryGetComponent(out StoryNpc npc))
+            {
+                HoldNpc(npc, dt); // a pirate in its jaws (Creature.Prey)
+                return;
+            }
             PlayerHub held = Grabbed;
             PlayerCombat combat = held != null ? held.GetComponent<PlayerCombat>() : null;
             if (combat == null || combat.IsDowned)
@@ -186,6 +206,7 @@ namespace PleaseDontDrown.Creatures
             if (held != null && why != null) ReleasedObservers(held, why);
             if (held != null && held.TryGetComponent(out PlayerCombat combat))
                 combat.ServerKnockback((held.transform.position - transform.position).normalized * 4f + Vector3.up * 3f, null);
+            if (held != null && held.TryGetComponent(out StoryNpc npc)) LetGoOfNpc(npc);
             SetAct(CreatureAct.Retreat, 2.5f);
         }
 
@@ -193,6 +214,7 @@ namespace PleaseDontDrown.Creatures
         public void ServerReleaseGrab()
         {
             if (!IsServerInitialized || _grabbed.Value == null) return;
+            if (_grabbed.Value.TryGetComponent(out StoryNpc npc)) npc.ServerLetGo();
             _grabbed.Value = null;
         }
 

@@ -6,12 +6,13 @@ namespace PleaseDontDrown.Combat
 
     /// <summary>
     /// What a fighting character (pirate, drunk, cage fighter) has in hand, as numbers only: the AI in
-    /// <see cref="Story.StoryNpc"/> reads these. Models come later (the pirates' own meshes); nothing here draws.
+    /// <see cref="Story.StoryNpc"/> reads these; <see cref="Story.NpcWeaponView"/> draws the weapon in their hands.
     ///
     /// Melee: the blow is wound up for <see cref="WindUp"/> seconds (the lifeguard's chance to step back or aside),
     /// lands only if they are still in <see cref="Reach"/> and in front, then <see cref="Recover"/> seconds of
     /// opening. Guns: <see cref="AimTime"/> to line up the first shot (the aim trails a moving target), a burst, then
-    /// a reload; misses grow with distance and with how fast the target moves.
+    /// a reload; misses grow with distance and with how fast the target moves. The pirates' guns are flintlocks: one
+    /// ball, then a long reload by hand (muzzle up, ramrod), which is the lifeguards' moment to rush them.
     /// </summary>
     public struct NpcWeapon
     {
@@ -36,8 +37,8 @@ namespace PleaseDontDrown.Combat
             NpcWeaponKind.Pistol => new NpcWeapon
             {
                 Kind = kind, MeleeDamage = 10, Reach = 1.4f, WindUp = 0.5f, Recover = 0.6f, Knock = 4f,
-                Ranged = true, ShotDamage = 14, MinRange = 4f, MaxRange = 22f, AimTime = 0.9f, FollowUpAim = 0.45f,
-                Spread = 2.2f, Burst = 2, Magazine = 6, BurstGap = 0.35f, Reload = 2.2f, Sound = Combat.GunSound.Pistol
+                Ranged = true, ShotDamage = 22, MinRange = 4f, MaxRange = 22f, AimTime = 0.9f, FollowUpAim = 0.45f,
+                Spread = 2.2f, Burst = 1, Magazine = 1, BurstGap = 0f, Reload = 2.6f, Sound = Combat.GunSound.Pistol
             },
             NpcWeaponKind.Musket => new NpcWeapon
             {

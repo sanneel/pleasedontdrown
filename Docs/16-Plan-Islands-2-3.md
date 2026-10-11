@@ -46,6 +46,12 @@ loot. Guests report thefts → the receptionist walks up to the team → boss fi
 - Death: stolen items scatter (return them for pay); the hotel pays $300.
 
 ### Island 3: Skull Cove (pirates) — no income here (you're undercover)
+**Always night** (Shako 2026-10-11): moon, stars, lanterns; a dark sea mist hides the hotel island (the island did
+not move: the night and the mist make it feel far). You land at a little dock on the **mountain side** (under the
+northern crags), climb a pirates' stair tower to a **lookout** on the cliff where you see the whole village, then sneak
+in past **sleeping pirates** to the THIEF. Runtime look: `World/IslandNight.cs` (blends by camera position, no asset
+changes); places: `GameSceneBuilder.Island3Night.cs` (menu: *Island three: night arrival*); sleepers:
+`Story/StoryNpc.Sleep.cs`.
 1. **Arrival** = a stealth mission run like a boss fight: if a **parrot** sees you, the mission restarts.
 2. **THIEF** (the robber, renamed, new look = `THIEFASPIRATE`) owes you for the tsunami: gives a pirate disguise
    (hat + eye patch) and tells you to buy guns and suppressors or you're dead.
@@ -89,9 +95,30 @@ screenshot first).
 | C5 | Perception: sight cone, hearing (`ServerNoise`, gunshots: suppressed ~4 m, loud ~60 m), alarm | **done** (21 automated checks pass, 2-player smoke test), needs Shako's playtest | `Story/Stealth.cs`, `Story/StoryNpc.Perception.cs`, `Combat/PlayerCombat.Stealth.cs`, `UI/ThreatHud.cs` |
 | C6 | Creatures: base with health + hit zones, parrot sentry, monkey (steals items), alligator (lunge + grab) | **logic done** (greybox bodies; Tripo models later), needs playtest | `Creatures/Creature*.cs`, prefab `Resources/Creature` |
 | C7 | Boss framework: phases, telegraph → stun window, boss bar, scaling per player | **done**; Old Snapper and the Kleptopus built on it (logic, greybox bodies) | `Creatures/BossFight.cs`, `Creatures/Creature.Snapper.cs` |
+| C9 | Killing vs knocking out; characters fighting each other: fists/blades knock people out, a bullet or an animal's bite that finishes them kills them (story people the plot needs only get K.O.'d); animals die, small ones are cleared away after ~30 s; stray NPC blows/shots hit other NPCs and start grudges; drunks brawl among themselves; the alligator and Old Snapper go for pirates too; a friend's bullet hurts a lifeguard (down = CPR, never dead) | **done** (`killcheck` ALL PASS), needs Shako's playtest | `Story/StoryNpc.Rivals.cs`, `Creatures/Creature.Prey.cs`, `Story/StoryDirector.Kills.cs` |
 
-Weapons are **logic only** for now (`NpcWeaponKind`: Fists, Cutlass, Pistol, Musket, synced as `StoryNpc.WeaponKind`);
-models get attached later. Shako does not want separate weapon models generated yet.
+Weapons (`NpcWeaponKind`: Fists, Cutlass, Pistol, Musket, synced as `StoryNpc.WeaponKind`) are **in the pirates' hands**
+since 2026-10-11 (the user asked for them): Tripo flintlock pistol, flintlock musket and cutlass
+(`Resources/NpcWeapons`, made by `ArtSource/Tools/tripo_prepare_weapons.py`, drawn by `Story/NpcWeaponView.cs`).
+- **What you see:** held exactly as the players' guns are seen from outside (`PlayerHands.ThirdPersonHold`: the
+  pistol held out in front at chest height, the musket's butt in the shoulder; the players' grip nodes and finger
+  poses from `WeaponGripAuthoring`; the hands reach the grips by arm IK). Armed guards carry their gun on watch, pointing
+  at the ground ahead. In a fight a gunman points it at you (a hammer click warns you), fires (flash, a cloud of black
+  powder smoke, the ball's tracer and its puff where it lands), then lowers it to reload. The cutlass is held forward
+  at the side (the players' knife pose, tipped less: it's long), raised over the shoulder for the wind-up and slashed
+  down. Up close a gunman hits you with the gun. Knocked down, the weapon stays in the hand.
+- **Logic:** the pistol is a flintlock too now: **one shot, then a 2.6 s reload** (was a 6-round gun with bursts), 22
+  damage; the musket one shot, 3.2 s. The reload is the moment to rush them. Shots and the "is an ally in the line"
+  check start from the drawn gun's muzzle. The gun state and aim point are synced (`StoryNpc.GunState`, `AimPoint`).
+- The weapons are drawn bigger than life (pistol 1.5x, musket 1.1x, cutlass 1.15x): the Tripo pirates have big hands.
+- Dev command `god [on|off]` (no damage, for tests and filming); `aimat <name> head` aims at the head.
+- **Hitting them** (`Story/StoryNpc.HitFeel.cs`): the body flashes red for a moment, a ball throws a red puff and a
+  heavy smack sound, the damage pops up over the head (sized to read the same near or far). **Headshots** (a ball above
+  ~1.5 m on someone standing) do **double damage**: "HEADSHOT -50" in gold. The shooter gets the host's confirmation:
+  a hit marker (white, gold for a headshot, red and bigger for a kill) with a tick / ding / thunk.
+- **Health:** the row of pips after the name is gone. `Story/NpcHealthBar.cs`: a slim bar over the head shows only
+  once they're hurt (green to yellow to red, a white chunk for the damage just done draining after it) and fades out
+  ~4 s after the last hit; gone when they're down.
 
 Measured (headless tests, 2026-10-11): fists vs a still player ~90% land, vs a player dodging left/right 29%; pistols
 ~40% still, ~21% dodging. A cage fighter no longer gets stun-locked by mashed punches.
@@ -120,8 +147,9 @@ Measured (headless tests, 2026-10-11): fists vs a still player ~90% land, vs a p
   everyone's screen, then an arm snatches a pistol and waves it by the pier: punch it to get the same gun back (parts
   and all). Phase 3 (33%): its eyes glow, then it throws a sun lounger or phone at you. Beaten: 6 stolen things spill
   out (hand them in) and the hotel pays $300.
-- **Chapter 3, Skull Cove** (after 2.7 the objective is to sail south): 3.1 sneak from the dock to the THIEF's shack
-  past 6 lookout parrots and 2 guards (seen = restart) · 3.2 the THIEF: everyone gets the disguise, "buy suppressed
+- **Chapter 3, Skull Cove** (after 2.7 the objective is to sail south, to the dock under the mountain): 3.1 at night:
+  climb the lookout tower, then sneak to the THIEF's shack at the far end of the village past 8 sleeping pirates (they
+  hear running and footsteps right beside them, sit up and look about; seen = restart) and 2 guards with lanterns · 3.2 the THIEF: everyone gets the disguise, "buy suppressed
   guns" · 3.3 gun stall by the dock (pistol 250, shotgun 500, SMG 700): done when the team has a pistol and a shotgun
   and every gun is suppressed (the THIEF tops the wallet up: no pay on this island) · 3.4 the tavern: cage fight with
   Iron Jaw Jack (brawler AI) · 3.5 the jungle: 3 guards and 3 monkeys between the west road and the river; a loud shot
@@ -146,6 +174,9 @@ Then try `story goto 3.8`, `bosstest kleptopus`, `creature alligator`, `chapter3
   `chapter3check` (plays chapter 3 through automatically), `swing` (nearest rope swing).
 - `stealthtest [guards] [parrots]`: sneak to the flag 45 m ahead past patrolling guards and parrots; seen = restart.
 - `creature <parrot|monkey|alligator|snapper> [count]`, `creatures` (list), `disguise [on|off]`, `bosstest` (Old Snapper).
+- Sleepers: running within ~7 m (or walking right past, ~2.5 m) stirs them; woken they sit up and look ~7 s with sleepy
+  eyes (10 m), then sleep again; a loud shot wakes them into the alarm. Night guards see 13 m (22 by day).
+- `killcheck`: automated checks of killing/K.O., drunk brawls, stray shots, the alligator killing a pirate (host log `[Check]`). `preytest`: an alligator by the nearest shore with two pirates on the bank.
 - `threatcheck`: automated checks of all of the above (host log `[Check]`, ends `[Check] DONE: ALL PASS`).
 - `brawltest [count] [fists|cutlass|pistol|musket|mix|drunk|brawler]`: a mission with fighters around you.
 - `fightstats`: every fighter's swings/hits/misses/shots/blocks (host log, `[Fight]`).

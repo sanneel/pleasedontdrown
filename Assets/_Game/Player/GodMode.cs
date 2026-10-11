@@ -16,6 +16,18 @@ namespace PleaseDontDrown.Player
             if (!On && Flying) ToggleFly();
         }
 
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.AfterAssembliesLoaded)] // (after DevCommands clears its list)
+        private static void Register()
+        {
+            On = false;
+            Core.DevCommands.Register("god", "[on|off]", "God mode for your lifeguard (as in the ESC menu): nothing hurts you (tests, filming).", args =>
+            {
+                bool want = args.Length == 0 ? !On : args[0] != "off";
+                if (want != On) Toggle();
+                Core.DevCommands.Print("god mode " + (On ? "on" : "off"));
+            }, cheat: true);
+        }
+
         public static void ToggleFly()
         {
             PlayerMotor motor = PlayerHub.Local != null ? PlayerHub.Local.Motor : null;

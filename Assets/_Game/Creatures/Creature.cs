@@ -165,6 +165,7 @@ namespace PleaseDontDrown.Creatures
                 }
             }
             if (IsServerInitialized && _setUp && _kind.Value == CreatureKind.Monkey) HatPickup();
+            CorpseUpdate(dt);
             AnimateBody(dt);
             UpdateGrabbedLocal(dt);
         }
@@ -301,7 +302,8 @@ namespace PleaseDontDrown.Creatures
             SetAct(CreatureAct.Dead, 0f);
             _alert.Value = 0;
             Stealth.Unregister(this);
-            Debug.Log($"[Creature] {DisplayName} is beaten{(by != null ? " by " + by.DisplayName : "")}");
+            Debug.Log($"[Creature] {DisplayName} is dead{(by != null ? " (killed by " + by.DisplayName + ")" : "")}");
+            ServerDeathFx(); // the cry, "KILLED!", the body cleared away later (Creature.Prey)
             OnDied(by);
             ServerKilled?.Invoke(this, by);
         }

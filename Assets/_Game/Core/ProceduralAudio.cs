@@ -22,6 +22,7 @@ namespace PleaseDontDrown.Core
             _suppressed = _dryFire = _aimIn = _aimOut = _magOut = _magIn = _rack = _impact = null;
             _steps = null;
             _cries = null;
+            _hitTick = _headDing = _killThunk = _fleshHit = null;
             _kiss = _knifeSwish = _stab = null;
             _stepVariant = 0;
         }
@@ -317,6 +318,44 @@ namespace PleaseDontDrown.Core
             float thud = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(140f, 60f, t / 0.25f) * t) * Mathf.Exp(-16f * t);
             float slap = (Mathf.PerlinNoise(t * 9000f, 0.7f) * 2f - 1f) * Mathf.Exp(-60f * t);
             return (thud * 0.9f + slap * 0.7f) * Mathf.Clamp01(t / 0.002f);
+        });
+
+        // ------------------------------------------------------------------ hits landing (the shooter's confirmation)
+
+        private static AudioClip _hitTick, _headDing, _killThunk, _fleshHit;
+
+        /// <summary>The shooter's "you hit him": a short bright tick.</summary>
+        public static AudioClip HitTick => _hitTick != null ? _hitTick : _hitTick = Build("HitTick", 0.07f, t =>
+        {
+            float tone = Mathf.Sin(2f * Mathf.PI * 2900f * t) * 0.6f + Mathf.Sin(2f * Mathf.PI * 4300f * t) * 0.25f;
+            float noise = Mathf.PerlinNoise(t * 12000f, 0.21f) * 2f - 1f;
+            return (tone + noise * 0.35f) * Mathf.Exp(-55f * t) * Mathf.Clamp01(t / 0.0015f) * 0.7f;
+        });
+
+        /// <summary>A headshot: a high, clean ding that rings a moment.</summary>
+        public static AudioClip HeadDing => _headDing != null ? _headDing : _headDing = Build("HeadDing", 0.45f, t =>
+        {
+            float s = Mathf.Sin(2f * Mathf.PI * 1960f * t) * Mathf.Exp(-9f * t)
+                      + 0.45f * Mathf.Sin(2f * Mathf.PI * 1960f * 2.4f * t) * Mathf.Exp(-16f * t)
+                      + 0.2f * Mathf.Sin(2f * Mathf.PI * 1960f * 3.9f * t) * Mathf.Exp(-24f * t);
+            return s * 0.42f * Mathf.Clamp01(t / 0.002f);
+        });
+
+        /// <summary>A kill: a deep thunk under a falling two-note chime.</summary>
+        public static AudioClip KillThunk => _killThunk != null ? _killThunk : _killThunk = Build("KillThunk", 0.55f, t =>
+        {
+            float thunk = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(110f, 48f, Mathf.Clamp01(t / 0.3f)) * t) * Mathf.Exp(-11f * t);
+            float chime = t < 0.09f ? Mathf.Sin(2f * Mathf.PI * 1500f * t) * Mathf.Exp(-20f * t)
+                : Mathf.Sin(2f * Mathf.PI * 1120f * t) * Mathf.Exp(-9f * (t - 0.09f));
+            return (thunk * 0.85f + chime * 0.35f) * Mathf.Clamp01(t / 0.002f);
+        });
+
+        /// <summary>A ball hitting a body: a heavy, dull smack.</summary>
+        public static AudioClip FleshHit => _fleshHit != null ? _fleshHit : _fleshHit = Build("FleshHit", 0.22f, t =>
+        {
+            float thud = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(170f, 70f, t / 0.22f) * t) * Mathf.Exp(-20f * t);
+            float smack = (Mathf.PerlinNoise(t * 6000f, 0.83f) * 2f - 1f) * Mathf.Exp(-45f * t);
+            return (thud * 1f + smack * 0.8f) * Mathf.Clamp01(t / 0.001f) * 0.9f;
         });
 
         // ------------------------------------------------------------------ guns

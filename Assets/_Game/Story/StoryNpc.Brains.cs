@@ -92,6 +92,7 @@ namespace PleaseDontDrown.Story
                 FightThink(dt); // StoryNpc.Combat: anyone set to fight (pirates, drunks, the cage fighter)
                 return;
             }
+            if (_asleep && SleepThink(dt)) return; // StoryNpc.Sleep: asleep, or just woken and looking about
             if (_guarding && _pose.Value == AvatarPose.Normal && Time.time >= _staggerUntil)
             {
                 GuardThink(dt); // StoryNpc.Perception: on watch

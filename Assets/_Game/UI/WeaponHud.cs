@@ -12,6 +12,8 @@ namespace PleaseDontDrown.UI
     public class WeaponHud : MonoBehaviour
     {
         private static float _hitAt = -10f;
+        private static Color _hitColour = Color.white;
+        private static float _hitSize = 1f, _hitLength = 0.18f;
         private Texture2D _scope;
         private int _scopeSize;
 
@@ -19,7 +21,21 @@ namespace PleaseDontDrown.UI
         private static void ResetStatics() => _hitAt = -10f;
 
         /// <summary>One of our bullets hit something that counts.</summary>
-        public static void ShowHitMarker() => _hitAt = Time.unscaledTime;
+        public static void ShowHitMarker() => ShowHitMarker(false, false);
+
+        /// <summary>
+        /// The host confirmed our hit: a headshot marks yellow and bigger, a kill red, biggest and longest (a plain hit
+        /// stays white). A plain confirmation doesn't shrink a headshot or kill marker still showing.
+        /// </summary>
+        public static void ShowHitMarker(bool head, bool kill)
+        {
+            bool showingBig = Time.unscaledTime - _hitAt < _hitLength && _hitSize > 1f;
+            if (!head && !kill && showingBig) return;
+            _hitAt = Time.unscaledTime;
+            _hitColour = kill ? new Color(1f, 0.22f, 0.18f) : head ? new Color(1f, 0.85f, 0.2f) : Color.white;
+            _hitSize = kill ? 1.6f : head ? 1.3f : 1f;
+            _hitLength = kill ? 0.45f : head ? 0.3f : 0.18f;
+        }
 
         private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
 
@@ -38,16 +54,18 @@ namespace PleaseDontDrown.UI
             if (Weapon.LocalScoped) DrawScope(cx, cy);
             else if (gun.Aim < 0.5f) DrawCrosshair(gun, cx, cy);
 
-            // Hit marker: four short ticks round the middle.
+            // Hit marker: four short ticks round the middle (popping out a little, bigger and coloured for a headshot / kill).
             float since = Time.unscaledTime - _hitAt;
-            if (since < 0.18f)
+            if (since < _hitLength)
             {
-                GUI.color = new Color(1f, 1f, 1f, 1f - since / 0.18f);
+                float t = since / _hitLength;
+                GUI.color = new Color(_hitColour.r, _hitColour.g, _hitColour.b, 1f - t * t);
+                float s = Hud.Scale * _hitSize * (1f + 0.25f * (1f - t));
                 for (int i = 0; i < 4; i++)
                 {
                     Matrix4x4 keep = GUI.matrix;
                     GUIUtility.RotateAroundPivot(45f + 90f * i, new Vector2(cx, cy));
-                    GUI.DrawTexture(new Rect(cx + 9f * Hud.Scale, cy - 1.5f * Hud.Scale, 12f * Hud.Scale, 3f * Hud.Scale), Texture2D.whiteTexture);
+                    GUI.DrawTexture(new Rect(cx + 9f * s, cy - 1.5f * s, 12f * s, 3f * s), Texture2D.whiteTexture);
                     GUI.matrix = keep;
                 }
                 GUI.color = Color.white;

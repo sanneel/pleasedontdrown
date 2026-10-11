@@ -758,7 +758,7 @@ namespace PleaseDontDrown.Story
             yield return Say(_sandy, "(on the radio) A jet ski, and now a pirate ship? Who ARE you?");
             yield return ChapterReport("CHAPTER 2 COMPLETE");
             // On to Skull Cove, where the pirates took the casino's money (by boat, or the travel pads).
-            Vector3 cove = Island3Arrival;
+            Vector3 cove = NightDock; // the little dock on the mountain side (round the back of the island, at night)
             SetObjective("Sail south to Skull Cove, the pirates' island");
             Marker("Skull Cove", cove + Vector3.up * 3f);
             while (StoryNpc.NearestPlayer(cove, 90f) == null) yield return new WaitForSeconds(0.5f);

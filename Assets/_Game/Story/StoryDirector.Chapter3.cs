@@ -15,7 +15,7 @@ namespace PleaseDontDrown.Story
     /// <summary>
     /// Chapter 3, Skull Cove (Docs/16-Plan-Islands-2-3.md): no pay here, you're undercover. The places are
     /// "Environment/Island3/Story/..." (GameSceneBuilder.Island3Story).
-    ///  3.1 sneak in past the parrots (seen = restart) · 3.2 the THIEF: disguises, "buy suppressed guns" ·
+    ///  3.1 at night: land under the mountain, climb the lookout, sneak past the sleeping pirates (seen = restart) · 3.2 the THIEF: disguises, "buy suppressed guns" ·
     ///  3.3 the gun stall: a pistol and a shotgun, every gun suppressed · 3.4 the tavern's cage fighter ·
     ///  3.5 the jungle (monkeys take hats; a loud shot = caught) · 3.6 the rope swing over the alligators' river ·
     ///  3.7 Old Snapper at the crag falls · 3.8 the gold vault behind those falls, in the heart of the mountain.
@@ -83,20 +83,40 @@ namespace PleaseDontDrown.Story
             int index = _beats.FindIndex(b => b.Id == "3.1");
             StartAt(index);
             yield return new WaitForSeconds(1f);
-            Check("3.1 starts on Skull Cove", _beat.Value == "3.1" && (me.transform.position - Island3Arrival).sqrMagnitude < 40f * 40f);
+            Check("3.1 starts at the dock under the mountain", _beat.Value == "3.1" && (me.transform.position - NightDock).sqrMagnitude < 25f * 25f,
+                $"{Vector3.Distance(me.transform.position, NightDock):F1} m off");
+            Check("3.1 it's night on Skull Cove", World.IslandNight.NightAt(me.transform.position) > 0.95f);
+            Transform lookout = NightPoint("Lookout");
+            Check("3.1 the lookout tower is built", lookout != null);
+            yield return new WaitForSeconds(6f);
+            if (lookout != null) Stand(lookout.position);
             float waited = Time.time; // the radio lines, then the mission
-            while (!MissionRunning && Time.time - waited < 25f) yield return null;
-            yield return new WaitForSeconds(0.3f);
+            while (!MissionRunning && Time.time - waited < 40f) yield return null;
+            yield return new WaitForSeconds(0.5f);
             Transform thief = Island3Point("Thief");
-            int parrots = 0;
-            foreach (Creature c in Creature.All) if (c.Kind == CreatureKind.Parrot && !c.IsDead) parrots++;
-            Check("3.1 lookout parrots on their perches", parrots >= 4, $"{parrots}");
+            var sleepers = new List<StoryNpc>();
+            foreach (StoryNpc n in StoryNpc.All) if (n.IsFastAsleep) sleepers.Add(n);
+            Check("3.1 pirates asleep in the village", sleepers.Count >= 6, $"{sleepers.Count}");
             int alarms = 0;
             void Alarmed(string who, PlayerHub whom, string why) => alarms++;
             Stealth.ServerSpotted += Alarmed;
-            yield return new WaitForSeconds(12f); // standing at the landing: out of their sight
+            yield return new WaitForSeconds(10f); // on the tower: out of everyone's sight
+            // Footsteps running past a sleeper wake him; he looks about, sees nobody, sleeps again.
+            if (sleepers.Count > 0)
+            {
+                StoryNpc s0 = sleepers[0];
+                for (int i = 0; i < 6 && s0.IsFastAsleep; i++)
+                {
+                    Stealth.ServerNoise(s0.transform.position + Vector3.right * 4f, Stealth.Running, me, NoiseKind.Footsteps);
+                    yield return new WaitForSeconds(0.5f);
+                }
+                Check("3.1 running near a sleeper wakes him", !s0.IsFastAsleep);
+                float t0 = Time.time;
+                while (!s0.IsFastAsleep && Time.time - t0 < 15f) yield return null;
+                Check("3.1 seeing nobody, he goes back to sleep", s0.IsFastAsleep, $"{Time.time - t0:F1} s");
+            }
             Stealth.ServerSpotted -= Alarmed;
-            Check("3.1 the landing is out of the lookouts' sight", alarms == 0, $"{alarms} alarms in 12 s");
+            Check("3.1 nobody sees you on the tower", alarms == 0, $"{alarms} alarms");
             if (thief != null) Stand(thief.position);
             yield return WaitBeat("3.2", 8f);
             Check("3.1 reaching the shack unseen moves on", _beat.Value == "3.2");
@@ -199,39 +219,73 @@ namespace PleaseDontDrown.Story
             Debug.Log($"[Check] DONE: {(_checkFails == 0 ? "ALL PASS" : _checkFails + " FAILED")}");
         }
 
-        // ------------------------------------------------------------------ 3.1 sneak in
+        // ------------------------------------------------------------------ 3.1 sneak in (at night)
+
+        /// <summary>The night arrival's places (GameSceneBuilder.Island3Night): the dock under the crags, the lookout...</summary>
+        private static Transform NightPoint(string name) => GameObject.Find("Environment/Island3/NightArrival/" + name)?.transform;
+
+        /// <summary>Where the team lands: the little dock on the mountain side (the old pirate dock if it isn't built).</summary>
+        private static Vector3 NightDock => NightPoint("Dock") is { } dock ? dock.position : Island3Arrival;
+
+        private static readonly string[] SleeperNames = { "Snorin' Sam", "Drowsy Dan", "Old Wheeze", "Barnacle Bess", "Nodding Ned", "Grumbles", "Lazy Lars", "Mumbling Mick" };
 
         private IEnumerator SkullCove()
         {
             SetChapter("Chapter 3: Skull Cove");
-            EnsureOnIsland3();
+            EnsureOnIsland3(NightDock);
             DisguiseEveryone(false);
-            TitleObservers("CHAPTER 3", "Skull Cove");
+            TitleObservers("CHAPTER 3", "Skull Cove, by night");
             yield return new WaitForSeconds(2f);
-            yield return Say(_sandy, "(on the radio) Skull Cove. The pirates' island. Their parrots squawk at any stranger they see.");
-            yield return Say(_sandy, "(on the radio) Sneak in. Walk, don't run. Keep buildings and trees between you and those birds.");
+            yield return Say(_sandy, "(on the radio) Skull Cove. You came in round the back, under the mountain. Nobody watches this side.");
+            yield return Say(_sandy, "(on the radio) See that old pirate tower against the cliff? Climb it. From up there you'll see the whole village.");
+            Transform lookout = NightPoint("Lookout");
+            if (lookout != null)
+            {
+                SetObjective("Climb the lookout tower against the cliff");
+                Marker("Lookout", lookout.position + Vector3.up * 1.5f);
+                yield return Reach(lookout.position, 4f);
+                NoMarker();
+                yield return Say(_sandy, "(on the radio) Look down there. Lanterns in the lane: two on watch. And round the campfire... asleep. Half the village is.");
+                yield return Say(_sandy, "(on the radio) Sleepers can't see you, but they hear. Don't run near them, and don't walk right past their ears.");
+            }
             Transform thief = Island3Point("Thief");
             if (thief == null) yield break;
-            Vector3 start = Island3Arrival;
+            Marker("THIEF's shack", thief.position + Vector3.up * 1.5f);
+            yield return Say(_sandy, "(on the radio) The THIEF's shack is the last one, past the square. Go quietly. If anyone sees you, it's over.");
+            Transform foot = NightPoint("TowerFoot");
+            Vector3 start = foot != null ? foot.position : NightDock;
             yield return RunStealthMission("Sneak in", start, () => ArrivalSneak(thief.position));
         }
 
         private IEnumerator ArrivalSneak(Vector3 goal)
         {
             int first = _spawnedActors.Count;
-            for (int i = 0; i < 6; i++)
-                if (Island3Point($"Perch_{i}") is { } perch) SpawnCreature(CreatureKind.Parrot, perch.position, perch.eulerAngles.y, "Lookout parrot")?.ServerLookout();
+            // Sleepers: round the campfire and on the porches along the way. Woken and sure of you, they fight.
+            for (int i = 0; i < 12; i++)
+            {
+                if (NightPoint($"Sleeper_{i}") is not { } spot) break;
+                StoryNpc sleeper = SpawnNpc(SleeperNames[i % SleeperNames.Length], NpcRole.Pirate, PirateLook(i + 3), spot.position, spot.eulerAngles.y, 100);
+                sleeper.ServerTeleport(spot.position, spot.eulerAngles.y, keepExact: true);
+                sleeper.ServerSleep(FighterProfile.Pirate(i % 2 == 0 ? NpcWeaponKind.Cutlass : NpcWeaponKind.Fists));
+            }
+            // Two on watch, with lanterns (they see less far by night).
             if (Island3Point("GuardA_0") is { } a0 && Island3Point("GuardA_1") is { } a1)
-                SpawnGuard("Bosun Barnaby", 0, a0.position, 0f, new[] { a0.position, a1.position });
+                NightGuard(SpawnNpc("Bosun Barnaby", NpcRole.Pirate, PirateLook(0), a0.position, 0f, 100), a0.position, a1.position);
             if (Island3Point("GuardB_0") is { } b0 && Island3Point("GuardB_1") is { } b1)
-                SpawnGuard("Squint", 2, b1.position, 0f, new[] { b1.position, b0.position });
+                NightGuard(SpawnNpc("Squint", NpcRole.Pirate, PirateLook(2), b1.position, 0f, 100), b1.position, b0.position);
             Marker("THIEF's shack", goal + Vector3.up * 1.5f);
-            MissionObjective("Sneak to the THIEF's shack at the end of the lane. Don't let the parrots see you.");
+            MissionObjective("Sneak to the THIEF's shack at the far end of the village. Walk, don't run; keep clear of the sleepers and the lanterns.");
             yield return Reach(goal, 3.5f);
-            CleanupActorsFrom(first); // in: the lookouts and their guards are done with
+            CleanupActorsFrom(first); // in: the sleepers and the watch are done with
             NoMarker();
-            TitleObservers("IN", "Nobody saw a thing");
+            TitleObservers("IN", "Nobody woke up");
             yield return new WaitForSeconds(1.5f);
+        }
+
+        private static void NightGuard(StoryNpc guard, Vector3 a, Vector3 b)
+        {
+            guard.ServerGuard(new[] { a, b }, FighterProfile.Pirate(NpcWeaponKind.Pistol), StoryNpc.NightGuard);
+            guard.ServerSetLantern(true);
         }
 
         // ------------------------------------------------------------------ 3.2 the THIEF
@@ -256,7 +310,7 @@ namespace PleaseDontDrown.Story
             DisguiseEveryone(true);
             TitleObservers("DISGUISED", "Pirates take you for one of theirs. Parrots too.");
             yield return Say(_thief, "One more thing. Buy guns. SUPPRESSED guns. A bang on this island and every pirate comes running.");
-            yield return Say(_thief, "The stall by the dock sells them. A pistol AND a shotgun, and a silencer on each. Trust me.");
+            yield return Say(_thief, "The stall down by the pirates' dock sells them. A pistol AND a shotgun, and a silencer on each. Trust me.");
         }
 
         // ------------------------------------------------------------------ 3.3 the gun stall

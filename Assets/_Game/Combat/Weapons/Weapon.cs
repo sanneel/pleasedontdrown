@@ -635,10 +635,14 @@ namespace PleaseDontDrown.Combat
             PlayerHub holder = _item.Holder;
             if (target == null || holder == null || holder.Owner != caller || _hitBudget <= 0) return;
             _hitBudget--;
-            // No health on players: a hit knocks them back, harder for heavier rounds.
+            // Friendly fire: it hurts and knocks them back (harder for heavier rounds); enough of it and they're down,
+            // knocked out until someone gives CPR (lifeguards are never killed).
             Vector3 flat = new Vector3(direction.x, 0f, direction.z).normalized;
             if (target.TryGetComponent(out PlayerCombat combat))
+            {
                 combat.ServerKnockback(flat * Mathf.Clamp(Damage / 12f, 1.5f, 7f) + Vector3.up * 1.5f, holder.DisplayName);
+                combat.ServerDamage(Damage, holder.DisplayName, holder.transform.position);
+            }
         }
 
         // ------------------------------------------------------------------ reload

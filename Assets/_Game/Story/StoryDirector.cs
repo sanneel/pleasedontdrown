@@ -801,13 +801,14 @@ namespace PleaseDontDrown.Story
                 me.Look.LookAt(p + Vector3.up * 0.4f);
                 DevCommands.Print($"at {target.name} {p:F1}");
             }, cheat: true, owner: this);
-            DevCommands.Register("aimat", "<name part>", "Look at a character's chest (gun tests).", args =>
+            DevCommands.Register("aimat", "<name part> [head]", "Look at a character's chest, or head (gun tests).", args =>
             {
                 if (args.Length == 0) throw new ArgumentException("who?");
                 Transform target = FindByName(args[0]);
                 PlayerHub me = PlayerHub.Local;
                 if (target == null || me == null) throw new InvalidOperationException($"nothing called '{args[0]}'");
-                Vector3 chest = target.TryGetComponent(out StoryNpc npc) ? npc.HeadPosition - Vector3.up * 0.35f
+                bool head = args.Length > 1 && args[1] == "head";
+                Vector3 chest = target.TryGetComponent(out StoryNpc npc) ? npc.HeadPosition - Vector3.up * (head ? 0.02f : 0.35f)
                     : target.TryGetComponent(out Creature creature) ? creature.TopPosition - Vector3.up * 0.6f : target.position + Vector3.up;
                 me.Look.LookAt(chest);
                 DevCommands.Print($"aiming at {target.name} {(chest - me.Head.position).magnitude:F1} m away");
@@ -821,6 +822,7 @@ namespace PleaseDontDrown.Story
             }, cheat: true, owner: this);
             RegisterMissionCommands();
             RegisterThreatCommands();
+            RegisterKillCommands();
         }
 
         public override void OnStopClient()
@@ -830,6 +832,7 @@ namespace PleaseDontDrown.Story
                 DevCommands.Unregister(c, this);
             UnregisterMissionCommands();
             UnregisterThreatCommands();
+            UnregisterKillCommands();
         }
 
         private static Transform FindByName(string part)
@@ -916,6 +919,7 @@ namespace PleaseDontDrown.Story
             if (!DevCommands.CheatsAllowed && !force) return;
             if (ServerMissionCheat(what, value, by)) return;
             if (ServerThreatCheat(what, value, by)) return;
+            if (ServerKillCheat(what, by)) return;
             // 6 m ahead on the level (looking down must not put things underground).
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")

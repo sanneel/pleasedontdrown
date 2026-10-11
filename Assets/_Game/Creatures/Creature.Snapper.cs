@@ -160,6 +160,7 @@ namespace PleaseDontDrown.Creatures
                 c.ServerDamage(_boss.ByPhase(30, 35, 40), DisplayName, p);
                 c.ServerKnockback(to.normalized * 9f + Vector3.up * 4f, DisplayName);
             }
+            BiteNpcs(p, jaws, 2.2f, 40f, _boss.ByPhase(30, 35, 40) * 2); // a pirate in the way too (Creature.Prey)
             BiteObservers(jaws);
         }
 
