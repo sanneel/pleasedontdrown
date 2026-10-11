@@ -88,3 +88,23 @@ Stylised low-poly dense tropical jungle bush, round clump of big glossy broad gr
 
 **19 jungle_fern** (added 2026-10-11, 5k, kept; prepared to 1.5k)
 Stylised low-poly tropical fern and monstera plant clump, long arching fern fronds and a few big split monstera leaves spreading out from the centre, bright green, bright cartoon colours, game asset, single plant, no ground.
+
+## Batch 2026-10-11 (Shako approved 2-7; the parrot already exists)
+
+Settings: PBR on, 2K, Ultra Mesh off, Remove Lighting on, Triangle, polycount 30000 (decimate later where the entry
+asks for less). Creatures use the pirates' look (stylized realistic, see `pirates.md`); buildings and the yacht use
+this list's style.
+
+**Creature style block:** Stylized realistic 3D game creature, like an animal from a modern high-end animated adventure game, full body, one animal alone, standing in a neutral pose, side view, realistic anatomy lightly stylized, detailed physically based textures, natural colours, clean high quality sculpt, no base, no ground.
+
+**20 jungle_monkey** (creature, target 15k): Cheeky capuchin jungle monkey standing on all fours, brown and cream fur, long curled tail, mischievous face with bright eyes.
+
+**21 alligator** (creature, target 15k): Long alligator lying low on all four short legs, dark olive-green scaly back with bony ridges, pale yellow belly, mouth closed, long heavy tail.
+
+**22 old_snapper** (creature, boss, target 30k): Giant ancient alligator snapping turtle boss, huge spiky dark brown shell covered in moss and barnacles, long alligator-like head with a hooked beak, mouth slightly open showing teeth, thick scaly legs with claws, long spiky tail, old scars.
+
+**23 gun_shop** (building, 25k, 6 × 5 × 5.5 m, near the pirate dock): Stylised low-poly pirate gun shop shack on short wooden stilts, weathered plank walls, wide open front serving counter under a wooden awning, crossed muskets carved on a plain wooden sign without letters, barrels and crates by the counter, steep wooden shingle roof, hanging lantern, bright cartoon colours, game asset, no ground, no text.
+
+**24 ufc_cage** (prop, target 15k, ~7 m across, inside the tavern): Stylised low-poly octagon fighting cage for a pirate tavern, raised wooden plank floor platform, eight thick wooden posts, rope and chain-link fence walls between the posts, one open gate, lanterns on two posts, bright cartoon colours, game asset, no people, no ground, no text.
+
+**25 yacht** (vehicle, 30k, ~14 m long, the hotel director's gift): Stylised low-poly luxury motor yacht, white hull with a teal stripe, wooden deck, small cabin with tinted windows, steering wheel on the open deck, railings, bright clean colours matching a tropical resort, game asset, no water, no text.

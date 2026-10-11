@@ -3,6 +3,7 @@
 Co-op (1–4 players) lifeguard chaos game. Unity 6.3 LTS (6000.3.25f1) · URP · FishNet 4.7.3 · Steam (FishySteamworks).
 
 * Design: [Docs/01-Game-Design.md](Docs/01-Game-Design.md)
+* **Plan for islands 2-3 + core fights (2026-10-11, branch shako-dev)**: [Docs/16-Plan-Islands-2-3.md](Docs/16-Plan-Islands-2-3.md)
 * **Play with Steam friends** (PLAY hosts, JOIN / invites, Steam overlay, app id 480 limits): [Docs/10-Steam-Friends.md](Docs/10-Steam-Friends.md)
 * **Dev island** (every gun and part free, shooting range, rescue test buttons, model gallery; pad on island 1 or `devisland`): [Docs/09-Dev-Island.md](Docs/09-Dev-Island.md)
 * **Guns** (pistol, SMG, shotgun, rifle, sniper; parts, recoil, projectiles): [Docs/08-Weapons.md](Docs/08-Weapons.md)
