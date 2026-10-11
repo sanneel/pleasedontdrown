@@ -155,6 +155,24 @@ namespace PleaseDontDrown.Audio
             return Finish(a, null, 0.75f);
         }
 
+        /// <summary>A boss shows up: three heavy low hits climbing a step each, then a long low note left to ring. Mono.</summary>
+        public static float[] RenderBoss()
+        {
+            var a = new float[(int)(Rate * 3.2f)];
+            int step = Beat * 2 / 3;
+            int[] climb = { 38, 39, 41 };
+            for (int i = 0; i < climb.Length; i++)
+            {
+                Bass(a, null, i * step, climb[i], 0.42f, 1.2f, wrap: false);
+                Bass(a, null, i * step, climb[i] + 12, 0.16f, 0.8f, wrap: false);
+                Marimba(a, null, i * step, climb[i] + 36, 0.12f, 0.5f, wrap: false, decay: 6f);
+            }
+            Bass(a, null, step * 3, 36, 0.5f, 2.6f, wrap: false);
+            Bass(a, null, step * 3, 43, 0.22f, 2.4f, wrap: false);
+            foreach (int note in new[] { 60, 63, 67 }) Marimba(a, null, step * 3, note, 0.1f, 0.5f, wrap: false, decay: 2.2f);
+            return Finish(a, null, 0.8f);
+        }
+
         // ------------------------------------------------------------------ instruments
 
         private static float Hz(int midi) => 440f * MathF.Pow(2f, (midi - 69) / 12f);

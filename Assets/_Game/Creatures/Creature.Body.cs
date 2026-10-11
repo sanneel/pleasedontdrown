@@ -381,7 +381,9 @@ namespace PleaseDontDrown.Creatures
                     if (_jaw != null) _jaw.localRotation = Quaternion.Euler(_open, 0f, 0f);
                     float slam = act == CreatureAct.Slam ? Mathf.Sin(Mathf.Clamp01((Time.time - _slamShownAt) / 0.6f) * Mathf.PI) * 1.4f : 0f;
                     if (act == CreatureAct.Slam && _lastShownAct != CreatureAct.Slam) _slamShownAt = Time.time;
-                    _model.localPosition = new Vector3(0f, slam, 0f);
+                    // Asleep in its pond it lies low: only the top of its shell above the water, like a rock.
+                    _sink = Mathf.MoveTowards(_sink, IsDormant ? 1.6f : 0f, dt * 0.9f);
+                    _model.localPosition = new Vector3(0f, slam - _sink, 0f);
                     _model.localRotation = Quaternion.Slerp(_model.localRotation, act == CreatureAct.Dead ? Quaternion.Euler(0f, 0f, 12f) : Quaternion.identity, k);
                     if (_tail != null) _tail.localRotation = Quaternion.Euler(0f, Mathf.Sin(Time.time * 1.2f) * 12f, 0f);
                     break;

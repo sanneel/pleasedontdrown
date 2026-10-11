@@ -113,7 +113,7 @@ namespace PleaseDontDrown.Story
         {
             Creature boss = SpawnCreature(CreatureKind.Kleptopus, lair, 180f, "The Kleptopus");
             if (boss == null) yield break;
-            TitleObservers("THE KLEPTOPUS", "Shoot the tentacles to free the guests. Its eyes go wide: shoot the head!");
+            BossIntroObservers("THE KLEPTOPUS", "Shoot the tentacles to free the guests. Its eyes go wide: shoot the head!");
             while (boss != null && !boss.IsDead)
             {
                 MissionObjective(boss.BossPhase switch

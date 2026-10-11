@@ -17,6 +17,10 @@ namespace PleaseDontDrown.Editor
     /// </summary>
     public static partial class GameSceneBuilder
     {
+        /// <summary>Bosun Barnaby's beat (the lane guard of the sneak in): from the lane's first bend (just out of sight of
+        /// the landing: guards see 22 m) a third of the way up the next stretch.</summary>
+        private static Vector2[] GuardABeat => new[] { VillageLaneNorth[1], Vector2.Lerp(VillageLaneNorth[1], VillageLaneNorth[2], 0.35f) };
+
         private static void BuildIsland3Story(Transform root, Vector3 arrival, List<Vector3> taken)
         {
             var story = new GameObject("Story").transform;
@@ -49,9 +53,10 @@ namespace PleaseDontDrown.Editor
                     taken.Add(new Vector3(spot.x, spot.y, 1.2f));
                 }
             }
-            // The guards' beats: up and down the lane, and across between the houses.
-            Point(story, "GuardA_0", Ground(VillageSquare + new Vector2(0f, 6f)), 0f);
-            Point(story, "GuardA_1", Ground(VillageLaneNorth[1]), 0f);
+            // The guards' beats: up and down the lane from its first bend (not at the square: from there he saw the landing
+            // itself, and you have to be able to start sneaking), and across between the houses.
+            Point(story, "GuardA_0", Ground(GuardABeat[0]), 0f);
+            Point(story, "GuardA_1", Ground(GuardABeat[1]), 0f);
             Point(story, "GuardB_0", Ground(new Vector2(80f, -879f)), 90f);
             Point(story, "GuardB_1", Ground(new Vector2(98f, -879f)), -90f);
 

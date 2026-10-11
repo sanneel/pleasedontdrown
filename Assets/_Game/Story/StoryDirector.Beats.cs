@@ -754,6 +754,7 @@ namespace PleaseDontDrown.Story
             Marker("Your boat", _pirateBoat.NetworkObject);
             while (_pirateBoat.Driver == null) yield return null;
             NoMarker();
+            PopulateIsland3(); // Skull Cove's lookouts, guards and animals take their places while you're out at sea
             yield return Say(_receptionist, "(on the radio) Leaving already? Come back soon! ...Seriously. Please.");
             yield return Say(_sandy, "(on the radio) A jet ski, and now a pirate ship? Who ARE you?");
             yield return ChapterReport("CHAPTER 2 COMPLETE");

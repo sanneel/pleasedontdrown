@@ -64,6 +64,29 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        /// <summary>Batch: the lane guard's beat moved up the lane (GuardABeat), in the saved scene.</summary>
+        public static void MoveSkullCoveGuardBatch()
+        {
+            try
+            {
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                for (int i = 0; i < 2; i++)
+                {
+                    Transform point = GameObject.Find("Environment/Island3/Story/GuardA_" + i).transform;
+                    Vector2 p = GuardABeat[i];
+                    point.position = new Vector3(p.x, BeachHeight(p.x, p.y), p.y);
+                    Debug.Log($"[Island3] GuardA_{i} at {point.position:F1}");
+                }
+                EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+                EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Island3] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         private static void RefreshCleanHotel()
         {
             LODGroup tower = Object.FindObjectsByType<LODGroup>(FindObjectsSortMode.None).Single(g => g.name == "CentralTower");
