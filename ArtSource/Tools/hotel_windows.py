@@ -304,6 +304,7 @@ def rebuild_windows(obj, names, log):
     bm.to_mesh(me); bm.free(); me.update()
 
     verts, faces, fmat, fcentre = [], [], [], []
+    fwin, current = [], [0]     # which window (1..) each face belongs to, 0 for none: hidden ones are removed later
 
     def box(a, sg, s0, s1, u0, u1, z0, z1, m):
         """Box in facade coordinates: signed depth s (outward), along-wall u, height z. No back face (it's in the wall)."""
@@ -314,7 +315,7 @@ def rebuild_windows(obj, names, log):
                     p = [0.0, 0.0, zz]; p[a] = s_ * sg; p[u] = uu; verts.append(p)
         mid = np.mean(verts[base:], axis=0)
         for q in ((4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)):
-            faces.append([base + i for i in q]); fmat.append(m); fcentre.append(mid)
+            faces.append([base + i for i in q]); fmat.append(m); fcentre.append(mid); fwin.append(current[0])
 
     def box_xyz(lo, hi, m):
         base = len(verts)
@@ -323,9 +324,10 @@ def rebuild_windows(obj, names, log):
                 for z in (lo[2], hi[2]): verts.append([x, y, z])
         mid = (np.array(lo) + np.array(hi)) / 2
         for q in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
-            faces.append([base + i for i in q]); fmat.append(m); fcentre.append(mid)
+            faces.append([base + i for i in q]); fmat.append(m); fcentre.append(mid); fwin.append(current[0])
 
-    for a, sg, sglass, swall, u0, u1, z0, z1, teal in built:
+    for wi, (a, sg, sglass, swall, u0, u1, z0, z1, teal) in enumerate(built):
+        current[0] = wi + 1
         w, h = u1 - u0, z1 - z0
         surround = TEAL if teal else WALL
         # Continuous planar backing around the opening closes holes left by long
@@ -368,6 +370,7 @@ def rebuild_windows(obj, names, log):
     mesh.from_pydata(verts, [], faces)
     for m in me.materials: mesh.materials.append(m)
     mesh.polygons.foreach_set('material_index', np.array(fmat, dtype=np.int32))
+    mesh.attributes.new('win', 'INT', 'FACE').data.foreach_set('value', np.array(fwin, dtype=np.int32))
     bm = bmesh.new(); bm.from_mesh(mesh); bm.faces.ensure_lookup_table()
     bm.normal_update()
     for face, mid in zip(bm.faces, fcentre):                 # every box face points away from its box

@@ -189,7 +189,7 @@ def find_slabs(slab, kept, xs, ys, zs):
         sg = -s                                                  # the building is on side s: the balcony looks the other way
         wall, front = (hi[a], lo[a]) if s > 0 else (lo[a], hi[a])
         u = 1 - a
-        found.append((a, sg, hi[2], wall * sg, front * sg, lo[u], hi[u]))
+        found.append(((a, sg, hi[2], wall * sg, front * sg, lo[u], hi[u]), cells))
     return found
 
 
@@ -248,9 +248,32 @@ def clean_massing(hotel, faces, source, height, names, log):
     kept = drop_thin(solid, xs, ys, zs, THIN, log)
     # What was thin in height and stood out of the walls: the AI model's balcony slabs (rebuilt by rebuild_balconies).
     flat = solid & ~drop_thin(solid, xs, ys, zs, (0.0, 0.0, THIN[2]), log_none)
-    slabs = [s for s in find_slabs(flat, kept, xs, ys, zs) if s[4] - s[3] >= BALCONY_DEPTH and s[6] - s[5] >= 1.2]
+    # A balcony: 0.75-3.2 m out, 1.2-10 m wide, from the first floor up. Deeper, wider or at the ground: the terrace
+    # round the base, the base storey's roof along the sides, roof terraces (their balustrades are built elsewhere).
+    slabs = []
+    for s, cells in find_slabs(flat, kept, xs, ys, zs):
+        if BALCONY_DEPTH <= s[4] - s[3] <= 3.2 and 1.2 <= s[6] - s[5] <= 10.0 and s[2] > 3.0: slabs.append(s)
+        elif s[4] - s[3] > 3.2 or s[2] <= 3.0: kept[tuple(cells.T)] = True   # part of the building: stays solid
     log('balcony slabs in the AI model', len(slabs))
     solid = kept
+
+    # Windows with a wall standing in front of them (the AI model had them in a corner or a bay's jamb): on the clean
+    # walls only a slit of them showed. Those aren't cut in, and their frames and glass go (remove_buried_windows).
+    def solid_at(p):
+        i = [np.searchsorted(l, v) - 1 for l, v in zip(coarse, p)]
+        return all(0 <= i[k] < solid.shape[k] for k in range(3)) and solid[i[0], i[1], i[2]]
+    buried = []                 # window numbers (1.., the 'win' face attribute of the detail mesh)
+    for wi, w in enumerate(windows):
+        a, sg, sglass, swall, u0, u1, z0, z1, teal = w
+        a = int(a)
+        hits = 0
+        for fu in (.1, .3, .5, .7, .9):
+            for fz in (.1, .3, .5, .7, .9):
+                p = [0.0, 0.0, z0 + (z1 - z0) * fz]; p[a] = (swall + .2) * sg; p[1 - a] = u0 + (u1 - u0) * fu
+                hits += solid_at(p)
+        if hits >= 2: buried.append(wi + 1)
+    windows = [w for wi, w in enumerate(windows) if wi + 1 not in buried]
+    log('windows behind a wall (not cut in, frames removed)', len(buried))
 
     # Fine grid: every window's opening and recess back get their own lines, so it is cut exactly.
     extra = ([xs], [ys], [zs])
@@ -290,10 +313,25 @@ def clean_massing(hotel, faces, source, height, names, log):
     hotel.data = mesh
     bpy.data.meshes.remove(old)
     log('clean massing: grid', [len(l) - 1 for l in fine], 'triangles', len(mesh.polygons))
-    return slabs
+    return slabs, buried
 
 
 # ---------------------------------------------------------------------------------------------------- balconies
+
+def remove_buried_windows(details, buried, log):
+    """The frames, glass and sills of the windows clean_massing found behind a wall (their 'win' face attribute)."""
+    me = details.data
+    attr = me.attributes.get('win')
+    if attr is None: return
+    win = np.empty(len(me.polygons), dtype=np.int32); attr.data.foreach_get('value', win)
+    doomed = np.nonzero(np.isin(win, np.array(buried, dtype=np.int32)))[0]
+    bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in doomed], context='FACES')
+    bm.to_mesh(me); bm.free()
+    me.attributes.remove(me.attributes['win'])
+    me.update()
+    log('buried windows removed', len(buried), 'faces', len(doomed))
+
 
 def _wall_at(bvh, a, sg, u, z, d_from):
     """Signed depth (outward +) of the clean wall met looking in from d_from at (u, z); None if open, or if the ray
