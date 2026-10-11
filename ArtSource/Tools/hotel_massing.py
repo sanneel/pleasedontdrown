@@ -28,7 +28,8 @@ ROOT = Path(__file__).resolve().parents[2]
 MERGE = .12              # wall planes closer than this are one plane
 MIN_PLANE = 6.0          # m^2 of facing faces for a plane to count
 SAMPLES = 3              # occupancy samples per cell along each axis
-THIN = (.35, .35, .6)    # solid thinner than this along x, y, z is a slab, ledge or parapet: rebuilt elsewhere
+THIN = (.35, .35, 1.0)   # solid thinner than this along x, y, z is a slab, ledge or parapet: rebuilt elsewhere
+BALCONY_DEPTH = .75      # a thin slab standing out at least this far from its wall is a balcony (else a ledge)
 CARVE_IN = .14           # window recess depth behind the wall face (the glass is 6 cm in)
 WINDOWS = ROOT / 'Logs/hotel-window-repairs.json'
 
@@ -50,6 +51,10 @@ def source_bvh(path, height):
         coll = getattr(bpy.data, k)
         for item in [i for i in coll if i not in old]: coll.remove(item)
     return bvh
+
+
+def log_none(*a):
+    pass
 
 
 def face_arrays(me):
@@ -149,6 +154,45 @@ def refine(lines_c, lines_f):
     return [np.clip(np.searchsorted(c, (f[:-1] + f[1:]) / 2) - 1, 0, len(c) - 2) for c, f in zip(lines_c, lines_f)]
 
 
+def find_slabs(slab, kept, xs, ys, zs):
+    """Balcony slabs: pieces of the thin-in-height solid (6-connected cells) that stand out of the building's wall.
+    Each: (axis, sign, top z, wall depth, front depth, u0, u1), depths signed outward along the axis."""
+    lines = (xs, ys, zs)
+    seen = np.zeros_like(slab)
+    found = []
+    for start in map(tuple, np.argwhere(slab)):
+        if seen[start]: continue
+        stack, cells = [start], []
+        seen[start] = True
+        while stack:
+            c = stack.pop(); cells.append(c)
+            for ax in range(3):
+                for s in (-1, 1):
+                    n = list(c); n[ax] += s; n = tuple(n)
+                    if 0 <= n[ax] < slab.shape[ax] and slab[n] and not seen[n]:
+                        seen[n] = True; stack.append(n)
+        # Which side the building is on: the most contact with what's left of it.
+        contact = {}
+        for c in cells:
+            for ax in (0, 1):
+                for s in (-1, 1):
+                    n = list(c); n[ax] += s; n = tuple(n)
+                    if 0 <= n[ax] < kept.shape[ax] and kept[n]:
+                        o = 1 - ax
+                        area = (lines[o][c[o] + 1] - lines[o][c[o]]) * (zs[c[2] + 1] - zs[c[2]])
+                        contact[(ax, s)] = contact.get((ax, s), 0.0) + area
+        if not contact: continue
+        (a, s) = max(contact, key=contact.get)
+        cells = np.array(cells)
+        lo = [lines[ax][cells[:, ax].min()] for ax in range(3)]
+        hi = [lines[ax][cells[:, ax].max() + 1] for ax in range(3)]
+        sg = -s                                                  # the building is on side s: the balcony looks the other way
+        wall, front = (hi[a], lo[a]) if s > 0 else (lo[a], hi[a])
+        u = 1 - a
+        found.append((a, sg, hi[2], wall * sg, front * sg, lo[u], hi[u]))
+    return found
+
+
 def build_surface(xs, ys, zs, solid, cls_at):
     """Quads between solid and empty cells, outward-facing, with a material per quad."""
     verts, faces, mats = [], [], []
@@ -201,7 +245,12 @@ def clean_massing(hotel, faces, source, height, names, log):
     cx, cy, cz = ((l[:-1] + l[1:]) / 2 for l in coarse)
     solid &= ~((cx[:, None, None] > CANOPY_X[0] - .3) & (cx[:, None, None] < CANOPY_X[1] + .3) &
                (cy[None, :, None] < CANOPY_Y[1]) & (cz[None, None, :] < CANOPY_TOP + .4))
-    solid = drop_thin(solid, xs, ys, zs, THIN, log)
+    kept = drop_thin(solid, xs, ys, zs, THIN, log)
+    # What was thin in height and stood out of the walls: the AI model's balcony slabs (rebuilt by rebuild_balconies).
+    flat = solid & ~drop_thin(solid, xs, ys, zs, (0.0, 0.0, THIN[2]), log_none)
+    slabs = [s for s in find_slabs(flat, kept, xs, ys, zs) if s[4] - s[3] >= BALCONY_DEPTH and s[6] - s[5] >= 1.2]
+    log('balcony slabs in the AI model', len(slabs))
+    solid = kept
 
     # Fine grid: every window's opening and recess back get their own lines, so it is cut exactly.
     extra = ([xs], [ys], [zs])
@@ -241,3 +290,95 @@ def clean_massing(hotel, faces, source, height, names, log):
     hotel.data = mesh
     bpy.data.meshes.remove(old)
     log('clean massing: grid', [len(l) - 1 for l in fine], 'triangles', len(mesh.polygons))
+    return slabs
+
+
+# ---------------------------------------------------------------------------------------------------- balconies
+
+def _wall_at(bvh, a, sg, u, z, d_from):
+    """Signed depth (outward +) of the clean wall met looking in from d_from at (u, z); None if open, or if the ray
+    meets a wall from inside."""
+    o = [0.0, 0.0, z]; o[a] = d_from * sg; o[1 - a] = u
+    d = [0.0, 0.0, 0.0]; d[a] = -sg
+    loc, n, i, dist = bvh.ray_cast(Vector(o), Vector(d), 40.0)
+    if loc is None or n[a] * sg < .9: return None
+    return loc[a] * sg
+
+
+def _side(bvh, a, sg, wall, front, zs, edge, toward):
+    """How far out a side wall (a bay's jamb) beside the balcony's end reaches (capped at its front), or None for an
+    open side."""
+    w = _wall_at(bvh, a, sg, edge + .08 * toward, zs + 1.2, front + 3.0)
+    return min(w, front) if w is not None and w > wall + .2 else None
+
+
+def _balcony(b, a, sg, wall, front, ul, ur, zs, rail_top, cap, closed_l, closed_r, idx):
+    """Slab, drip and gold lines, the front balustrade with corner posts, side balustrades where no wall closes the
+    side. Facade coordinates: depth d (outward +), along the wall u, height z."""
+    W, WH, G = idx['wall'], idx['white'], idx['gold']
+    u_ax = 1 - a
+
+    def box(d0, d1, u0, u1, z0, z1, m):
+        lo = [0.0, 0.0, z0]; hi = [0.0, 0.0, z1]
+        lo[a], hi[a] = sorted((d0 * sg, d1 * sg)); lo[u_ax], hi[u_ax] = u0, u1
+        b.box(tuple(lo), tuple(hi), m)
+
+    box(wall - .12, front + .06, ul - .05, ur + .05, zs - .42, zs, W)                 # one clean slab, into the wall
+    box(front + .06, front + .1, ul - .05, ur + .05, zs - .16, zs - .06, WH)           # drip moulding
+    box(front + .06, front + .075, ul - .03, ur + .03, zs - .055, zs - .025, G)        # gold slab line
+    box(front - .14, front - .03, ul + .02, ur - .02, rail_top - .08, rail_top, cap)   # front handrail
+    box(front - .15, front - .02, ul + .02, ur - .02, rail_top, rail_top + .03, G)     # gold cap
+    box(front - .13, front - .05, ul + .02, ur - .02, zs, zs + .1, WH)                 # bottom rail
+    n = max(2, int((ur - ul - .4) / .18))
+    for i in range(n + 1):
+        x = ul + .22 + (ur - ul - .44) * i / n
+        box(front - .12, front - .06, x - .025, x + .025, zs + .1, rail_top - .08, WH)   # balusters
+    for side, closed in ((ul + .02, closed_l), (ur - .18, closed_r)):
+        box(front - .2, front - .02, side, side + .16, zs, rail_top + .04, WH)        # corner post
+        box(front - .17, front - .05, side + .02, side + .14, rail_top + .04, rail_top + .13, G)  # finial
+        start = wall if closed is None else closed
+        if front - .2 - start < .15: continue                                          # the bay's wall closes this side
+        box(start - .02, front - .2, side + .04, side + .12, rail_top - .08, rail_top, cap)   # side handrail
+        box(start - .02, front - .2, side + .05, side + .11, zs, zs + .1, WH)          # side bottom rail
+        k = max(1, int((front - start - .3) / .18))
+        for i in range(k):
+            d = start + .1 + (front - start - .35) * i / k
+            box(d, d + .05, side + .055, side + .105, zs + .1, rail_top - .08, WH)    # side balusters
+
+
+
+
+def rebuild_balconies(hotel, details, slabs, names, log):
+    """The balconies, where the AI model has a slab standing out of a wall (found on the massing grid, so against
+    the real wall: no rails short of it or across a door, none on a balcony that isn't there). Each gets a clean slab,
+    a balustrade along its front and side balustrades where no wall (a bay's jamb) closes the side. The rail caps keep
+    the colour the window step saw on the AI model's (teal on some), white otherwise."""
+    from hotel_exterior import Builder, TERRACES
+    idx = {n: i for i, n in enumerate(names)}
+    found = json.loads(WINDOWS.read_text(encoding='utf-8'))['balconies']
+    me = hotel.data
+    me.calc_loop_triangles()
+    bvh = BVHTree.FromPolygons([v.co.copy() for v in me.vertices], [tuple(t.vertices) for t in me.loop_triangles])
+
+    def on_terrace(zs, x, y):
+        return any(abs(zs - zr) < .35 and xa < x < xb and ya < y < yb for zr, xa, xb, ya, yb in TERRACES)
+
+    def cap_of(a, sg, zs, u0, u1):
+        for fa, fsg, fzs, fwall, ffront, ful, fur, capmat, captop in found:
+            if int(fa) == a and fsg == sg and abs(fzs - zs) < .5 and ful < u1 and fur > u0 and capmat is not None:
+                return int(capmat)
+        return idx['white']
+
+    b = Builder()
+    built = skipped = 0
+    for a, sg, zs, wall, front, ul, ur in slabs:
+        centre = [0.0, 0.0]; centre[a] = (wall + front) / 2 * sg; centre[1 - a] = (ul + ur) / 2
+        if on_terrace(zs, *centre):
+            skipped += 1                       # a roof terrace's edge: it has its own balustrade
+            continue
+        closed_l = _side(bvh, a, sg, wall, front, zs, ul, -1)
+        closed_r = _side(bvh, a, sg, wall, front, zs, ur, 1)
+        _balcony(b, a, sg, wall, front, ul, ur, zs, zs + 1.03, cap_of(a, sg, zs, ul, ur), closed_l, closed_r, idx)
+        built += 1
+    b.append_to(details)
+    log('balconies built', built, 'terrace edges skipped', skipped)

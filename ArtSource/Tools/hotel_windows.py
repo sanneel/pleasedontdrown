@@ -362,35 +362,8 @@ def rebuild_windows(obj, names, log):
             for b in ((u0 - L - g, u0 - L, z0 - L - g, z1 + L + g), (u1 + L, u1 + L + g, z0 - L - g, z1 + L + g),
                       (u0 - L, u1 + L, z1 + L, z1 + L + g), (u0 - L, u1 + L, z0 - L - g, z0 - L)):
                 box(a, sg, swall - .03, swall + .046, *b, GOLD)
-    for a, sg, zs, swall, front, ul, ur, capmat, captop in balconies:                          # clean balconies
-        u = 1 - a
-        def rail_box(d0, d1, u_0, u_1, z_0, z_1, mat):
-            p, q = [0.0, 0.0, z_0], [0.0, 0.0, z_1]
-            p[a], q[a] = min(d0 * sg, d1 * sg), max(d0 * sg, d1 * sg); p[u], q[u] = u_0, u_1
-            box_xyz(p, q, mat)
-        cap = WHITE if capmat is None else capmat
-        rail_top = min(max(captop, zs + .95), zs + 1.15)
-        rail_box(swall - .1, front + .06, ul - .03, ur + .03, zs - .42, zs, WALL)               # one clean slab
-        rail_box(front + .06, front + .1, ul - .05, ur + .05, zs - .16, zs - .06, WHITE)        # drip moulding
-        rail_box(front - .14, front - .03, ul + .02, ur - .02, rail_top - .08, rail_top, cap)   # front handrail
-        rail_box(front - .15, front - .02, ul + .02, ur - .02, rail_top, rail_top + .03, GOLD)    # gold cap
-        rail_box(front + .06, front + .075, ul - .03, ur + .03, zs - .055, zs - .025, GOLD)     # gold slab line
-        rail_box(front - .13, front - .05, ul + .02, ur - .02, zs, zs + .1, WHITE)              # bottom rail
-        n = max(2, int((ur - ul - .4) / .18))
-        for i in range(n + 1):
-            x = ul + .22 + (ur - ul - .44) * i / n
-            rail_box(front - .12, front - .06, x - .025, x + .025, zs + .1, rail_top - .08, WHITE)   # balusters
-        for side in (ul + .02, ur - .18):
-            rail_box(front - .2, front - .02, side, side + .16, zs, rail_top + .04, WHITE)      # corner posts
-            rail_box(front - .17, front - .05, side + .02, side + .14, rail_top + .04, rail_top + .13, GOLD)  # finial
-            rail_box(swall + .02, front - .2, side + .04, side + .12, rail_top - .08, rail_top, cap)  # side rails
-            rail_box(swall + .02, front - .2, side + .05, side + .11, zs, zs + .1, WHITE)
-            k = max(1, int((front - swall - .3) / .18))
-            for i in range(k):
-                d = swall + .15 + (front - swall - .4) * i / k
-                rail_box(d, d + .05, side + .055, side + .105, zs + .1, rail_top - .08, WHITE)
-    for lo, hi, m, slab, la in rails:                                                            # roof rails
-        box_xyz(lo, hi, m)
+    # The balconies are built on the clean massing (hotel_massing.rebuild_balconies), where their real walls are known;
+    # the AI roof rail caps (find_rails) are left out: the roofs get clean balustrades (hotel_exterior.roof_edges).
     mesh = bpy.data.meshes.new('HotelWindows')
     mesh.from_pydata(verts, [], faces)
     for m in me.materials: mesh.materials.append(m)
