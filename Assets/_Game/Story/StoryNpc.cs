@@ -530,10 +530,14 @@ namespace PleaseDontDrown.Story
         public bool ServerTakeHit(int damage, DamageKind kind, PlayerHub attacker, Vector3 point, Vector3 direction)
         {
             if (_maxHealth.Value <= 0 || _health.Value <= 0) return false; // can't be hurt / already down
+            damage = FightOnHit(damage, kind, attacker, direction); // a fighter's guard, interrupted blows, knockdowns
             _health.Value = Mathf.Max(0, _health.Value - damage);
             Vector3 push = new Vector3(direction.x, 0f, direction.z).normalized;
-            _knock = push * (kind == DamageKind.Bullet ? 2f : 3.5f);
-            _staggerUntil = Time.time + (kind == DamageKind.Bullet ? 0.35f : 0.6f);
+            if (FightStaggers())
+            {
+                _knock = push * (kind == DamageKind.Bullet ? 2f : 3.5f);
+                _staggerUntil = Time.time + (kind == DamageKind.Bullet ? 0.35f : 0.6f);
+            }
             HitObservers(point, push, _health.Value, kind == DamageKind.Bullet);
             OnServerHit(attacker);
             if (_health.Value <= 0)
@@ -747,6 +751,12 @@ namespace PleaseDontDrown.Story
                 // Knocked back by a hit, sliding to a stop (against a wall, not into it).
                 transform.position = Grounded(MoveChecked(p, _knock * dt));
                 _knock = Vector3.MoveTowards(_knock, Vector3.zero, dt * 8f);
+                return;
+            }
+
+            if (FightMove(dt)) // fighting: stepping in, circling, backing off (StoryNpc.Combat)
+            {
+                Separate(dt);
                 return;
             }
 

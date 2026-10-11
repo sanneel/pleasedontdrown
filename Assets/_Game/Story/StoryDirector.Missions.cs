@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using PleaseDontDrown.Combat;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Player;
@@ -23,6 +24,28 @@ namespace PleaseDontDrown.Story
         public static bool MissionRunning { get; private set; }
 
         private string _missionFailReason;
+        private readonly SyncVar<string> _missionTitle = new SyncVar<string>();
+        private readonly SyncVar<string> _missionObjective = new SyncVar<string>();
+        private readonly SyncVar<int> _missionProgress = new SyncVar<int>();
+        private readonly SyncVar<int> _missionGoal = new SyncVar<int>();
+
+        /// <summary>Host: no mission any more (finished, or the story jumped/stopped): the story's line shows again.</summary>
+        private void EndMission()
+        {
+            MissionRunning = false;
+            if (!IsServerInitialized) return;
+            _missionTitle.Value = string.Empty;
+            _missionObjective.Value = string.Empty;
+            _missionProgress.Value = _missionGoal.Value = 0;
+        }
+
+        /// <summary>Host: the running mission's objective (shown instead of the story's while it runs).</summary>
+        private void MissionObjective(string text, int progress = 0, int goal = 0)
+        {
+            if (_missionObjective.Value != text) _missionObjective.Value = text;
+            if (_missionProgress.Value != progress) _missionProgress.Value = progress;
+            if (_missionGoal.Value != goal) _missionGoal.Value = goal;
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetMissionStatics() => MissionRunning = false;
@@ -41,6 +64,7 @@ namespace PleaseDontDrown.Story
         private IEnumerator RunMission(string title, Vector3 start, Func<IEnumerator> body)
         {
             MissionRunning = true;
+            _missionTitle.Value = title;
             int attempt = 1;
             while (true)
             {
@@ -74,7 +98,7 @@ namespace PleaseDontDrown.Story
 
                 Debug.Log($"[Mission] {title} failed: {_missionFailReason}");
                 TitleObservers("MISSION FAILED", _missionFailReason);
-                SetObjective("Mission failed. Trying again...");
+                MissionObjective("Mission failed. Trying again...");
                 NoMarker();
                 yield return new WaitForSeconds(FailedPause);
                 CleanupActorsFrom(actorsBefore);
@@ -83,7 +107,7 @@ namespace PleaseDontDrown.Story
                 attempt++;
                 TitleObservers(title, $"Attempt {attempt}");
             }
-            MissionRunning = false;
+            EndMission();
             _missionFailReason = null;
             Debug.Log($"[Mission] {title}: done");
         }
@@ -94,6 +118,7 @@ namespace PleaseDontDrown.Story
             for (int i = _spawnedActors.Count - 1; i >= index && i >= 0; i--)
             {
                 GameObject go = _spawnedActors[i];
+                if (go != null && go.TryGetComponent(out StoryNpc npc)) npc.ServerStopFighting(); // its tally, for tuning
                 if (go != null && go.TryGetComponent(out NetworkObject nob) && nob.IsSpawned) Despawn(go);
                 _spawnedActors.RemoveAt(i);
             }
@@ -103,16 +128,21 @@ namespace PleaseDontDrown.Story
 
         private void RegisterMissionCommands()
         {
-            DevCommands.Register("brawltest", "[pirates]", "Mission test: fight pirates here; everyone down restarts it.", args =>
-                CheatServer("brawltest", args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 3), cheat: true, owner: this);
+            DevCommands.Register("brawltest", "[count] [fists|cutlass|pistol|musket|mix|drunk|brawler]",
+                "Mission test: fighters around you; everyone down restarts it.", args =>
+                    CheatServer("brawltest:" + (args.Length > 1 ? args[1].ToLowerInvariant() : "fists"),
+                        args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 3), cheat: true, owner: this);
             DevCommands.Register("fail", "[reason]", "Fail the running mission (it restarts).", args =>
                 CheatServer("fail:" + (args.Length > 0 ? string.Join(" ", args) : "Test"), 0), cheat: true, owner: this);
+            DevCommands.Register("fightstats", "", "Print every fighter's swings, hits, misses, shots and blocks so far (host log).", _ =>
+                CheatServer("fightstats", 0), cheat: true, owner: this);
         }
 
         private void UnregisterMissionCommands()
         {
             DevCommands.Unregister("brawltest", this);
             DevCommands.Unregister("fail", this);
+            DevCommands.Unregister("fightstats", this);
         }
 
         /// <summary>Host: the mission test commands; true if <paramref name="what"/> was one.</summary>
@@ -123,25 +153,49 @@ namespace PleaseDontDrown.Story
                 ServerFailMission(what.Substring(5));
                 return true;
             }
-            if (what != "brawltest" || by == null) return false;
+            if (what == "fightstats")
+            {
+                foreach (StoryNpc npc in StoryNpc.All)
+                    if (npc != null && npc.IsFighting) npc.ServerLogTally("so far");
+                return true;
+            }
+            if (!what.StartsWith("brawltest:") || by == null) return false;
             if (MissionRunning) return true;
             Vector3 start = by.transform.position;
             int count = Mathf.Clamp(value, 1, 8);
-            StartCoroutine(RunMission("Pirate brawl", start, () => BrawlTest(start, count)));
+            string kind = what.Substring(10);
+            StartCoroutine(RunMission("Brawl", start, () => BrawlTest(start, count, kind)));
             return true;
         }
 
-        private IEnumerator BrawlTest(Vector3 start, int count)
+        /// <summary>Who the test brawl's fighter number <paramref name="i"/> is.</summary>
+        private static FighterProfile TestFighter(string kind, int i) => kind switch
         {
-            TitleObservers("Pirate brawl", "Take them all down");
+            "cutlass" => FighterProfile.Pirate(NpcWeaponKind.Cutlass),
+            "pistol" => FighterProfile.Pirate(NpcWeaponKind.Pistol),
+            "musket" => FighterProfile.Pirate(NpcWeaponKind.Musket),
+            "drunk" => FighterProfile.Drunk(),
+            "brawler" => FighterProfile.Brawler(),
+            // A raiding party: two with blades or fists up close, the rest shooting.
+            "mix" => FighterProfile.Pirate(i % 4 == 0 ? NpcWeaponKind.Cutlass : i % 4 == 1 ? NpcWeaponKind.Fists : i % 4 == 2 ? NpcWeaponKind.Pistol : NpcWeaponKind.Musket),
+            _ => FighterProfile.Pirate(NpcWeaponKind.Fists)
+        };
+
+        private IEnumerator BrawlTest(Vector3 start, int count, string kind)
+        {
+            TitleObservers("Brawl", "Take them all down");
             var pirates = new List<StoryNpc>();
             string[] names = { "One-Eye", "Barnacle", "Saltbeard", "Rusty", "Gulliver", "Mack", "Jonesy", "Cutter" };
             for (int i = 0; i < count; i++)
             {
+                FighterProfile profile = TestFighter(kind, i);
                 float angle = i * 360f / count;
-                Vector3 at = start + Quaternion.Euler(0f, angle, 0f) * Vector3.forward * 9f;
-                StoryNpc pirate = SpawnNpc(names[i % names.Length], NpcRole.Pirate, PirateLook(i), at, angle + 180f, 100);
-                pirate.ServerAggressive(true, start);
+                float from = profile.Weapon.Ranged ? 16f : 9f;
+                Vector3 at = start + Quaternion.Euler(0f, angle, 0f) * Vector3.forward * from;
+                string name = $"{names[i % names.Length]} ({profile.Weapon.Kind})";
+                int health = profile.Style == FightStyle.Brawler ? 160 : profile.Style == FightStyle.Drunk ? 60 : 100;
+                StoryNpc pirate = SpawnNpc(name, NpcRole.Pirate, PirateLook(i), at, angle + 180f, health);
+                pirate.ServerFight(profile, start);
                 pirates.Add(pirate);
             }
             while (true)
@@ -149,13 +203,17 @@ namespace PleaseDontDrown.Story
                 int down = 0;
                 foreach (StoryNpc p in pirates)
                     if (p == null || p.IsDefeated) down++;
-                SetObjective("Take the pirates down", down, pirates.Count);
+                MissionObjective("Take the pirates down", down, pirates.Count);
                 if (down >= pirates.Count) break;
                 yield return new WaitForSeconds(0.25f);
             }
-            TitleObservers("MISSION COMPLETE", "Pirate brawl");
+            TitleObservers("MISSION COMPLETE", "Brawl");
             yield return new WaitForSeconds(2f);
-            foreach (StoryNpc p in pirates) Remove(p);
+            foreach (StoryNpc p in pirates)
+            {
+                if (p != null) p.ServerStopFighting(); // prints its tally
+                Remove(p);
+            }
         }
     }
 }

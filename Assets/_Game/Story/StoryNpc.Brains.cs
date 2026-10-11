@@ -20,15 +20,12 @@ namespace PleaseDontDrown.Story
         private static readonly string[] Taunts = { "Can't catch me!", "Too slow, lifeguard!", "Hah!", "Nope!", "Catch me if you can!" };
         private static readonly string[] PirateShouts = { "ARRR!", "Hand over the loot!", "Yarr!", "Get 'em, lads!" };
 
-        private const int PirateFist = 12; // a pirate's punch on a lifeguard (100 health: about eight of them)
-
         private readonly RaycastHit[] _brainHits = new RaycastHit[8];
         private float _nextThink;
         private Vector3 _home;
         private Rect _area = new Rect(-40f, 5f, 80f, 40f);
         private bool _fleeing;
         private bool _aggressive;
-        private float _nextAttack;
         private float _nextShout;
         private string _shoutText;
         private Vector3 _shoutAt;
@@ -51,12 +48,16 @@ namespace PleaseDontDrown.Story
             if (!flee) _moveTarget = null;
         }
 
-        /// <summary>Host (pirate): attack lifeguards; with nobody around, head for <paramref name="home"/>.</summary>
+        /// <summary>
+        /// Host (pirate): attack lifeguards with fists; with nobody around, head for <paramref name="home"/>. (A
+        /// pirate with a weapon: <see cref="ServerFight"/> with a <see cref="FighterProfile"/>.)
+        /// </summary>
         [Server]
         public void ServerAggressive(bool aggressive, Vector3 home)
         {
-            _aggressive = aggressive;
             _home = home;
+            if (aggressive) ServerFight(FighterProfile.Pirate(NpcWeaponKind.Fists), home);
+            else ServerStopFighting();
         }
 
         /// <summary>Host (bystander): keep shouting this, facing <paramref name="at"/>. Null text stops.</summary>
@@ -85,6 +86,11 @@ namespace PleaseDontDrown.Story
                 ShoutObservers(_shoutText, true);
                 GestureObservers(AvatarGesture.Wave, _shoutAt);
             }
+            if (_fighting)
+            {
+                FightThink(dt); // StoryNpc.Combat: anyone set to fight (pirates, drunks, the cage fighter)
+                return;
+            }
             if (IsDefeated || _pose.Value != AvatarPose.Normal || Time.time < _nextThink) return;
 
             switch (_role.Value)
@@ -92,10 +98,6 @@ namespace PleaseDontDrown.Story
                 case NpcRole.Robber when _fleeing:
                     _nextThink = Time.time + 0.35f;
                     RobberThink();
-                    break;
-                case NpcRole.Pirate when _aggressive:
-                    _nextThink = Time.time + 0.15f;
-                    PirateThink();
                     break;
             }
         }
@@ -153,36 +155,6 @@ namespace PleaseDontDrown.Story
             for (int i = 0; i < count; i++)
                 if (_brainHits[i].collider.attachedRigidbody == null) return false; // a wall, a palm, the shack
             return true;
-        }
-
-        private void PirateThink()
-        {
-            Vector3 p = transform.position;
-            PlayerHub target = NearestStandingPlayer(p, 35f);
-            if (target == null)
-            {
-                if ((p - _home).sqrMagnitude > 4f && !_moveTarget.HasValue) ServerMoveTo(_home, run: false);
-                return;
-            }
-            Vector3 to = target.transform.position - p;
-            to.y = 0f;
-            float distance = to.magnitude;
-            if (distance > 1.35f)
-            {
-                ServerMoveTo(target.transform.position - to.normalized * 1.1f, run: distance > 4f);
-                if (Random.value < 0.01f) ShoutObservers(PirateShouts[Random.Range(0, PirateShouts.Length)], false);
-                return;
-            }
-            _moveTarget = null;
-            _facePoint = target.transform.position;
-            if (Time.time < _nextAttack) return;
-            _nextAttack = Time.time + Random.Range(1.1f, 1.6f);
-            GestureObservers(AvatarGesture.Punch, target.Head.position);
-            if (target.TryGetComponent(out PlayerCombat combat))
-            {
-                combat.ServerKnockback(to.normalized * 6.5f + Vector3.up * 3f, Name);
-                combat.ServerDamage(PirateFist, Name, p);
-            }
         }
     }
 }

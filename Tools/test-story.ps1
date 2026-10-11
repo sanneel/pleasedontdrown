@@ -6,7 +6,7 @@
 #   powershell -File Tools\test-story.ps1 -Shots           also saves pictures to Builds\Win64\Screenshots\Autoplay
 #
 # Before the story it checks the body itself: walking, sprinting, jumping, swimming, diving, climbing out.
-# Needs a player build (GameSceneBuilder.BuildPlayerBatch). Uses port 7790, never touches the story save.
+# Needs a player build (GameSceneBuilder.BuildPlayerBatch, or DevPlayerBuild.Build). Uses port 7790, never touches the story save.
 # Exit code 0 = the story was played to the end of -Last with no errors in the log.
 param(
     [string]$Last = "1.10",
@@ -29,13 +29,13 @@ Remove-Item $hostLog, $clientLog -ErrorAction SilentlyContinue
 $moveLog = Join-Path $logs "story-test-move.log"
 Remove-Item $moveLog -ErrorAction SilentlyContinue
 $moveGame = Start-Process $exe -PassThru -ArgumentList @("-batchmode", "-nographics", "-pdd-nosteam", "-pdd-port", "7790", "-pdd-host-offline",
-    "-pdd-nosave", "-pdd-nostory", "-pdd-movecheck", "-pdd-quit-after", "120", "-logFile", $moveLog)
+    "-pdd-nosave", "-pdd-nostory", "-pdd-movecheck", "-pdd-quit-after", "120", "-logFile", "`"$moveLog`"")
 $moveGame.WaitForExit()
 Select-String -Path $moveLog -Pattern "^\[MoveCheck\]" | ForEach-Object { $_.Line }
 $moved = [bool](Select-String -Path $moveLog -Pattern "^\[MoveCheck\] RESULT PASS" -Quiet)
 
 $hostArgs = @("-batchmode", "-pdd-nosteam", "-pdd-port", "7790", "-pdd-host-offline", "-pdd-nosave",
-    "-pdd-autoplay", $Last, "-pdd-npcwatch", "-pdd-timescale", "$Speed", "-pdd-quit-after", "$($Minutes * 60)", "-logFile", $hostLog)
+    "-pdd-autoplay", $Last, "-pdd-npcwatch", "-pdd-timescale", "$Speed", "-pdd-quit-after", "$($Minutes * 60)", "-logFile", "`"$hostLog`"")
 if ($Shots) { $hostArgs += "-pdd-autoshots" } else { $hostArgs += "-nographics" }
 $hostGame = Start-Process $exe -ArgumentList $hostArgs -PassThru
 
@@ -43,7 +43,7 @@ $clientGame = $null
 if ($Client) {
     Start-Sleep -Seconds 8   # the host has to be up first
     $clientArgs = @("-batchmode", "-nographics", "-pdd-nosteam", "-pdd-port", "7790", "-pdd-join", "localhost", "-pdd-nosave",
-        "-pdd-quit-after", "$($Minutes * 60)", "-pdd-exec", "`"wait 30; story; players`"", "-logFile", $clientLog)
+        "-pdd-quit-after", "$($Minutes * 60)", "-pdd-exec", "`"wait 30; story; players`"", "-logFile", "`"$clientLog`"")
     $clientGame = Start-Process $exe -ArgumentList $clientArgs -PassThru
 }
 

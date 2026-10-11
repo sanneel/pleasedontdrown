@@ -112,10 +112,12 @@ namespace PleaseDontDrown.Story
         private float _sandyHomeYaw;
 
         public static StoryDirector Instance { get; private set; }
-        public string Chapter => _chapter.Value;
-        public string Objective => _objective.Value;
-        public int Progress => _progress.Value;
-        public int Goal => _goal.Value;
+        // A running mission's own line wins over the story's (both can be going at once: a test mission mid-story).
+        private bool MissionLine => !string.IsNullOrEmpty(_missionObjective.Value);
+        public string Chapter => MissionLine ? _missionTitle.Value : _chapter.Value;
+        public string Objective => MissionLine ? _missionObjective.Value : _objective.Value;
+        public int Progress => MissionLine ? _missionProgress.Value : _progress.Value;
+        public int Goal => MissionLine ? _missionGoal.Value : _goal.Value;
         public string BeatId => _beat.Value;
         public string MarkerLabel => _markerLabel.Value;
         /// <summary>Where the jet ski ride of chapter 1 ends (tests steer at it).</summary>
@@ -180,7 +182,7 @@ namespace PleaseDontDrown.Story
         public override void OnStopServer()
         {
             StopAllCoroutines();
-            MissionRunning = false;
+            EndMission();
             _running = false;
             _freePlay = false;
             ClearWaits();
@@ -261,7 +263,7 @@ namespace PleaseDontDrown.Story
         private void StartAt(int index)
         {
             StopAllCoroutines(); // the beat and anything it started (waving, delayed lines...)
-            MissionRunning = false; // a mission it was in is gone with it
+            EndMission(); // a mission it was in is gone with it
             _freePlay = false;
             ResetTsunamiActors();
             SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2."));
@@ -891,7 +893,7 @@ namespace PleaseDontDrown.Story
                         break;
                     case "off":
                         StopAllCoroutines();
-                        MissionRunning = false;
+                        EndMission();
                         _running = false;
                         _freePlay = false;
                         CleanupActors();

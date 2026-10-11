@@ -322,12 +322,17 @@ namespace PleaseDontDrown.UI
             }
 
             if (!combat.IsDowned) return;
-            Hud.Fill(new Rect(0f, 0f, Hud.Width, Hud.Height), new Color(0.12f, 0f, 0f, 0.45f), 0f);
-            bool friends = PlayerHub.All.Count > 1;
-            Hud.Label(new Rect(0f, cy - 120f, Hud.Width, 60f), "YOU'RE DOWN", 52f, new Color(1f, 0.45f, 0.4f), heavy: true);
-            Hud.Label(new Rect(0f, cy - 60f, Hud.Width, 36f), friends ? "A friend can bring you back with CPR" : "Catching your breath...", 26f, Hud.Sand);
+            // Down: lying on the sand says most of it. Just one quiet line above the hotbar, and the revive bar
+            // while a friend is pumping.
+            bool someoneUp = false;
+            foreach (PlayerHub p in PlayerHub.All)
+                if (p != null && p != local && p.TryGetComponent(out Combat.PlayerCombat c) && !c.IsDowned) someoneUp = true;
+            string line = combat.Revive01 > 0f ? "Being revived..." : someoneUp ? "You're down. A friend can revive you (CPR)" : "You're down. Getting your breath back...";
+            float y = Hud.HotbarTop - 70f;
+            Hud.Label(new Rect(cx - 500f + 1.5f, y + 2f, 1000f, 34f), line, 26f, new Color(0f, 0f, 0f, 0.5f), heavy: true);
+            Hud.Label(new Rect(cx - 500f, y, 1000f, 34f), line, 26f, new Color(1f, 0.82f, 0.75f), heavy: true);
             if (combat.Revive01 > 0f)
-                Hud.Bar(new Rect(cx - 160f, cy - 14f, 320f, 14f), combat.Revive01, new Color(0.5f, 1f, 0.6f));
+                Hud.Bar(new Rect(cx - 140f, y + 40f, 280f, 10f), combat.Revive01, new Color(0.5f, 1f, 0.6f));
         }
 
         /// <summary>Follows a level up at once; down, it holds a quarter second, then eases after it.</summary>
