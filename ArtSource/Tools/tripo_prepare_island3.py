@@ -9,6 +9,7 @@ Sources: ArtSource/Tripo/island3/*.glb (decoded by tripo_decode.py). Output: Ass
 import json
 import math
 import os
+import sys
 
 import bmesh
 import bpy
@@ -18,6 +19,8 @@ from mathutils.bvhtree import BVHTree
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(ROOT, "ArtSource", "Tripo", "island3")
 OUT = os.path.join(ROOT, "Assets", "_Game", "Art", "Tripo", "Island3")
+SRC2 = os.path.join(ROOT, "ArtSource", "Tripo", "Island2")
+OUT2 = os.path.join(ROOT, "Assets", "_Game", "Art", "Tripo", "Island2")
 
 # The shacks are walk-in: the game builds a plank room inside each one. The room is measured on the sized model (before
 # any cut): its floor from below, each wall by many rays at standing height, taking the wall itself, not the porch
@@ -157,6 +160,17 @@ MODELS = {
     "gold_coin_pile": dict(turn=0, fit=("x", 3.0)),
     "money_sack": dict(turn=-90, fit=("z", 1.1)),
     "casino_chip_stacks": dict(turn=0, fit=("z", 0.5)),
+    # The gold vault in the heart of the crags (behind the crag falls).
+    "gold_hoard": dict(turn=0, fit=("x", 6.0), decimate=16000, shiny=True),
+    "gold_bar_stack": dict(turn=0, fit=("x", 1.2), shiny=True),
+    # Island 2 (the hotel's casino and the gala): from ArtSource/Tripo/Island2 to Assets/_Game/Art/Tripo/Island2.
+    "slot_machine": dict(island=2, turn=-90, fit=("x", 0.72), shiny=True),  # a chunky one: on the casino's stands,
+    "roulette_table": dict(island=2, turn=0, fit=("y", 3.0)),
+    "blackjack_table": dict(island=2, turn=0, fit=("z", 0.95)),
+    "champagne_tower": dict(island=2, turn=0, fit=("z", 0.9), shiny=True),
+    "crystal_chandelier": dict(island=2, turn=0, fit=("z", 1.6), shiny=True),
+    "velvet_rope_stanchions": dict(island=2, turn=0, fit=("z", 1.0), shiny=True),
+    "inflatable_cushion": dict(island=2, turn=0, fit=("x", 2.4)),
     "sea_rock_pinnacle": dict(turn=0, fit=("z", 20.0)),
     # The jungle (hundreds of copies): fewer triangles, and the leaves drawn from both sides.
     "jungle_tree": dict(turn=0, fit=("z", 10.0), decimate=6000, two_sided=True),
@@ -165,9 +179,14 @@ MODELS = {
 }
 
 os.makedirs(OUT, exist_ok=True)
+ONLY = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []  # names to redo (default: all)
 for name, spec in MODELS.items():
+    if ONLY and name not in ONLY:
+        continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.gltf(filepath=os.path.join(SRC, name + ".glb"), merge_vertices=True)
+    src, out = (SRC2, OUT2) if spec.get("island") == 2 else (SRC, OUT)
+    os.makedirs(out, exist_ok=True)
+    bpy.ops.import_scene.gltf(filepath=os.path.join(src, name + ".glb"), merge_vertices=True)
     meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     bpy.ops.object.select_all(action="DESELECT")
     for o in meshes:
@@ -252,7 +271,9 @@ for name, spec in MODELS.items():
         mat.use_backface_culling = not spec.get("two_sided", False)  # exported as doubleSided
         if mat.use_nodes:
             for node in mat.node_tree.nodes:
-                if node.type == "BSDF_PRINCIPLED":
+                if node.type == "BSDF_PRINCIPLED" and spec.get("shiny"):
+                    pass  # gold, chrome and crystal keep Tripo's metal and gloss
+                elif node.type == "BSDF_PRINCIPLED":
                     node.inputs["Metallic"].default_value = 0.0
                     for link in list(node.inputs["Metallic"].links) + list(node.inputs["Roughness"].links):
                         mat.node_tree.links.remove(link)
@@ -261,11 +282,12 @@ for name, spec in MODELS.items():
                     node.inputs["Strength"].default_value = 0.35
     size = [round(max(v.co[i] for v in me.vertices) - min(v.co[i] for v in me.vertices), 2) for i in range(3)]
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
-    bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, name + ".glb"), export_format="GLB", use_selection=False)
+    bpy.ops.export_scene.gltf(filepath=os.path.join(out, name + ".glb"), export_format="GLB", use_selection=False)
     print(f"[prepare] {name}: size {size} m, {tris} triangles, cut {removed} faces")
 
 # Unity's frame: x mirrored, front is +z. x from-to, z from-to, floor, ceiling.
-with open(os.path.join(OUT, "shack_rooms.json"), "w") as f:
+if SHACK_ROOMS:  # only when the shacks were redone (a run for other models must not empty it)
+  with open(os.path.join(OUT, "shack_rooms.json"), "w") as f:
     json.dump({"rooms": [{"name": n, "x0": -x1, "x1": -x0, "z0": -y1, "z1": -y0, "floor": fl, "top": tp,
                           "doorX": -DOORS[n]["x"], "doorWidth": 2 * DOORS[n]["half"], "doorHeight": DOORS[n]["top"],
                           "porchZ": -DOORS[n].get("porch", 0.0)}

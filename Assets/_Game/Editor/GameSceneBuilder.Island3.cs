@@ -335,7 +335,7 @@ namespace PleaseDontDrown.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        /// <summary>Island 3's ground: the same 2 m grid as the shared terrain (seamless), painted with vertex colours.</summary>
+        /// <summary>Island 3's ground: the same 2 m grid as the shared terrain (seamless), its layers in uv1 (Island3Surfaces).</summary>
         private static Mesh GetIsland3Mesh()
         {
             const float step = TerrainStep;
@@ -357,6 +357,7 @@ namespace PleaseDontDrown.Editor
                     float x0 = Island3MinX + ix * step, z0 = Island3MinZ + iz * step;
                     // The cave is cut out: its rock shell (BuildMoneyCave) stands in for the cliff and plateau there.
                     if (InCave(x0, z0, 13f, -4f, 34f) && InCave(x0 + step, z0 + step, 13f, -4f, 34f)) continue;
+                    if (InVaultHole(x0 + step * 0.5f, z0 + step * 0.5f)) continue; // the vault's door behind the crag falls
                     int a = iz * nx + ix, b = a + nx;
                     triangles.Add(a); triangles.Add(b); triangles.Add(a + 1);
                     triangles.Add(a + 1); triangles.Add(b); triangles.Add(b + 1);
@@ -377,46 +378,13 @@ namespace PleaseDontDrown.Editor
             mesh.RecalculateBounds();
             Vector3[] normals = mesh.normals;
             var colours = new Color[vertices.Length];
-            for (int i = 0; i < vertices.Length; i++) colours[i] = Island3GroundColour(vertices[i], normals[i]);
+            var weights = new Vector4[vertices.Length];
+            for (int i = 0; i < vertices.Length; i++) (weights[i], colours[i]) = Island3GroundLayers(vertices[i], normals[i]);
             mesh.colors = colours;
+            mesh.SetUVs(1, weights);
             if (isNew) AssetDatabase.CreateAsset(mesh, path);
             EditorUtility.SetDirty(mesh);
             return mesh;
-        }
-
-        /// <summary>Sand at the water, grass inland, dirt roads and yards, grey rock on steep ground and the crags.</summary>
-        private static Color Island3GroundColour(Vector3 v, Vector3 normal)
-        {
-            Color sand = new(0.92f, 0.82f, 0.6f), wet = new(0.66f, 0.58f, 0.43f), grass = new(0.43f, 0.62f, 0.27f),
-                lush = new(0.27f, 0.47f, 0.2f), dirt = new(0.6f, 0.46f, 0.31f), rock = new(0.53f, 0.51f, 0.48f), crag = new(0.38f, 0.36f, 0.35f);
-            float x = v.x, z = v.z, h = v.y;
-            var p = new Vector2(x, z);
-            float s = Island3Shore(x, z, BoxDistanceOut(x, z, Island3Center, Island3HalfSize, Island3CornerRadius));
-            Color c = Color.Lerp(sand, wet, Smooth(0.1f, -1.5f, h));
-            float green = Smooth(8f, 15f, s) * Smooth(-0.2f, 0.5f, h);
-            foreach ((Vector2 centre, float radius) in Island3Pools)
-                green *= Smooth(radius - 0.5f, radius + 1f, Vector2.Distance(p, centre)); // pool beds
-            c = Color.Lerp(c, Color.Lerp(lush, grass, Mathf.PerlinNoise(x * 0.05f + 3f, z * 0.05f + 9f)), green);
-            float bare = Mathf.Max(Smooth(3.4f, 1.8f, DistanceToRoads(p)), Near(x, z, CastleCenter, CastleHalf, 7f));
-            c = Color.Lerp(c, dirt, bare * green);
-            float rocky = Mathf.Max(Smooth(0.8f, 0.6f, normal.y), Smooth(21f, 25f, h));
-            if (InCave(x, z, 18f, -10f, 40f)) rocky = 1f;
-            c = Color.Lerp(c, Color.Lerp(rock, crag, Mathf.PerlinNoise(x * 0.08f, z * 0.08f + 20f)), rocky);
-            float shade = 0.92f + 0.16f * Mathf.PerlinNoise(x * 0.17f + 50f, z * 0.17f);
-            return new Color(c.r * shade, c.g * shade, c.b * shade, 1f);
-        }
-
-        /// <summary>The character shader (vertex colours, soft light, shadows) with the rim and backlight glow off.</summary>
-        private static Material Island3GroundMaterial()
-        {
-            Material mat = LoadOrCreateMaterial("Island3Ground", Shader.Find("PleaseDontDrown/Avatar"));
-            mat.SetColor("_BaseColor", Color.white);
-            mat.SetFloat("_Softness", 1f);
-            mat.SetFloat("_Rim", 0f);
-            mat.SetFloat("_SSS", 0f);
-            mat.SetFloat("_Ambient", 0.6f);
-            EditorUtility.SetDirty(mat);
-            return mat;
         }
 
         // =====================================================================
@@ -442,7 +410,9 @@ namespace PleaseDontDrown.Editor
             BuildMoneyCave(root);
             BuildPlateauWater(root);
             BuildCragFalls(root, taken);
+            BuildGoldVault(root);
             Transform arrival = BuildPirateDock(root, taken);
+            BuildIsland3Story(root, arrival.position, taken); // chapter 3's places (before the trees, which keep clear of them)
             BuildIsland3Jungle(root, taken);
             BuildIsland3Palms(root, taken);
             var dev = Object.FindFirstObjectByType<DevIsland>();
@@ -460,14 +430,17 @@ namespace PleaseDontDrown.Editor
                 rock.SetPositionAndRotation(centre, Quaternion.Euler(tilt, yaw, tilt * 0.5f));
             rock.localScale = size;
             TagSurface(rock.gameObject, SurfaceKind.Rock);
+            Material stone = Island3RockMaterial("Island3Boulder", I3Rock, metres: 5f);
             GameObject model = PropModel("rock", rock);
             if (model == null)
             {
-                Primitive(PrimitiveType.Sphere, "Boulder", rock, Vector3.zero, Vector3.one, GetMaterial("Rock", new Color(0.5f, 0.5f, 0.52f), smoothness: 0.1f));
+                Primitive(PrimitiveType.Sphere, "Boulder", rock, Vector3.zero, Vector3.one, stone);
                 return;
             }
             foreach (MeshFilter filter in model.GetComponentsInChildren<MeshFilter>())
                 filter.gameObject.AddComponent<MeshCollider>().sharedMesh = filter.sharedMesh;
+            foreach (Renderer r in model.GetComponentsInChildren<Renderer>())
+                r.sharedMaterials = Enumerable.Repeat(stone, r.sharedMaterials.Length).ToArray();
         }
 
         private static void BuildSkullCoveRocks(Transform root)
@@ -615,7 +588,7 @@ namespace PleaseDontDrown.Editor
                 new(0.7f, 0.5f, 0.34f), new(0.5f, 0.53f, 0.47f), new(0.6f, 0.58f, 0.55f)
             };
             Color rust = new(0.72f, 0.48f, 0.3f);
-            Material material = Island3GroundMaterial(); // vertex colours, like the ground
+            Material material = Island3RockMaterial("Island3Riprap", Color.white, metres: 3f, vertexColours: true);
             string dir = MeshDir + "/Island3";
             Directory.CreateDirectory(dir);
 
@@ -678,6 +651,7 @@ namespace PleaseDontDrown.Editor
                     float patch = Smooth(0.5f, 0.72f, Mathf.PerlinNoise(mid.x * 0.7f + seed, mid.z * 0.7f + mid.y * 0.7f)) * rusty;
                     Color c = Color.Lerp(body, rust, patch) * R(0.88f, 1.08f);
                     if (mid.y < WaterLevel + 0.35f) c *= 0.72f;
+                    c = c.linear;
                     c.a = 1f;
                     colours.Add(c); colours.Add(c); colours.Add(c);
                     triangles.Add(k); triangles.Add(k + 1); triangles.Add(k + 2);
@@ -748,6 +722,7 @@ namespace PleaseDontDrown.Editor
             go.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
             go.transform.localScale = scale;
             foreach (Renderer r in go.GetComponentsInChildren<Renderer>()) r.allowOcclusionWhenDynamic = false;
+            DressTripoStone(go, name);
             return go;
         }
 
@@ -1479,8 +1454,8 @@ namespace PleaseDontDrown.Editor
         /// </summary>
         private static void BuildPirateCastle(Transform root)
         {
-            Material stone = GetMaterial("CastleStone", new Color(0.5f, 0.47f, 0.43f), smoothness: 0.12f);
-            Material stoneDark = GetMaterial("CastleStoneDark", new Color(0.34f, 0.32f, 0.3f), smoothness: 0.1f);
+            Material stone = Island3RockMaterial("CastleStone", new Color(0.62f, 0.6f, 0.57f), "CastleStone", 3.2f);
+            Material stoneDark = Island3RockMaterial("CastleStoneDark", new Color(0.42f, 0.4f, 0.38f), "CastleStone", 3.2f);
             Material roof = GetMaterial("CastleRoof", new Color(0.46f, 0.12f, 0.1f), smoothness: 0.2f);
             Material wood = GetMaterial("PirateWoodDark", new Color(0.32f, 0.21f, 0.13f));
             Material dark = GetMaterial("PirateTrim", new Color(0.16f, 0.11f, 0.08f));
@@ -1703,19 +1678,10 @@ namespace PleaseDontDrown.Editor
         /// </summary>
         private static void BuildMoneyCave(Transform root)
         {
-            Material rock = GetMaterial("CaveRock", new Color(0.44f, 0.42f, 0.4f), smoothness: 0.1f);
-            Material rockDark = GetMaterial("CaveRockDark", new Color(0.27f, 0.26f, 0.26f), smoothness: 0.15f);
+            Material rock = Island3RockMaterial("CaveRock", new Color(0.46f, 0.44f, 0.42f), "Cliff", 7f);
+            Material rockDark = Island3RockMaterial("CaveRockDark", new Color(0.3f, 0.29f, 0.29f), "Rock", 4f);
             Material wood = GetMaterial("PirateWoodDark", new Color(0.32f, 0.21f, 0.13f));
-            Material gold = GetMaterial("PirateGold", new Color(0.95f, 0.72f, 0.2f), metallic: 0.7f, smoothness: 0.6f, emission: new Color(0.25f, 0.16f, 0.02f));
-            Material cash = GetMaterial("Banknotes", new Color(0.45f, 0.64f, 0.42f));
-            Material band = GetMaterial("White", new Color(0.95f, 0.95f, 0.95f));
-            Material burlap = GetMaterial("MoneySack", new Color(0.7f, 0.6f, 0.42f));
             Material flame = GetMaterial("TorchFlame", new Color(1f, 0.55f, 0.15f), emission: new Color(3f, 1.3f, 0.3f));
-            Material[] chips =
-            {
-                GetMaterial("ChipRed", new Color(0.75f, 0.1f, 0.1f)), GetMaterial("ChipBlack", new Color(0.08f, 0.08f, 0.09f)),
-                GetMaterial("ChipBlue", new Color(0.12f, 0.25f, 0.65f))
-            };
             float T = Island3CliffTop - 0.05f; // a hair under the ground round it, so the edges never flicker
             const float bottom = -10f, ceiling = 7f, ledge = 0.6f;
 
@@ -1801,83 +1767,10 @@ namespace PleaseDontDrown.Editor
             fade.color = gradient;
             mist.GetComponent<ParticleSystemRenderer>().sharedMaterial = GetSplashMaterial();
 
-            // The loot on the ledge: chests full of gold, heaps of coins, cash bricks, money sacks and casino chips.
-            var loot = new GameObject("StolenMoney").transform;
-            loot.SetParent(cave, false);
-            bool tripoLoot = TripoPrefab("treasure_chest_open") != null;
-            if (tripoLoot)
-            {
-                foreach ((Vector3 at, float yaw) in new[] { (new Vector3(-4f, ledge, 24f), 200f), (new Vector3(3.5f, ledge, 26f), 165f), (new Vector3(0f, ledge, 28.2f), 180f) })
-                {
-                    GameObject chest = TripoModel("treasure_chest_open", loot, at, yaw, Vector3.one);
-                    var box = chest.AddComponent<BoxCollider>();
-                    box.center = new Vector3(0f, 0.45f, 0f);
-                    box.size = new Vector3(1.5f, 0.9f, 1.1f);
-                }
-                foreach ((Vector3 at, float scale) in new[] { (new Vector3(-1.5f, ledge, 19.5f), 1f), (new Vector3(2.5f, ledge, 21f), 0.8f),
-                             (new Vector3(0f, ledge, 24.3f), 1.15f), (new Vector3(-5.5f, ledge, 28f), 0.85f) })
-                    TripoModel("gold_coin_pile", loot, at, R(0f, 360f), Vector3.one * scale);
-                foreach (Vector3 at in new[] { new Vector3(-6f, ledge, 18f), new Vector3(6.1f, ledge, 20.2f), new Vector3(-6.2f, ledge, 25.5f),
-                             new Vector3(6f, ledge, 27.5f), new Vector3(2.8f, ledge, 29f), new Vector3(-2.6f, ledge, 29.2f) })
-                    TripoModel("money_sack", loot, at, R(120f, 240f), Vector3.one * R(0.9f, 1.15f));
-                foreach (Vector3 at in new[] { new Vector3(-3.2f, ledge, 17.5f), new Vector3(1f, ledge, 18f), new Vector3(4f, ledge, 22.8f),
-                             new Vector3(-3.6f, ledge, 20.2f), new Vector3(-0.8f, ledge, 21.6f) })
-                    TripoModel("casino_chip_stacks", loot, at, R(0f, 360f), Vector3.one * R(0.9f, 1.3f));
-            }
-            else foreach ((Vector3 at, float yaw) in new[] { (new Vector3(-4f, ledge, 24f), 20f), (new Vector3(3.5f, ledge, 26f), -15f), (new Vector3(0f, ledge, 28.3f), 0f) })
-            {
-                var chest = new GameObject("TreasureChest").transform;
-                chest.SetParent(loot, false);
-                chest.localPosition = at;
-                chest.localRotation = Quaternion.Euler(0f, yaw, 0f);
-                ResortBox(chest, "Body", new Vector3(0f, 0.4f, 0f), new Vector3(1.6f, 0.8f, 1f), wood);
-                foreach (float x in new[] { -0.55f, 0.55f })
-                    ResortBox(chest, "Band", new Vector3(x, 0.4f, 0f), new Vector3(0.12f, 0.82f, 1.02f), gold, false);
-                Primitive(PrimitiveType.Sphere, "Gold", chest, new Vector3(0f, 0.8f, 0f), new Vector3(1.4f, 0.5f, 0.85f), gold, keepCollider: false);
-                var hinge = new GameObject("LidHinge").transform;
-                hinge.SetParent(chest, false);
-                hinge.localPosition = new Vector3(0f, 0.8f, -0.5f);
-                hinge.localRotation = Quaternion.Euler(-70f, 0f, 0f);
-                ResortBox(hinge, "Lid", new Vector3(0f, 0.06f, 0.5f), new Vector3(1.6f, 0.12f, 1f), wood, false);
-            }
-            if (!tripoLoot)
-                foreach ((Vector3 at, Vector3 size) in new[] { (new Vector3(-1.5f, ledge, 19.5f), new Vector3(3f, 1f, 2.4f)),
-                         (new Vector3(2.5f, ledge, 21f), new Vector3(2.2f, 0.8f, 2f)), (new Vector3(0f, ledge, 24.5f), new Vector3(3.6f, 1.4f, 3f)),
-                         (new Vector3(-5.5f, ledge, 28f), new Vector3(2.4f, 1.1f, 2.4f)) })
-                Primitive(PrimitiveType.Sphere, "CoinHeap", loot, at, size, gold, keepCollider: false);
-            foreach (Vector3 pile in new[] { new Vector3(5f, ledge, 18.5f), new Vector3(-5.5f, ledge, 21.5f), new Vector3(5.5f, ledge, 22.5f) })
-                for (int layer = 0; layer < 4; layer++)
-                    for (int i = 0; i < 4 - layer; i++)
-                    {
-                        Vector3 brick = pile + new Vector3((i - (3 - layer) * 0.5f) * 0.36f, 0.09f + layer * 0.18f, R(-0.05f, 0.05f));
-                        ResortBox(loot, "CashBrick", brick, new Vector3(0.34f, 0.17f, 0.7f), cash, false);
-                        ResortBox(loot, "CashBand", brick, new Vector3(0.35f, 0.175f, 0.12f), band, false);
-                    }
-            for (int i = 0; i < (tripoLoot ? 0 : 9); i++)
-            {
-                Vector3 at = new(R(-6.5f, 6.5f), ledge, R(16.5f, 29f));
-                if (Mathf.Abs(at.x) < 2.2f && at.z > 23f) continue; // keep clear of the middle chest
-                Primitive(PrimitiveType.Sphere, "MoneySack", loot, at + Vector3.up * 0.45f, new Vector3(0.85f, 0.95f, 0.85f), burlap, keepCollider: false);
-                Primitive(PrimitiveType.Cylinder, "SackNeck", loot, at + Vector3.up * 0.98f, new Vector3(0.28f, 0.12f, 0.28f), burlap, keepCollider: false);
-            }
-            for (int i = 0; i < (tripoLoot ? 0 : 10); i++) // the casino's chips, in stacks
-            {
-                Vector3 at = new(R(-6f, 6f), ledge, R(17f, 23f));
-                int height = rng.Next(3, 10);
-                Material chip = chips[i % chips.Length];
-                for (int k = 0; k < height; k++)
-                    Primitive(PrimitiveType.Cylinder, "Chip", loot, at + Vector3.up * (0.025f + k * 0.052f), new Vector3(0.34f, 0.025f, 0.34f), chip, keepCollider: false);
-            }
+            // The stolen money is in the gold vault in the heart of the crags now (GameSceneBuilder.Island3Vault): the
+            // sea cave is just a sea cave, a pirate hideout with its torches.
             foreach (int side in new[] { -1, 1 })
                 Torch(cave, new Vector3(side * 6.3f, ledge, 17f), wood, flame);
-            var glow = new GameObject("GoldGlow").AddComponent<Light>();
-            glow.transform.SetParent(cave, false);
-            glow.transform.localPosition = new Vector3(0f, 3f, 24f);
-            glow.type = LightType.Point;
-            glow.range = 10f;
-            glow.intensity = 1.6f;
-            glow.color = new Color(1f, 0.8f, 0.4f);
-            glow.shadows = LightShadows.None;
         }
 
         /// <summary>The two pools on the plateau and the stream from them to the cave roof (shallow, for looks).</summary>
@@ -2212,7 +2105,7 @@ namespace PleaseDontDrown.Editor
             ("throne", new Vector3(c.x, Island3CliffTop + 2f, c.y + 8f), new Vector3(c.x, Island3CliffTop + 1.5f, c.y - 12f)),
             ("waterfall", new Vector3(CaveX + 25f, 6f, CaveFaceZ - 45f), new Vector3(CaveX, 8f, CaveFaceZ)),
             ("cave", new Vector3(CaveX, 2.5f, CaveFaceZ + 3f), new Vector3(CaveX, 0.5f, CaveFaceZ + 26f)),
-        });
+        }.Concat(Chapter3Views()).ToArray());
         }
 
         public static void ReviewIsland3Batch()

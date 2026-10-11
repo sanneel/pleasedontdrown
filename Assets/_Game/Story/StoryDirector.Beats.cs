@@ -31,8 +31,8 @@ namespace PleaseDontDrown.Story
             Body = AvatarLook.Bodies.GirlBlonde // generated model (own model later)
         };
 
-        // The robber has his own model (sunglasses, headband, striped shirt); the pirates are look-alikes of the only
-        // man model for now. The code-built fields are the fallback.
+        // The robber has his own model (sunglasses, headband, striped shirt); the pirates are the Tripo crew (Pete the
+        // marksman, One-Eyed Olga, Big Sal, Salty Bill the quartermaster, round again). The code-built fields are the fallback.
         public static AvatarLook RobberLook => new()
         {
             Figure = 0, Build = 0, Height = 2, Skin = 2, Hair = HairStyle.Short, HairColor = 0,
@@ -43,11 +43,23 @@ namespace PleaseDontDrown.Story
 
         public static AvatarLook PirateLook(int i) => new()
         {
-            Figure = 0, Build = (byte)(i % 2 == 0 ? 2 : 3), Height = (byte)(1 + i % 3), Skin = (byte)(2 + i % 4),
+            Figure = (byte)(i % 4 == 1 ? 1 : 0), Build = (byte)(i % 2 == 0 ? 2 : 3), Height = (byte)(1 + i % 3), Skin = (byte)(2 + i % 4),
             Hair = HairStyle.Long, HairColor = (byte)(i % 3), Top = i % 2 == 0 ? TopStyle.Tank : TopStyle.None, TopColor = 1,
             Bottom = BottomStyle.Trousers, BottomColor = 11, Hat = HatStyle.Bandana, HatColor = 0, Face = i % 3 == 2 ? FacialHair.Mustache : FacialHair.Beard,
-            Body = AvatarLook.Bodies.Variant(AvatarLook.Bodies.TouristBuddy, 1 + (i * 3) % AvatarLook.Bodies.VariantsPerBase)
+            Body = PirateCrew[((i % PirateCrew.Length) + PirateCrew.Length) % PirateCrew.Length]
         };
+
+        private static readonly byte[] PirateCrew =
+            { AvatarLook.Bodies.PirateMarksman, AvatarLook.Bodies.PirateGirl, AvatarLook.Bodies.PirateFat, AvatarLook.Bodies.PirateQuartermaster };
+
+        /// <summary>A pirate's look by its body (the crew above, or the king).</summary>
+        public static AvatarLook PirateLookOf(byte body)
+        {
+            AvatarLook look = PirateLook(0);
+            look.Body = body;
+            look.Figure = (byte)(AvatarLook.Bodies.IsFeminine(body) ? 1 : 0);
+            return look;
+        }
 
         private static AvatarLook GuestLook(int seed, int figure) => AvatarLook.RandomTourist(seed, figure);
 
@@ -70,8 +82,17 @@ namespace PleaseDontDrown.Story
             Add("2.3", "Harder work", HarderWork);
             Add("2.4", "Shark!", SharkAttack);
             Add("2.5", "One more guest", OneMoreGuest);
+            Add("2.5b", "The Kleptopus", Kleptopus);
             Add("2.6", "Pirates", Pirates);
             Add("2.7", "Your boat now", TheBoat);
+            Add("3.1", "Sneak in", SkullCove);
+            Add("3.2", "The THIEF", TheThief);
+            Add("3.3", "Armed and quiet", GunStallBeat);
+            Add("3.4", "Cage fight", CageFight);
+            Add("3.5", "The jungle", Jungle);
+            Add("3.6", "The river", River);
+            Add("3.7", "Old Snapper", SnapperBeat);
+            Add("3.8", "The gold vault", MoneyCave);
         }
 
         // ================================================================== chapter 1
@@ -735,10 +756,13 @@ namespace PleaseDontDrown.Story
             NoMarker();
             yield return Say(_receptionist, "(on the radio) Leaving already? Come back soon! ...Seriously. Please.");
             yield return Say(_sandy, "(on the radio) A jet ski, and now a pirate ship? Who ARE you?");
-            SetChapter("End of chapter 2");
-            SetObjective("To be continued...");
             yield return ChapterReport("CHAPTER 2 COMPLETE");
-            TitleObservers("THE SEA NEVER CLOSES", "Open shift: fish them out, trickshot them back, as long as you like");
+            // On to Skull Cove, where the pirates took the casino's money (by boat, or the travel pads).
+            Vector3 cove = Island3Arrival;
+            SetObjective("Sail south to Skull Cove, the pirates' island");
+            Marker("Skull Cove", cove + Vector3.up * 3f);
+            while (StoryNpc.NearestPlayer(cove, 90f) == null) yield return new WaitForSeconds(0.5f);
+            NoMarker();
         }
     }
 }

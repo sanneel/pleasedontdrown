@@ -86,9 +86,9 @@ screenshot first).
 | C8 | Hit feel: red edges, camera jolt, punch hit marker, quiet "down" line | **done** (Shako asked for a quieter down screen: done) | `UI/PlayerHud.cs`, `Player/PlayerLook.cs` |
 | C3 | Melee fight AI: turns (max 2 on one player), wind-up then a real hit check, back-off, knockdown + get up, cage fighter guard/combos, no stun-lock | **logic done, needs Shako's playtest** | `Story/StoryNpc.Combat.cs`, `Combat/NpcWeapon.cs` |
 | C4 | Gun AI (pirates): keep range, line of sight, aim lag, bursts, reload, reposition, don't shoot through allies | **logic done, needs playtest** | same |
-| C5 | Perception: sight cone, hearing (`ServerNoise`, gunshots: suppressed ~4 m, loud ~60 m), alarm | to do | `Story/Stealth.cs` (planned) |
-| C6 | Creatures: base with health + hit zones, parrot sentry, monkey (steals items), alligator (lunge + grab) | to do | `Creatures/` |
-| C7 | Boss framework: phases, telegraph → stun window, boss bar, scaling per player | to do (Kleptopus, Old Snapper) | `Story/BossFight.cs` (planned) |
+| C5 | Perception: sight cone, hearing (`ServerNoise`, gunshots: suppressed ~4 m, loud ~60 m), alarm | **done** (21 automated checks pass, 2-player smoke test), needs Shako's playtest | `Story/Stealth.cs`, `Story/StoryNpc.Perception.cs`, `Combat/PlayerCombat.Stealth.cs`, `UI/ThreatHud.cs` |
+| C6 | Creatures: base with health + hit zones, parrot sentry, monkey (steals items), alligator (lunge + grab) | **logic done** (greybox bodies; Tripo models later), needs playtest | `Creatures/Creature*.cs`, prefab `Resources/Creature` |
+| C7 | Boss framework: phases, telegraph → stun window, boss bar, scaling per player | **done**; Old Snapper and the Kleptopus built on it (logic, greybox bodies) | `Creatures/BossFight.cs`, `Creatures/Creature.Snapper.cs` |
 
 Weapons are **logic only** for now (`NpcWeaponKind`: Fists, Cutlass, Pistol, Musket, synced as `StoryNpc.WeaponKind`);
 models get attached later. Shako does not want separate weapon models generated yet.
@@ -96,7 +96,57 @@ models get attached later. Shako does not want separate weapon models generated 
 Measured (headless tests, 2026-10-11): fists vs a still player ~90% land, vs a player dodging left/right 29%; pistols
 ~40% still, ~21% dodging. A cage fighter no longer gets stun-locked by mashed punches.
 
+### How C5-C7 work (2026-10-11)
+- **Stealth:** guards (`StoryNpc.ServerGuard`) and parrots look with a cone of sight; what they see fills a meter (faster
+  close up and when you run, slower when you creep). Over their head: a "?" ring filling, then a red "!" (the alarm).
+  A loud shot is heard ~60 m off (instant alarm), a suppressed one ~4 m, running feet ~7 m. In the pirate disguise
+  guards and parrots ignore you (only standing right in a guard's face for a while makes him wonder). During a
+  stealth mission the alarm fails it ("Lookout Lou spotted you!") and it restarts.
+- **Creatures** (one prefab, `Resources/Creature`, greybox bodies): parrot lookout (perch, circle, squawk the alarm;
+  one shot downs it); monkey (creeps up on a disguised lifeguard, steals the hat = disguise gone, runs off and jeers;
+  hit it and it drops the hat, walk over the hat to put it back on; its screech is a little noise); alligator (stalks
+  people in or by the water, hisses with jaws open = the warning, lunges, grabs and drags with a death roll; five
+  punches break free, or friends hurt it enough).
+- **Boss framework + Old Snapper:** phases by health (100/60/30%), every attack cued first, a stun window after the
+  bite (head 2.5x, shell 5%, legs 30%), a slam from phase 2 when crowded or flanked, faster from phase 3; health x1.6
+  per extra lifeguard; boss bar bottom middle with phase pips and "WEAK SPOT OPEN!". Phase 2 knocks a pirate who can't
+  swim into the water (rescue him mid-fight).
+
+### Story built on them (2026-10-11)
+- **2.5b The Kleptopus** (between the last guest rescue and the pirates): guests shout that their things are gone, the
+  receptionist runs out to the team (wet sucker marks lead under the pier, the hotel pays $300), then the fight at
+  the pier's far end. Phase 1: an arm drags a sunbather into the sea; shoot the arm (they're then in the water to
+  rescue; left too long they come up out cold) and it shrieks with its eyes wide (head 2.5x). Phase 2 (66%): ink on
+  everyone's screen, then an arm snatches a pistol and waves it by the pier: punch it to get the same gun back (parts
+  and all). Phase 3 (33%): its eyes glow, then it throws a sun lounger or phone at you. Beaten: 6 stolen things spill
+  out (hand them in) and the hotel pays $300.
+- **Chapter 3, Skull Cove** (after 2.7 the objective is to sail south): 3.1 sneak from the dock to the THIEF's shack
+  past 6 lookout parrots and 2 guards (seen = restart) · 3.2 the THIEF: everyone gets the disguise, "buy suppressed
+  guns" · 3.3 gun stall by the dock (pistol 250, shotgun 500, SMG 700): done when the team has a pistol and a shotgun
+  and every gun is suppressed (the THIEF tops the wallet up: no pay on this island) · 3.4 the tavern: cage fight with
+  Iron Jaw Jack (brawler AI) · 3.5 the jungle: 3 guards and 3 monkeys between the west road and the river; a loud shot
+  or a pirate seeing your face = caught, restart · 3.6 the rope swing over the river, 2 alligators · 3.7 Old Snapper
+  in the pond under the crag falls (the plan's "waterfall"); phase 2 knocks a pirate into the water · 3.8 the gold
+  vault (Shako 2026-10-11: "the gold inside the mountain, in the centre, where the waterfall is"): swim in behind the
+  crag falls, up a ramp, along a tunnel to a hall in the heart of the crags (a mound of gold, bars, chests, sacks and
+  the casino's chips): chapter 3 complete. `GameSceneBuilder.Island3Vault`. The south sea cave is now just a cave.
+  Places: `Island3/Story/...` (GameSceneBuilder.Island3Story).
+- Still open: the gala bar, VIP tips, bouncer, cushion ride, blackjack (island 2); suppressors cost 150 in the gun
+  prefabs (plan says 250); the yacht (the pirate boat stands in); pirates walking the village; the gala itself (its
+  Tripo props are ready, see below); the director as a story character; Shako's playtest verdicts.
+
+## On another PC (after `git pull` of `shako-dev`)
+`git lfs pull` (the models and textures are in LFS), open the project in Unity 6000.3.25f1 and let it import. Nothing
+has to be regenerated: the Game scene, the baked bodies (Avatar/Bodies) and Resources/CreatureModels are committed.
+Build: `PLEASE DON'T DROWN > Dev build (scene as is)` (or `-executeMethod PleaseDontDrown.Editor.DevPlayerBuild.Build`).
+Then try `story goto 3.8`, `bosstest kleptopus`, `creature alligator`, `chapter3check`.
+
 ## Test commands (dev build: `PLEASE DON'T DROWN > Dev build (scene as is)` or `DevPlayerBuild.Build`)
+- `bosstest kleptopus` (at the hotel pier), `kleptocheck` (automated), `story goto 2.5b` / `story goto 3.1`..`3.8`,
+  `chapter3check` (plays chapter 3 through automatically), `swing` (nearest rope swing).
+- `stealthtest [guards] [parrots]`: sneak to the flag 45 m ahead past patrolling guards and parrots; seen = restart.
+- `creature <parrot|monkey|alligator|snapper> [count]`, `creatures` (list), `disguise [on|off]`, `bosstest` (Old Snapper).
+- `threatcheck`: automated checks of all of the above (host log `[Check]`, ends `[Check] DONE: ALL PASS`).
 - `brawltest [count] [fists|cutlass|pistol|musket|mix|drunk|brawler]`: a mission with fighters around you.
 - `fightstats`: every fighter's swings/hits/misses/shots/blocks (host log, `[Fight]`).
 - `fail [reason]`: fail the running mission. `hurt [n]`: hurt yourself. `cprfriend`: CPR the nearest downed friend.
@@ -104,12 +154,30 @@ Measured (headless tests, 2026-10-11): fists vs a still player ~90% land, vs a p
 - Headless: `PleaseDontDrown.exe -batchmode -nographics -pdd-nosteam -pdd-host-offline -pdd-nosave -pdd-nostory
   -pdd-exec "wait 6; brawltest 3 mix; wait 40; fightstats" -logFile <log>`.
 
-## Art made with Tripo (not in the game yet)
-- `ArtSource/Tripo/Pirates/`: pirate_king (hook + eye patch; a hand is still next to the hook: fix in Blender
-  later), pirate_king_nohook, pirate_fat, pirate_teen (T-pose), pirate_girl, pirate_marksman, pirate_quartermaster,
-  tavern_brawler. ~28-30k triangles each, PBR. To be rigged with `ArtSource/Tools/prepare_character.py`.
-- `ArtSource/Tripo/island3/`: jungle_monkey, alligator, old_snapper (stylised-realistic), gun_shop, ufc_cage (came out
-  6-sided, no gate), yacht (in the island-3 low-poly style). The parrot already exists (`Fun/Parrot.cs`).
+## Art made with Tripo
+In the game (2026-10-11):
+- **Pirates**: pirate_fat (Big Sal, Iron Jaw Jack), pirate_girl (One-Eyed Olga), pirate_marksman (Pirate Pete),
+  pirate_quartermaster (Salty Bill): avatar bodies 10-13 (`AvatarLook.Bodies.Pirate*`), dealt out by
+  `StoryDirector.PirateLook`. Rigged with `prepare_character.py --turn -90 --symlegs 1` (+ `--shoulderx 0.1` for the
+  long coats). Hotel director: body 25, rigged, not in the story yet.
+- **Creatures**: monkey, alligator, Old Snapper, Kleptopus: `Resources/CreatureModels/*.glb` from
+  `ArtSource/Tools/tripo_prepare_creatures.py` (faced forward, sized, split into Body/Head/Jaw/Tail on hinges);
+  `Creature.Tripo.cs` hangs them on the greybox pivots (the greybox keeps the hit zones). Jaws open, tails sway. The
+  Kleptopus keeps its two working (shootable) arms as before; its own 8 tentacles are the idle arms. The parrot is
+  still greybox.
+- **Gold vault**: gold_hoard, gold_bar_stack (+ the island 3 chests, coin piles, sacks, chips).
+- **Casino**: `BuildCasino` puts the Tripo slot_machine on the 6 black stands (`GameSceneBuilder.CasinoTripo`), but the
+  saved scene still has the box machines (merged into the lobby's combined mesh): they change at the next hotel
+  rebuild, which wasn't run (Shako's hotel look is fragile).
+- Ready for the gala, not placed yet (`Assets/_Game/Art/Tripo/Island2/`): roulette_table, blackjack_table,
+  champagne_tower (no table under it: stand it on one), crystal_chandelier, velvet_rope_stanchions,
+  inflatable_cushion (the cushion ride). Prompts: `.claude/skills/pdd-tripo/prompts/island2-gala-gold.md`.
+
+Not in the game:
+- pirate_king and pirate_king_nohook: the automatic rig fails (arms wide in the coat: the arm joints land on the wrong
+  side). pirate_teen (T-pose) and tavern_brawler (arms against the body) can't be rigged automatically either.
+- `ArtSource/Tripo/island3/`: gun_shop, ufc_cage (came out 6-sided, no gate), yacht (in the island-3 low-poly style).
+- Known look issue: the marksman's and Olga's hands touch the holster at their hip when standing still.
 - Review pictures: `Screenshots/Review/Tripo/` (local only: `Screenshots/` is git-ignored; render them again with
   Blender from the GLBs if needed). Prompts: `.claude/skills/pdd-tripo/prompts/pirates.md`, `island3.md`.
 

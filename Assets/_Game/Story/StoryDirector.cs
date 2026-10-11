@@ -176,6 +176,7 @@ namespace PleaseDontDrown.Story
             ShopCounter.ServerPurchased += OnPurchased;
             Economy.ServerChanged += OnMoneyChanged;
             PlayerHub.ServerJoined += OnPlayerJoined;
+            StartThreats();
             StartCoroutine(Boot());
         }
 
@@ -187,6 +188,7 @@ namespace PleaseDontDrown.Story
             _freePlay = false;
             ClearWaits();
             GetComponent<Fun.TrickShots>()?.SetServerActive(false);
+            StopThreats();
             base.OnStopServer();
             VictimBrain.ServerEvent -= OnVictimEvent;
             LostAndFound.ServerHandedIn -= OnHandedIn;
@@ -266,7 +268,7 @@ namespace PleaseDontDrown.Story
             EndMission(); // a mission it was in is gone with it
             _freePlay = false;
             ResetTsunamiActors();
-            SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2."));
+            SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2.") || _beats[index].Id.StartsWith("3."));
             _hints = null;
             _waitingForTalk = false;
             foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
@@ -283,7 +285,7 @@ namespace PleaseDontDrown.Story
                 _beatIndex = i;
                 Beat beat = _beats[i];
                 _beat.Value = beat.Id;
-                SetChapter(beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
+                SetChapter(beat.Id.StartsWith("3.") ? "Chapter 3: Skull Cove" : beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
                 Debug.Log($"[Story] beat {beat.Id}: {beat.Title}");
                 ClearWaits();
                 Save();
@@ -672,8 +674,9 @@ namespace PleaseDontDrown.Story
             }
             Beat beat = _beats[_beatIndex];
             bool second = beat.Id.StartsWith("2.");
+            string chapterNo = beat.Id.Substring(0, beat.Id.IndexOf('.'));
             // Next to a teammate who's standing on land; if they're all at sea, the island's own landing.
-            Vector3 at = second && _island2Spawn != null ? Island2SpawnPoint : player.transform.position;
+            Vector3 at = second && _island2Spawn != null ? Island2SpawnPoint : chapterNo == "3" ? Island3Arrival : player.transform.position;
             foreach (PlayerHub mate in PlayerHub.All)
             {
                 if (mate == player || mate == null || !Shore.IsAshore(mate.transform.position)) continue;
@@ -687,7 +690,7 @@ namespace PleaseDontDrown.Story
             int inChapter = 0, done = 0;
             for (int i = 0; i < _beats.Count; i++)
             {
-                if (_beats[i].Id.StartsWith("2.") != second) continue;
+                if (!_beats[i].Id.StartsWith(chapterNo + ".")) continue;
                 inChapter++;
                 if (i < _beatIndex) done++;
             }
@@ -695,7 +698,7 @@ namespace PleaseDontDrown.Story
             string recap = $"You joined <b>{host}</b>'s shift: part {done + 1} of {inChapter}, \"{beat.Title}\". " +
                            $"So far this chapter: {_chapterRescued} rescued, {_chapterLost} lost, ${Economy.Money} in the team's wallet.";
             Debug.Log($"[Story] {player.DisplayName} joined at beat {beat.Id}{(move ? " (moved to the team)" : "")}");
-            WelcomeTarget(player.Owner, second ? "CHAPTER 2" : "CHAPTER 1", beat.Title, recap, at, move);
+            WelcomeTarget(player.Owner, "CHAPTER " + chapterNo, beat.Title, recap, at, move);
         }
 
         private static string GetHostName()
@@ -804,7 +807,8 @@ namespace PleaseDontDrown.Story
                 Transform target = FindByName(args[0]);
                 PlayerHub me = PlayerHub.Local;
                 if (target == null || me == null) throw new InvalidOperationException($"nothing called '{args[0]}'");
-                Vector3 chest = target.TryGetComponent(out StoryNpc npc) ? npc.HeadPosition - Vector3.up * 0.35f : target.position + Vector3.up;
+                Vector3 chest = target.TryGetComponent(out StoryNpc npc) ? npc.HeadPosition - Vector3.up * 0.35f
+                    : target.TryGetComponent(out Creature creature) ? creature.TopPosition - Vector3.up * 0.6f : target.position + Vector3.up;
                 me.Look.LookAt(chest);
                 DevCommands.Print($"aiming at {target.name} {(chest - me.Head.position).magnitude:F1} m away");
             }, cheat: true, owner: this);
@@ -816,6 +820,7 @@ namespace PleaseDontDrown.Story
                 CheatServer($"tourist:{figure}:{(silent ? 1 : 0)}:{(flat ? 1 : 0)}", 0);
             }, cheat: true, owner: this);
             RegisterMissionCommands();
+            RegisterThreatCommands();
         }
 
         public override void OnStopClient()
@@ -824,6 +829,7 @@ namespace PleaseDontDrown.Story
             foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat" })
                 DevCommands.Unregister(c, this);
             UnregisterMissionCommands();
+            UnregisterThreatCommands();
         }
 
         private static Transform FindByName(string part)
@@ -833,6 +839,9 @@ namespace PleaseDontDrown.Story
             foreach (VictimBrain v in VictimBrain.All) if (Match(v.Name)) return v.transform;
             foreach (Vehicle v in Vehicle.All) if (Match(v.DisplayName)) return v.transform;
             foreach (StoryNpc n in StoryNpc.All) if (Match(n.Name)) return n.transform;
+            foreach (Creature c in Creature.All) if (Match(c.DisplayName)) return c.transform;
+            // Chapter 3's places by their exact name ("goto RopeSwing", "goto Island3GunShop").
+            if (GameObject.Find("Environment/Island3/Story/" + part) is { } place) return place.transform;
             foreach (Item i in Item.All) if (!i.IsHeld && Match(i.DisplayName)) return i.transform;
             return null;
         }
@@ -847,7 +856,8 @@ namespace PleaseDontDrown.Story
             if (args[0] == "list")
             {
                 DevCommands.Print("1.1 meet Sandy, 1.2 five rescues, 1.3 thief, 1.4 return loot, 1.5 three men, 1.6 silent one, 1.7 drugs, 1.8 one more, " +
-                                  "1.9 thief again, 1.10 jet ski; 2.1 check in, 2.2 buy pistol, 2.3 three guests, 2.4 shark, 2.5 two more, 2.6 pirates, 2.7 the boat");
+                                  "1.9 thief again, 1.10 jet ski; 2.1 check in, 2.2 buy pistol, 2.3 three guests, 2.4 shark, 2.5 two more, 2.5b the Kleptopus, 2.6 pirates, 2.7 the boat; " +
+                                  "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.8 gold vault");
                 return;
             }
             if (!DevCommands.CheatsAllowed && args[0] != "reset") throw new InvalidOperationException("cheats are off");
@@ -905,6 +915,7 @@ namespace PleaseDontDrown.Story
             }
             if (!DevCommands.CheatsAllowed && !force) return;
             if (ServerMissionCheat(what, value, by)) return;
+            if (ServerThreatCheat(what, value, by)) return;
             // 6 m ahead on the level (looking down must not put things underground).
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")

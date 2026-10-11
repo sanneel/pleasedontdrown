@@ -8,13 +8,14 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Island3Ground
-  m_Shader: {fileID: 4800000, guid: 84bffa4145ffe8d48a6d0298b63d2487, type: 3}
+  m_Shader: {fileID: 4800000, guid: 8f239fa65be872548805d5dab8558559, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _MODE_GROUND
   m_InvalidKeywords: []
   m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
+  m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
@@ -22,18 +23,92 @@ Material:
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
-    m_TexEnvs: []
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DirtD:
+        m_Texture: {fileID: 2800000, guid: a79651689f6d8da48929a645487b9b05, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DirtN:
+        m_Texture: {fileID: 2800000, guid: 3d3f0c3af398a6241880fb6326b3f120, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _GrassD:
+        m_Texture: {fileID: 2800000, guid: 452762fd234fcdc449ea61c7d52230f4, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _GrassN:
+        m_Texture: {fileID: 2800000, guid: f1589f0fa48793f48b1a696823362869, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _JungleD:
+        m_Texture: {fileID: 2800000, guid: bd5a5332a41fe444ca6d5c360eec82c5, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _JungleN:
+        m_Texture: {fileID: 2800000, guid: cb3eada50b4ac1c43997db6d7fe98f05, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RockD:
+        m_Texture: {fileID: 2800000, guid: 2f52e4a5dc14fb6449781ec656143623, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RockN:
+        m_Texture: {fileID: 2800000, guid: e63584202a469f940a2a5b7f34f27f0f, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RockTopD:
+        m_Texture: {fileID: 2800000, guid: 253384ff61d3c5644ab7d8186c0b3746, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _RockTopN:
+        m_Texture: {fileID: 2800000, guid: aa4075646bdfbb04e9c0ffb0e80209ed, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SandD:
+        m_Texture: {fileID: 2800000, guid: 8ba7f002915ee3648a313ce92c77c66b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SandN:
+        m_Texture: {fileID: 2800000, guid: 4e5becc50411b1f42a8c7dd066246119, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _Ambient: 0.6
+    - _BaseBlurMip: 6
+    - _BaseDetail: 1
+    - _BlendDepth: 0.18
     - _Cull: 2
+    - _Desaturate: 0
+    - _HeightBlend: 0.6
+    - _Mode: 0
+    - _NormalStrength: 1
+    - _Occlusion: 0.7
     - _Rim: 0
+    - _RockContrast: 0.9
+    - _RockScale: 11
     - _SSS: 0
     - _ShadowAmount: 1
+    - _Smoothness: 0.1
     - _Softness: 1
+    - _StoneOnly: 1
+    - _VertexColor: 1
+    - _VertexScale: 2
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseTint: {r: 1, g: 1, b: 1, a: 1}
+    - _Contrast: {r: 0.7, g: 1.3, b: 1, a: 1}
+    - _DirtColor: {r: 0.6, g: 0.46, b: 0.31, a: 1}
+    - _GrassColor: {r: 0.43, g: 0.62, b: 0.27, a: 1}
+    - _JungleColor: {r: 0.36, g: 0.43, b: 0.22, a: 1}
+    - _RockColor: {r: 0.55, g: 0.53, b: 0.5, a: 1}
     - _SSSColor: {r: 1, g: 0.47999996, b: 0.11999995, a: 1}
+    - _SandColor: {r: 0.92, g: 0.82, b: 0.6, a: 1}
+    - _Scales: {r: 6, g: 3.2, b: 4.5, a: 4.5}
     - _ShadowTint: {r: 0.62, g: 0.65999997, b: 0.8, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

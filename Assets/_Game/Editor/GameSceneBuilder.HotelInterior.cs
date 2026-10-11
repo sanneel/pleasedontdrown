@@ -511,16 +511,19 @@ namespace PleaseDontDrown.Editor
             {
                 Vector3 m = new Vector3(x0 + .45f, .3f, -2.4f - i * 1.15f);
                 Box("SlotBase", m + new Vector3(0, .45f, 0), new Vector3(.6f, .9f, .8f), black, true);
-                Box("SlotCabinet", m + new Vector3(0, 1.4f, 0), new Vector3(.55f, 1.0f, .75f), GetMaterial("CasinoSlot" + i % 3,
-                    new[] { new Color(.65f, .05f, .08f), new Color(.08f, .12f, .45f), new Color(.45f, .3f, .05f) }[i % 3], .3f, .7f));
-                Box("SlotTrim", m + new Vector3(.01f, 1.92f, 0), new Vector3(.57f, .04f, .77f), gold);
-                Box("SlotScreen", m + new Vector3(.28f, 1.45f, 0), new Vector3(.01f, .4f, .55f),
-                    GetMaterial("CasinoSlotScreen" + i % 3, new Color(.3f, .2f, .5f), emission: new[] { new Color(.9f, .3f, .2f), new Color(.2f, .6f, 1f), new Color(1f, .8f, .2f) }[i % 3] * 1.2f));
-                for (int r = 0; r < 3; r++)
-                    Box("SlotReel", m + new Vector3(.29f, 1.45f, -.17f + r * .17f), new Vector3(.005f, .26f, .13f), card);
-                Box("SlotTopper", m + new Vector3(.05f, 2.05f, 0), new Vector3(.4f, .22f, .7f), lampGlow);
-                Cyl("SlotLever", m + new Vector3(.05f, 1.5f, .45f), .02f, .4f, gold);
-                Primitive(PrimitiveType.Sphere, "SlotLeverKnob", root, m + new Vector3(.05f, 1.72f, .45f), Vector3.one * .08f, Chip(0), false);
+                if (TripoSlot(root, m + new Vector3(0, .9f, 0), 90f) == null) // the Tripo one-armed bandit on the stand (CasinoTripo)
+                {
+                    Box("SlotCabinet", m + new Vector3(0, 1.4f, 0), new Vector3(.55f, 1.0f, .75f), GetMaterial("CasinoSlot" + i % 3,
+                        new[] { new Color(.65f, .05f, .08f), new Color(.08f, .12f, .45f), new Color(.45f, .3f, .05f) }[i % 3], .3f, .7f));
+                    Box("SlotTrim", m + new Vector3(.01f, 1.92f, 0), new Vector3(.57f, .04f, .77f), gold);
+                    Box("SlotScreen", m + new Vector3(.28f, 1.45f, 0), new Vector3(.01f, .4f, .55f),
+                        GetMaterial("CasinoSlotScreen" + i % 3, new Color(.3f, .2f, .5f), emission: new[] { new Color(.9f, .3f, .2f), new Color(.2f, .6f, 1f), new Color(1f, .8f, .2f) }[i % 3] * 1.2f));
+                    for (int r = 0; r < 3; r++)
+                        Box("SlotReel", m + new Vector3(.29f, 1.45f, -.17f + r * .17f), new Vector3(.005f, .26f, .13f), card);
+                    Box("SlotTopper", m + new Vector3(.05f, 2.05f, 0), new Vector3(.4f, .22f, .7f), lampGlow);
+                    Cyl("SlotLever", m + new Vector3(.05f, 1.5f, .45f), .02f, .4f, gold);
+                    Primitive(PrimitiveType.Sphere, "SlotLeverKnob", root, m + new Vector3(.05f, 1.72f, .45f), Vector3.one * .08f, Chip(0), false);
+                }
                 Cyl("SlotStool", m + new Vector3(.9f, .62f, 0), .19f, .08f, leather, true);
                 Cyl("SlotStoolPost", m + new Vector3(.9f, .32f, 0), .03f, .6f, gold);
             }

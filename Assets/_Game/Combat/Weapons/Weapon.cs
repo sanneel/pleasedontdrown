@@ -550,6 +550,8 @@ namespace PleaseDontDrown.Combat
             _ammo.Value--;
             _hitBudget = Mathf.Min(_hitBudget + _pellets, _pellets * 3);
             ShotObservers(tick, origin, forward.normalized, seed, Mathf.Clamp(spread, 0f, _hipSpread * 3f), caller.ClientId);
+            // Sentries hear it: a bang carries right across an island, a suppressed shot a few steps (Story/Stealth).
+            Story.Stealth.ServerNoise(origin, Barrel.Suppressed ? Story.Stealth.SuppressedShot : Story.Stealth.LoudShot, holder, Story.NoiseKind.Gunshot);
         }
 
         [ObserversRpc]

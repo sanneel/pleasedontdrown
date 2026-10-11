@@ -46,6 +46,7 @@ namespace PleaseDontDrown.Combat
             {
                 ServerHealthUpdate();
                 ServerAllDownCheck();
+                ServerStealthUpdate();
             }
             if (IsOwner) UpdateHealthOwner();
             UpdateFun();

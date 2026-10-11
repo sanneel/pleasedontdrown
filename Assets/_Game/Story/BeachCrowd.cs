@@ -1177,6 +1177,14 @@ namespace PleaseDontDrown.Story
                 if (m.Borrowed) Return(m.Npc);
         }
 
+        /// <summary>Host: this one leaves the crowd for good (the story takes them: dragged into the sea...).</summary>
+        [Server]
+        public void Release(StoryNpc npc)
+        {
+            Member m = _members.Find(x => x.Npc == npc);
+            if (m != null) Forget(m);
+        }
+
         /// <summary>Is this one of ours (and not lent out)?</summary>
         public bool IsMember(StoryNpc npc) => _members.Exists(m => m.Npc == npc);
     }

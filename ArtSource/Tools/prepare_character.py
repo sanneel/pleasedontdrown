@@ -11,6 +11,9 @@ blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- <in.glb>
   --armsmooth 40           smoothing passes over the arm/chest split round the shoulders (0 = off)
   --preview <prefix>       also render front/side pictures with the skeleton drawn in
   --turn -90               degrees to turn the model about the vertical first (Tripo's decoded models face +X: -90)
+  --shoulderx 0.1          shoulders at least this far from the middle (fraction of the height): a long coat with a
+                           high collar hides the armpit and the arm's line runs up to the collar
+  --symlegs 1              mirror the leg joints (mean of both sides): a sash or a scabbard on one hip skews that leg's fit
 
 What it does: keeps one figure (drops other figures and floating text), stands it on the origin facing -Y
 (glTF +Z), finds the joints from the front silhouette, builds a skeleton named like AvatarRig.Bone
@@ -32,7 +35,7 @@ from mathutils.kdtree import KDTree
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, DST = argv[0], argv[1]
-opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'armsmooth': 40, 'preview': '', 'turn': 0.0}
+opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'armsmooth': 40, 'preview': '', 'turn': 0.0, 'symlegs': 0, 'shoulderx': 0.0}
 i = 2
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -230,6 +233,9 @@ for side, run in (('R', arm_runs[0]), ('L', arm_runs[-1])):  # -X is the charact
     axis = vt[0] if vt[0][1] < 0 else -vt[0]  # pointing down the arm
     sz = armpit_z + 0.6 * thickness
     shoulder = mean + axis * ((sz - mean[1]) / axis[1])
+    min_x = opts['shoulderx'] * H
+    if min_x and abs(shoulder[0]) < min_x and abs(axis[0]) > 1e-3:
+        shoulder = shoulder + axis * ((np.sign(mean[0]) * min_x - shoulder[0]) / axis[0])  # slide out along the arm
     tip = pts[np.argmax(((pts - shoulder) ** 2).sum(axis=1))]
     length = float(np.linalg.norm(tip - shoulder))
     along = (tip - shoulder) / length
@@ -271,6 +277,10 @@ for side, pick in (('R', 0), ('L', -1)):
     for name, p in (('Thigh', hip), ('Shin', knee), ('Foot', ankle)):
         joints[name + side] = [float(p[0]), depth_at(p[0], p[1]), float(p[1])]
     joints['FootTip' + side] = [float(ankle[0]), toe_y, 0.02 * unit]
+if opts['symlegs']:
+    for name in ('Thigh', 'Shin', 'Foot', 'FootTip'):
+        half = (abs(joints[name + 'L'][0]) + abs(joints[name + 'R'][0])) / 2
+        joints[name + 'L'][0], joints[name + 'R'][0] = half, -half
 
 shoulder_z = (joints['UpperArmL'][2] + joints['UpperArmR'][2]) / 2
 hips_z = hip_z + 0.04 * unit

@@ -80,6 +80,18 @@ namespace PleaseDontDrown.Avatars
             public const byte Goofy = 8;
 
             /// <summary>
+            /// The pirates (Tripo, ArtSource/Tripo/Pirates, rigged by prepare_character.py): the king, and the crew that
+            /// <see cref="Story.StoryDirector.PirateLook"/> deals out. 14-15 are kept for the teen and the brawler.
+            /// </summary>
+            public const byte PirateKing = 9;
+            public const byte PirateFat = 10;
+            public const byte PirateGirl = 11;
+            public const byte PirateMarksman = 12;
+            public const byte PirateQuartermaster = 13;
+            /// <summary>The hotel director (island 2: the gala, the yacht keys).</summary>
+            public const byte HotelDirector = 25;
+
+            /// <summary>
             /// The tourist women (Tripo, ArtSource/Tripo/Tourists): Lola, and four girls sharing one Smart Mesh body with
             /// their own painted faces, hair and bikinis. Every woman on the beach is one of these.
             /// </summary>
@@ -111,7 +123,7 @@ namespace PleaseDontDrown.Avatars
             /// <summary>The base tourist or one of its look-alikes (a missing body falls back to the code-built one).</summary>
             /// <summary>Women's bodies (the look's Figure should say feminine: bust jiggle, CPR lines).</summary>
             public static bool IsFeminine(byte body) =>
-                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender || body >= VariantFirst && body < VariantFirst + 48;
+                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender or PirateGirl || body >= VariantFirst && body < VariantFirst + 48;
 
             public static byte PickVariant(System.Random rng, byte baseBody) => Variant(baseBody, rng.Next(VariantsPerBase + 1));
         }

@@ -107,3 +107,21 @@ Before showing the user any picture of the result in the game, follow the `pdd-v
 - Tripo sometimes fails a generation and retries it by itself (`running_operator.flags.is_retry`); wait and reload the
   page before reading `model_url`.
 - Paths with spaces: pass file lists to Blender as a bash array (`"${args[@]}"`), never an unquoted string.
+
+## Lessons (2026-10-11, gala/gold batch: 11 models, all kept first try, 330 credits)
+
+- **Download without copying links by hand:** in the page, read `serverProjects` (above) and build the `curl` lines
+  with `javascript_tool` (`${p.model_url}`), match by `project_name` / `biz_info.description`. Reload the page first:
+  the list in memory doesn't pick up new generations.
+- Generate button: `find` "Generate" → the `generic "Generate"` ref; after a click, check `location.href` changed to a
+  new project id before filling the next prompt (a click while the page is busy does nothing).
+- **Characters → game bodies:** `prepare_character.py --turn -90 --symlegs 1 [--shoulderx 0.1]` → `Art/Characters/`,
+  add to `MeshyCharacters.Bodies` (+ `OpenEyesOnly`), bake with `MeshyCharacters.BakeBatch` (needs graphics: no
+  `-nographics`). `--symlegs`: a sash or holster skews one leg. `--shoulderx`: long coats with high collars put the
+  shoulder at the collar. Arms spread wide in a big coat (the pirate king) or a T-pose / arms on the body fail.
+- **Creatures:** `tripo_prepare_creatures.py` (Resources/CreatureModels). Check the facing per model (Tripo isn't
+  consistent: the monkey faced +Y, the gator +X and diagonal, the snapper -Y) with `tripo_sides.py`, then render the
+  parts posed (jaw open, tail swung) before Unity.
+- **Props:** `tripo_prepare_island3.py -- <names>` (island=2 entries go to `Art/Tripo/Island2`); `shiny=True` keeps
+  metal/gloss for gold, chrome and crystal. Fit by the axis that matters (the slot machine came out squat: fit its
+  width). Running it for a few names used to empty `shack_rooms.json`: it only writes that file when shacks ran now.

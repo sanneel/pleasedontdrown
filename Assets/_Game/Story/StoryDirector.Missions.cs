@@ -119,6 +119,7 @@ namespace PleaseDontDrown.Story
             {
                 GameObject go = _spawnedActors[i];
                 if (go != null && go.TryGetComponent(out StoryNpc npc)) npc.ServerStopFighting(); // its tally, for tuning
+                if (go != null && go.TryGetComponent(out Creatures.Creature creature)) creature.ServerReleaseAll(); // people and pistols it holds
                 if (go != null && go.TryGetComponent(out NetworkObject nob) && nob.IsSpawned) Despawn(go);
                 _spawnedActors.RemoveAt(i);
             }

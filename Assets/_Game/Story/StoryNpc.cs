@@ -251,6 +251,7 @@ namespace PleaseDontDrown.Story
         {
             base.OnStopNetwork();
             _all.Remove(this);
+            Stealth.Unregister(this);
         }
 
         public override void OnStartClient()

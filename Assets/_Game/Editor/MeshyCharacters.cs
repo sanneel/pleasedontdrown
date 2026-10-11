@@ -40,6 +40,11 @@ namespace PleaseDontDrown.Editor
             (AvatarLook.Bodies.TouristBuddy, "Tourist (sunburnt dad)", "tourist_buddy"),
             (AvatarLook.Bodies.Robber, "Robber", "robber"),
             (AvatarLook.Bodies.Goofy, "Goofy lifeguard", "goofy"),
+            (AvatarLook.Bodies.PirateFat, "Pirate (big)", "pirate_fat"),
+            (AvatarLook.Bodies.PirateGirl, "Pirate (girl)", "pirate_girl"),
+            (AvatarLook.Bodies.PirateMarksman, "Pirate (marksman)", "pirate_marksman"),
+            (AvatarLook.Bodies.PirateQuartermaster, "Pirate (quartermaster)", "pirate_quartermaster"),
+            (AvatarLook.Bodies.HotelDirector, "Hotel director", "hotel_director"),
         };
 
         /// <summary>Bodies that keep their painted face as it is: the robber's eyes are behind sunglasses (lids would blink on the lenses).</summary>
@@ -52,7 +57,8 @@ namespace PleaseDontDrown.Editor
         /// </summary>
         private static readonly HashSet<string> OpenEyesOnly = new()
             { "tourist_lola", "tourist_girl_red", "tourist_girl_blonde", "tourist_girl_redhead", "tourist_girl_black",
-              "tourist_girl_pink", "tourist_girl_lavender", "tourist_girl_barista", "tourist_girl_bartender" };
+              "tourist_girl_pink", "tourist_girl_lavender", "tourist_girl_barista", "tourist_girl_bartender",
+              "pirate_fat", "pirate_girl", "pirate_marksman", "pirate_quartermaster", "hotel_director" };
 
         private static readonly int BoneTotal = (int)Bone.Count + 2 * HandBones.BoneCount;
 

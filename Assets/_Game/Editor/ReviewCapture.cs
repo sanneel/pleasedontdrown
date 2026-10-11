@@ -53,6 +53,18 @@ namespace PleaseDontDrown.Editor
                     SpawnAvatar(p);
                     continue;
                 }
+                if (p[0] == "near")
+                {
+                    // near <object name> <shot> dx dy dz tx ty tz fov: a shot from beside a named object, in its own frame.
+                    GameObject anchor = GameObject.Find(p[1]);
+                    if (anchor == null) { Debug.LogWarning($"[Review] no object '{p[1]}'"); continue; }
+                    Transform a = anchor.transform;
+                    camera.transform.position = a.TransformPoint(new Vector3(F(3), F(4), F(5)));
+                    camera.transform.LookAt(a.TransformPoint(new Vector3(F(6), F(7), F(8))));
+                    camera.fieldOfView = F(9);
+                    Render(camera, p[2]);
+                    continue;
+                }
                 if (p[0] == "clear")
                 {
                     // Everyone posed so far goes: the next poses can stand on the same spot.

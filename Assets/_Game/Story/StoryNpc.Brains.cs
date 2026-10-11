@@ -74,6 +74,7 @@ namespace PleaseDontDrown.Story
         private void OnServerHit(PlayerHub attacker)
         {
             _nextThink = 0f; // react right away (robber: run; pirate: turn on whoever hit us)
+            if (!IsDefeated) GuardOnHit(attacker); // (a guard put down in one quiet shot raises no alarm)
             if (_role.Value == NpcRole.Robber && _health.Value > 0 && Random.value < 0.4f)
                 ShoutObservers(_health.Value == 1 ? "OK OK, ENOUGH!" : "Hey, ow!", false);
         }
@@ -89,6 +90,11 @@ namespace PleaseDontDrown.Story
             if (_fighting)
             {
                 FightThink(dt); // StoryNpc.Combat: anyone set to fight (pirates, drunks, the cage fighter)
+                return;
+            }
+            if (_guarding && _pose.Value == AvatarPose.Normal && Time.time >= _staggerUntil)
+            {
+                GuardThink(dt); // StoryNpc.Perception: on watch
                 return;
             }
             if (IsDefeated || _pose.Value != AvatarPose.Normal || Time.time < _nextThink) return;

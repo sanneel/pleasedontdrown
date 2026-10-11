@@ -80,3 +80,19 @@ one-sided and cuts openings (the keep's front door and the inside of its hall; t
   the loot is Tripo chests, coin piles, money sacks and chip stacks (the cash bricks stay).
 - **Rocks:** the crag pinnacles and sea stacks are the rock spire model with capsule colliders. The coast breakwater
   stays the generated boulders (the Tripo boulder set would be ~2 M triangles round the coast).
+
+## Surfaces (2026-10-11)
+
+Real grain from Poly Haven scans (CC0): `ArtSource/Tools/make_island3_ground_textures.py` downloads them and writes
+seamless 1024 detail + normal maps to `Assets/_Game/Art/Island3Ground/` (colour as a ratio to the scan's average, so
+the island keeps its own palette). `Assets/_Game/Data/Shaders/Ground.shader` (URP lit) draws them; the materials are set
+up in `GameSceneBuilder.Island3Surfaces.cs`.
+
+- **Ground:** sand, grass (with lush and dry patches), jungle floor under the jungle, dirt roads, yards and river banks,
+  rock on steep ground and the crags (cliff strata on the sides, rock on top). Layer weights in the mesh's uv1, blended by
+  the scans' heights so edges are pebbles and tufts. Beach sand only below ~2.5 m.
+- **Rock:** crag boulders, the breakwater (its own colours kept), cave walls: triplanar rock.
+- **Castle:** the wall model's smeared slabs replaced by real masonry over its broad colour; towers, gatehouse and keep
+  keep their own map with a light stone grain (not on red roofs or flags); the greybox hall inside is masonry.
+- **Spires and the cave facade:** greyed to match the crags, with the cliff grain.
+- Close-ups: `PleaseDontDrown.Editor.GameSceneBuilder.ReviewIsland3SurfacesBatch` → `Screenshots/Review/Island3Surfaces/`.
