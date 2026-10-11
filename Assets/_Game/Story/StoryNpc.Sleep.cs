@@ -186,7 +186,7 @@ namespace PleaseDontDrown.Story
         {
             Camera cam = Camera.main;
             if (cam == null || (cam.transform.position - transform.position).sqrMagnitude > 22f * 22f) return;
-            FloatingText.Spawn(HeadPosition + Vector3.up * 0.35f, Random.value < 0.5f ? "z z Z" : "z Z z", new Color(0.7f, 0.82f, 1f), 0.7f, 1.8f);
+            FloatingText.Spawn(HeadPosition + Vector3.up * 0.95f, Random.value < 0.5f ? "z z Z" : "z Z z", new Color(0.7f, 0.82f, 1f), 0.7f, 1.8f);
         }
 
         private void LateUpdate() => UpdateLantern();

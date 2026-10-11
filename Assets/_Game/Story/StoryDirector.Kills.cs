@@ -131,7 +131,7 @@ namespace PleaseDontDrown.Story
             made.Add(shot);
             yield return null;
             int before = shot.Health;
-            shot.ServerHitBy(22, DamageKind.Bullet, boxer, shot.HeadPosition, f);
+            shot.ServerHitBy(22, DamageKind.Bullet, boxer, shot.transform.position + Vector3.up * 1.1f, f); // the chest (a head shot does double)
             Check("a pirate's shot hurts another pirate", shot.Health == before - 22, $"{before} -> {shot.Health}");
             foreach (Component c in made)
                 if (c != null) Remove(c);
