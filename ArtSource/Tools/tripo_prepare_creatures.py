@@ -26,7 +26,8 @@ CREATURES = {
     "alligator": dict(src="island3/alligator.glb", front="+X", size=("length", 3.6), tris=15000, align=True,
                       head=0.17, jaw=0.42, tail=0.4, tail_below=1.0, tail_half=0.24),
     "old_snapper": dict(src="island3/old_snapper.glb", front="-Y", size=("length", 7.4), tris=25000, align=True,
-                        head=0.2, jaw=0.4, tail=0.27, tail_below=0.42),
+                        head=0.2, jaw=0.4, tail=0.27, tail_below=0.42,
+                        neck=dict(start=1.9, half=0.62, low=1.05, high=2.45)),
     "kleptopus": dict(src="Island2/kleptopus.glb", front="+X", size=("height", 4.7), tris=25000, eyes=True),
 }
 TURN = {"-Y": 0.0, "+Y": 180.0, "+X": -90.0, "-X": 90.0}
@@ -135,6 +136,38 @@ def split(obj, name, origin):
     return part
 
 
+def skin_neck(body, hinge, neck):
+    """The neck between the shell and the head stretches instead of tearing: two bones, NeckBase (stays with the body)
+    and NeckTip (at the head's hinge; the game hangs it on the head pivot), and the neck's skin weighted from one to
+    the other along its length. neck: start (forward distance where it leaves the shell), half width, low/high z."""
+    arm = bpy.data.objects.new("NeckRig", bpy.data.armatures.new("NeckRig"))
+    bpy.context.scene.collection.objects.link(arm)
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode="EDIT")
+    for name, at in (("NeckBase", Vector((0.0, -neck["start"], hinge.z))), ("NeckTip", hinge)):
+        bone = arm.data.edit_bones.new(name)
+        bone.head = at
+        bone.tail = at + Vector((0.0, 0.0, 0.3))
+    bpy.ops.object.mode_set(mode="OBJECT")
+    base, tip = body.vertex_groups.new(name="NeckBase"), body.vertex_groups.new(name="NeckTip")
+    length = -hinge.y - neck["start"]
+    moving = 0
+    for v in body.data.vertices:
+        t = (-v.co.y - neck["start"]) / length
+        w = 0.0
+        if t > 0 and abs(v.co.x) < neck["half"] and neck["low"] < v.co.z < neck["high"]:
+            t = min(t, 1.0)
+            w = t * t * (3 - 2 * t)
+            moving += 1
+        if w < 1.0:
+            base.add([v.index], 1.0 - w, "REPLACE")
+        if w > 0.0:
+            tip.add([v.index], w, "REPLACE")
+    body.parent = arm
+    body.modifiers.new("NeckRig", "ARMATURE").object = arm
+    log("neck skin:", moving, "vertices follow the head, over", round(length, 2), "m")
+
+
 def empty(name, at):
     e = bpy.data.objects.new(name, None)
     e.location = at
@@ -180,6 +213,8 @@ def build(name, spec):
         for o in bpy.context.scene.objects:
             if o.type == "MESH" and "part" in o.data.attributes:
                 o.data.attributes.remove(o.data.attributes["part"])
+        if "neck" in spec:
+            skin_neck(obj, Vector((0.0, -u_head, (lo + hi) / 2)), spec["neck"])
     if spec.get("hat"):
         # The top of the head: the highest point in the front third.
         top = max((v.co for v in me.vertices if -v.co.y > front - 0.33 * length), key=lambda c: c.z)

@@ -125,8 +125,11 @@ def rebuild_canopy(hotel, details, idx, log):
             b.box((cx - 1.5, cy - 1.8, SOFFIT - .03), (cx + 1.5, cy + 1.8, SOFFIT + .0), WH)
     # The entrance wall under the canopy: the AI facade there (shards, a broken balcony over the door) is replaced by
     # a clean wall with a 2.6 m doorway into the lobby, a stone and gold door surround and gold-framed shopfronts.
-    removed += delete_in_box(hotel, (x0 - .05, -5.45, .28), (x1 + .05, -2.9, SOFFIT)) +         delete_in_box(details, (x0 - .05, -5.45, .28), (x1 + .05, -2.9, SOFFIT))
+    # Up to under the first tower balcony (slab from 8.04 m): the broken one's rail stood up behind the canopy.
+    removed += delete_in_box(hotel, (x0 - .05, -5.45, .28), (x1 + .05, -2.9, 7.9)) +         delete_in_box(details, (x0 - .05, -5.45, .28), (x1 + .05, -2.9, 7.9))
     wy0, wy1 = ENTRANCE_WALL_Y, ENTRANCE_WALL_Y + .4
+    # The canopy reaches back onto the entrance wall: no open strip between them to look up through.
+    b.box((x0, y1 - .01, SOFFIT), (x1, wy1, CANOPY_TOP), W)
     D = DOOR_HALF
     b.box((x0, wy0, .28), (-D, wy1, SOFFIT), W); b.box((D, wy0, .28), (x1, wy1, SOFFIT), W)
     b.box((-D, wy0, 3.3), (D, wy1, SOFFIT), W)                                        # over the door

@@ -877,10 +877,10 @@ namespace PleaseDontDrown.Editor
                     light.shadows = LightShadows.None;
                 }
 
-            // The porch in front of the door is solid at floor height, and the model's steps get a ramp to walk up.
+            // The porch in front of the door is solid (at the model's deck height where it has one), the doorway's cut
+            // strip gets a doorstep, and the model's steps get a ramp to walk up.
             float porchEnd = r.porchZ > 0f ? r.porchZ * scale : bounds.max.z - 0.15f;
-            if (porchEnd - z1 > 0.2f)
-                Collider(house, "Porch", new Vector3(rcx, floor - 0.1f, (z1 + porchEnd) * 0.5f), new Vector3(wx, 0.2f, porchEnd - z1));
+            ShackPorch(house, r, scale, porchEnd);
             Vector3 foot = house.TransformPoint(new Vector3(dx, 0f, porchEnd + 1.2f));
             float ground = BeachHeight(foot.x, foot.z) - house.position.y;
             float rise = floor - ground;
@@ -939,9 +939,31 @@ namespace PleaseDontDrown.Editor
             ConfigureInteractable(root.AddComponent<PleaseDontDrown.Interaction.Interactable>(), new[] { leaf.GetComponent<Collider>() }, outline.ToArray(), 2.8f);
         }
 
+        /// <summary>
+        /// The porch of a walk-in Tripo house. Cutting the doorway took the model's deck out in front of the door (a strip
+        /// the door's width, to 0.8 m out): through it you looked down at the ground under the stilts. A plank doorstep
+        /// at the deck's height closes it, and the porch collider is the deck's height too (feet sank into it).
+        /// </summary>
+        private static void ShackPorch(Transform house, ShackRoom r, float scale, float porchEnd)
+        {
+            float x0 = r.x0 * scale, x1 = r.x1 * scale, z1 = r.z1 * scale, floor = r.floor * scale;
+            float deckTop = floor + r.porchTop * scale, deckEnd = z1 + r.porchDepth * scale;
+            float stepFrom = z1 + r.stepFrom * scale, stepTo = z1 + 0.86f * scale, stepBottom = floor - 0.3f * scale;
+            ResortBox(house, "Doorstep", new Vector3(r.doorX * scale, (deckTop + stepBottom) * 0.5f, (stepFrom + stepTo) * 0.5f),
+                new Vector3(r.doorWidth * scale + 0.04f, deckTop - stepBottom, stepTo - stepFrom), GetMaterial("ShackPlanks", new Color(0.55f, 0.39f, 0.25f)));
+            float rcx = (x0 + x1) * 0.5f, wx = x1 - x0;
+            bool deck = r.porchDepth > 0f;
+            float solidTo = deck ? deckEnd : porchEnd, top = deck ? deckTop : floor;
+            if (solidTo - z1 > 0.2f)
+                Collider(house, "Porch", new Vector3(rcx, top - 0.1f, (z1 + solidTo) * 0.5f), new Vector3(wx, 0.2f, solidTo - z1));
+            if (deck && porchEnd - deckEnd > 0.2f)  // past the deck (the ladder's top) at the room floor's height, as before
+                Collider(house, "PorchFront", new Vector3(rcx, floor - 0.1f, (deckEnd + porchEnd) * 0.5f), new Vector3(wx, 0.2f, porchEnd - deckEnd));
+        }
+
         // The room inside each shack, measured by tripo_prepare_island3.py (shack_rooms.json, Unity frame: front is +z):
-        // x and z extents, floor and ceiling height, on the 6 m wide model.
-        [Serializable] private class ShackRoom { public string name; public float x0, x1, z0, z1, floor, top, doorX, doorWidth, doorHeight, porchZ; }
+        // x and z extents, floor and ceiling height, on the 6 m wide model. Porch (measured on the models): its deck's
+        // height over the room floor and depth from the front wall's inside, and where the doorway's cut strip starts.
+        [Serializable] private class ShackRoom { public string name; public float x0, x1, z0, z1, floor, top, doorX, doorWidth, doorHeight, porchZ, porchTop, porchDepth, stepFrom; }
         [Serializable] private class ShackRoomList { public ShackRoom[] rooms; }
 
         private static ShackRoom TripoShackRoom(string shack) =>

@@ -55,10 +55,17 @@ namespace PleaseDontDrown.Creatures
                     Hang(body, "Tail", _tail);
                     break;
                 case CreatureKind.OldSnapper:
-                    Hang(body, "Head", _neck != null ? _neck.Find("HeadPivot") : null);
+                {
+                    Transform headPivot = _neck != null ? _neck.Find("HeadPivot") : null;
+                    Hang(body, "Head", headPivot);
                     Hang(body, "Jaw", _jaw);
                     Hang(body, "Tail", _tail);
+                    // The neck's skin is weighted between the body and this bone at the head's hinge: on the head pivot it
+                    // stretches out of the shell with the head (it used to come away from the neck, a gap behind its head).
+                    Transform tip = Find(body, "NeckTip");
+                    if (tip != null && headPivot != null) tip.SetParent(headPivot, true);
                     break;
+                }
                 case CreatureKind.Monkey:
                     Transform spot = Find(body, "HatSpot");
                     if (spot != null && _hat != null) _hat.position = spot.position + Vector3.up * 0.02f;

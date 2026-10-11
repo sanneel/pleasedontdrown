@@ -18,6 +18,7 @@ WING_FACE = 12.77       # back wall of the wings (window glass sits at 12.74)
 FLOOR_WINDOWS = [(5.4, 7.4), (8.6, 10.6), (11.8, 13.7), (15.0, 16.9), (18.1, 20.1), (21.2, 23.1)]
 BACK_SLOTS = [(-8.45, -6.15), (6.1, 8.45)]
 SIDE_X = 23.9           # outer face of the side walls
+SIDE_FACE = {-1: 23.864, 1: 23.894}  # 4 mm proud of the clean massing's side walls (hotel_massing): slot fills look flush
 SIDE_SLOT = (3.4, 6.6)  # y range of the side slots
 SIDE_HOLE = (3.7, 6.7)  # y range of the ground-floor hole through the side (white lobby box showed through)
 # Window centres of the upper back floors, repeated on the base storey.
@@ -90,14 +91,14 @@ def fill_blanks(lod, details, names, log):
 
     # Side slots and the ground-floor hole through the building: plaster flush with the side walls.
     for s in (-1, 1):
-        lo, hi = sorted((s * (SIDE_X - .75), s * SIDE_X))
+        lo, hi = sorted((s * (SIDE_FACE[s] - .75), s * SIDE_FACE[s]))
         b.box((lo, SIDE_SLOT[0], 4.0), (hi, SIDE_SLOT[1], 23.7), W)
-        hlo, hhi = sorted((s * (SIDE_X - .75), s * (SIDE_X + .03)))
+        hlo, hhi = sorted((s * (SIDE_FACE[s] - .75), s * SIDE_FACE[s]))
         b.box((hlo, SIDE_HOLE[0], 0), (hhi, SIDE_HOLE[1], 4.05), W)
         cy = sum(SIDE_SLOT) / 2
         for z0, z1 in FLOOR_WINDOWS:
-            window_x(b, idx, cy, s * SIDE_X, z0, z1, 1.2, s)
-        window_x(b, idx, sum(SIDE_HOLE) / 2, s * (SIDE_X + .03), 1.1, 3.6, 1.0, s)
+            window_x(b, idx, cy, s * SIDE_FACE[s], z0, z1, 1.2, s)
+        window_x(b, idx, sum(SIDE_HOLE) / 2, s * SIDE_FACE[s], 1.1, 3.6, 1.0, s)
 
     b.append_to(details)
     log('filled blanks: back base storey, back slots, side slots; junk faces removed', removed)

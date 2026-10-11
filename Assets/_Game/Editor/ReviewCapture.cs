@@ -65,6 +65,14 @@ namespace PleaseDontDrown.Editor
                     Render(camera, p[2]);
                     continue;
                 }
+                if (p[0] == "hide")
+                {
+                    // hide <name part>: stops drawing everything whose name contains it (e.g. "_Door", to look through doorways).
+                    foreach (Renderer r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+                        for (Transform t = r.transform; t != null; t = t.parent)
+                            if (t.name.Contains(p[1])) { r.enabled = false; break; }
+                    continue;
+                }
                 if (p[0] == "clear")
                 {
                     // Everyone posed so far goes: the next poses can stand on the same spot.

@@ -369,8 +369,10 @@ namespace PleaseDontDrown.Creatures
                     _open = Mathf.Lerp(_open, open, 1f - Mathf.Exp(-(act == CreatureAct.Bite ? 30f : 8f) * dt));
                     if (_neck != null)
                     {
-                        _neck.localPosition = new Vector3(0f, 1.1f + (act == CreatureAct.Rear ? 0.6f : 0f), 2f + _extend);
-                        _neck.localRotation = Quaternion.Euler(act == CreatureAct.Rear ? -25f : 0f, 0f, 0f);
+                        // The model's neck is short (it stretches out of the shell): it rears less far than the greybox.
+                        float rear = act == CreatureAct.Rear ? 1f : 0f;
+                        _neck.localPosition = new Vector3(0f, 1.1f + rear * (_tripo ? 0.3f : 0.6f), 2f + _extend);
+                        _neck.localRotation = Quaternion.Euler(rear * (_tripo ? -18f : -25f), 0f, 0f);
                     }
                     if (_jaw != null) _jaw.localRotation = Quaternion.Euler(_open, 0f, 0f);
                     float slam = act == CreatureAct.Slam ? Mathf.Sin(Mathf.Clamp01((Time.time - _slamShownAt) / 0.6f) * Mathf.PI) * 1.4f : 0f;

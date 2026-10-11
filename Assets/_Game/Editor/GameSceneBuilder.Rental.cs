@@ -10,6 +10,15 @@ namespace PleaseDontDrown.Editor
 {
     public static partial class GameSceneBuilder
     {
+        // Milo's T pier (dock-local): the walkway's 0.45 m planks every 0.48 m from z 10 toward the sea, up to the cross
+        // dock (z -11, 3.2 m deep, so its back edge is at -9.4); the last plank fills what's left, 3 cm gaps either side.
+        private const int PierPlanks = 41;
+        private const float CrossDockBack = -9.4f;
+        private static float PierPlankStart(int i) => 10f - i * 0.48f;
+        private static float PierLastFrom => PierPlankStart(PierPlanks - 2) - 0.225f - 0.03f;
+        private static float PierPlankZ(int i) => i < PierPlanks - 1 ? PierPlankStart(i) : (PierLastFrom + CrossDockBack + 0.03f) * 0.5f;
+        private static float PierPlankDepth(int i) => i < PierPlanks - 1 ? 0.45f : PierLastFrom - (CrossDockBack + 0.03f);
+
         private static void BuildRentalDock(Transform env, Transform story, GameObject npcPrefab,
             out StoryNpc operatorNpc, out Vehicle[] fleet, out Transform[] berths, out Transform keySpot)
         {
@@ -22,9 +31,10 @@ namespace PleaseDontDrown.Editor
             dock.SetParent(env, false);
             dock.position = new Vector3(32f, 0f, -3f);
             TagSurface(dock.gameObject, SurfaceKind.Wood);
-            // A broad T pier: individual planks, sturdy piles and four open boarding bays.
-            for (int i = 0; i < 48; i++)
-                Primitive(PrimitiveType.Cube, "PierPlank", dock, new Vector3(0f, 0.26f, 10f - i * 0.48f), new Vector3(3f, 0.20f, 0.45f), i % 3 == 0 ? light : wood);
+            // A broad T pier: individual planks, sturdy piles and four open boarding bays. The walkway's planks stop at
+            // the cross dock (under it they lay in its plane and flickered through it); the last one fills the gap.
+            for (int i = 0; i < PierPlanks; i++)
+                Primitive(PrimitiveType.Cube, "PierPlank", dock, new Vector3(0f, 0.26f, PierPlankZ(i)), new Vector3(3f, 0.20f, PierPlankDepth(i)), i % 3 == 0 ? light : wood);
             for (int i = 0; i < 50; i++)
                 Primitive(PrimitiveType.Cube, "CrossDockPlank", dock, new Vector3(-12f + i * 0.48f, 0.26f, -11f), new Vector3(0.45f, 0.20f, 3.2f), i % 3 == 0 ? light : wood);
             foreach (float z in new[] { -12f, -7f, -2f, 3f, 8f })

@@ -11,7 +11,10 @@
    "doorX": -0.0,
    "doorWidth": 1.2,
    "doorHeight": 2.1,
-   "porchZ": -0.0
+   "porchZ": -0.0,
+   "porchTop": 0.24,
+   "porchDepth": 1.75,
+   "stepFrom": 0.58
   },
   {
    "name": "pirate_shack_tarp",
@@ -24,7 +27,10 @@
    "doorX": -0.0,
    "doorWidth": 1.2,
    "doorHeight": 2.1,
-   "porchZ": -0.0
+   "porchZ": -0.0,
+   "porchTop": 0.15,
+   "porchDepth": 1.6,
+   "stepFrom": 0.58
   },
   {
    "name": "pirate_shack_shingle",
@@ -37,7 +43,10 @@
    "doorX": -0.0,
    "doorWidth": 1.2,
    "doorHeight": 2.1,
-   "porchZ": -0.0
+   "porchZ": -0.0,
+   "porchTop": 0.2,
+   "porchDepth": 1.0,
+   "stepFrom": 0.58
   },
   {
    "name": "pirate_tavern",
@@ -50,7 +59,10 @@
    "doorX": -0.2,
    "doorWidth": 2.7,
    "doorHeight": 2.9,
-   "porchZ": 8.9
+   "porchZ": 8.9,
+   "porchTop": -0.02,
+   "porchDepth": 0.0,
+   "stepFrom": 0.0
   }
  ]
 }

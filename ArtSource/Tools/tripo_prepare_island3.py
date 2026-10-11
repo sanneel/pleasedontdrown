@@ -67,6 +67,17 @@ DOORS = {
 }
 
 
+# The porch in front of each door, measured on the cut models (rays down through a 0.5 m grid in front of the wall): the
+# deck's height over the room floor, its depth out from the front wall's inside face, and where the strip the doorway
+# cut out of the deck starts (the frame's front; the tavern has no frame). The game closes that strip with a doorstep.
+PORCH = {
+    "pirate_shack_thatch": dict(top=0.24, depth=1.75, step=0.58),
+    "pirate_shack_tarp": dict(top=0.15, depth=1.6, step=0.58),
+    "pirate_shack_shingle": dict(top=0.2, depth=1.0, step=0.58),
+    "pirate_tavern": dict(top=-0.02, depth=0.0, step=0.0),  # depth 0: the porch stays at the hall floor's height
+}
+
+
 def shack_cut(name):
     def cut(x, y, z):
         (x0, x1), (y0, y1), floor, top = SHACK_ROOMS[name]
@@ -290,5 +301,6 @@ if SHACK_ROOMS:  # only when the shacks were redone (a run for other models must
   with open(os.path.join(OUT, "shack_rooms.json"), "w") as f:
     json.dump({"rooms": [{"name": n, "x0": -x1, "x1": -x0, "z0": -y1, "z1": -y0, "floor": fl, "top": tp,
                           "doorX": -DOORS[n]["x"], "doorWidth": 2 * DOORS[n]["half"], "doorHeight": DOORS[n]["top"],
-                          "porchZ": -DOORS[n].get("porch", 0.0)}
+                          "porchZ": -DOORS[n].get("porch", 0.0), "porchTop": PORCH[n]["top"],
+                          "porchDepth": PORCH[n]["depth"], "stepFrom": PORCH[n]["step"]}
                          for n, ((x0, x1), (y0, y1), fl, tp) in SHACK_ROOMS.items()]}, f, indent=1)
