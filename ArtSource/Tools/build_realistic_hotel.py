@@ -350,9 +350,9 @@ def main():
     walls = wall_faces(obj)
     details, report['windows'] = rebuild_windows(obj, NAMES, log)
     finish_exterior(obj, details, NAMES, CLASSES, log)
-    slabs, buried = clean_massing(obj, walls, SOURCE, HEIGHT, NAMES, log)
+    slabs, buried, terraces = clean_massing(obj, walls, SOURCE, HEIGHT, NAMES, log)
     remove_buried_windows(details, buried, log)
-    rebuild_balconies(obj, details, slabs, NAMES, log)
+    rebuild_balconies(obj, details, slabs, terraces, NAMES, log)
     details.hide_render = True
     # The clean massing is light and boxy (decimating it would only bend its corners): every level shares it.
     lods = [decimated_copy(obj, 1, f'HotelLOD{i}') for i in range(3)]
