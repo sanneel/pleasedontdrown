@@ -66,6 +66,12 @@ namespace PleaseDontDrown.Story
         [Server] public void ServerSetAvailable(bool available) => _available.Value = available;
 
         public bool CanInteract(PlayerHub player) => _available.Value;
+
+        /// <summary>Open for business right now.</summary>
+        public bool IsOpen => _available.Value;
+
+        /// <summary>Which product (0..) is <paramref name="item"/> (catalog name), or -1 (automated tests).</summary>
+        public int ProductIndex(string item) => Array.FindIndex(_products, p => p.Item == item);
         public string GetPrompt(PlayerHub player) => _free ? $"{_title}: take guns and parts (free)" : $"{_title}: buy equipment (${Economy.Money})";
         public void OnInteract(PlayerHub player) => SetOpen(true);
 
@@ -289,8 +295,19 @@ namespace PleaseDontDrown.Story
             DevCommands.Register("buy", "<n>", "Buy product n (1..) at the nearest open shop counter (automated tests).", args =>
             {
                 int n = Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) - 1;
-                BuyServer(n);
-                DevCommands.Print($"buying product {n + 1} at {_title}");
+                PlayerHub me = PlayerHub.Local;
+                ShopCounter nearest = null; // every counter registers the command: the nearest open one sells
+                foreach (ShopCounter counter in FindObjectsByType<ShopCounter>(FindObjectsSortMode.None))
+                    if (me != null && counter._available.Value &&
+                        (nearest == null || (counter.transform.position - me.transform.position).sqrMagnitude < (nearest.transform.position - me.transform.position).sqrMagnitude))
+                        nearest = counter;
+                if (nearest == null)
+                {
+                    DevCommands.Print("no open shop counter");
+                    return;
+                }
+                nearest.BuyServer(n);
+                DevCommands.Print($"buying product {n + 1} at {nearest._title}");
             }, cheat: true, owner: this);
         }
 

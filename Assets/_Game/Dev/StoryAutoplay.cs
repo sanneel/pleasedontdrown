@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using PleaseDontDrown.Combat;
 using PleaseDontDrown.Core;
+using PleaseDontDrown.Creatures;
 using PleaseDontDrown.Items;
 using PleaseDontDrown.Player;
 using PleaseDontDrown.Rescue;
@@ -33,7 +35,8 @@ namespace PleaseDontDrown.Dev
         private const float BeatLimit = 300f;       // game seconds one beat may take before the run counts as stuck
         private static readonly string[] Beats =
         {
-            "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6", "2.7", "end"
+            "1.1", "1.2", "1.3", "1.4", "1.5", "1.9", "1.10", "2.1", "2.2", "2.3", "2.4", "2.5", "2.5b", "2.6", "2.7",
+            "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.8", "end"
         };
 
         private readonly List<string> _errors = new();
@@ -216,6 +219,16 @@ namespace PleaseDontDrown.Dev
                     if (item.DisplayName == "Fleet Key Case" && !item.IsHeld) { yield return PickUp(me, item); break; }
                 yield break;
             }
+            if (me.Motor.Seat != null && beat.StartsWith("2.") && beat != "2.7")
+            {
+                Exec("getoff"); // arrived on the jet ski: on foot from here
+                yield return new WaitForSeconds(0.8f);
+                yield break;
+            }
+            if (beat.StartsWith("3.")) { yield return Chapter3(me, beat); yield break; }
+            if (beat == "2.1") { yield return TalkToMarked(me); yield break; }
+            if (beat == "2.2" && !Carries(me, "Pistol")) { yield return BuyAt(me, "Pistol"); yield break; }
+            if (beat == "2.7") { yield return SailToSkullCove(me); yield break; }
 
             // Someone in trouble comes first.
             foreach (VictimBrain v in VictimBrain.All)
@@ -224,6 +237,13 @@ namespace PleaseDontDrown.Dev
                     yield return Rescue(me, v);
                     yield break;
                 }
+
+            // A boss up: shoot it in the head (as if with the pistol; a guest it drags comes free when it's hurt).
+            if (ActiveBoss() is { } boss)
+            {
+                yield return HitBoss(me, boss);
+                yield break;
+            }
 
             // A robber (or pirate) on his feet: knock him down.
             foreach (StoryNpc n in StoryNpc.All)
@@ -274,6 +294,15 @@ namespace PleaseDontDrown.Dev
 
             if (beat == "1.8") yield return WadeToFalseAlarm(me);
             if (beat == "1.10") yield return RideToIsland2(me);
+            // Sent somewhere (the Kleptopus's pier): go where the marker is.
+            if (beat == "2.5b" && !StoryDirector.MissionRunning && StoryDirector.Instance.MarkerLabel == "The pier" &&
+                StoryDirector.Instance.MarkerPosition is { } there)
+            {
+                Vector3 at = there - Vector3.up * 2f;
+                at.y = WaterSurface.Exists && Shore.WaterDepthAt(at + Vector3.up * 2f) > 1.3f ? WaterSurface.HeightAt(at) - 1.2f : at.y;
+                me.Motor.Teleport(at + Vector3.back * 6f);
+                yield return new WaitForSeconds(1f);
+            }
         }
 
         private IEnumerator TalkRental(PlayerHub me)
@@ -410,6 +439,11 @@ namespace PleaseDontDrown.Dev
                 yield return new WaitForSeconds(0.4f);
                 Tagged("tow", me);
             }
+            if (mine && v.HasLostLeg)
+            {
+                yield return ToHospitalBed(me); // bitten: the infirmary, not the beach
+                yield break;
+            }
             if (mine)
             {
                 // Tow them in: a few metres at a time, like swimming, until we stand on dry sand.
@@ -486,6 +520,224 @@ namespace PleaseDontDrown.Dev
             float throttle = Mathf.Abs(angle) > 100f ? 0.5f : 1f;
             DevCommands.Execute(string.Format(CultureInfo.InvariantCulture, "drive 0.7 {0:0.00} {1:0.00}", steer, throttle));
             Tagged("ride", me, 3);
+        }
+
+        // ------------------------------------------------------------------ chapters 2 and 3
+
+        private static void Stand(PlayerHub me, Vector3 p) => me.Motor.Teleport(p + Vector3.up * 0.3f);
+
+        private static Transform StoryPoint(string name) => GameObject.Find("Environment/Island3/Story/" + name)?.transform;
+
+        /// <summary>Whoever the story waits to talk to (talkable, the marker over them): in front of them, Interact.</summary>
+        private IEnumerator TalkToMarked(PlayerHub me)
+        {
+            Vector3? marker = StoryDirector.Instance.MarkerPosition;
+            if (marker == null) yield break; // not marked yet: wait (anyone talkable elsewhere isn't who the story means)
+            StoryNpc best = null;
+            foreach (StoryNpc n in StoryNpc.All)
+                if (n != null && n.IsTalkable && (n.transform.position - marker.Value).sqrMagnitude < 6f * 6f && (best == null ||
+                    (n.transform.position - marker.Value).sqrMagnitude < (best.transform.position - marker.Value).sqrMagnitude))
+                    best = n;
+            if (best == null) yield break;
+            Stand(me, best.transform.position + best.transform.forward * 1.5f);
+            me.Look.LookAt(best.HeadPosition);
+            yield return new WaitForSeconds(0.4f);
+            Say($"talking to {best.Name} at {Vector3.Distance(me.transform.position, best.transform.position):F1} m");
+            best.OnInteract(me);
+            yield return new WaitForSeconds(1f);
+        }
+
+        /// <summary>To the nearest open counter selling <paramref name="item"/>, buy it.</summary>
+        private IEnumerator BuyAt(PlayerHub me, string item)
+        {
+            ShopCounter shop = null;
+            foreach (ShopCounter c in FindObjectsByType<ShopCounter>(FindObjectsSortMode.None))
+                if (c.IsOpen && c.ProductIndex(item) >= 0 && (shop == null ||
+                    (c.transform.position - me.transform.position).sqrMagnitude < (shop.transform.position - me.transform.position).sqrMagnitude))
+                    shop = c;
+            if (shop == null) yield break;
+            Vector3 at = shop.HandOverPoint;
+            Vector3 stand = at - shop.transform.forward * 1.4f;
+            float ground = Shore.GroundHeightAt(stand + Vector3.up * 3f);
+            if (!float.IsNaN(ground)) stand.y = ground;
+            Stand(me, stand);
+            me.Look.LookAt(at);
+            yield return new WaitForSeconds(0.5f);
+            Exec($"buy {shop.ProductIndex(item) + 1}");
+            yield return new WaitForSeconds(1f);
+            Exec($"grab {item}");
+            yield return new WaitForSeconds(0.6f);
+        }
+
+        /// <summary>Carrying a shark-bite victim: to the infirmary bed, Interact.</summary>
+        private IEnumerator ToHospitalBed(PlayerHub me)
+        {
+            HospitalBed bed = FindFirstObjectByType<HospitalBed>();
+            if (bed == null)
+            {
+                Warn("no hospital bed in the scene");
+                yield break;
+            }
+            Stand(me, bed.transform.position + bed.transform.right * 1.2f);
+            me.Look.LookAt(bed.transform.position);
+            yield return new WaitForSeconds(0.5f);
+            Exec("use");
+            yield return new WaitForSeconds(0.8f);
+            if (bed.CanInteract(me))
+            {
+                Warn("couldn't use the hospital bed by looking at it; admitting directly");
+                bed.OnInteract(me);
+                yield return new WaitForSeconds(0.8f);
+            }
+        }
+
+        /// <summary>A boss fighting right now (awake, alive), or null.</summary>
+        private static Creature ActiveBoss()
+        {
+            foreach (Creature c in Creature.All)
+                if (c != null && c.IsBoss && !c.IsDead && !c.IsDormant) return c;
+            return null;
+        }
+
+        /// <summary>Host: a few pistol shots into the boss's head (from where a player would stand).</summary>
+        private IEnumerator HitBoss(PlayerHub me, Creature boss)
+        {
+            Transform head = null;
+            foreach (CreatureZone z in boss.GetComponentsInChildren<CreatureZone>())
+                if (z.Part == "Head") head = z.transform;
+            if (head == null) yield break;
+            for (int i = 0; i < 4 && !boss.IsDead; i++)
+            {
+                ((IDamageable)boss).ServerTakeHit(60, DamageKind.Bullet, me, head.position, (head.position - me.Head.position).normalized);
+                yield return new WaitForSeconds(0.15f);
+            }
+            if (me.TryGetComponent(out PlayerCombat combat) && combat.IsDowned) combat.ServerStandUp(PlayerCombat.MaxHealth, 0f);
+        }
+
+        /// <summary>Onto the pirate boat and south to Skull Cove, steering at its dock.</summary>
+        private IEnumerator SailToSkullCove(PlayerHub me)
+        {
+            Transform cove = GameObject.Find("Environment/Island3/Island3Arrival")?.transform;
+            if (cove == null) yield break;
+            if (me.Motor.Seat == null)
+            {
+                Vehicle boat = null;
+                foreach (Vehicle v in Vehicle.All)
+                    if (v.DisplayName == "Pirate Boat" && !v.IsLocked && v.Driver == null) boat = v;
+                if (boat == null) yield break;
+                Vector3 boarding = boat.transform.position + boat.transform.right * 2.5f;
+                boarding.y = WaterSurface.Exists ? WaterSurface.HeightAt(boarding) - 1.0f : boarding.y;
+                me.Motor.Teleport(boarding);
+                me.Look.LookAt(boat.transform.position + Vector3.up * 0.8f);
+                yield return new WaitForSeconds(0.6f);
+                Exec("use");
+                yield return new WaitForSeconds(1f);
+                if (me.Motor.Seat == null) boat.OnInteract(me);
+                yield return new WaitForSeconds(1f);
+                yield break;
+            }
+            Vehicle ride = me.Motor.Seat;
+            // The hotel island lies between its beach and Skull Cove: round its west end (x -160 .. 200, z -220 .. -480).
+            // Skull Cove's dock is on its east shore (the island is x -75 .. 115, z -1020 .. -780): come in from the east.
+            Vector3 p = ride.transform.position;
+            Vector3 target = cove.position;
+            if (p.z > -500f && p.x > -205f) target = new Vector3(-225f, 0f, p.z - 40f);
+            else if (p.z > -500f) target = new Vector3(-225f, 0f, -530f);
+            else if (p.x < 150f && p.z > -890f) target = new Vector3(165f, 0f, Mathf.Min(p.z, -740f) - 25f);
+            else if (p.x < 150f) target = new Vector3(165f, 0f, cove.position.z);
+            Vector3 to = target - p;
+            to.y = 0f;
+            float angle = Vector3.SignedAngle(ride.transform.forward, to, Vector3.up);
+            DevCommands.Execute(string.Format(CultureInfo.InvariantCulture, "drive 0.7 {0:0.00} {1:0.00}",
+                Mathf.Clamp(angle / 35f, -1f, 1f), Mathf.Abs(angle) > 100f ? 0.5f : 1f));
+            Tagged("sail", me, 3);
+        }
+
+        /// <summary>Skull Cove, beat by beat (what chapter3check does, as a player would).</summary>
+        private IEnumerator Chapter3(PlayerHub me, string beat)
+        {
+            if (me.Motor.Seat != null) Exec("getoff");
+            PlayerCombat combat = me.GetComponent<PlayerCombat>();
+            if (combat != null && combat.IsDowned) combat.ServerStandUp(PlayerCombat.MaxHealth, 0f);
+            switch (beat)
+            {
+                case "3.1":
+                    // Ashore at the dock (the fight starts there), then straight to the THIEF's door.
+                    Transform landing = GameObject.Find("Environment/Island3/Island3Arrival")?.transform;
+                    if (!StoryDirector.MissionRunning)
+                    {
+                        if (landing != null && (me.transform.position - landing.position).sqrMagnitude > 8f * 8f) Stand(me, landing.position);
+                        yield return new WaitForSeconds(1f);
+                        yield break;
+                    }
+                    if (StoryPoint("Thief") is { } thief) Stand(me, thief.position);
+                    yield return new WaitForSeconds(2f);
+                    break;
+                case "3.2":
+                    yield return TalkToMarked(me);
+                    break;
+                case "3.3":
+                    foreach (string gun in new[] { "Pistol", "Shotgun" })
+                    {
+                        Item have = null;
+                        foreach (Item i in Item.All)
+                            if (i.Holder == me && i.DisplayName == gun) have = i;
+                        if (have == null)
+                        {
+                            Exec($"spawn {gun}");
+                            yield return new WaitForSeconds(0.8f);
+                            Exec($"grab {gun}");
+                            yield return new WaitForSeconds(0.8f);
+                        }
+                        else Exec($"slot {SlotOf(me, have) + 1}");
+                        yield return new WaitForSeconds(0.3f);
+                        me.Hands.HeldItem?.GetComponent<Weapon>()?.ServerFitByName("suppressor");
+                        yield return new WaitForSeconds(0.3f);
+                    }
+                    break;
+                case "3.4":
+                    Transform floor = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor")?.transform;
+                    if (floor != null && (me.transform.position - floor.position).sqrMagnitude > 4f * 4f) Stand(me, floor.position);
+                    foreach (StoryNpc n in StoryNpc.All)
+                        if (n != null && n.Name == "Iron Jaw Jack" && n.IsFighting && !n.IsDefeated)
+                            for (int k = 0; k < 6; k++)
+                            {
+                                ((IDamageable)n).ServerTakeHit(Damage.Punch, DamageKind.Punch, me, n.HeadPosition, me.Head.forward);
+                                yield return new WaitForSeconds(0.2f);
+                            }
+                    break;
+                case "3.5":
+                    if (StoryDirector.MissionRunning && StoryPoint("RiverBankA") is { } bank) Stand(me, bank.position);
+                    else if (StoryPoint("JungleStart") is { } jungle) Stand(me, jungle.position);
+                    yield return new WaitForSeconds(1.5f);
+                    break;
+                case "3.6":
+                    if (StoryPoint("RiverBankA") is { } a && (me.transform.position - a.position).sqrMagnitude > 3f * 3f) Stand(me, a.position);
+                    yield return new WaitForSeconds(0.5f);
+                    Exec("swing");
+                    yield return new WaitForSeconds(3f);
+                    break;
+                case "3.7":
+                    if (ActiveBoss() is { } snapper) { yield return HitBoss(me, snapper); break; }
+                    if (StoryPoint("SnapperPond") is { } pond && StoryPoint("UpRiver") is { } up)
+                        Stand(me, pond.position + (up.position - pond.position).normalized * 12f);
+                    yield return new WaitForSeconds(1f);
+                    break;
+                case "3.8":
+                    Transform mouth = StoryPoint("CaveMouth"), ledge = StoryPoint("CaveLedge");
+                    if (mouth != null) Stand(me, mouth.position);
+                    yield return new WaitForSeconds(1.5f);
+                    if (ledge != null) Stand(me, ledge.position);
+                    yield return new WaitForSeconds(2f);
+                    break;
+            }
+        }
+
+        private static int SlotOf(PlayerHub me, Item item)
+        {
+            for (int s = 0; s < PlayerHands.SlotCount; s++)
+                if (me.Hands.SlotItem(s) == item) return s;
+            return 0;
         }
 
         // ------------------------------------------------------------------ pictures
