@@ -87,6 +87,25 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        /// <summary>Batch: island 3's houses on their stilts down to the ground (GroundIsland3Houses). -pdd-dry reports only.</summary>
+        public static void GroundIsland3HousesBatch()
+        {
+            try
+            {
+                bool dry = Array.IndexOf(Environment.GetCommandLineArgs(), "-pdd-dry") >= 0;
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                GroundIsland3Houses(GameObject.Find("Environment/Island3").transform, dry);
+                if (dry) return;
+                EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+                EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Island3] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         private static void RefreshCleanHotel()
         {
             LODGroup tower = Object.FindObjectsByType<LODGroup>(FindObjectsSortMode.None).Single(g => g.name == "CentralTower");
