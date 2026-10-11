@@ -125,8 +125,11 @@ def rebuild_canopy(hotel, details, idx, log):
             b.box((cx - 1.5, cy - 1.8, SOFFIT - .03), (cx + 1.5, cy + 1.8, SOFFIT + .0), WH)
     # The entrance wall under the canopy: the AI facade there (shards, a broken balcony over the door) is replaced by
     # a clean wall with a 2.6 m doorway into the lobby, a stone and gold door surround and gold-framed shopfronts.
-    removed += delete_in_box(hotel, (x0 - .05, -5.45, .28), (x1 + .05, -2.9, SOFFIT)) +         delete_in_box(details, (x0 - .05, -5.45, .28), (x1 + .05, -2.9, SOFFIT))
+    # Up to under the first tower balcony (slab from 8.04 m): the broken one's rail stood up behind the canopy.
+    removed += delete_in_box(hotel, (x0 - .05, -5.45, .28), (x1 + .05, -2.9, 7.9)) +         delete_in_box(details, (x0 - .05, -5.45, .28), (x1 + .05, -2.9, 7.9))
     wy0, wy1 = ENTRANCE_WALL_Y, ENTRANCE_WALL_Y + .4
+    # The canopy reaches back onto the entrance wall: no open strip between them to look up through.
+    b.box((x0, y1 - .01, SOFFIT), (x1, wy1, CANOPY_TOP), W)
     D = DOOR_HALF
     b.box((x0, wy0, .28), (-D, wy1, SOFFIT), W); b.box((D, wy0, .28), (x1, wy1, SOFFIT), W)
     b.box((-D, wy0, 3.3), (D, wy1, SOFFIT), W)                                        # over the door
@@ -462,39 +465,6 @@ def facade_shards(hotel, details, idx, log):
     log('facade slivers removed', int(kill.sum()), 'plaster patches', patches)
 
 
-# Tower front balcony stack (x, out of the facade in -y): the window rebuild missed the 18 m one, which is still the
-# AI's lumpy balcony. It gets a copy of the clean one below it, one storey (3.16 m) up.
-TOWER_BAY_X = 3.6
-TOWER_BAY_FRONT_Y = -3.95       # faces further out than this belong to the balcony, not the wall or window sills
-MISSING_BALCONY_Z, BALCONY_BELOW_Z = 18.04, 14.88
-# The recessed bays behind those balconies: side walls at |x| = 2.6 between the facade and the glazed back wall.
-BAY_JAMB_X = (2.4, 2.85)
-BAY_Y = (-3.93, -1.9)
-BAY_Z = (7.6, 35.9)
-
-
-def tower_balcony(hotel, details, idx, log):
-    dz = MISSING_BALCONY_Z - BALCONY_BELOW_Z
-    x, y = TOWER_BAY_X, TOWER_BAY_FRONT_Y
-    removed = delete_in_box(hotel, (-x, -9, MISSING_BALCONY_Z - 1.1), (x, y, MISSING_BALCONY_Z + 1.5)) + \
-        delete_in_box(details, (-x, -9, MISSING_BALCONY_Z - 1.1), (x, y, MISSING_BALCONY_Z + 1.5)) + \
-        delete_in_box(hotel, (-BAY_JAMB_X[0], y, MISSING_BALCONY_Z - 1.1),
-                      (BAY_JAMB_X[0], BAY_Y[1], MISSING_BALCONY_Z + 1.5))      # AI balcony left inside the bay
-    me = details.data
-    bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
-    src = [f for f in bm.faces if -x < f.calc_center_median().x < x and f.calc_center_median().y < BAY_Y[1] and
-           BALCONY_BELOW_Z - .5 < f.calc_center_median().z < BALCONY_BELOW_Z + 1.35]
-    dup = bmesh.ops.duplicate(bm, geom=src)
-    bmesh.ops.translate(bm, verts=[g for g in dup['geom'] if isinstance(g, bmesh.types.BMVert)], vec=(0, 0, dz))
-    bm.to_mesh(me); bm.free(); me.update()
-    b = Builder()                                                       # the bays' side walls are jagged: clean jambs
-    for sx in (-1, 1):
-        xa, xb = sorted((sx * BAY_JAMB_X[0], sx * BAY_JAMB_X[1]))
-        b.box((xa, BAY_Y[0], BAY_Z[0]), (xb, BAY_Y[1], BAY_Z[1]), idx['wall'])
-    b.append_to(details)
-    log('tower balcony at', MISSING_BALCONY_Z, 'rebuilt from', len(src), 'faces; AI faces removed', removed)
-
-
 def vary_glass(details, idx, log):
     """Occupied-hotel look: per pane, dark glass, a lighter tint or drawn curtains (stable per pane)."""
     me = details.data
@@ -584,6 +554,5 @@ def finish_exterior(hotel, details, names, classes, log):
     roof_edges(hotel, details, idx, log)
     ledges(hotel, details, idx, log)
     facade_shards(hotel, details, idx, log)
-    tower_balcony(hotel, details, idx, log)
     vary_glass(details, idx, log)
     gold_dressing(details, idx, log)

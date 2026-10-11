@@ -314,6 +314,7 @@ namespace PleaseDontDrown.Story
             foreach (GameObject go in _spawnedActors)
                 if (go != null && go.TryGetComponent(out NetworkObject nob) && nob.IsSpawned) Despawn(go);
             _spawnedActors.Clear();
+            CleanupResidents();
         }
 
         /// <summary>Automated tests (-pdd-nosave) never touch the real save.</summary>

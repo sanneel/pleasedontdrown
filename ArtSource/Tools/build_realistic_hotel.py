@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hotel_windows import rebuild_windows  # noqa: E402
 from hotel_exterior import finish_exterior, box_uvs  # noqa: E402
 from hotel_fill import fill_blanks  # noqa: E402
+from hotel_massing import clean_massing, rebuild_balconies, wall_faces  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'ArtSource/Resort/tripo_hotel_upload.glb'
@@ -346,16 +347,14 @@ def merged_hotel():
 def main():
     obj, report = merged_hotel()
     tris = report['merged_tris']
+    walls = wall_faces(obj)
     details, report['windows'] = rebuild_windows(obj, NAMES, log)
     finish_exterior(obj, details, NAMES, CLASSES, log)
+    slabs = clean_massing(obj, walls, SOURCE, HEIGHT, NAMES, log)
+    rebuild_balconies(obj, details, slabs, NAMES, log)
     details.hide_render = True
-    lods = []
-    for i, target in enumerate((250000, 60000, 15000)):
-        # Each level is reduced from the previous one (base mesh for LOD0).
-        base = lods[-1] if lods else obj
-        base.data.calc_loop_triangles()
-        ratio = min(1, target / len(base.data.loop_triangles))
-        lods.append(decimated_copy(base, ratio, f'HotelLOD{i}'))
+    # The clean massing is light and boxy (decimating it would only bend its corners): every level shares it.
+    lods = [decimated_copy(obj, 1, f'HotelLOD{i}') for i in range(3)]
     obj.hide_render = True; obj.hide_set(True)
     # Keep close-up frame detail at LOD0; simplify small railings and frames at distance.
     windows = []

@@ -260,6 +260,7 @@ namespace PleaseDontDrown.Creatures
         public bool ServerTakeHit(int damage, DamageKind kind, PlayerHub attacker, Vector3 point, Vector3 direction)
         {
             if (!_setUp || IsDead || _health.Value <= 0) return false;
+            if (IsDormant) return true; // a boss asleep in its lair: bullets just splash (the story wakes it)
             CreatureZone zone = ZoneAt(point);
             float multiplier = ZoneMultiplier(zone, kind, point, direction);
             int dealt = Mathf.Max(multiplier > 0.01f ? 1 : 0, Mathf.RoundToInt(damage * multiplier));

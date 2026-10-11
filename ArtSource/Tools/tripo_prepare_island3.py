@@ -67,6 +67,17 @@ DOORS = {
 }
 
 
+# The porch in front of each door, measured on the cut models (rays down through a 0.5 m grid in front of the wall): the
+# deck's height over the room floor, its depth out from the front wall's inside face, and where the strip the doorway
+# cut out of the deck starts (the frame's front; the tavern has no frame). The game closes that strip with a doorstep.
+PORCH = {
+    "pirate_shack_thatch": dict(top=0.24, depth=1.75, step=0.58),
+    "pirate_shack_tarp": dict(top=0.15, depth=1.6, step=0.58),
+    "pirate_shack_shingle": dict(top=0.2, depth=1.0, step=0.58),
+    "pirate_tavern": dict(top=-0.02, depth=0.0, step=0.0),  # depth 0: the porch stays at the hall floor's height
+}
+
+
 def shack_cut(name):
     def cut(x, y, z):
         (x0, x1), (y0, y1), floor, top = SHACK_ROOMS[name]
@@ -147,9 +158,11 @@ MODELS = {
     "castle_gatehouse": dict(turn=-90, fit=("x", 24.0)),
     # The keep is a shell over the game's walk-in hall (16 x 14 m, 12 m high; the model's walls stand at ~60% of its
     # half-size): open its front door, and clear out
-    # everything inside the hall (its other doors' recesses) so only the outer walls are left round the hall.
+    # everything inside the hall (its other doors' recesses) so only the outer walls are left round the hall. The front
+    # steps go too, their side walls included (the front wall stands at y -8; one stood out into the yard as a fin).
     "castle_keep": dict(turn=-90, size=(30.0, 24.0, 26.0),
-                        cut=lambda x, y, z: (abs(x) < 2.4 and z < 6.4 and y < -6.0) or (abs(x) < 7.9 and abs(y) < 6.6 and z < 12.5)),
+                        cut=lambda x, y, z: (abs(x) < 2.4 and z < 6.4 and y < -6.0) or (abs(x) < 3.6 and z < 6.4 and y < -8.6)
+                        or (abs(x) < 7.9 and abs(y) < 6.6 and z < 12.5)),
     # Long and low like the source (it is ~4.5x longer than tall): 30 m pieces keep the stonework's proportions.
     "castle_wall": dict(turn=90, size=(30.0, 3.0, 10.5)),
     "pirate_throne": dict(turn=-90, fit=("z", 3.3)),
@@ -290,5 +303,6 @@ if SHACK_ROOMS:  # only when the shacks were redone (a run for other models must
   with open(os.path.join(OUT, "shack_rooms.json"), "w") as f:
     json.dump({"rooms": [{"name": n, "x0": -x1, "x1": -x0, "z0": -y1, "z1": -y0, "floor": fl, "top": tp,
                           "doorX": -DOORS[n]["x"], "doorWidth": 2 * DOORS[n]["half"], "doorHeight": DOORS[n]["top"],
-                          "porchZ": -DOORS[n].get("porch", 0.0)}
+                          "porchZ": -DOORS[n].get("porch", 0.0), "porchTop": PORCH[n]["top"],
+                          "porchDepth": PORCH[n]["depth"], "stepFrom": PORCH[n]["step"]}
                          for n, ((x0, x1), (y0, y1), fl, tp) in SHACK_ROOMS.items()]}, f, indent=1)

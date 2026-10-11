@@ -620,10 +620,21 @@ namespace PleaseDontDrown.Story
                 Shark shark = SpawnShark(at + new Vector3(15f, 0f, 12f), at, 9f);
                 SetObjective($"{guest.Name} is in trouble... and there's a fin out there!");
                 Marker(guest.Name, guest.NetworkObject);
+                _rescued.Clear();
                 yield return new WaitForSeconds(4f);
-                if (guest != null && guest.IsSpawned) shark.ServerAttack(guest);
-                while (guest != null && guest.IsSpawned && !guest.HasLostLeg && guest.State != VictimState.Lost) yield return null;
+                if (guest != null && guest.IsSpawned && !_rescued.Contains(guest)) shark.ServerAttack(guest);
+                // Bitten, lost, or pulled out before the shark got there (it can't follow him up the beach).
+                while (guest != null && guest.IsSpawned && !guest.HasLostLeg && guest.State != VictimState.Lost && !_rescued.Contains(guest))
+                    yield return null;
                 if (guest == null || !guest.IsSpawned || guest.State == VictimState.Lost) continue;
+                if (!guest.HasLostLeg)
+                {
+                    if (shark != null) shark.ServerCircle(at, 12f); // it missed its dinner: back out where he was
+                    NoMarker();
+                    yield return Say(guest.Name, "That WAS a shark?! You got me out before it... I owe you my legs. Both of them.", new Color(0.8f, 0.9f, 1f));
+                    yield return Say(_receptionist, "(over the speaker) A SHARK?! ...The pool is open, everybody! The pool is very nice!");
+                    yield break;
+                }
 
                 SetObjective($"Get {guest.Name} out of the water and rush him to the hotel infirmary!");
                 bool pointingAtBed = false;
@@ -754,6 +765,7 @@ namespace PleaseDontDrown.Story
             Marker("Your boat", _pirateBoat.NetworkObject);
             while (_pirateBoat.Driver == null) yield return null;
             NoMarker();
+            PopulateIsland3(); // Skull Cove's lookouts, guards and animals take their places while you're out at sea
             yield return Say(_receptionist, "(on the radio) Leaving already? Come back soon! ...Seriously. Please.");
             yield return Say(_sandy, "(on the radio) A jet ski, and now a pirate ship? Who ARE you?");
             yield return ChapterReport("CHAPTER 2 COMPLETE");

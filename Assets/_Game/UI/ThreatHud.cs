@@ -95,7 +95,11 @@ namespace PleaseDontDrown.UI
         private static void DrawBossBar()
         {
             Creature boss = Creature.ActiveBoss;
-            if (boss == null) return;
+            if (boss == null)
+            {
+                DrawMissionBossBar();
+                return;
+            }
             // Bottom middle, above the hotbar: the top left is the mission's, the middle is for titles.
             float width = 700f, x = (Hud.Width - width) * 0.5f, y = Hud.HotbarTop - 120f;
             Hud.Label(new Rect(x, y, width, 30f), boss.IsDead ? $"{boss.DisplayName.ToUpperInvariant()}  BEATEN" : boss.DisplayName.ToUpperInvariant(), 24f,
@@ -112,6 +116,38 @@ namespace PleaseDontDrown.UI
             }
             if (boss.BossOpen && !boss.IsDead)
                 Hud.Label(new Rect(x, y - 32f, width, 30f), "WEAK SPOT OPEN! HIT THE HEAD!", 21f, new Color(1f, 0.95f, 0.4f), heavy: true);
+        }
+
+        private static float _missionBarShown = -1f;
+
+        /// <summary>
+        /// A mission run like a boss fight (StoryDirector.ServerBossBar): same place and size as a boss's bar, the bar
+        /// emptying as the team closes in, and a clock ring beside it (the last 10 seconds counted down in the middle).
+        /// </summary>
+        private static void DrawMissionBossBar()
+        {
+            if (!StoryDirector.BossBarShown)
+            {
+                _missionBarShown = -1f;
+                return;
+            }
+            float target = StoryDirector.BossBar01;
+            _missionBarShown = _missionBarShown < 0f ? target : Mathf.MoveTowards(_missionBarShown, target, Time.unscaledDeltaTime * 0.6f);
+            float width = 700f, x = (Hud.Width - width) * 0.5f, y = Hud.HotbarTop - 120f;
+            Hud.Label(new Rect(x, y, width, 30f), StoryDirector.BossBarTitle.ToUpperInvariant(), 24f, new Color(1f, 0.88f, 0.55f), heavy: true);
+            var bar = new Rect(x, y + 34f, width, 18f);
+            Hud.Bar(bar, _missionBarShown, new Color(0.86f, 0.22f, 0.18f));
+            Hud.Frame(bar, new Color(1f, 1f, 1f, 0.7f), 2f, 9f);
+            float total = StoryDirector.BossBarTimeTotal, left = StoryDirector.BossBarTimeLeft;
+            if (total <= 0f) return;
+            // The clock: a ring that runs down, right of the bar; red and counted in the last 10 seconds.
+            var ring = new Rect(x + width + 14f, y + 18f, 50f, 50f);
+            bool hurry = left <= 10f;
+            Hud.Fill(ring, new Color(0f, 0f, 0f, 0.55f), 25f);
+            Hud.Arc(ring, 0f, Mathf.Clamp01(left / total), 5f, hurry ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 0.88f, 0.55f));
+            if (hurry)
+                Hud.Label(new Rect(x, y - 70f, width, 60f), Mathf.CeilToInt(left).ToString(), 52f,
+                    new Color(1f, 0.35f, 0.25f, 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 10f)), heavy: true);
         }
     }
 }

@@ -49,6 +49,7 @@ namespace PleaseDontDrown.Story
                 if ((p.transform.position - dock).sqrMagnitude > 230f * 230f) anyFar = true;
             if (anyFar) TeleportObservers(dock);
             if (_beatIndex >= 0 && _beats[_beatIndex].Id.CompareTo("3.3") >= 0 && GunStall != null) GunStall.ServerSetAvailable(true);
+            PopulateIsland3();
         }
 
         private void DisguiseEveryone(bool on)
@@ -200,6 +201,10 @@ namespace PleaseDontDrown.Story
                 yield return null;
             }
             Check("3.7 Old Snapper waits at the pond", boss != null && pond != null && Vector3.Distance(boss.transform.position, pond.position) < 8f);
+            if (pond != null && up != null) Stand(pond.position + (up.position - pond.position).normalized * 12f); // close enough to wake it
+            t = Time.time;
+            while (boss != null && boss.IsDormant && Time.time - t < 20f) yield return null; // asleep until the fight starts
+            Check("3.7 it wakes when you come for it", boss != null && !boss.IsDormant);
             Transform head = null;
             if (boss != null)
                 foreach (CreatureZone z in boss.GetComponentsInChildren<CreatureZone>())
@@ -229,10 +234,14 @@ namespace PleaseDontDrown.Story
 
         private static readonly string[] SleeperNames = { "Snorin' Sam", "Drowsy Dan", "Old Wheeze", "Barnacle Bess", "Nodding Ned", "Grumbles", "Lazy Lars", "Mumbling Mick" };
 
+        // Sneaking in is run like a boss fight (How to Fish): introduced, a bar at the bottom that empties as you close
+        // in on the THIEF's shack, a clock. Seen, too slow or everyone down: back to the landing, the lookouts reset.
+        private const float SneakInSeconds = 300f, ShackReach = 3.5f;
+
         private IEnumerator SkullCove()
         {
             SetChapter("Chapter 3: Skull Cove");
-            EnsureOnIsland3(NightDock);
+            EnsureOnIsland3(NightDock); // the sleepers and the watch are there already: they came on the island as you set sail
             DisguiseEveryone(false);
             TitleObservers("CHAPTER 3", "Skull Cove, by night");
             yield return new WaitForSeconds(2f);
@@ -252,51 +261,72 @@ namespace PleaseDontDrown.Story
             if (thief == null) yield break;
             Marker("THIEF's shack", thief.position + Vector3.up * 1.5f);
             yield return Say(_sandy, "(on the radio) The THIEF's shack is the last one, past the square. Go quietly. If anyone sees you, it's over.");
+            // Run like a boss fight (How to Fish): the card and the sting, then the bar empties as you close in.
+            // Seen, too slow or everyone down: back to the foot of the tower, the sleepers and the watch reset.
             Transform foot = NightPoint("TowerFoot");
             Vector3 start = foot != null ? foot.position : NightDock;
-            yield return RunStealthMission("Sneak in", start, () => ArrivalSneak(thief.position));
-        }
-
-        private IEnumerator ArrivalSneak(Vector3 goal)
-        {
-            int first = _spawnedActors.Count;
-            // Sleepers: round the campfire and on the porches along the way. Woken and sure of you, they fight.
-            for (int i = 0; i < 12; i++)
-            {
-                if (NightPoint($"Sleeper_{i}") is not { } spot) break;
-                StoryNpc sleeper = SpawnNpc(SleeperNames[i % SleeperNames.Length], NpcRole.Pirate, PirateLook(i + 3), spot.position, spot.eulerAngles.y, 100);
-                sleeper.ServerTeleport(spot.position, spot.eulerAngles.y, keepExact: true);
-                sleeper.ServerSleep(FighterProfile.Pirate(i % 2 == 0 ? NpcWeaponKind.Cutlass : NpcWeaponKind.Fists));
-            }
-            // Two on watch, with lanterns (they see less far by night).
-            if (Island3Point("GuardA_0") is { } a0 && Island3Point("GuardA_1") is { } a1)
-                NightGuard(SpawnNpc("Bosun Barnaby", NpcRole.Pirate, PirateLook(0), a0.position, 0f, 100), a0.position, a1.position);
-            if (Island3Point("GuardB_0") is { } b0 && Island3Point("GuardB_1") is { } b1)
-                NightGuard(SpawnNpc("Squint", NpcRole.Pirate, PirateLook(2), b1.position, 0f, 100), b1.position, b0.position);
-            Marker("THIEF's shack", goal + Vector3.up * 1.5f);
-            MissionObjective("Sneak to the THIEF's shack at the far end of the village. Walk, don't run; keep clear of the sleepers and the lanterns.");
-            yield return Reach(goal, 3.5f);
-            CleanupActorsFrom(first); // in: the sleepers and the watch are done with
-            NoMarker();
-            TitleObservers("IN", "Nobody woke up");
+            BossIntroObservers("SKULL COVE", "Sleepers hear you. Lanterns see you. Get to the THIEF without waking the village.");
             yield return new WaitForSeconds(1.5f);
+            yield return RunStealthMission("Sneak in", start, () => ArrivalSneak(start, thief.position), () => ResetResidents("I3Lookouts"));
         }
 
-        private static void NightGuard(StoryNpc guard, Vector3 a, Vector3 b)
+        private IEnumerator ArrivalSneak(Vector3 landing, Vector3 goal)
         {
+            float from = Mathf.Max(ShackReach + 1f, Flat(landing, goal));
+            float started = Time.time;
+            Marker("THIEF's shack", goal + Vector3.up * 1.5f);
+            while (true)
+            {
+                float nearest = float.MaxValue;
+                foreach (PlayerHub p in PlayerHub.All)
+                    if (p != null) nearest = Mathf.Min(nearest, Flat(p.transform.position, goal));
+                if (nearest <= ShackReach) break;
+                float left = SneakInSeconds - (Time.time - started);
+                if (left <= 0f)
+                {
+                    ServerFailMission("Too slow: the pirates changed the watch");
+                    yield break;
+                }
+                ServerBossBar("Skull Cove's lookouts", (nearest - ShackReach) / (from - ShackReach), left, SneakInSeconds);
+                MissionObjective("Sneak to the THIEF's shack at the far end of the village. Walk, don't run; keep clear of the sleepers and the lanterns.");
+                yield return new WaitForSeconds(0.2f);
+            }
+            HideBossBar();
+            NoMarker();
+            // The THIEF lives here: at his door the disguises go straight on.
+            DisguiseEveryone(true);
+            TitleObservers("IN", "Nobody woke up. The THIEF throws you hats and eye patches: you're pirates now");
+            yield return ThiefSays("Psst! Lifeguards?! Quick, put those on! Pirates take you for crew in them. Parrots too.");
+            yield return new WaitForSeconds(0.5f);
+        }
+
+        private static float Flat(Vector3 a, Vector3 b) => new Vector2(a.x - b.x, a.z - b.z).magnitude;
+
+        /// <summary>A guard on the night watch: walks his beat with a lantern and sees less far than by day.</summary>
+        private StoryNpc NightGuard(string name, int look, Vector3 a, Vector3 b)
+        {
+            StoryNpc guard = SpawnNpc(name, NpcRole.Pirate, PirateLook(look), a, 0f, 100);
             guard.ServerGuard(new[] { a, b }, FighterProfile.Pirate(NpcWeaponKind.Pistol), StoryNpc.NightGuard);
             guard.ServerSetLantern(true);
+            return guard;
+        }
+
+        /// <summary>A pirate asleep at one of the night arrival's spots (round the campfire, by the porches).</summary>
+        private StoryNpc Sleeper(int i, Transform spot)
+        {
+            StoryNpc sleeper = SpawnNpc(SleeperNames[i % SleeperNames.Length], NpcRole.Pirate, PirateLook(i + 3), spot.position, spot.eulerAngles.y, 100);
+            sleeper.ServerTeleport(spot.position, spot.eulerAngles.y, keepExact: true);
+            sleeper.ServerSleep(FighterProfile.Pirate(i % 2 == 0 ? NpcWeaponKind.Cutlass : NpcWeaponKind.Fists));
+            return sleeper;
         }
 
         // ------------------------------------------------------------------ 3.2 the THIEF
 
         private IEnumerator TheThief()
         {
-            EnsureOnIsland3();
-            Transform at = Island3Point("Thief");
-            if (at == null) yield break;
-            if (_thief == null || !_thief.IsSpawned)
-                _thief = SpawnNpc("THIEF", NpcRole.Guide, RobberLook, at.position, at.eulerAngles.y + 180f);
+            EnsureOnIsland3(); // he lives on his porch (Skull Cove's residents)
+            if (_thief == null || !_thief.IsSpawned) yield break;
+            DisguiseEveryone(true); // a resumed save: he handed the disguises over at the door
             SetObjective("Talk to the THIEF");
             Marker("THIEF", _thief.NetworkObject);
             yield return WaitTalk(_thief, "Talk to the THIEF");
@@ -305,10 +335,8 @@ namespace PleaseDontDrown.Story
             _thief.ServerSetMood(AvatarMood.Scared);
             yield return Say(_thief, "YOU?! The lifeguards from the tsunami... Fine. I owe you. You pulled me out of that wave.");
             _thief.ServerSetMood(AvatarMood.Neutral);
-            yield return Say(_thief, "These pirates robbed the hotel's casino. The money's in a cave behind the big waterfall, down south.");
-            yield return Say(_thief, "Looking like THAT you won't last a minute. Here. Hats. Eye patches. Now you're pirates.");
-            DisguiseEveryone(true);
-            TitleObservers("DISGUISED", "Pirates take you for one of theirs. Parrots too.");
+            yield return Say(_thief, "These pirates robbed the hotel's casino. The money's inside the mountain, behind the crag falls.");
+            yield return Say(_thief, "Keep those hats on. To the pirates you're crew now, and the parrots won't look twice.");
             yield return Say(_thief, "One more thing. Buy guns. SUPPRESSED guns. A bang on this island and every pirate comes running.");
             yield return Say(_thief, "The stall down by the pirates' dock sells them. A pistol AND a shotgun, and a silencer on each. Trust me.");
         }
@@ -371,14 +399,17 @@ namespace PleaseDontDrown.Story
             NoMarker();
             PlayerHub first = StoryNpc.NearestPlayer(floor.position, 8f);
             Vector3 start = first != null ? first.transform.position : floor.position;
-            yield return RunMission("Cage fight", start, () => CageFightBody(floor.position));
+            yield return RunMission("Cage fight", start, CageFightBody, () => ResetResidents("I3Tavern"));
         }
 
-        private IEnumerator CageFightBody(Vector3 floor)
+        private IEnumerator CageFightBody()
         {
-            StoryNpc champ = SpawnNpc("Iron Jaw Jack", NpcRole.Pirate, PirateLookOf(AvatarLook.Bodies.PirateFat), floor + Vector3.forward * 2f, 180f, 160);
+            // The tavern's champion has been in there all along (Skull Cove's residents): he steps up.
+            List<StoryNpc> jack = ResidentsOf<StoryNpc>("I3Tavern");
+            if (jack.Count == 0) yield break;
+            StoryNpc champ = jack[0];
             yield return Say(champ, "Fresh meat! Nobody asks about the treasure without going a round with Iron Jaw Jack.");
-            TitleObservers("CAGE FIGHT", "Fists only. He guards: hit him after he swings.");
+            BossIntroObservers("IRON JAW JACK", "Fists only. He guards: hit him after he swings.");
             champ.ServerFight(FighterProfile.Brawler(0.75f), champ.transform.position);
             while (!champ.IsDefeated)
             {
@@ -388,8 +419,8 @@ namespace PleaseDontDrown.Story
             champ.ServerStopFighting();
             yield return new WaitForSeconds(1.5f);
             yield return Say(champ, "Hrrk... you hit like a kraken. Fine. The gold? In the mountain, behind the falls. Through the jungle, over the river...");
-            yield return Say(champ, "...past old Snapper's pond under the crag falls, then the big falls on the south cliffs. Don't wake the turtle.");
-            StartCoroutine(RemoveLater(champ, 30f));
+            yield return Say(champ, "...to old Snapper's pond under the crag falls. The gold's behind those falls, inside the mountain. Don't wake the turtle.");
+            // He stays in his tavern, nursing his jaw.
         }
 
         // ------------------------------------------------------------------ 3.5 the jungle
@@ -403,24 +434,16 @@ namespace PleaseDontDrown.Story
             Marker("Jungle", start.position + Vector3.up * 2f);
             yield return Reach(start.position, 10f);
             NoMarker();
-            yield return RunStealthMission("The jungle", start.position + Vector3.up * 0.3f, () => JungleBody(bank.position));
+            yield return RunStealthMission("The jungle", start.position + Vector3.up * 0.3f, () => JungleBody(bank.position), () => ResetResidents("I3Jungle"));
         }
 
         private IEnumerator JungleBody(Vector3 bank)
         {
-            int first = _spawnedActors.Count;
+            // Its guards and monkeys live there (Skull Cove's residents); a lost hat comes back with the next try.
             DisguiseEveryone(true);
-            string[] names = { "Mangy Mo", "Long Tom", "Grog" };
-            for (int i = 0; i < 3; i++)
-            {
-                if (Island3Point($"JungleGuard_{i}_0") is { } p0 && Island3Point($"JungleGuard_{i}_1") is { } p1)
-                    SpawnGuard(names[i], i + 1, p0.position, 0f, new[] { p0.position, p1.position });
-                if (Island3Point($"MonkeyHome_{i}") is { } home) SpawnCreature(CreatureKind.Monkey, home.position, 0f, "Monkey");
-            }
             Marker("River", bank + Vector3.up * 1.5f);
             MissionObjective("Reach the river. Keep your hat on: the pirates know a lifeguard's face. A loud shot and you're caught.");
             yield return Reach(bank, 4.5f);
-            CleanupActorsFrom(first);
             NoMarker();
         }
 
@@ -431,18 +454,15 @@ namespace PleaseDontDrown.Story
             EnsureOnIsland3();
             Transform a = Island3Point("RiverBankA"), b = Island3Point("RiverBankB");
             if (a == null || b == null) yield break;
-            yield return RunMission("The river", a.position, () => RiverBody(b.position));
+            yield return RunMission("The river", a.position, () => RiverBody(b.position), () => ResetResidents("I3River"));
         }
 
         private IEnumerator RiverBody(Vector3 far)
         {
-            int first = _spawnedActors.Count;
-            for (int i = 0; i < 2; i++)
-                if (Island3Point($"Gator_{i}") is { } g) SpawnCreature(CreatureKind.Alligator, g.position, Random.Range(0f, 360f), "Alligator");
+            // The alligators live in the river (Skull Cove's residents).
             Marker("Rope swing", far + Vector3.up * 2f);
             MissionObjective("Swing across on the rope (look at it, press E). The river's full of alligators.");
             yield return Reach(far, 4f);
-            CleanupActorsFrom(first);
             NoMarker();
             yield return You("Not today, lizards.");
         }
@@ -456,24 +476,28 @@ namespace PleaseDontDrown.Story
             if (pond == null) yield break;
             SetObjective("Upriver to the crag falls");
             Marker("The falls", pond.position + Vector3.up * 3f);
+            // It has been lying in its pond all along, low in the water like a rock (Skull Cove's residents).
             yield return Reach(pond.position, 22f);
             NoMarker();
             Vector3 start = up != null ? up.position : StoryNpc.NearestPlayer(pond.position, 30f)?.transform.position ?? pond.position;
-            yield return RunMission("Old Snapper", start, () => SnapperBody(pond.position, pond.eulerAngles.y));
+            yield return RunMission("Old Snapper", start, SnapperBody, () => ResetResidents("I3Snapper"));
         }
 
-        private IEnumerator SnapperBody(Vector3 at, float yaw)
+        private IEnumerator SnapperBody()
         {
-            Creature boss = SpawnCreature(CreatureKind.OldSnapper, at, yaw, "Old Snapper");
-            if (boss == null) yield break;
-            TitleObservers("OLD SNAPPER", "Its shell stops bullets. Hit the head when it gasps after a bite.");
+            List<Creature> found = ResidentsOf<Creature>("I3Snapper");
+            if (found.Count == 0) yield break;
+            Creature boss = found[0];
+            boss.ServerWake(); // it rises out of the pond...
+            BossIntroObservers("OLD SNAPPER", "Its shell stops bullets. Hit the head when it gasps after a bite.");
             while (!boss.IsDead)
             {
                 MissionObjective($"Beat Old Snapper (phase {boss.BossPhase}/{boss.BossPhases}). Bullets bounce off the shell: shoot the head when it gasps.");
                 yield return new WaitForSeconds(0.25f);
             }
-            TitleObservers("OLD SNAPPER IS BEATEN", "The way south is clear");
+            TitleObservers("OLD SNAPPER IS BEATEN", "The way into the mountain is clear");
             yield return new WaitForSeconds(3f);
+            ForgetResidents("I3Snapper"); // beaten for good: not back after a reload of this chapter
             StartCoroutine(RemoveLater(boss, 40f));
         }
 

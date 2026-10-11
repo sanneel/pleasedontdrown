@@ -223,10 +223,10 @@ namespace PleaseDontDrown.Story
         }
 
         /// <summary>A mission where any sentry raising the alarm fails it.</summary>
-        private IEnumerator RunStealthMission(string title, Vector3 start, System.Func<IEnumerator> body)
+        private IEnumerator RunStealthMission(string title, Vector3 start, System.Func<IEnumerator> body, System.Action onRetry = null)
         {
             _failOnSpotted = true;
-            try { yield return RunMission(title, start, body); }
+            try { yield return RunMission(title, start, body, onRetry); }
             finally { _failOnSpotted = false; }
         }
 

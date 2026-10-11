@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace PleaseDontDrown.Audio
 {
-    public enum Jingle { Saved, Lost, Chapter }
+    public enum Jingle { Saved, Lost, Chapter, Boss }
 
     /// <summary>
     /// Plays the music on this copy of the game: the calm beach loop (in the menu too), a drum layer that comes in on
@@ -21,7 +21,7 @@ namespace PleaseDontDrown.Audio
 
         private AudioSource _calm, _danger, _jingles;
         private Task<float[]> _calmRender, _dangerRender;
-        private readonly AudioClip[] _jingleClips = new AudioClip[3];
+        private readonly AudioClip[] _jingleClips = new AudioClip[4];
         private bool _playing;
         private float _dangerMix, _nextCheck, _duck;
         private bool _trouble;
@@ -90,7 +90,7 @@ namespace PleaseDontDrown.Audio
             if (Time.unscaledTime >= _nextCheck)
             {
                 _nextCheck = Time.unscaledTime + 0.5f;
-                _trouble = AnyoneInTrouble();
+                _trouble = AnyoneInTrouble() || BossFightOn;
             }
             // In quickly when someone goes under, out slowly once they're safe.
             _dangerMix = Mathf.MoveTowards(_dangerMix, _trouble ? 1f : 0f, dt * (_trouble ? 0.8f : 0.25f));
@@ -99,6 +99,9 @@ namespace PleaseDontDrown.Audio
             _calm.volume = music * CalmLevel * (1f - 0.3f * _dangerMix);
             _danger.volume = music * DangerLevel * _dangerMix;
         }
+
+        /// <summary>A boss fight near you (a boss creature's, or a mission run like one): the drums play all through it.</summary>
+        private static bool BossFightOn => Creatures.Creature.ActiveBoss != null || Story.StoryDirector.BossBarShown;
 
         /// <summary>A tourist in the water who is past "fine", or one lying ashore who still needs CPR.</summary>
         private static bool AnyoneInTrouble()
@@ -122,6 +125,7 @@ namespace PleaseDontDrown.Audio
                 {
                     Jingle.Saved => MusicSynth.RenderSaved(),
                     Jingle.Lost => MusicSynth.RenderLost(),
+                    Jingle.Boss => MusicSynth.RenderBoss(),
                     _ => MusicSynth.RenderChapter()
                 };
                 _jingleClips[i] = AudioClip.Create("Jingle" + jingle, samples.Length, 1, MusicSynth.Rate, false);

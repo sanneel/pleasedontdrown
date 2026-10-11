@@ -55,22 +55,33 @@ namespace PleaseDontDrown.Creatures
                     Hang(body, "Tail", _tail);
                     break;
                 case CreatureKind.OldSnapper:
-                    Hang(body, "Head", _neck != null ? _neck.Find("HeadPivot") : null);
+                {
+                    Transform headPivot = _neck != null ? _neck.Find("HeadPivot") : null;
+                    Hang(body, "Head", headPivot);
                     Hang(body, "Jaw", _jaw);
                     Hang(body, "Tail", _tail);
+                    // The neck's skin is weighted between the body and this bone at the head's hinge: on the head pivot it
+                    // stretches out of the shell with the head (it used to come away from the neck, a gap behind its head).
+                    Transform tip = Find(body, "NeckTip");
+                    if (tip != null && headPivot != null) tip.SetParent(headPivot, true);
                     break;
+                }
                 case CreatureKind.Monkey:
                     Transform spot = Find(body, "HatSpot");
                     if (spot != null && _hat != null) _hat.position = spot.position + Vector3.up * 0.02f;
                     break;
                 case CreatureKind.Kleptopus:
                     // Its own eight tentacles are the idle arms: only the two working (shootable) arms stay drawn.
-                    for (int a = 2; a < (_arms?.Length ?? 0); a++)
-                        foreach (Transform seg in _arms[a]) seg.GetComponent<MeshRenderer>().enabled = false;
-                    // The two working arms: one skin like the model's tentacles (no greybox stripes), slimmer (AnimateArms).
-                    if (_paints.Length > (int)CreaturePaint.Purple)
-                        for (int a = 0; a < Mathf.Min(2, _arms?.Length ?? 0); a++)
-                            foreach (Transform seg in _arms[a]) seg.GetComponent<MeshRenderer>().sharedMaterial = _paints[(int)CreaturePaint.Purple];
+                    // The two working arms are smooth tentacles out of its waist (Creature.Tentacles), slimmer (AnimateArms).
+                    for (int a = 2; a < (_arms?.Length ?? 0); a++) ShowTentacle(a, false);
+                    // Their skin like the model's: a lighter, glossy purple (the greybox paint is flat and dark beside it).
+                    if (_tentacleDrawn != null && (int)CreaturePaint.Purple < _paints.Length)
+                    {
+                        var skin = new Material(_paints[(int)CreaturePaint.Purple]) { name = "KleptopusTentacle" };
+                        skin.SetColor("_BaseColor", new Color(0.52f, 0.3f, 0.66f));
+                        skin.SetFloat("_Smoothness", 0.55f);
+                        for (int a = 0; a < Mathf.Min(2, _tentacleDrawn.Length); a++) _tentacleDrawn[a].sharedMaterial = skin;
+                    }
                     _shadesAt = Find(body, "Eyes");
                     if (_glasses != null && _shadesAt != null)
                     {

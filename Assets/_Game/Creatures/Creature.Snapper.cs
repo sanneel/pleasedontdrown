@@ -31,7 +31,32 @@ namespace PleaseDontDrown.Creatures
         /// <summary>Host: a boss moved to a new phase (the story reacts: a pirate in the water...).</summary>
         public static event System.Action<Creature, int> ServerBossPhase;
 
+        private readonly SyncVar<bool> _dormant = new SyncVar<bool>();
+        private float _sink;
+
         public bool IsBoss => _kind.Value is CreatureKind.OldSnapper or CreatureKind.Kleptopus;
+        /// <summary>Every machine: a boss asleep in its lair (low in the water, no bar, it ignores everyone) until woken.</summary>
+        public bool IsDormant => _dormant.Value;
+
+        /// <summary>Host: sleep in the lair (it lives here before its fight: it doesn't pop up out of nowhere).</summary>
+        [Server]
+        public void ServerSleep()
+        {
+            _dormant.Value = true;
+            _boss?.Close();
+            SetAct(CreatureAct.Idle, 1f);
+        }
+
+        /// <summary>Host: the fight starts: it rises out of the water and comes for them.</summary>
+        [Server]
+        public void ServerWake()
+        {
+            if (!_dormant.Value) return;
+            _dormant.Value = false;
+            _nextSlamAllowed = Time.time + 8f;
+            SetAct(CreatureAct.Idle, 2.5f); // a moment to get out of the water before the first move
+            RoarObservers(null);
+        }
         /// <summary>Every machine: the boss phase (1..) and whether its weak spot is open right now.</summary>
         public int BossPhase => Mathf.Max(1, _bossPhase.Value);
         public int BossPhases => 3;
@@ -45,7 +70,7 @@ namespace PleaseDontDrown.Creatures
                 PlayerHub local = PlayerHub.Local;
                 foreach (Creature c in _all)
                 {
-                    if (c == null || !c.IsBoss || c._maxHealth.Value <= 0) continue;
+                    if (c == null || !c.IsBoss || c._maxHealth.Value <= 0 || c.IsDormant) continue;
                     if (local != null && (local.transform.position - c.transform.position).sqrMagnitude > 80f * 80f) continue;
                     return c;
                 }
@@ -72,6 +97,12 @@ namespace PleaseDontDrown.Creatures
         private void SnapperThink(float dt)
         {
             Vector3 p = transform.position;
+            if (_dormant.Value)
+            {
+                if (Flat(p, _home) > 2f) MoveToward(_home, 1.2f, dt, 40f, water: true);
+                if (_act.Value != CreatureAct.Idle) SetAct(CreatureAct.Idle, 1f);
+                return;
+            }
             bool open = _boss.Vulnerable;
             if (_bossOpen.Value != open) _bossOpen.Value = open;
             if (Time.time >= _nextBossThink)

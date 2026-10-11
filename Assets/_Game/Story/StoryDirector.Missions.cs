@@ -35,6 +35,7 @@ namespace PleaseDontDrown.Story
             MissionRunning = false;
             if (!IsServerInitialized) return;
             _missionTitle.Value = string.Empty;
+            HideBossBar();
             _missionObjective.Value = string.Empty;
             _missionProgress.Value = _missionGoal.Value = 0;
         }
@@ -59,9 +60,10 @@ namespace PleaseDontDrown.Story
 
         /// <summary>
         /// Host: run <paramref name="body"/> as a mission starting at <paramref name="start"/>; failing it restarts it
-        /// until it finishes. The body is stepped here (not as its own coroutine), so a failure stops it mid-line.
+        /// until it finishes (<paramref name="onRetry"/>: put back what lives there before each new try). The body is
+        /// stepped here (not as its own coroutine), so a failure stops it mid-line.
         /// </summary>
-        private IEnumerator RunMission(string title, Vector3 start, Func<IEnumerator> body)
+        private IEnumerator RunMission(string title, Vector3 start, Func<IEnumerator> body, Action onRetry = null)
         {
             MissionRunning = true;
             _missionTitle.Value = title;
@@ -102,6 +104,7 @@ namespace PleaseDontDrown.Story
                 NoMarker();
                 yield return new WaitForSeconds(FailedPause);
                 CleanupActorsFrom(actorsBefore);
+                onRetry?.Invoke(); // the island's own people and animals back where they were, calm again
                 TeleportObservers(start);
                 yield return new WaitForSeconds(0.4f);
                 attempt++;

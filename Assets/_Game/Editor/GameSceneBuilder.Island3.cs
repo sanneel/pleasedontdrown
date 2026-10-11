@@ -417,6 +417,8 @@ namespace PleaseDontDrown.Editor
             taken.AddRange(NightTaken());
             BuildIsland3Jungle(root, taken);
             BuildIsland3Palms(root, taken);
+            SettleIsland3Plants(root, dryRun: false);
+            GroundIsland3Houses(root, dryRun: false);
             var dev = Object.FindFirstObjectByType<DevIsland>();
             if (dev != null) SetRef(dev, "_pirate", arrival);
         }
@@ -879,10 +881,10 @@ namespace PleaseDontDrown.Editor
                     light.shadows = LightShadows.None;
                 }
 
-            // The porch in front of the door is solid at floor height, and the model's steps get a ramp to walk up.
+            // The porch in front of the door is solid (at the model's deck height where it has one), the doorway's cut
+            // strip gets a doorstep, and the model's steps get a ramp to walk up.
             float porchEnd = r.porchZ > 0f ? r.porchZ * scale : bounds.max.z - 0.15f;
-            if (porchEnd - z1 > 0.2f)
-                Collider(house, "Porch", new Vector3(rcx, floor - 0.1f, (z1 + porchEnd) * 0.5f), new Vector3(wx, 0.2f, porchEnd - z1));
+            ShackPorch(house, r, scale, porchEnd);
             Vector3 foot = house.TransformPoint(new Vector3(dx, 0f, porchEnd + 1.2f));
             float ground = BeachHeight(foot.x, foot.z) - house.position.y;
             float rise = floor - ground;
@@ -941,9 +943,31 @@ namespace PleaseDontDrown.Editor
             ConfigureInteractable(root.AddComponent<PleaseDontDrown.Interaction.Interactable>(), new[] { leaf.GetComponent<Collider>() }, outline.ToArray(), 2.8f);
         }
 
+        /// <summary>
+        /// The porch of a walk-in Tripo house. Cutting the doorway took the model's deck out in front of the door (a strip
+        /// the door's width, to 0.8 m out): through it you looked down at the ground under the stilts. A plank doorstep
+        /// at the deck's height closes it, and the porch collider is the deck's height too (feet sank into it).
+        /// </summary>
+        private static void ShackPorch(Transform house, ShackRoom r, float scale, float porchEnd)
+        {
+            float x0 = r.x0 * scale, x1 = r.x1 * scale, z1 = r.z1 * scale, floor = r.floor * scale;
+            float deckTop = floor + r.porchTop * scale, deckEnd = z1 + r.porchDepth * scale;
+            float stepFrom = z1 + r.stepFrom * scale, stepTo = z1 + 0.86f * scale, stepBottom = floor - 0.3f * scale;
+            ResortBox(house, "Doorstep", new Vector3(r.doorX * scale, (deckTop + stepBottom) * 0.5f, (stepFrom + stepTo) * 0.5f),
+                new Vector3(r.doorWidth * scale + 0.04f, deckTop - stepBottom, stepTo - stepFrom), GetMaterial("ShackPlanks", new Color(0.55f, 0.39f, 0.25f)));
+            float rcx = (x0 + x1) * 0.5f, wx = x1 - x0;
+            bool deck = r.porchDepth > 0f;
+            float solidTo = deck ? deckEnd : porchEnd, top = deck ? deckTop : floor;
+            if (solidTo - z1 > 0.2f)
+                Collider(house, "Porch", new Vector3(rcx, top - 0.1f, (z1 + solidTo) * 0.5f), new Vector3(wx, 0.2f, solidTo - z1));
+            if (deck && porchEnd - deckEnd > 0.2f)  // past the deck (the ladder's top) at the room floor's height, as before
+                Collider(house, "PorchFront", new Vector3(rcx, floor - 0.1f, (deckEnd + porchEnd) * 0.5f), new Vector3(wx, 0.2f, porchEnd - deckEnd));
+        }
+
         // The room inside each shack, measured by tripo_prepare_island3.py (shack_rooms.json, Unity frame: front is +z):
-        // x and z extents, floor and ceiling height, on the 6 m wide model.
-        [Serializable] private class ShackRoom { public string name; public float x0, x1, z0, z1, floor, top, doorX, doorWidth, doorHeight, porchZ; }
+        // x and z extents, floor and ceiling height, on the 6 m wide model. Porch (measured on the models): its deck's
+        // height over the room floor and depth from the front wall's inside, and where the doorway's cut strip starts.
+        [Serializable] private class ShackRoom { public string name; public float x0, x1, z0, z1, floor, top, doorX, doorWidth, doorHeight, porchZ, porchTop, porchDepth, stepFrom; }
         [Serializable] private class ShackRoomList { public ShackRoom[] rooms; }
 
         private static ShackRoom TripoShackRoom(string shack) =>
@@ -1909,6 +1933,177 @@ namespace PleaseDontDrown.Editor
                 }
             }
             foreach (Vector2 t in trees) taken.Add(new Vector3(t.x, t.y, 1.2f));
+        }
+
+        /// <summary>
+        /// Island 3's trees, bushes, ferns and palms stood at the island's height formula at their centre: on slopes,
+        /// river banks and rocks their wide roots (a jungle tree's spread 2.4 m) hung in the air. Each now stands on the
+        /// ground mesh itself, as low as the ground 70 % of the way out under its roots (the uphill roots go a little into
+        /// the slope, the trunk doesn't); the ones standing on a rock, or on ground too steep for them, go.
+        /// </summary>
+        private static void SettleIsland3Plants(Transform island, bool dryRun)
+        {
+            var ground = island.Find("Island3Ground").GetComponent<MeshCollider>();
+            int settled = 0, onRock = 0, steep = 0;
+            float sunk = 0f, raised = 0f;
+            Transform[] groups = { island.Find("Jungle"), island.Find("Palms") };
+            // Many rocks (and props) are drawn without a collider: for this check everything drawn gets one for a moment.
+            var temporary = new List<MeshCollider>();
+            foreach (MeshFilter f in island.GetComponentsInChildren<MeshFilter>())
+                if (f.sharedMesh != null && f.gameObject != ground.gameObject && f.GetComponent<Collider>() == null &&
+                    f.TryGetComponent(out Renderer drawn) && drawn.enabled && drawn.bounds.size.y > 0.4f &&
+                    !groups.Any(grp => grp != null && f.transform.IsChildOf(grp)))
+                {
+                    var probe = f.gameObject.AddComponent<MeshCollider>();
+                    probe.sharedMesh = f.sharedMesh;
+                    temporary.Add(probe);
+                }
+            Physics.SyncTransforms();
+            foreach (Transform group in groups)
+            {
+                if (group == null) continue;
+                foreach (Transform plant in group.Cast<Transform>().ToArray())
+                {
+                    // Root spread (metres) and the most the ground may fall away under it.
+                    (float roots, float maxDrop) = plant.name switch
+                    {
+                        "Tripo_jungle_tree" => (2.4f * plant.localScale.x, 1.4f),
+                        "Tripo_jungle_bush" => (1.2f * plant.localScale.x, 0.8f),
+                        "Tripo_jungle_fern" => (0.9f * plant.localScale.x, 0.6f),
+                        "palm_tall_Pivot" => (0.6f, 0.8f),
+                        _ => (0f, 0f)
+                    };
+                    if (roots <= 0f) continue;
+                    Vector3 c = plant.position;
+                    float? GroundAt(Vector3 p) => ground.Raycast(new Ray(new Vector3(p.x, c.y + 60f, p.z), Vector3.down), out RaycastHit hit, 200f) ? hit.point.y : null;
+                    bool RockAt(Vector3 p, float groundY) =>
+                        Physics.RaycastAll(new Ray(new Vector3(p.x, groundY + 30f, p.z), Vector3.down), 30f)
+                            .Any(h => h.collider != ground && !h.collider.isTrigger && !groups.Any(grp => grp != null && h.collider.transform.IsChildOf(grp)) && h.point.y > groundY + 0.3f);
+                    float? centre = GroundAt(c);
+                    if (centre == null) continue;
+                    float low = centre.Value;
+                    int rocky = RockAt(c, centre.Value) ? 3 : 0;
+                    for (int k = 0; k < 8; k++)
+                    {
+                        float a = k * Mathf.PI / 4f;
+                        Vector3 p = c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (roots * 0.7f);
+                        if (GroundAt(p) is not { } g) continue;
+                        low = Mathf.Min(low, g);
+                        if (RockAt(p, g)) rocky++;
+                    }
+                    bool remove = rocky >= 3 || centre.Value - low > maxDrop;
+                    if (remove)
+                    {
+                        if (rocky >= 3) onRock++; else steep++;
+                        if (!dryRun) Object.DestroyImmediate(plant.gameObject);
+                        continue;
+                    }
+                    float y = low - 0.08f;
+                    if (y < c.y) sunk = Mathf.Max(sunk, c.y - y); else raised = Mathf.Max(raised, y - c.y);
+                    if (!dryRun) plant.position = new Vector3(c.x, y, c.z);
+                    settled++;
+                }
+            }
+            foreach (MeshCollider probe in temporary) Object.DestroyImmediate(probe);
+            Debug.Log($"[Island3] plants {(dryRun ? "(dry run) " : "")}on the ground: {settled} (lowered up to {sunk:F2} m, raised up to {raised:F2} m); " +
+                      $"removed: {onRock} on rocks, {steep} on too steep ground");
+        }
+
+        /// <summary>
+        /// The walk-in houses stand where the ground is halfway between its highest and lowest point under them, so on a
+        /// slope the model's stilts and steps on the low side ended in the air. Each leg or step that hangs over the
+        /// ground gets a timber post down to it: looking up from the ground under the model, a leg's end is the lowest
+        /// thing round it and at the model's bottom (beams under the floor are higher).
+        /// </summary>
+        private static void GroundIsland3Houses(Transform island, bool dryRun)
+        {
+            var ground = island.Find("Island3Ground").GetComponent<MeshCollider>();
+            Material wood = GetMaterial("PirateWoodDark", new Color(0.32f, 0.21f, 0.13f));
+            int houses = 0, posts = 0;
+            float worst = 0f;
+            foreach (Transform house in island.GetComponentsInChildren<Transform>()
+                         .Where(t => t.name.StartsWith("PirateHouse_") || t.name == "PirateTavern").ToArray())
+            {
+                Transform model = house.Cast<Transform>().FirstOrDefault(t => t.name.StartsWith("Tripo_pirate_"));
+                if (model == null) continue;
+                foreach (Transform old in house.Cast<Transform>().Where(t => t.name == "StiltPost").ToArray())
+                    Object.DestroyImmediate(old.gameObject);
+                // Looking up from under the ground at the model alone (it has no colliders of its own: probes for now).
+                var probes = new List<MeshCollider>();
+                foreach (MeshFilter f in model.GetComponentsInChildren<MeshFilter>())
+                {
+                    var probe = f.gameObject.AddComponent<MeshCollider>();
+                    probe.sharedMesh = f.sharedMesh;
+                    probes.Add(probe);
+                }
+                Physics.SyncTransforms();
+                Bounds b = TripoBounds(model, house);
+                const float step = 0.25f;
+                int nx = Mathf.CeilToInt(b.size.x / step) + 1, nz = Mathf.CeilToInt(b.size.z / step) + 1;
+                var under = new float[nx, nz];   // the model's underside, house-local height (NaN: nothing above)
+                var floor = new float[nx, nz];   // the ground there, house-local height
+                for (int i = 0; i < nx; i++)
+                    for (int k = 0; k < nz; k++)
+                    {
+                        Vector3 p = house.TransformPoint(new Vector3(b.min.x + i * step, 0f, b.min.z + k * step));
+                        under[i, k] = floor[i, k] = float.NaN;
+                        if (!ground.Raycast(new Ray(p + Vector3.up * 60f, Vector3.down), out RaycastHit g, 200f)) continue;
+                        floor[i, k] = house.InverseTransformPoint(g.point).y;
+                        float best = float.MaxValue;
+                        foreach (MeshCollider probe in probes)
+                            if (probe.Raycast(new Ray(g.point - Vector3.up * 0.4f, Vector3.up), out RaycastHit h, 8f) && h.distance < best)
+                            {
+                                best = h.distance;
+                                under[i, k] = house.InverseTransformPoint(h.point).y;
+                            }
+                    }
+                foreach (MeshCollider probe in probes) Object.DestroyImmediate(probe);
+                // Leg ends: lower than the mean of what's above the ground round them by a good step, and hanging.
+                var feet = new List<(int i, int k)>();
+                for (int i = 0; i < nx; i++)
+                    for (int k = 0; k < nz; k++)
+                    {
+                        float u = under[i, k];
+                        // Its legs and steps all end at the model's bottom (it was made for flat ground); beams under the floor don't.
+                        if (float.IsNaN(u) || u > b.min.y + 0.35f || u - floor[i, k] < 0.15f || u - floor[i, k] > 3.5f) continue;
+                        float lowest = float.MaxValue;
+                        int count = 0;
+                        for (int di = -3; di <= 3; di++)
+                            for (int dk = -3; dk <= 3; dk++)
+                            {
+                                int a = i + di, c = k + dk;
+                                if ((di == 0 && dk == 0) || a < 0 || c < 0 || a >= nx || c >= nz || float.IsNaN(under[a, c])) continue;
+                                count++;
+                                lowest = Mathf.Min(lowest, under[a, c]);
+                            }
+                        if (count >= 4 && u <= lowest + 0.02f) feet.Add((i, k));
+                    }
+                // One post per leg (neighbouring cells of one leg end are one).
+                var done = new HashSet<(int, int)>();
+                foreach ((int i, int k) foot in feet)
+                {
+                    if (done.Contains(foot)) continue;
+                    var leg = new List<(int i, int k)> { foot };
+                    done.Add(foot);
+                    for (int q = 0; q < leg.Count; q++)
+                        foreach ((int i, int k) other in feet)
+                            if (!done.Contains(other) && Mathf.Abs(other.i - leg[q].i) <= 1 && Mathf.Abs(other.k - leg[q].k) <= 1)
+                            {
+                                done.Add(other);
+                                leg.Add(other);
+                            }
+                    float x = b.min.x + (float)leg.Average(c => c.i) * step, z = b.min.z + (float)leg.Average(c => c.k) * step;
+                    float top = leg.Min(c => under[c.i, c.k]) + 0.12f, bottom = leg.Min(c => floor[c.i, c.k]) - 0.3f;
+                    float width = Mathf.Clamp(Mathf.Sqrt(leg.Count) * step, 0.2f, 0.4f);
+                    worst = Mathf.Max(worst, top - 0.12f - (bottom + 0.3f));
+                    posts++;
+                    if (!dryRun)
+                        ResortBox(house, "StiltPost", new Vector3(x, (top + bottom) * 0.5f, z), new Vector3(width, top - bottom, width), wood, false);
+                    Debug.Log($"[Island3]   {house.name}: a post of {top - 0.12f - (bottom + 0.3f):F2} m at ({x:F1}, {z:F1})");
+                }
+                houses++;
+            }
+            Debug.Log($"[Island3] houses on their stilts {(dryRun ? "(dry run) " : "")}: {houses} houses, {posts} posts down to the ground, the longest {worst:F2} m");
         }
 
         private static void BuildIsland3Palms(Transform root, List<Vector3> taken)
