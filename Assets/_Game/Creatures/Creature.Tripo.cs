@@ -72,12 +72,16 @@ namespace PleaseDontDrown.Creatures
                     break;
                 case CreatureKind.Kleptopus:
                     // Its own eight tentacles are the idle arms: only the two working (shootable) arms stay drawn.
-                    for (int a = 2; a < (_arms?.Length ?? 0); a++)
-                        foreach (Transform seg in _arms[a]) seg.GetComponent<MeshRenderer>().enabled = false;
-                    // The two working arms: one skin like the model's tentacles (no greybox stripes), slimmer (AnimateArms).
-                    if (_paints.Length > (int)CreaturePaint.Purple)
-                        for (int a = 0; a < Mathf.Min(2, _arms?.Length ?? 0); a++)
-                            foreach (Transform seg in _arms[a]) seg.GetComponent<MeshRenderer>().sharedMaterial = _paints[(int)CreaturePaint.Purple];
+                    // The two working arms are smooth tentacles out of its waist (Creature.Tentacles), slimmer (AnimateArms).
+                    for (int a = 2; a < (_arms?.Length ?? 0); a++) ShowTentacle(a, false);
+                    // Their skin like the model's: a lighter, glossy purple (the greybox paint is flat and dark beside it).
+                    if (_tentacleDrawn != null && (int)CreaturePaint.Purple < _paints.Length)
+                    {
+                        var skin = new Material(_paints[(int)CreaturePaint.Purple]) { name = "KleptopusTentacle" };
+                        skin.SetColor("_BaseColor", new Color(0.52f, 0.3f, 0.66f));
+                        skin.SetFloat("_Smoothness", 0.55f);
+                        for (int a = 0; a < Mathf.Min(2, _tentacleDrawn.Length); a++) _tentacleDrawn[a].sharedMaterial = skin;
+                    }
                     _shadesAt = Find(body, "Eyes");
                     if (_glasses != null && _shadesAt != null)
                     {

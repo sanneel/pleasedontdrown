@@ -415,6 +415,7 @@ namespace PleaseDontDrown.Editor
             BuildIsland3Story(root, arrival.position, taken); // chapter 3's places (before the trees, which keep clear of them)
             BuildIsland3Jungle(root, taken);
             BuildIsland3Palms(root, taken);
+            SettleIsland3Plants(root, dryRun: false);
             var dev = Object.FindFirstObjectByType<DevIsland>();
             if (dev != null) SetRef(dev, "_pirate", arrival);
         }
@@ -1929,6 +1930,80 @@ namespace PleaseDontDrown.Editor
                 }
             }
             foreach (Vector2 t in trees) taken.Add(new Vector3(t.x, t.y, 1.2f));
+        }
+
+        /// <summary>
+        /// Island 3's trees, bushes, ferns and palms stood at the island's height formula at their centre: on slopes,
+        /// river banks and rocks their wide roots (a jungle tree's spread 2.4 m) hung in the air. Each now stands on the
+        /// ground mesh itself, as low as the ground 70 % of the way out under its roots (the uphill roots go a little into
+        /// the slope, the trunk doesn't); the ones standing on a rock, or on ground too steep for them, go.
+        /// </summary>
+        private static void SettleIsland3Plants(Transform island, bool dryRun)
+        {
+            var ground = island.Find("Island3Ground").GetComponent<MeshCollider>();
+            int settled = 0, onRock = 0, steep = 0;
+            float sunk = 0f, raised = 0f;
+            Transform[] groups = { island.Find("Jungle"), island.Find("Palms") };
+            // Many rocks (and props) are drawn without a collider: for this check everything drawn gets one for a moment.
+            var temporary = new List<MeshCollider>();
+            foreach (MeshFilter f in island.GetComponentsInChildren<MeshFilter>())
+                if (f.sharedMesh != null && f.gameObject != ground.gameObject && f.GetComponent<Collider>() == null &&
+                    f.TryGetComponent(out Renderer drawn) && drawn.enabled && drawn.bounds.size.y > 0.4f &&
+                    !groups.Any(grp => grp != null && f.transform.IsChildOf(grp)))
+                {
+                    var probe = f.gameObject.AddComponent<MeshCollider>();
+                    probe.sharedMesh = f.sharedMesh;
+                    temporary.Add(probe);
+                }
+            Physics.SyncTransforms();
+            foreach (Transform group in groups)
+            {
+                if (group == null) continue;
+                foreach (Transform plant in group.Cast<Transform>().ToArray())
+                {
+                    // Root spread (metres) and the most the ground may fall away under it.
+                    (float roots, float maxDrop) = plant.name switch
+                    {
+                        "Tripo_jungle_tree" => (2.4f * plant.localScale.x, 1.4f),
+                        "Tripo_jungle_bush" => (1.2f * plant.localScale.x, 0.8f),
+                        "Tripo_jungle_fern" => (0.9f * plant.localScale.x, 0.6f),
+                        "palm_tall_Pivot" => (0.6f, 0.8f),
+                        _ => (0f, 0f)
+                    };
+                    if (roots <= 0f) continue;
+                    Vector3 c = plant.position;
+                    float? GroundAt(Vector3 p) => ground.Raycast(new Ray(new Vector3(p.x, c.y + 60f, p.z), Vector3.down), out RaycastHit hit, 200f) ? hit.point.y : null;
+                    bool RockAt(Vector3 p, float groundY) =>
+                        Physics.RaycastAll(new Ray(new Vector3(p.x, groundY + 30f, p.z), Vector3.down), 30f)
+                            .Any(h => h.collider != ground && !h.collider.isTrigger && !groups.Any(grp => grp != null && h.collider.transform.IsChildOf(grp)) && h.point.y > groundY + 0.3f);
+                    float? centre = GroundAt(c);
+                    if (centre == null) continue;
+                    float low = centre.Value;
+                    int rocky = RockAt(c, centre.Value) ? 3 : 0;
+                    for (int k = 0; k < 8; k++)
+                    {
+                        float a = k * Mathf.PI / 4f;
+                        Vector3 p = c + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (roots * 0.7f);
+                        if (GroundAt(p) is not { } g) continue;
+                        low = Mathf.Min(low, g);
+                        if (RockAt(p, g)) rocky++;
+                    }
+                    bool remove = rocky >= 3 || centre.Value - low > maxDrop;
+                    if (remove)
+                    {
+                        if (rocky >= 3) onRock++; else steep++;
+                        if (!dryRun) Object.DestroyImmediate(plant.gameObject);
+                        continue;
+                    }
+                    float y = low - 0.08f;
+                    if (y < c.y) sunk = Mathf.Max(sunk, c.y - y); else raised = Mathf.Max(raised, y - c.y);
+                    if (!dryRun) plant.position = new Vector3(c.x, y, c.z);
+                    settled++;
+                }
+            }
+            foreach (MeshCollider probe in temporary) Object.DestroyImmediate(probe);
+            Debug.Log($"[Island3] plants {(dryRun ? "(dry run) " : "")}on the ground: {settled} (lowered up to {sunk:F2} m, raised up to {raised:F2} m); " +
+                      $"removed: {onRock} on rocks, {steep} on too steep ground");
         }
 
         private static void BuildIsland3Palms(Transform root, List<Vector3> taken)

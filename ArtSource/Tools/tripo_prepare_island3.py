@@ -158,9 +158,11 @@ MODELS = {
     "castle_gatehouse": dict(turn=-90, fit=("x", 24.0)),
     # The keep is a shell over the game's walk-in hall (16 x 14 m, 12 m high; the model's walls stand at ~60% of its
     # half-size): open its front door, and clear out
-    # everything inside the hall (its other doors' recesses) so only the outer walls are left round the hall.
+    # everything inside the hall (its other doors' recesses) so only the outer walls are left round the hall. The front
+    # steps go too, their side walls included (the front wall stands at y -8; one stood out into the yard as a fin).
     "castle_keep": dict(turn=-90, size=(30.0, 24.0, 26.0),
-                        cut=lambda x, y, z: (abs(x) < 2.4 and z < 6.4 and y < -6.0) or (abs(x) < 7.9 and abs(y) < 6.6 and z < 12.5)),
+                        cut=lambda x, y, z: (abs(x) < 2.4 and z < 6.4 and y < -6.0) or (abs(x) < 3.6 and z < 6.4 and y < -8.6)
+                        or (abs(x) < 7.9 and abs(y) < 6.6 and z < 12.5)),
     # Long and low like the source (it is ~4.5x longer than tall): 30 m pieces keep the stonework's proportions.
     "castle_wall": dict(turn=90, size=(30.0, 3.0, 10.5)),
     "pirate_throne": dict(turn=-90, fit=("z", 3.3)),

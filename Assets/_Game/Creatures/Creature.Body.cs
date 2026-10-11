@@ -225,6 +225,7 @@ namespace PleaseDontDrown.Creatures
                 }
                 _armTips[a] = transform.TransformPoint(_armRoots[a] * 2f + Vector3.up);
             }
+            BuildTentacles();
             _gun = Part(transform, PrimitiveType.Cube, "StolenPistol", Vector3.zero, new Vector3(0.12f, 0.2f, 0.4f), CreaturePaint.HatBlack);
             _gun.gameObject.SetActive(false);
         }
@@ -264,23 +265,26 @@ namespace PleaseDontDrown.Creatures
                 ArmState state = a < 2 ? Arm(a) : ArmState.Idle;
                 float speed = state == ArmState.Reach ? 16f : state == ArmState.Drag ? 30f : 8f;
                 _armTips[a] = Vector3.MoveTowards(_armTips[a], want, speed * dt);
-                Vector3 root = transform.TransformPoint(_armRoots[a]);
+                Vector3 root = ArmRoot(a);
                 Vector3 tip = _armTips[a];
-                // A soft arch from root to tip, higher for a long reach.
-                Vector3 mid = (root + tip) * 0.5f + Vector3.up * Mathf.Clamp(Vector3.Distance(root, tip) * 0.25f, 0.5f, 3f);
+                Vector3 outward = root - transform.position;
+                outward.y = 0f;
+                outward = outward.sqrMagnitude > 0.01f ? outward.normalized : transform.forward;
+                // Out of the body, arching up over to the tip; the (hidden) segments carry the hit zones along it.
                 Vector3 prev = root;
+                float rootThick = 0.75f * (_tripo ? 0.7f : 1f); // slimmer, like the model's tentacles (still easy to shoot)
                 for (int s = 0; s < ArmSegments; s++)
                 {
-                    float k = (s + 1) / (float)ArmSegments;
-                    Vector3 p = (1f - k) * (1f - k) * root + 2f * (1f - k) * k * mid + k * k * tip;
+                    Vector3 p = ArmCurve(root, outward, tip, (s + 1) / (float)ArmSegments);
                     Transform seg = _arms[a][s];
                     Vector3 d = p - prev;
                     float length = Mathf.Max(0.05f, d.magnitude);
-                    float thick = Mathf.Lerp(0.75f, 0.25f, s / (float)(ArmSegments - 1)) * (_tripo ? 0.7f : 1f); // slimmer, like the model's (still easy to shoot)
+                    float thick = rootThick * Mathf.Lerp(1f, 0.33f, s / (float)(ArmSegments - 1));
                     seg.SetPositionAndRotation((p + prev) * 0.5f, Quaternion.FromToRotation(Vector3.up, d.sqrMagnitude > 1e-6f ? d / length : Vector3.up));
                     seg.localScale = new Vector3(thick, length * 0.5f + thick * 0.3f, thick);
                     prev = p;
                 }
+                DrawTentacle(a, root, outward, tip, rootThick);
             }
             if (_gun != null)
             {

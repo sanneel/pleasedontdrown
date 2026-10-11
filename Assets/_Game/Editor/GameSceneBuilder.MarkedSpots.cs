@@ -43,6 +43,27 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        /// <summary>Batch: island 3's trees, bushes and palms onto the ground (SettleIsland3Plants), navigation baked again.
+        /// -pdd-dry only reports what it would do.</summary>
+        public static void SettleIsland3PlantsBatch()
+        {
+            try
+            {
+                bool dry = Array.IndexOf(Environment.GetCommandLineArgs(), "-pdd-dry") >= 0;
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                SettleIsland3Plants(GameObject.Find("Environment/Island3").transform, dry);
+                if (dry) return;
+                BakeNavMeshes(only: "Island3");
+                EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+                EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Island3] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         private static void RefreshCleanHotel()
         {
             LODGroup tower = Object.FindObjectsByType<LODGroup>(FindObjectsSortMode.None).Single(g => g.name == "CentralTower");
