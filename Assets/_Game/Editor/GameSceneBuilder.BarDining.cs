@@ -27,7 +27,7 @@ namespace PleaseDontDrown.Editor
         // Armchairs measured from the bar model (side render of the LOD2 GLB, bar space): x = +/-10.36, two per table.
         // Each faces its table: (chair z, table z).
         private static readonly (float chair, float table)[] BarTableChairs = { (2.47f, 4.02f), (5.58f, 4.02f), (-4.55f, -3.12f), (-1.7f, -3.12f) };
-        private const float BarTableX = 10.36f, ArmchairSeat = 0.95f, BarTableTop = 0.74f;
+        private const float BarTableX = 10.36f, ArmchairSeat = 0.84f, BarTableTop = 0.74f;
 
         /// <summary>What the hotel bar sells (item, label, price).</summary>
         private static readonly (string item, string label, int price)[] HotelBarMenu =
@@ -141,7 +141,7 @@ namespace PleaseDontDrown.Editor
             box.size = new Vector3(1.5f, 0.78f, 1.35f);
             var seat = new GameObject("Seat").transform;
             seat.SetParent(go.transform, false);
-            seat.localPosition = new Vector3(0f, ArmchairSeat, 0.08f); // on the front of the cushion, toward the table (deep in it, the big armchair swallowed the body)
+            seat.localPosition = new Vector3(0f, ArmchairSeat, -0.08f); // the cushion top, back against the backrest (the hips sit right on it: AvatarMotion.ChairSeat)
             var serve = new GameObject("ServePoint").transform;
             serve.SetParent(bar, false);
             serve.localPosition = serveLocal;
