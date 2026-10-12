@@ -29,14 +29,14 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | A3 | Cannon: the one inside is hidden in the barrel; a loaded cannon only turns and aims, doesn't roll about | **done** |
 | A4 | Throwing a carried lifeguard works exactly like throwing a tourist (hold Drop, same speed, real flight) | **done** |
 | A5 | Defibrillator: a paddle in each hand, kneel, paddles on the chest, the shock | **done** (side view still to check) |
-| A6 | Bar: fix the orders | open |
-| A7 | Casino working (blackjack side quest) | open |
-| A8 | Octagon (tavern cage fight): its own punches | open |
-| A9 | Golf cart driving (needs C's model; can start on a greybox) | open |
-| A10 | More local pirates walking the village | open |
-| A11 | Island 3 story: the sewer behind the back waterfall → the palace → beat the Pirate King → he says where to go | open |
-| A12 | Character poses: feet in the ground, sitting, lying; nobody inside anybody (people and animals) | open |
-| A13 | On-screen text: a cleaner design for what's left | open |
+| A6 | Bar: a real menu card (mouse or number keys), khinkali, the tables' armchairs as seats, the order into your hand, eating seated | **done** |
+| A7 | Casino working (blackjack side quest) | **done** (`Fun/BlackjackTable.cs`) |
+| A8 | Octagon (tavern cage fight): its own punches | **done**: LMB jab, RMB hook, crouch+LMB uppercut, jab-jab-hook combo |
+| A9 | Golf cart driving (needs C's model; can start on a greybox) | **done** on a greybox (`Vehicle._land`), C's Tripo model to drop in |
+| A10 | More local pirates walking the village | **done**: tavern regulars, the village drunk |
+| A11 | Island 3 story: the sewer behind the back waterfall → the palace → beat the Pirate King → he says where to go | **done** (beat 3.7b), waits for C's `SewerEntrance` / `PalaceThrone` points |
+| A12 | Character poses: feet in the ground, sitting, lying; nobody inside anybody (people and animals) | **done**: lying arms, chair/stool sitting, CPR at the side, towels in decks skipped, only GLB characters; NpcWatch clean on all islands |
+| A13 | On-screen text: a cleaner design for what's left | **done**: messages on dark pills, no timers |
 
 ### B: islands 1 and 2, scene work
 | # | Task | Status |
@@ -74,6 +74,11 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | C12 | Tripo: custom characters for island 2 | open |
 
 Island 3 always night, mountain dock, sleepers: see `Docs/16`.
+
+## After merging part A's branch (`sancho-dev`)
+Part A's scene changes are made by a script, so they survive anyone's scene: after merging, keep the other person's
+`Game.unity` and run **PLEASE DON'T DROWN → Part A: scene additions (bar tables, khinkali, blackjack)** once (it also
+places the golf cart), then save.
 
 ## Notes on what's done (part A, 2026-10-12)
 - Text: `Fun/TrickShots.cs` only logs now; the pop-up words are gone from about 15 files; damage numbers, money,
