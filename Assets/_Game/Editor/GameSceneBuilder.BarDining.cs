@@ -33,7 +33,7 @@ namespace PleaseDontDrown.Editor
         private static readonly (string item, string label, int price)[] HotelBarMenu =
             { ("Fries", "Fries", 3), ("Cola", "Cola", 2), ("Beer", "Beer", 4), ("Cocktail", "Cocktail", 8), ("Khinkali", "Khinkali", 6) };
 
-        [MenuItem("PLEASE DON'T DROWN/Hotel bar: tables and khinkali")]
+        [MenuItem("PLEASE DON'T DROWN/Part A: scene additions (bar tables, khinkali, blackjack)")]
         public static void BuildBarDining()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Stop Play first.");
@@ -66,14 +66,32 @@ namespace PleaseDontDrown.Editor
 
             List<Object> seats = AddBarTables(bar, hotel, barista);
             SetHotelBarMenu(barista);
-            AssignSceneIds(scene); // the new seats are networked scene objects
+            AddBlackjackGame();
+            AssignSceneIds(scene); // the new seats and the card table are networked scene objects
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            Debug.Log($"[BarDining] PASS: {seats.Count} table seats, menu of {HotelBarMenu.Length} (khinkali in)");
+            Debug.Log($"[BarDining] PASS: {seats.Count} table seats, menu of {HotelBarMenu.Length} (khinkali in), blackjack table playable");
         }
 
         /// <summary>Batch: the same.</summary>
         public static void BuildBarDiningBatch() => BuildBarDining();
+
+        /// <summary>The casino's blackjack table plays (Fun.BlackjackTable): looking at its collision box opens the cards.</summary>
+        private static void AddBlackjackGame()
+        {
+            Collider table = Object.FindObjectsByType<BoxCollider>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .FirstOrDefault(c => c.name == "BlackjackCollider");
+            if (table == null) throw new InvalidOperationException("No BlackjackCollider in the scene (the hotel casino).");
+            Transform old = table.transform.parent.Find("BlackjackGame");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            var go = new GameObject("BlackjackGame");
+            go.transform.SetParent(table.transform.parent, false);
+            go.transform.SetPositionAndRotation(table.transform.position, table.transform.rotation);
+            go.AddComponent<NetworkObject>();
+            go.AddComponent<BlackjackTable>();
+            ConfigureInteractable(go.AddComponent<Interactable>(), new[] { table }, new Renderer[0], 4f);
+            Debug.Log($"[BarDining] blackjack table at {table.bounds.center:F1}, size {table.bounds.size:F1}");
+        }
 
         private static Item BuildKhinkali()
         {
