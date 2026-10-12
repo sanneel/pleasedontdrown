@@ -2220,7 +2220,8 @@ namespace PleaseDontDrown.Editor
                 throw new InvalidOperationException("Cave mouth blocked by " + (hit.collider != null ? hit.collider.name : "nothing (no back wall)"));
             // Gate and keep door line up: straight in from the road to the throne.
             from = new Vector3(CastleCenter.x, Island3CliffTop + 1.5f, CastleCenter.y + 32f);
-            if (!Physics.Raycast(from, Vector3.back, out hit, 80f, ~0, QueryTriggerInteraction.Ignore) || hit.point.z > CastleCenter.y - 8f)
+            // (The gate may be shut on purpose: Docs/18 C5, GameSceneBuilder.TeamB.)
+            if (!Physics.Raycast(from, Vector3.back, out hit, 80f, ~0, QueryTriggerInteraction.Ignore) || hit.point.z > CastleCenter.y - 8f && hit.collider.name != "GateShut")
                 throw new InvalidOperationException("Castle gate or keep door blocked by " + (hit.collider != null ? hit.collider.name : "nothing"));
 
             // Walkable: from the dock to the village, the castle yard and the throne room.

@@ -753,6 +753,67 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[TeamB] PASS: C4 falls lip fan {narrow:0.0} -> {wide:0.0} m over {length:0.0} m");
         }
 
+        /// <summary>Batch: C5, the palace (the Pirate King's castle): the gate shut (two iron-banded doors across the arch
+        /// and a solid blocker: nobody walks in), and the sewer's way out in the castle yard: a stone drain with an iron
+        /// grate on a hinge (SewerGrateHinge, for A11 to swing open) and the point SewerExit where you climb out.</summary>
+        public static void TeamCPalaceBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform castle = FindByPath("Environment/Island3/PirateCastle") ?? throw new InvalidOperationException("No castle");
+            foreach (string old in new[] { "GateShut", "SewerExitDrain" })
+                if (castle.Find(old) is { } t) Object.DestroyImmediate(t.gameObject);
+            const float Z = 20f, G = 0.3f; // the castle's frame (GameSceneBuilder.Island3: gate on the north wall line)
+            Material wood = GetMaterial("PirateWoodDark", new Color(0.32f, 0.21f, 0.13f));
+            Material iron = GetMaterial("GateIron", new Color(0.12f, 0.12f, 0.13f), 0.6f, 0.35f);
+            Material stoneDark = GetMaterial("SewerStone", new Color(0.36f, 0.35f, 0.33f), smoothness: 0.15f);
+            Material black = GetMaterial("SewerDark", new Color(0.02f, 0.02f, 0.02f));
+
+            // The gate: shut, in the arch's outer half.
+            var gate = new GameObject("GateShut").transform;
+            gate.SetParent(castle, false);
+            gate.localPosition = new Vector3(0f, G, Z + 2.8f);
+            const float width = 3.9f, height = 6.6f;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                float cx = side * width * 0.25f;
+                for (int p = 0; p < 4; p++) // vertical planks
+                    Primitive(PrimitiveType.Cube, "Plank", gate, new Vector3(cx - width * 0.25f + (p + 0.5f) * width / 8f, height * 0.5f, 0f),
+                        new Vector3(width / 8f - 0.03f, height, 0.22f), wood, keepCollider: false);
+                foreach (float y in new[] { 1.1f, 3.3f, 5.5f }) // iron bands and studs
+                    Primitive(PrimitiveType.Cube, "Band", gate, new Vector3(cx, y, 0.13f), new Vector3(width * 0.5f - 0.08f, 0.16f, 0.04f), iron, keepCollider: false);
+                Primitive(PrimitiveType.Cylinder, "RingHandle", gate, new Vector3(side * 0.35f, 2.6f, 0.2f), new Vector3(0.36f, 0.02f, 0.36f), iron, keepCollider: false)
+                    .transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            }
+            Primitive(PrimitiveType.Cube, "Bar", gate, new Vector3(0f, 2.9f, -0.2f), new Vector3(width - 0.2f, 0.25f, 0.2f), wood, keepCollider: false); // barred from inside
+            var blocker = gate.gameObject.AddComponent<BoxCollider>();
+            blocker.center = new Vector3(0f, height * 0.5f + 1f, 0f);
+            blocker.size = new Vector3(width + 0.6f, height + 2f, 0.8f);
+
+            // The sewer's way out: a round stone drain in the yard's west half, an iron grate over it.
+            var drain = new GameObject("SewerExitDrain").transform;
+            drain.SetParent(castle, false);
+            drain.localPosition = new Vector3(-21f, G, 4f);
+            Primitive(PrimitiveType.Cylinder, "Kerb", drain, new Vector3(0f, 0.12f, 0f), new Vector3(2.2f, 0.12f, 2.2f), stoneDark);
+            Primitive(PrimitiveType.Cylinder, "Shaft", drain, new Vector3(0f, 0.245f, 0f), new Vector3(1.6f, 0.005f, 1.6f), black, keepCollider: false);
+            var hinge = new GameObject("SewerGrateHinge").transform;
+            hinge.SetParent(drain, false);
+            hinge.localPosition = new Vector3(-0.8f, 0.27f, 0f); // swings up on its west edge
+            for (int i = -3; i <= 3; i++)
+                Primitive(PrimitiveType.Cube, "GrateBar", hinge, new Vector3(0.8f, 0.02f, i * 0.22f), new Vector3(1.7f, 0.05f, 0.06f), iron, keepCollider: false);
+            foreach (float x in new[] { 0.35f, 0.8f, 1.25f })
+                Primitive(PrimitiveType.Cube, "GrateRib", hinge, new Vector3(x, 0.03f, 0f), new Vector3(0.06f, 0.05f, 1.6f), iron, keepCollider: false);
+            var exit = new GameObject("SewerExit").transform;
+            exit.SetParent(drain, false);
+            exit.localPosition = new Vector3(1.6f, 0.3f, 0f);
+            exit.localRotation = Quaternion.Euler(0f, 90f, 0f);
+
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island3");
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[TeamB] PASS: C5 gate shut at {gate.position}, sewer exit at {exit.position}");
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
