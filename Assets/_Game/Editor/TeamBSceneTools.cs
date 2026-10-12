@@ -171,6 +171,119 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        /// <summary>Side rays (-x and +x) and an up ray from points along z at x = PDD_X, y = PDD_Y, z from PDD_Z0 to
+        /// PDD_Z1 in 0.25 m steps: what the doorway's sides are made of, to PDD_DUMP.</summary>
+        public static void DoorwayProbe()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Physics.SyncTransforms();
+            float F(string n) => float.Parse(System.Environment.GetEnvironmentVariable(n), System.Globalization.CultureInfo.InvariantCulture);
+            float x = F("PDD_X"), y = F("PDD_Y"), z0 = F("PDD_Z0"), z1 = F("PDD_Z1");
+            // Renderers get temporary mesh colliders so drawn-only pieces show up too.
+            var temp = new System.Collections.Generic.List<Collider>();
+            foreach (MeshFilter mf in Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
+                if (mf.sharedMesh != null && mf.GetComponent<Collider>() == null && Vector3.Distance(mf.GetComponent<Renderer>().bounds.center, new Vector3(x, y, (z0 + z1) / 2)) < 60f)
+                {
+                    var c = mf.gameObject.AddComponent<MeshCollider>(); c.sharedMesh = mf.sharedMesh; temp.Add(c);
+                }
+            Physics.SyncTransforms();
+            var sb = new StringBuilder();
+            string Path(Transform t) => t.parent == null ? t.name : Path(t.parent) + "/" + t.name;
+            for (float z = z0; z <= z1 + 0.001f; z += 0.25f)
+            {
+                var o = new Vector3(x, y, z);
+                sb.Append($"z {z:0.00}:");
+                foreach (Vector3 d in new[] { Vector3.left, Vector3.right, Vector3.up })
+                {
+                    var hits = Physics.RaycastAll(o, d, 6f, ~0, QueryTriggerInteraction.Ignore).OrderBy(h => h.distance).Take(2);
+                    sb.Append($"  {(d == Vector3.left ? "-x" : d == Vector3.right ? "+x" : "up")}: ");
+                    foreach (var h in hits) sb.Append($"{h.distance:0.00} {Path(h.collider.transform).Replace("Environment/Hotel/", "")}{(temp.Contains(h.collider) ? "(drawn)" : "")}; ");
+                }
+                sb.Append('\n');
+            }
+            foreach (Collider c in temp) Object.DestroyImmediate(c);
+            File.WriteAllText(System.Environment.GetEnvironmentVariable("PDD_DUMP"), sb.ToString());
+        }
+
+        /// <summary>Seams in a wall: rays toward -z from z = PDD_Z (outside) at x from PDD_X0 to PDD_X1 (2 cm steps),
+        /// heights PDD_YS (space separated); where a ray goes much deeper than its neighbours, a crack. To PDD_DUMP.</summary>
+        public static void SeamProbe()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            float F(string n) => float.Parse(System.Environment.GetEnvironmentVariable(n), System.Globalization.CultureInfo.InvariantCulture);
+            float z = F("PDD_Z"), x0 = F("PDD_X0"), x1 = F("PDD_X1");
+            string axis = System.Environment.GetEnvironmentVariable("PDD_AXIS") ?? "z-"; // the ray: z- (scan along x), x+ or x- (scan along z)
+            Vector3 Origin(float a, float y) => axis == "z-" ? new Vector3(a, y, z) : new Vector3(z, y, a);
+            Vector3 dirRay = axis == "z-" ? Vector3.back : axis == "x+" ? Vector3.right : Vector3.left;
+            float[] ys = System.Environment.GetEnvironmentVariable("PDD_YS").Split(' ').Select(s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            var temp = new System.Collections.Generic.List<Collider>();
+            foreach (MeshFilter mf in Object.FindObjectsByType<MeshFilter>(FindObjectsSortMode.None))
+                if (mf.sharedMesh != null && mf.GetComponent<Collider>() == null && mf.GetComponent<Renderer>() is { enabled: true } r &&
+                    r.bounds.Intersects(axis == "z-" ? new Bounds(new Vector3((x0 + x1) / 2, 25f, z - 5f), new Vector3(x1 - x0, 60f, 40f)) : new Bounds(new Vector3(z + (axis == "x+" ? 5f : -5f), 25f, (x0 + x1) / 2), new Vector3(40f, 60f, x1 - x0))))
+                { var c = mf.gameObject.AddComponent<MeshCollider>(); c.sharedMesh = mf.sharedMesh; temp.Add(c); }
+            Physics.SyncTransforms();
+            var sb = new StringBuilder();
+            foreach (float y in ys)
+            {
+                float? prev = null;
+                for (float x = x0; x <= x1; x += 0.02f)
+                {
+                    float d = Physics.Raycast(Origin(x, y), dirRay, out RaycastHit h, 40f, ~0, QueryTriggerInteraction.Ignore) ? h.distance : 40f;
+                    if (prev.HasValue && d - prev.Value > 0.08f)
+                    {
+                        // A jump deeper: how wide is the crack?
+                        float xe = x;
+                        while (xe < x1 && (Physics.Raycast(Origin(xe, y), dirRay, out h, 40f, ~0, QueryTriggerInteraction.Ignore) ? h.distance : 40f) - prev.Value > 0.08f) xe += 0.01f;
+                        if (xe - x < 0.4f) sb.Append($"y {y:0.0}: crack at {x:0.00}..{xe:0.00} (wall {prev.Value:0.00} m in, crack goes {d - prev.Value:0.00} deeper)\n");
+                    }
+                    prev = d;
+                }
+            }
+            foreach (Collider c in temp) Object.DestroyImmediate(c);
+            File.WriteAllText(System.Environment.GetEnvironmentVariable("PDD_DUMP"), sb.ToString());
+        }
+
+        /// <summary>Where the hotel's railing triangles are (materials "white"/"gold" of the hotel's LOD0 meshes) inside
+        /// the world box PDD_BOX ("minx maxx miny maxy minz maxz"): a 1 m histogram along x and z, to PDD_DUMP.</summary>
+        public static void HotelRailProbe()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            float[] b = System.Environment.GetEnvironmentVariable("PDD_BOX").Split(' ').Select(s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            var sb = new StringBuilder();
+            var hotel = GameObject.Find("Environment/Hotel/ResortExterior");
+            foreach (MeshRenderer r in hotel.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                var mf = r.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                Mesh m = mf.sharedMesh;
+                Vector3[] v = m.vertices;
+                var xs = new System.Collections.Generic.SortedDictionary<int, int>();
+                var zs = new System.Collections.Generic.SortedDictionary<int, int>();
+                var ys = new System.Collections.Generic.SortedDictionary<int, int>();
+                int count = 0;
+                for (int s = 0; s < m.subMeshCount && s < r.sharedMaterials.Length; s++)
+                {
+                    string mat = r.sharedMaterials[s] != null ? r.sharedMaterials[s].name : "";
+                    if (!mat.Contains("white") && !mat.Contains("gold")) continue;
+                    int[] t = m.GetTriangles(s);
+                    for (int i = 0; i < t.Length; i += 3)
+                    {
+                        Vector3 c = r.transform.TransformPoint((v[t[i]] + v[t[i + 1]] + v[t[i + 2]]) / 3f);
+                        if (c.x < b[0] || c.x > b[1] || c.y < b[2] || c.y > b[3] || c.z < b[4] || c.z > b[5]) continue;
+                        count++;
+                        float g = float.TryParse(System.Environment.GetEnvironmentVariable("PDD_GRID"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float gg) ? gg : 1f;
+                        int kx = Mathf.FloorToInt(c.x / g), kz = Mathf.FloorToInt(c.z), ky = Mathf.FloorToInt(c.y * 4f);
+                        xs[kx] = xs.TryGetValue(kx, out int a) ? a + 1 : 1;
+                        zs[kz] = zs.TryGetValue(kz, out a) ? a + 1 : 1;
+                        ys[ky] = ys.TryGetValue(ky, out a) ? a + 1 : 1;
+                    }
+                }
+                if (count == 0) continue;
+                sb.Append($"{r.name} ({m.name}, {m.subMeshCount} submeshes): {count} rail triangles\n  x: {string.Join(" ", xs.Select(p => $"{p.Key * (float.TryParse(System.Environment.GetEnvironmentVariable("PDD_GRID"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float g2) ? g2 : 1f):0.0}:{p.Value}"))}\n  z: {string.Join(" ", zs.Select(p => $"{p.Key}:{p.Value}"))}\n  y/4: {string.Join(" ", ys.Select(p => $"{p.Key / 4f:0.00}:{p.Value}"))}\n");
+            }
+            File.WriteAllText(System.Environment.GetEnvironmentVariable("PDD_DUMP"), sb.ToString());
+        }
+
         private static void Dump(Transform t, string parent, StringBuilder sb)
         {
             string path = parent.Length == 0 ? t.name : parent + "/" + t.name;

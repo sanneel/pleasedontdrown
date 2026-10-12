@@ -151,6 +151,141 @@ namespace PleaseDontDrown.Editor
             Debug.Log("[TeamB] PASS: towels on the sand\n" + string.Join("\n", log));
         }
 
+        // ---------------------------------------------------------------- hotel touch-ups (Shako's screenshots, 2026-10-12)
+
+        /// <summary>Batch: the hotel's touch-ups from Shako's screenshots, as additions to the scene (the hotel model is
+        /// fragile; its GLBs stay as they are): (1) the entrance doorway's sides and head lined in one piece (the lobby
+        /// wall and the facade were two thin walls with an open slot between them); (2) a plaster strip over each open
+        /// seam in the facade (front, west and east faces); (3) the base storey roof's railing on the east and west
+        /// sides cut back to the two corner balconies (the details meshes are copied without those triangles).</summary>
+        public static void TeamBHotelTouchUpsBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform hotel = FindByPath("Environment/Hotel") ?? throw new InvalidOperationException("No hotel");
+            if (hotel.Find("TouchUps") is { } old) Object.DestroyImmediate(old.gameObject);
+            var root = new GameObject("TouchUps").transform;
+            root.SetParent(hotel, false);
+            root.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            var log = new List<string>();
+            Material lobbyWall = hotel.Find("WallFrontL").GetComponent<MeshRenderer>().sharedMaterial;
+            Material facadeWall = AssetDatabase.LoadAssetAtPath<Material>($"{MaterialDir}/HotelReal_wall.mat") ?? lobbyWall;
+            GameObject Box(string n, Vector3 min, Vector3 max, Material m, bool solid = true)
+            {
+                GameObject go = Primitive(PrimitiveType.Cube, n, root, (min + max) * 0.5f, max - min, m, solid);
+                go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                return go;
+            }
+
+            // (1) The doorway: 2.6 m wide round x 20, from the lobby wall (z -245.1) out through the facade (z -244.1).
+            Bounds lintel = hotel.Find("Lintel").GetComponent<Renderer>().bounds;
+            Bounds wallL = hotel.Find("WallFrontL").GetComponent<Renderer>().bounds;
+            float doorL = wallL.max.x, doorR = hotel.Find("WallFrontR").GetComponent<Renderer>().bounds.min.x;
+            float floorY = hotel.Find("Floor").GetComponent<Renderer>().bounds.max.y, head = lintel.min.y;
+            const float zIn = -245.15f, zOut = -243.85f;
+            doorL += 0.03f; doorR -= 0.03f; // the linings stand 3 cm proud of both walls' edges: no sliver between them
+            Box("DoorJambL", new Vector3(doorL - 0.45f, floorY, zIn), new Vector3(doorL, head, zOut), lobbyWall);
+            Box("DoorJambR", new Vector3(doorR, floorY, zIn), new Vector3(doorR + 0.45f, head, zOut), lobbyWall);
+            Box("DoorHead", new Vector3(doorL - 0.45f, head, zIn), new Vector3(doorR + 0.45f, head + 0.65f, zOut), lobbyWall);
+            log.Add($"doorway lined: x {doorL:0.00}..{doorR:0.00}, floor {floorY:0.00}, head {head:0.00}");
+
+            // (2) Seams: (ray direction, wall line, crack middle along the wall).
+            Physics.SyncTransforms();
+            var probes = new List<Collider>();
+            foreach (MeshFilter mf in hotel.GetComponentsInChildren<MeshFilter>())
+                if (mf.sharedMesh != null && mf.GetComponent<Collider>() == null && mf.GetComponent<Renderer>() is { enabled: true })
+                { var c = mf.gameObject.AddComponent<MeshCollider>(); c.sharedMesh = mf.sharedMesh; probes.Add(c); }
+            Physics.SyncTransforms();
+            foreach ((string face, Vector3 dir, float along) in new[]
+            {
+                ("west", Vector3.right, -254.655f), ("east", Vector3.left, -254.655f), ("front", Vector3.back, 28.435f), ("front", Vector3.back, 17.475f),
+            })
+            {
+                bool alongZ = face != "front";
+                Vector3 From(float a, float y) => face == "west" ? new Vector3(-20f, y, a) : face == "east" ? new Vector3(60f, y, a) : new Vector3(a, y, -243.7f);
+                float Depth(Vector3 o) => Physics.Raycast(o, dir, out RaycastHit h, 60f, ~0, QueryTriggerInteraction.Ignore) ? h.distance : 99f;
+                float? start = null; var walls = new List<float>();
+                for (float y = 1.6f; y <= 38f; y += 0.25f) // below the roof balustrades (their gaps aren't seams)
+                {
+                    float mid = Depth(From(along, y)), side = Mathf.Min(Depth(From(along - 0.3f, y)), Depth(From(along + 0.3f, y)));
+                    float l = Depth(From(along - 0.3f, y)), rr = Depth(From(along + 0.3f, y));
+                    bool crack = mid - Mathf.Max(l, rr) > 0.08f && Mathf.Max(l, rr) < 50f && Mathf.Abs(l - rr) < 0.4f;
+                    if (crack) { if (start == null) start = y; walls.Add(side); }
+                    if ((!crack || y + 0.25f > 38f) && start != null)
+                    {
+                        float top = crack ? y : y - 0.25f;
+                        walls.Sort();
+                        float wall = walls[walls.Count / 2]; walls.Clear(); // the wall itself (a railing in front of a few rows aside)
+                        Vector3 face0 = From(along, 0f) + dir * wall; // on the wall plane
+                        Vector3 outward = -dir;
+                        Vector3 a = face0 + outward * 0.03f, b = face0 - dir * 0f - outward * 0.12f; // 3 cm proud, 12 cm in
+                        Vector3 min = Vector3.Min(a, b), max = Vector3.Max(a, b);
+                        if (alongZ) { min.z = along - 0.18f; max.z = along + 0.18f; } else { min.x = along - 0.18f; max.x = along + 0.18f; }
+                        min.y = start.Value - 0.2f; max.y = top + 0.2f;
+                        Box($"SeamStrip_{face}", min, max, facadeWall, solid: false);
+                        log.Add($"seam strip {face} at {along:0.00}: y {min.y:0.0}..{max.y:0.0}, wall {face0}");
+                        start = null;
+                    }
+                }
+            }
+            foreach (Collider c in probes) Object.DestroyImmediate(c);
+
+            // (3) The base storey roof's railing (in the details meshes): the middle of the east and west runs goes.
+            var cut = new[]
+            {
+                new Bounds(new Vector3(44.0f, 7.25f, -253.55f), new Vector3(0.8f, 1.9f, 15.1f)),
+                new Bounds(new Vector3(-4.05f, 7.25f, -253.55f), new Vector3(0.8f, 1.9f, 15.1f)),
+            };
+            var replaced = new Dictionary<Mesh, Mesh>();
+            foreach (MeshFilter mf in hotel.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (!mf.name.StartsWith("HotelWindows") || mf.sharedMesh == null) continue;
+                Mesh src = mf.sharedMesh;
+                if (src.name.EndsWith("_TeamB")) { log.Add($"{mf.name}: already cut"); continue; } // a re-run: keep it
+                if (!replaced.TryGetValue(src, out Mesh copy))
+                {
+                    var r = mf.GetComponent<MeshRenderer>();
+                    copy = Object.Instantiate(src);
+                    copy.name = src.name.EndsWith("_TeamB") ? src.name : src.name.Replace(".", "_") + "_TeamB";
+                    Vector3[] v = src.vertices;
+                    int removed = 0;
+                    for (int s = 0; s < src.subMeshCount; s++)
+                    {
+                        string mat = r != null && s < r.sharedMaterials.Length && r.sharedMaterials[s] != null ? r.sharedMaterials[s].name : "";
+                        int[] t = src.GetTriangles(s);
+                        if (!mat.Contains("white") && !mat.Contains("gold")) { copy.SetTriangles(t, s); continue; }
+                        var keep = new List<int>(t.Length);
+                        for (int i = 0; i < t.Length; i += 3)
+                        {
+                            Vector3 c = mf.transform.TransformPoint((v[t[i]] + v[t[i + 1]] + v[t[i + 2]]) / 3f);
+                            if (cut.Any(b => b.Contains(c))) { removed++; continue; }
+                            keep.Add(t[i]); keep.Add(t[i + 1]); keep.Add(t[i + 2]);
+                        }
+                        copy.SetTriangles(keep, s);
+                    }
+                    copy.RecalculateBounds();
+                    Directory.CreateDirectory($"{MeshDir}/Hotel");
+                    string path = $"{MeshDir}/Hotel/{copy.name}.asset";
+                    AssetDatabase.DeleteAsset(path);
+                    AssetDatabase.CreateAsset(copy, path);
+                    replaced[src] = copy;
+                    log.Add($"{mf.name}: {removed} railing triangles cut ({path})");
+                }
+                mf.sharedMesh = copy;
+            }
+            foreach (MeshCollider mc in hotel.GetComponentsInChildren<MeshCollider>(true))
+            {
+                if (mc.sharedMesh != null && replaced.TryGetValue(mc.sharedMesh, out Mesh copy)) { mc.sharedMesh = copy; log.Add($"collider {mc.name} uses the cut mesh"); }
+                // A collider that lost its mesh (an earlier run replaced the asset): the details LOD0 mesh again.
+                if (mc.sharedMesh == null && hotel.GetComponentsInChildren<MeshFilter>(true).FirstOrDefault(f => f.name == "HotelWindows0") is { } lod0)
+                { mc.sharedMesh = lod0.sharedMesh; log.Add($"collider {mc.name} repaired with {lod0.sharedMesh.name}"); }
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[TeamB] PASS: hotel touch-ups\n" + string.Join("\n", log));
+        }
+
         private static void LowerStiltHouse(Transform tower, List<string> log)
         {
             if (tower == null) { log.Add("no Tower"); return; }
