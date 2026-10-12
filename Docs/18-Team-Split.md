@@ -48,7 +48,7 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | B5 | Sandy's house: lower, stairs removed | **done** (Shako) — read as the red-roof house on stilts: down 2.4 m, porch one step up, stairs gone |
 | B6 | Towels and shells overlapping the dock (islands 1 and 2) | **done** (Shako) — one towel under Milo's pier moved onto the sand; no shell objects exist on islands 1-2 |
 | B7 | Sand texture prettier (islands 1 and 2) | **done** (Shako) — island 3's sand scan (ripples, grain) on the shared beach ground, darker wet sand from the waterline down (`TeamBSandBatch`, material `BeachSand`) |
-| B8 | Island 2 smaller (more fun) | open |
+| B8 | Island 2 smaller (more fun) | **done** (Shako) — 360 x 260 m cut to 180 x 110 m (x -95..85, z -330..-220); the hotel, bar, dock and north beach did not move; room behind the hotel for B9, B10, B13 (`TeamBShrinkIsland2Batch`) |
 | B9 | Island 2: pool | open |
 | B10 | Island 2: golf cart road | open |
 | B11 | Island 2: bar restyle (look only; orders are A6) | open |

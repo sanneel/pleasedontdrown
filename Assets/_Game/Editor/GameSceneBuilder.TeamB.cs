@@ -129,6 +129,53 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        // ---------------------------------------------------------------- B8: island 2 smaller
+
+        /// <summary>Batch: redraws the shared ground with island 2's smaller shape (<see cref="Island2HalfSize"/>),
+        /// checks nothing else on the map changed height and nothing on island 2 is left over water, bakes island 2's
+        /// navmesh again.</summary>
+        public static void TeamBShrinkIsland2Batch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject terrain = GameObject.Find("Environment/BeachTerrain");
+            Vector3[] before = terrain.GetComponent<MeshFilter>().sharedMesh.vertices;
+            RefreshBeachTerrain(terrain);
+            Vector3[] after = terrain.GetComponent<MeshFilter>().sharedMesh.vertices;
+            var log = new List<string>();
+            int changed = 0, elsewhere = 0;
+            for (int i = 0; i < before.Length && i < after.Length; i++)
+            {
+                if (Mathf.Abs(before[i].y - after[i].y) < 0.02f) continue;
+                changed++;
+                Vector3 p = after[i];
+                if (p.x < -200f || p.x > 240f || p.z < -520f || p.z > -180f)
+                {
+                    if (elsewhere++ < 10) log.Add($"WARNING height changed away from island 2 at {p} ({before[i].y:0.00} -> {p.y:0.00})");
+                }
+            }
+            log.Add($"{changed} ground points changed, {elsewhere} of them away from island 2");
+            if (before.Length != after.Length) log.Add($"WARNING vertex count {before.Length} -> {after.Length}");
+
+            // Everything standing on island 2 must still have sand under it.
+            Physics.SyncTransforms();
+            foreach (string path in new[] { "Environment/Hotel", "Environment/BeachTowels_Island2", "Environment/HotelDock" })
+                foreach (Transform t in FindByPath(path).Cast<Transform>())
+                {
+                    Vector3 p = t.position;
+                    float ground = GroundUnder(p);
+                    if (ground < WaterLevel + 0.2f && !path.EndsWith("Dock")) log.Add($"WARNING {path}/{t.name} at {p} is over water ({ground:0.00})");
+                }
+
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island2");
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Directory.CreateDirectory("Logs");
+            File.WriteAllLines("Logs/teamb-island2.txt", log);
+            Debug.Log("[TeamB] PASS: island 2 reshaped\n" + string.Join("\n", log));
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);

@@ -781,10 +781,11 @@ namespace PleaseDontDrown.Editor
         private const float TerrainMinX = -400f, TerrainMaxX = 300f, TerrainMinZ = -1290f, TerrainMaxZ = 150f, TerrainStep = 2f;
 
         // The hotel island (chapter 2), ~200 m south across the channel; its beach faces island 1.
-        // Keep the arrival shore at z=-220; expand west, east and south for the resort.
-        private static readonly Vector2 Island2Center = new(20f, -350f);
-        private static readonly Vector2 Island2HalfSize = new(180f, 130f);
-        private const float Island2CornerRadius = 48f;
+        // Keep the arrival shore at z=-220. It was 360 x 260 m of mostly empty sand; Docs/18 B8 (2026-10-12) cut it to
+        // 180 x 110 m round the hotel and the bar, with room behind the hotel for the pool, the cart road and the gun shop.
+        private static readonly Vector2 Island2Center = new(-5f, -275f);
+        private static readonly Vector2 Island2HalfSize = new(90f, 55f);
+        private const float Island2CornerRadius = 30f;
 
         /// <summary>Signed distance outside a rounded box (negative inside).</summary>
         private static float BoxDistanceOut(float x, float z, Vector2 center, Vector2 half, float radius)

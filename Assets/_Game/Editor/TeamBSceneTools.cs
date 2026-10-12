@@ -59,6 +59,34 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[TeamB] shots written to {outDir}");
         }
 
+        /// <summary>Renderer bounds of every object down to depth PDD_DEPTH (default 3) whose bounds touch the XZ box
+        /// PDD_BOX ("minx maxx minz maxz"), to PDD_DUMP.</summary>
+        public static void BoundsReport()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            float[] box = System.Environment.GetEnvironmentVariable("PDD_BOX").Split(' ')
+                .Select(s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            int maxDepth = int.TryParse(System.Environment.GetEnvironmentVariable("PDD_DEPTH"), out int d) ? d : 3;
+            var sb = new StringBuilder();
+            void Walk(Transform t, string path, int depth)
+            {
+                path = path.Length == 0 ? t.name : path + "/" + t.name;
+                var rs = t.GetComponentsInChildren<Renderer>();
+                if (rs.Length > 0)
+                {
+                    Bounds b = rs[0].bounds;
+                    foreach (Renderer r in rs) b.Encapsulate(r.bounds);
+                    if (b.max.x >= box[0] && b.min.x <= box[1] && b.max.z >= box[2] && b.min.z <= box[3])
+                        sb.Append($"{path} | x {b.min.x:0} .. {b.max.x:0}  z {b.min.z:0} .. {b.max.z:0}  y {b.min.y:0.0} .. {b.max.y:0.0}\n");
+                    else return;
+                }
+                if (depth < maxDepth) foreach (Transform c in t) Walk(c, path, depth + 1);
+            }
+            foreach (GameObject root in scene.GetRootGameObjects()) Walk(root.transform, "", 1);
+            File.WriteAllText(System.Environment.GetEnvironmentVariable("PDD_DUMP") ?? "Temp/bounds.txt", sb.ToString());
+            Debug.Log("[TeamB] bounds report written");
+        }
+
         private static void Dump(Transform t, string parent, StringBuilder sb)
         {
             string path = parent.Length == 0 ? t.name : parent + "/" + t.name;
