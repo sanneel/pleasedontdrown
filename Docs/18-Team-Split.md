@@ -12,7 +12,7 @@ work (Git can't merge it). So:
 - Planned fix: move each island into its own prefab so B and C can work in parallel (one-time job, one person).
 
 ## Branches
-Each person has their own branch (A: `shako-dev`; B and C: their own `<name>-dev`). Merge `origin/main` in before
+Each person has their own branch (A: `sancho-dev`; Shako: `shako-dev`; the third: their own `<name>-dev`). Merge `origin/main` in before
 every push, push your branch only, and merge to `main` in small pieces (every day or two), never straight to `main`.
 
 ## The full list, in order (pick from the top of your part)
@@ -21,7 +21,7 @@ Status: **done** = in code on a branch, waiting for a playtest; **open** = nobod
 someone is on it. When you take an item, write your name next to it here (and in the team chat) so nobody does it twice.
 Order rule (the user's): gameplay logic first, then visuals, then money. Quick removals first because they're cheap.
 
-### A: gameplay and code (owner: `shako-dev`)
+### A: gameplay and code (owner: `sancho-dev`)
 | # | Task | Status |
 |---|---|---|
 | A1 | On-screen text: no BOP/WHAP/BONK/OOF..., no "LONG SHOT! X flew 21 m", no stunt or cannonball money | **done** |
