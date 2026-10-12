@@ -141,6 +141,36 @@ namespace PleaseDontDrown.Editor
             File.WriteAllText(System.Environment.GetEnvironmentVariable("PDD_DUMP"), sb.ToString());
         }
 
+        /// <summary>Renders the model at PDD_MODEL (an asset path) from +z, -z, +x, -x (PNGs model-*.jpg in PDD_SHOTDIR) and
+        /// logs its size: to see which way a Tripo model faces before placing it.</summary>
+        public static void PreviewModel()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(System.Environment.GetEnvironmentVariable("PDD_MODEL"));
+            GameObject go = Object.Instantiate(prefab);
+            var rs = go.GetComponentsInChildren<Renderer>();
+            Bounds b = rs[0].bounds;
+            foreach (Renderer r in rs) b.Encapsulate(r.bounds);
+            Debug.Log($"[TeamB] model bounds {b}");
+            string outDir = System.Environment.GetEnvironmentVariable("PDD_SHOTDIR") ?? "Screenshots/TeamB";
+            Directory.CreateDirectory(outDir);
+            var cam = new GameObject("PreviewCamera").AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(.55f, .65f, .75f);
+            float d = b.extents.magnitude * 2.4f;
+            foreach ((string name, Vector3 dir) in new[] { ("pz", Vector3.forward), ("nz", Vector3.back), ("px", Vector3.right), ("nx", Vector3.left) })
+            {
+                cam.transform.position = b.center + dir * d + Vector3.up * b.extents.y * 0.6f;
+                cam.transform.LookAt(b.center);
+                const int w = 900, h = 700;
+                var rt = new RenderTexture(w, h, 24) { antiAliasing = 4 };
+                var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+                cam.targetTexture = rt; cam.Render();
+                RenderTexture.active = rt; tex.ReadPixels(new Rect(0, 0, w, h), 0, 0); tex.Apply();
+                RenderTexture.active = null; cam.targetTexture = null;
+                File.WriteAllBytes(Path.Combine(outDir, "model-" + name + ".jpg"), tex.EncodeToJPG(85));
+            }
+        }
+
         private static void Dump(Transform t, string parent, StringBuilder sb)
         {
             string path = parent.Length == 0 ? t.name : parent + "/" + t.name;

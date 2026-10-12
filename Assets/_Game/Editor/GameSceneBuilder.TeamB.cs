@@ -1003,6 +1003,64 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[TeamB] PASS: C7 octagon at {centre} (removed {removed} tables/stools), bar dressed");
         }
 
+        /// <summary>Batch: C8, island 3's gun shop as a real building: the Tripo gun_shop (open shop front, awning,
+        /// counter, steps; it faces its -x) stands behind the stall's counter (the working "Skull Cove guns" shop stays
+        /// as its walk-up counter), its front toward the nearest road; the stall's awning, posts and sign go.</summary>
+        public static void TeamCGunShopBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform shop = FindByPath("Environment/Island3/Story/Island3GunShop") ?? throw new InvalidOperationException("No gun stall");
+            Transform counter = shop.Find("Counter");
+            foreach (Transform t in shop.Cast<Transform>().ToArray())
+                if (t.name is "AwningPost" or "Awning" or "Sign" or "Tripo_gun_shop" or "GunShopBody") Object.DestroyImmediate(t.gameObject);
+            Vector3 c = shop.position + Vector3.up * 0.6f; // the stall's spot (the counter moves below: re-running stays put)
+            // Which way is the road: the direction (16 tried) whose point 5 m out is nearest a road.
+            Vector3 front = Vector3.forward;
+            float best = float.MaxValue;
+            for (int i = 0; i < 16; i++)
+            {
+                Vector3 dir = Quaternion.Euler(0f, i * 22.5f, 0f) * Vector3.forward;
+                float d = DistanceToRoads(new Vector2(c.x + dir.x * 5f, c.z + dir.z * 5f));
+                if (d < best) { best = d; front = dir; }
+            }
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{TripoIsland3Dir}/gun_shop.glb") ?? throw new InvalidOperationException("gun_shop.glb missing");
+            GameObject house = Object.Instantiate(prefab, shop, false);
+            house.name = "Tripo_gun_shop";
+            // The model's front is its -x: turn that to face the road.
+            float yaw = Mathf.Atan2(front.x, front.z) * Mathf.Rad2Deg + 90f;
+            house.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            house.transform.position = Vector3.zero;
+            // Its width is along its z (1.0 m as imported), its depth along x (0.76): 7 m wide.
+            const float Width = 7f;
+            float scale = Width / 1.0f;
+            house.transform.localScale = Vector3.one * scale;
+            Bounds b = RendererBounds(house.transform);
+            float depth = b.size.x * Mathf.Abs(front.x) + b.size.z * Mathf.Abs(front.z);
+            Vector3 centre = c - front * (depth * 0.5f + 0.4f); // the counter just in front of its open front
+            float ground = GroundUnder(centre);
+            house.transform.position += new Vector3(centre.x - b.center.x, ground - 0.15f - b.min.y, centre.z - b.center.z);
+            foreach (Renderer r in house.GetComponentsInChildren<Renderer>()) r.allowOcclusionWhenDynamic = false;
+            // The working counter onto the model's own counter (front right, as imported about (-0.3, -0.2, -0.22)):
+            // its box stops drawing, its collider stays to talk to; things bought appear on top.
+            Vector3 onCounter = house.transform.TransformPoint(new Vector3(-0.3f, -0.2f, -0.22f));
+            counter.SetPositionAndRotation(onCounter + Vector3.down * 0.25f, Quaternion.LookRotation(front));
+            if (counter.GetComponent<MeshRenderer>() is { } box) box.enabled = false;
+            if (shop.Find("ShopSpawn") is { } spawn) spawn.position = onCounter + Vector3.up * 0.15f;
+            // Its body to bump into (the open front half stays walk-up).
+            var body = new GameObject("GunShopBody").transform;
+            body.SetParent(shop, false);
+            body.position = centre - front * (depth * 0.15f) + Vector3.up * (ground + 3f - centre.y);
+            body.rotation = Quaternion.LookRotation(front);
+            body.gameObject.AddComponent<BoxCollider>().size = new Vector3(Width * 0.92f, 6f, depth * 0.7f);
+            TagSurface(body.gameObject, SurfaceKind.Wood);
+
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island3");
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[TeamB] PASS: C8 gun shop at {centre} facing {front} (road {best:0.0} m), scale {scale:0.0}, size {RendererBounds(house.transform).size}");
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
