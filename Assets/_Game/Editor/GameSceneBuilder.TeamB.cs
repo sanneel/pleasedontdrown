@@ -678,6 +678,81 @@ namespace PleaseDontDrown.Editor
             Debug.Log("[TeamB] PASS: C1 tower removed\n" + string.Join("\n", log));
         }
 
+        /// <summary>Batch: C4, the main waterfall (over the sea cave). Where the water starts, the roof stream (3.6 m) used
+        /// to turn into a flat 13.4 m plate with square corners: now a fan widens smoothly from the stream to the falls and
+        /// curls over the edge. The falling sheets reach a metre under the sea so no gap opens in a wave trough.</summary>
+        public static void TeamCWaterfallBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform cave = FindByPath("Environment/Island3/MoneyCave") ?? throw new InvalidOperationException("No sea cave");
+            Transform lip = cave.Find("FallsLip");
+            Transform roof = cave.Find("RoofStream");
+            if (cave.Find("FallsLipFan") is { } oldFan) Object.DestroyImmediate(oldFan.gameObject);
+            if (lip == null || roof == null) throw new InvalidOperationException("Falls pieces missing");
+            Material water = lip.GetComponent<MeshRenderer>().sharedMaterial;
+            float y = lip.localPosition.y, edge = lip.localPosition.z - lip.localScale.y * 0.5f, wide = lip.localScale.x;
+            float narrow = roof.localScale.x, start = roof.localPosition.z - roof.localScale.y * 0.5f + 0.3f; // under the stream's end
+            lip.gameObject.SetActive(false); // kept (off) for the builder's checks; the fan draws the lip now
+
+            // Rows from the stream's end to the edge, then a short curl down over it.
+            const int rows = 14, cols = 12;
+            var verts = new List<Vector3>(); var uvs = new List<Vector2>(); var tris = new List<int>();
+            float length = start - edge;
+            for (int r = 0; r <= rows; r++)
+            {
+                float k = r / (float)rows;
+                float z = Mathf.Lerp(start, edge - 0.25f, k);
+                float drop = k > 0.8f ? Mathf.SmoothStep(0f, 0.55f, (k - 0.8f) / 0.2f) : 0f; // the curl over the edge
+                float width = Mathf.Lerp(narrow, wide, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(k * 1.25f)));
+                for (int c = 0; c <= cols; c++)
+                {
+                    float x = Mathf.Lerp(-width * 0.5f, width * 0.5f, c / (float)cols);
+                    verts.Add(new Vector3(x, y - drop, z));
+                    uvs.Add(new Vector2(x / 3.35f, (z - edge) / 6f)); // ~3.35 m per streak tile across, v grows upstream
+                }
+            }
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++)
+                {
+                    int a = r * (cols + 1) + c, b = a + 1, d = a + cols + 1, e = d + 1;
+                    tris.AddRange(new[] { a, d, b, b, d, e });
+                }
+            var mesh = new Mesh { name = "FallsLipFan" };
+            mesh.SetVertices(verts); mesh.SetUVs(0, uvs); mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals(); mesh.RecalculateBounds();
+            Directory.CreateDirectory(MeshDir);
+            string meshPath = $"{MeshDir}/FallsLipFan.asset";
+            AssetDatabase.DeleteAsset(meshPath);
+            AssetDatabase.CreateAsset(mesh, meshPath);
+            var fan = new GameObject("FallsLipFan");
+            fan.transform.SetParent(cave, false);
+            fan.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var fr = fan.AddComponent<MeshRenderer>();
+            fr.sharedMaterial = water;
+            fr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var flow = new SerializedObject(fan.AddComponent<PleaseDontDrown.World.WaterfallFlow>());
+            Require(flow, "_speed").floatValue = 0.8f;
+            Require(flow, "_tiling").vector2Value = Vector2.one;
+            flow.ApplyModifiedPropertiesWithoutUndo();
+
+            // The sheets a metre further down, under the waves.
+            foreach (string name in new[] { "WaterfallSheet", "WaterfallSheetFront" })
+                if (cave.Find(name) is { } sheet && sheet.localScale.y < 40f)
+                {
+                    float bottom = sheet.localPosition.y - sheet.localScale.y * 0.5f;
+                    if (bottom > WaterLevel - 0.5f)
+                    {
+                        sheet.localScale += new Vector3(0f, 1f, 0f);
+                        sheet.localPosition -= new Vector3(0f, 0.5f, 0f);
+                    }
+                }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[TeamB] PASS: C4 falls lip fan {narrow:0.0} -> {wide:0.0} m over {length:0.0} m");
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
