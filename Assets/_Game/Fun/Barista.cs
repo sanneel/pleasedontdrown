@@ -145,22 +145,9 @@ namespace PleaseDontDrown.Fun
             }
             at = FreeSpotNear(at, seat.transform.right);
             Item order = Instantiate(prefab, at, Quaternion.Euler(0f, seat.transform.eulerAngles.y, 0f));
-            Spawn(order.gameObject);
-            ServedTarget(caller, order.NetworkObject);
+            Spawn(order.gameObject); // (put down in front of them: they eat it there, Fun.TableMeal)
             Debug.Log($"[Bar] {player.DisplayName} ordered {wanted.Item} for ${wanted.Price}");
             SayTextObservers(OrderLines[Random.Range(0, OrderLines.Length)].Replace("{0}", wanted.Label.ToLowerInvariant()).Replace("{1}", wanted.Price.ToString()), at, true);
-        }
-
-        /// <summary>The one who ordered: it's put in their hand if it's free (they're sitting: they can't reach for it).</summary>
-        [TargetRpc]
-        private void ServedTarget(NetworkConnection target, NetworkObject order) => StartCoroutine(TakeServed(order));
-
-        private System.Collections.IEnumerator TakeServed(NetworkObject order)
-        {
-            yield return new WaitForSeconds(0.5f); // (she puts it down first)
-            PlayerHub me = PlayerHub.Local;
-            if (order == null || me == null || me.Hands == null || me.Hands.HeldItem != null) yield break;
-            if (order.TryGetComponent(out Item item) && !item.IsHeld) me.Hands.TryPickUp(item);
         }
 
         /// <summary>Along the counter beside the serving spot, the first place nothing already stands (orders used to stack).</summary>

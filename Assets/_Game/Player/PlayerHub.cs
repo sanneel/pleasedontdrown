@@ -244,6 +244,13 @@ namespace PleaseDontDrown.Player
             if (IsOwner && Look != null) Look.KneelAt(chest, head, reach);
         }
 
+        /// <summary>Seated at the bar: a bite off the dish at <paramref name="dish"/> (Fun.TableMeal; every machine).</summary>
+        public void ShowTableBite(Vector3 dish)
+        {
+            _avatar.PlayGesture(AvatarGesture.TableBite, dish);
+            if (_arms != null) _arms.Play(AvatarGesture.TableBite, dish);
+        }
+
         /// <summary>The other CPR steps: a rescue breath at the mouth, or a punch to the face (every machine).</summary>
         public void ShowCprAction(Rescue.CprStep step, Vector3 point)
         {

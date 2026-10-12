@@ -35,7 +35,7 @@ namespace PleaseDontDrown.Editor
         // his feet land with the thighs level, each stool 0.55 m back from the counter top's edge so his knees clear it.
         private const float BarStoolTop = 1.07f;                              // cushion top over its feet (the model's)
         private const float BarStoolSeat = BarDeckTop + BarStoolTop;          // ...in the bar's frame: the seat point
-        private const float BarStoolFromCounter = 0.55f;                      // the counter top's edge this far ahead
+        private const float BarStoolFromCounter = 0.50f;                      // the counter top's edge this far ahead (in reach of a seated arm)
         private const float BarTableX = 10.2f, ArmchairSeat = 0.83f, ArmchairSeatZ = 0.2f, ArmchairEdge = 0.38f;
         private const float BarTableTop = BarDeckTop + 0.484f, BarTableWidth = 0.97f, BarTableDepth = 0.58f; // (model_bar_table.py)
 
@@ -50,8 +50,9 @@ namespace PleaseDontDrown.Editor
             Scene scene = SceneManager.GetActiveScene();
             if (scene.path != ScenePath) scene = EditorSceneManager.OpenScene(ScenePath);
 
-            // The khinkali item (and the catalog / network prefab list knowing it).
+            // The khinkali item (and the catalog / network prefab list knowing it); every bar dish eaten at the table.
             Item khinkali = BuildKhinkali();
+            AddTableMeals();
             var catalog = AssetDatabase.LoadAssetAtPath<ItemCatalog>(ItemCatalogPath);
             var so = new SerializedObject(catalog);
             SerializedProperty list = Require(so, "_items");
@@ -329,6 +330,35 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[BarDining] golf cart at {spot.Value:F1}");
         }
 
+        /// <summary>
+        /// The bar's dishes are eaten where they're put down (Fun.TableMeal): three bites or sips each, the khinkali one
+        /// dumpling at a time off the plate (khinkali.glb's Khinkali0..2).
+        /// </summary>
+        private static void AddTableMeals()
+        {
+            foreach (string name in new[] { "Fries", "Cola", "Beer", "Cocktail", "Khinkali" })
+            {
+                string path = $"Assets/_Game/Items/Prefabs/{name}.prefab";
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null) throw new InvalidOperationException($"No {name} item ({path})");
+                GameObject root = PrefabUtility.LoadPrefabContents(path);
+                try
+                {
+                    var meal = root.GetComponent<TableMeal>() ?? root.AddComponent<TableMeal>();
+                    SetField(meal, "_bites", p => p.intValue = 3);
+                    SetField(meal, "_pieceNames", p =>
+                    {
+                        p.arraySize = name == "Khinkali" ? 3 : 0;
+                        for (int i = 0; i < p.arraySize; i++) p.GetArrayElementAtIndex(i).stringValue = "Khinkali" + i;
+                    });
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                }
+                finally
+                {
+                    PrefabUtility.UnloadPrefabContents(root);
+                }
+            }
+        }
+
         private static Item BuildKhinkali()
         {
             PhysicsMaterial paper = GetPhysicsMaterial("Paper", 0.4f, 0.1f, PhysicsMaterialCombine.Average);
@@ -360,7 +390,7 @@ namespace PleaseDontDrown.Editor
                     float table = (edge + BarArmchairs[i ^ 1].edge) * 0.5f; // the pair's table, halfway between them
                     if (i % 2 == 0) BuildLoungeTable(root, bar, n / 2, new Vector3(side * BarTableX, 0f, table));
                     Vector3 local = new(side * BarTableX, 0f, edge - facing * ArmchairEdge); // (its point 0.38 behind the cushion's edge)
-                    Vector3 serve = new(side * BarTableX, BarTableTop + 0.06f, table - facing * BarTableDepth * 0.22f); // on the table, its own half
+                    Vector3 serve = new(side * BarTableX, BarTableTop + 0.06f, table - facing * BarTableDepth * 0.3f); // on the table, its own half, near its edge (in reach, Fun.TableMeal)
                     seats.Add(BuildTableSeat(root, bar, n++, local, facing > 0f ? 0f : 180f, serve, barista));
                 }
 

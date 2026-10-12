@@ -3,8 +3,9 @@ using Bone = PleaseDontDrown.Avatars.AvatarRig.Bone;
 
 namespace PleaseDontDrown.Avatars
 {
-    /// <summary>One-off moves that play over whatever the body is doing.</summary>
-    public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot, JumpShot, Burp }
+    /// <summary>One-off moves that play over whatever the body is doing. TableBite: seated, a bite off the dish on the
+    /// table in front (the point), up to the mouth (Fun.TableMeal).</summary>
+    public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot, JumpShot, Burp, TableBite }
 
     /// <summary>
     /// Whole-body poses held for a while (story characters, knockouts). SitStool: on a bar stool exactly as a player
@@ -1514,6 +1515,8 @@ namespace PleaseDontDrown.Avatars
                 }
             }
 
+            PoseTableBite(upperR, foreR);
+
             if (_fly > 0.01f)
             {
                 // Superman: the body lies along the flight, arms stretched out ahead (fists), legs together behind,
@@ -1905,6 +1908,37 @@ namespace PleaseDontDrown.Avatars
                 _rig.LeftHand?.Pose(HandPose.Flat);
                 _rig.RightHand?.Pose(HandPose.Flat);
             }
+        }
+
+        /// <summary>
+        /// A bite off the dish on the table (seated at the bar, Fun.TableMeal): the right hand reaches to it, takes a
+        /// piece, brings it up to the mouth, holds there a moment (chewing), and goes back down.
+        /// </summary>
+        private void PoseTableBite(Transform upperR, Transform foreR)
+        {
+            const float seconds = 1.3f;
+            if (!GestureActive(AvatarGesture.TableBite, seconds) || _gesturePoint == Vector3.zero) return;
+            float t = GestureT(seconds) * seconds;
+            // Leaning in over the counter for it (back and chest, the shoulder reaching on), sitting back up to eat: on
+            // a bar stool the dish is about an arm off, more than that for the goofy body's short arms.
+            Vector3 dish = _gesturePoint;
+            float lean = t < 0.35f ? Mathf.SmoothStep(0f, 1f, t / 0.3f) : 1f - Mathf.SmoothStep(0f, 1f, (t - 0.35f) / 0.35f);
+            if (lean > 0f)
+            {
+                if (B(Bone.Spine) is { } spine) spine.rotation = Quaternion.AngleAxis(26f * lean, transform.right) * spine.rotation;
+                if (B(Bone.Chest) is { } chest) chest.rotation = Quaternion.AngleAxis(14f * lean, transform.right) * chest.rotation;
+                // (The head stays up, looking at the dish: bent down with the back, the big goofy head dived into the counter.)
+                if (B(Bone.Neck) is { } neck) neck.rotation = Quaternion.AngleAxis(-26f * lean, transform.right) * neck.rotation;
+                Vector3 toDish = Vector3.ProjectOnPlane(dish - upperR.position, Vector3.up);
+                if (toDish.sqrMagnitude > 1e-4f) upperR.position += toDish.normalized * (0.045f * _rig.Scale * lean);
+            }
+            Vector3 mouth = Lips + transform.forward * (0.07f * _rig.Scale) - Vector3.up * (0.03f * _rig.Scale);
+            Vector3 hand = t < 0.35f ? dish : t < 0.7f ? Vector3.Lerp(dish, mouth, Mathf.SmoothStep(0f, 1f, (t - 0.35f) / 0.35f)) : mouth;
+            float w = Mathf.SmoothStep(0f, 1f, t / 0.3f) * (1f - Mathf.SmoothStep(0f, 1f, (t - 1.0f) / 0.3f));
+            float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+            IK.Solve(upperR, foreR, la, lb, hand, transform.right - Vector3.up * 0.6f, w, false);
+            _rig.RightHand?.Pose(HandPose.Lerp(HandPose.Relaxed, HandPose.Cup, w));
+            if (t > 0.7f && t < 1.0f) Motion.Talking = true; // chewing
         }
 
         private void AimedGestures(Transform upperL, Transform foreL, Transform upperR, Transform foreR)

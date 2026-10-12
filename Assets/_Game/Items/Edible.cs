@@ -39,6 +39,9 @@ namespace PleaseDontDrown.Items
             BiteServer();
         }
 
+        /// <summary>The bite's sound on this machine only (Fun.TableMeal plays it on every machine itself).</summary>
+        public void PlaySoundHere() => Crunch();
+
         private void Crunch()
         {
             if (_audio != null) _audio.PlayOneShot(_drink ? ActionFoley.Gulp : ActionFoley.Bite, _drink ? 0.85f : 0.75f);

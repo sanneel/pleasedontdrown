@@ -1,5 +1,6 @@
 # Khinkali on a plate for the hotel bar menu (Assets/_Game/Art/Props/khinkali.glb).
-# Three dumplings: round bottoms, pleated tops pinched into a knot. Origin at the plate's bottom centre, +Y up in Unity.
+# Three dumplings: round bottoms, pleated tops pinched into a knot, each its own object (eaten one by one). Origin at
+# the plate's bottom centre, +Y up in Unity.
 # blender -b -P model_khinkali.py -- <out.glb>
 import bpy, bmesh, math, sys, mathutils
 out = sys.argv[sys.argv.index("--") + 1]
@@ -56,16 +57,25 @@ def khinkali(x, y, yaw, size):
     k = bpy.context.object; k.data.materials.append(dough)
     return [o, k]
 
-parts = []
+# Each dumpling its own object (Khinkali0..2, eaten one at a time off the plate at the bar: Fun.TableMeal), the plate
+# and its rim one more (Plate).
+def join(objs, name):
+    bpy.ops.object.select_all(action='DESELECT')
+    for ob in objs:
+        ob.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    ob = bpy.context.object
+    ob.name = ob.data.name = name
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    return ob
+
+pieces = []
 for i, (a, s) in enumerate([(90, 0.034), (210, 0.032), (330, 0.033)]):
     t = math.radians(a)
-    parts += khinkali(math.cos(t) * 0.045, math.sin(t) * 0.045, t, s)
+    pieces.append(join(khinkali(math.cos(t) * 0.045, math.sin(t) * 0.045, t, s), f"Khinkali{i}"))
+plate_obj = join([p, r], "Plate")
 
 bpy.ops.object.select_all(action='SELECT')
-bpy.context.view_layer.objects.active = p
-bpy.ops.object.join()
-o = bpy.context.object; o.name = "khinkali"; o.data.name = "khinkali"
-bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=True)
-dims = o.dimensions
-print("KHINKALI", [round(d, 3) for d in dims])
+print("KHINKALI", [ob.name for ob in [plate_obj] + pieces])

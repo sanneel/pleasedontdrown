@@ -27,7 +27,7 @@ namespace PleaseDontDrown.Player
         private const float MaxReach = 0.85f;    // from the eye
         private const float IdlePitch = 5f;
 
-        private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave, Punch, Breath, Drive, Slap }
+        private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave, Punch, Breath, Drive, Slap, Bite }
 
         private sealed class Hand
         {
@@ -505,6 +505,16 @@ namespace PleaseDontDrown.Player
                 pose = HandPose.Cup;
                 blend = 0.12f;
             }
+            else if (hand.Right && Fun.TableMeal.LocalBiteGrip(_hub, out HandGrip bite))
+            {
+                // A bite off the dish on the table (Fun.TableMeal): the hand goes over to the khinkali (or the glass)
+                // and holds it while it comes up in front of the mouth, like eating something held.
+                state = State.Bite;
+                palm = bite.Point;
+                rot = bite.Rotation(side);
+                pose = bite.Pose;
+                blend = 0.3f;
+            }
             else if (sincePump < 1.2f)
             {
                 // CPR: palms flat on the chest, right hand on top, pressing on each pump.
@@ -653,7 +663,7 @@ namespace PleaseDontDrown.Player
             // Resting, swimming, holding things: never into a wall (reaching, pressing and punching do touch it).
             // A gun pulls itself back from walls; its hands stay on it.
             bool onGun = state == State.Item && _rigidGrip;
-            if (state is not (State.Reach or State.Cpr or State.Punch or State.Breath or State.Slap) && !onGun) palm = KeepOutOfWalls(eye, palm);
+            if (state is not (State.Reach or State.Bite or State.Cpr or State.Punch or State.Breath or State.Slap) && !onGun) palm = KeepOutOfWalls(eye, palm);
             // Never inside another person, whatever the hand is doing: a punch or a slap lands on the skin, pressing
             // a chest stays on it, a hand held out stops at whoever stands in front. (Not on a gun: its grip holds the hand.)
             if (!onGun) BodySpace.PushOut(ref palm, 0.045f, _hub.Avatar != null ? _hub.Avatar.Rig : null);

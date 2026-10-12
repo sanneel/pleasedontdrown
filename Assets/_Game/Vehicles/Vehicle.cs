@@ -886,14 +886,15 @@ namespace PleaseDontDrown.Vehicles
             // A rider: Interact always means "get off" too.
             PlayerHub me = PlayerHub.Local;
             if (me != null && me != driver && SeatIndexOf(me) > 0 && me.Motor != null && me.Motor.Seat == this && GameInput.GameplayActive
-                && GameInput.Interact.WasPressedThisFrame() && Time.time > _nextEnterRequest)
+                && GameInput.Interact.WasPressedThisFrame() && Time.time > _nextEnterRequest && !(me.Interactor != null && me.Interactor.TargetsSeatedUse))
             {
                 _nextEnterRequest = Time.time + 0.5f;
                 ExitNow();
             }
             // Our driver: Interact always means "get off" (whatever the crosshair is on).
             if (driver != null && driver == PlayerHub.Local && driver.Motor != null && driver.Motor.Seat == this && GameInput.GameplayActive
-                && GameInput.Interact.WasPressedThisFrame() && Time.time > _nextEnterRequest) // not the same press that just got us on
+                && GameInput.Interact.WasPressedThisFrame() && Time.time > _nextEnterRequest // not the same press that just got us on
+                && !(driver.Interactor != null && driver.Interactor.TargetsSeatedUse)) // (E on the dish in front: a bite, not getting up)
             {
                 _nextEnterRequest = Time.time + 0.5f;
                 ExitNow();

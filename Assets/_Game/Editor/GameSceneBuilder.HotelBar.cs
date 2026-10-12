@@ -29,15 +29,15 @@ namespace PleaseDontDrown.Editor
         // toward the side counters, each 0.55 m back from the counter top's edge (front z 4.84, sides x +/-5.02).
         private static readonly (Vector3 at, float yaw)[] HotelBarStools =
         {
-            (new Vector3(3.4f, 0f, 5.39f), 180f), (new Vector3(1.12f, 0f, 5.39f), 180f), (new Vector3(-1.12f, 0f, 5.39f), 180f), (new Vector3(-3.4f, 0f, 5.39f), 180f),
-            (new Vector3(5.57f, 0f, 0.5f), 270f), (new Vector3(5.57f, 0f, 1.65f), 270f), (new Vector3(5.57f, 0f, 2.8f), 270f), (new Vector3(5.57f, 0f, 3.95f), 270f),
-            (new Vector3(-5.57f, 0f, 0.5f), 90f), (new Vector3(-5.57f, 0f, 1.65f), 90f),
+            (new Vector3(3.4f, 0f, 5.34f), 180f), (new Vector3(1.12f, 0f, 5.34f), 180f), (new Vector3(-1.12f, 0f, 5.34f), 180f), (new Vector3(-3.4f, 0f, 5.34f), 180f),
+            (new Vector3(5.52f, 0f, 0.5f), 270f), (new Vector3(5.52f, 0f, 1.65f), 270f), (new Vector3(5.52f, 0f, 2.8f), 270f), (new Vector3(5.52f, 0f, 3.95f), 270f),
+            (new Vector3(-5.52f, 0f, 0.5f), 90f), (new Vector3(-5.52f, 0f, 1.65f), 90f),
         };
         // The last two stools on the west side: the guests'.
         private static readonly (Vector3 at, float yaw, byte body, string name)[] HotelBarGuests =
         {
-            (new Vector3(-5.57f, 0f, 2.8f), 90f, AvatarLook.Bodies.GirlPink, "Kayla"),
-            (new Vector3(-5.57f, 0f, 3.95f), 90f, AvatarLook.Bodies.GirlLavender, "Mia"),
+            (new Vector3(-5.52f, 0f, 2.8f), 90f, AvatarLook.Bodies.GirlPink, "Kayla"),
+            (new Vector3(-5.52f, 0f, 3.95f), 90f, AvatarLook.Bodies.GirlLavender, "Mia"),
         };
         private const float BarDeckTop = 0.266f; // the bar model's deck (measured)
         private const float CounterTop = 1.54f;
@@ -127,10 +127,11 @@ namespace PleaseDontDrown.Editor
             var seat = new GameObject("Seat").transform;
             seat.SetParent(go.transform, false);
             seat.localPosition = new Vector3(0f, BarStoolSeat, 0f);
-            // In front of the stool, on the counter (its edge half a metre ahead).
+            // In front of the stool, on the counter (its edge half a metre ahead): the plate (0.1 round) just in from the
+            // edge, where a seated arm reaches it (Fun.TableMeal; further in, the goofy body's short arms fell short).
             var serve = new GameObject("ServePoint").transform;
             serve.SetParent(go.transform, false);
-            serve.localPosition = new Vector3(0f, CounterTop + 0.1f, BarStoolFromCounter + 0.15f);
+            serve.localPosition = new Vector3(0f, CounterTop + 0.1f, BarStoolFromCounter + 0.11f);
 
             var vehicle = go.AddComponent<Vehicle>();
             var so = new SerializedObject(vehicle);

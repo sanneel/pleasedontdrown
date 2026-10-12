@@ -204,6 +204,7 @@ GameObject:
   - component: {fileID: 449790786059434115}
   - component: {fileID: 1874345803200135049}
   - component: {fileID: 8609711186804191391}
+  - component: {fileID: 3779087837050615595}
   m_Layer: 0
   m_Name: Beer
   m_TagString: Untagged
@@ -575,3 +576,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.World.ImpactSound
   _audio: {fileID: 1683035312918438742}
   _minSpeed: 2.2
+--- !u!114 &3779087837050615595
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8781926170317866583}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be01ec0b5cc601c4f89607ea5f49f089, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Fun.TableMeal
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 4808827713822698712}
+  _networkObjectCache: {fileID: 0}
+  _bites: 3
+  _pieceNames: []

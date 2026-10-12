@@ -98,7 +98,8 @@ namespace PleaseDontDrown.Fun
             _barista.OrderFromSeat(PlayerHub.Local, this, index);
             // Ordered: the card goes away so the hands are free to eat (Tab brings it back).
             SetCard(false);
-            PlayerHud.ShowToast($"<b>[Tab]</b> menu   <b>[{GameInput.KeyLabel(GameInput.Secondary)}]</b> hold to eat   <b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> stand up", 4f);
+            // (It's put down in front of you: look at it and E takes a bite, Fun.TableMeal.)
+            PlayerHud.ShowToast($"<b>[Tab]</b> menu   look at your food, <b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> to eat   <b>[{GameInput.KeyLabel(GameInput.Interact)}]</b> elsewhere: stand up", 4f);
         }
 
         private void SetCard(bool open)

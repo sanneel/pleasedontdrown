@@ -69,6 +69,9 @@ namespace PleaseDontDrown.Player
         public void OnGesture(AvatarGesture gesture) => OnGesture(gesture, Vector3.zero);
 
         /// <summary>A CPR breath or punch: stays kneeling by the tourist.</summary>
+        /// <summary>A gesture aimed at a point (a bite off a dish on the table).</summary>
+        public void PlayGesture(AvatarGesture gesture, Vector3 point) => _animator.Play(gesture, point);
+
         public void OnCprGesture(AvatarGesture gesture, Vector3 point)
         {
             _lastPumpTime = Time.time;

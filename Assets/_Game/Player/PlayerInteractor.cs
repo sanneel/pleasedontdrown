@@ -35,8 +35,13 @@ namespace PleaseDontDrown.Player
         {
             Interactable found = null;
             Camera cam = _hub.Look.Camera;
-            if (cam != null && GameInput.GameplayActive && _hub.Motor.Seat == null) // driving: E only gets you off
-                found = FindTarget(cam.transform);
+            // Driving: E only gets you off. Sitting in a chair: only what's used from the seat (the dish in front of you
+            // at the bar, Fun.TableMeal), and E on it doesn't get you up (Vehicle asks TargetsSeatedUse).
+            if (cam != null && GameInput.GameplayActive && _hub.Motor.Seat == null)
+                found = FindTarget(cam.transform, false);
+            else if (cam != null && GameInput.GameplayActive && _hub.Motor.Seat.IsChair)
+                found = FindTarget(cam.transform, true);
+            TargetsSeatedUse = _hub.Motor.Seat != null && found != null;
 
             if (found != _current)
             {
@@ -70,7 +75,10 @@ namespace PleaseDontDrown.Player
             return c != null ? c.ClosestPoint(view.position + view.forward * 1.2f) : _current.transform.position;
         }
 
-        private Interactable FindTarget(Transform view)
+        /// <summary>Sitting in a chair and looking at something used from the seat: E is for that, not for getting up.</summary>
+        public bool TargetsSeatedUse { get; private set; }
+
+        private Interactable FindTarget(Transform view, bool seated)
         {
             Vector3 origin = view.position;
             Vector3 forward = view.forward;
@@ -79,7 +87,7 @@ namespace PleaseDontDrown.Player
             if (FirstHit(origin, forward, _rayDistance, out RaycastHit hit))
             {
                 Interactable direct = Interactable.FromCollider(hit.collider);
-                if (Usable(direct, hit.distance))
+                if (Usable(direct, hit.distance) && (!seated || SeatedUse(direct)))
                     return direct;
             }
 
@@ -96,7 +104,7 @@ namespace PleaseDontDrown.Player
                 Vector3 toCenter = center - origin;
                 float distance = toCenter.magnitude;
                 float angle = Vector3.Angle(forward, toCenter);
-                if (angle > _maxAngle || !Usable(candidate, distance) || !InPlainSight(origin, center, candidate))
+                if (angle > _maxAngle || !Usable(candidate, distance) || (seated && !SeatedUse(candidate)) || !InPlainSight(origin, center, candidate))
                     continue;
 
                 float score = angle + distance * 2f; // mostly "closest to the crosshair", a little "closest to me"
@@ -108,6 +116,10 @@ namespace PleaseDontDrown.Player
             }
             return best;
         }
+
+        /// <summary>Used where it lies, from where we sit (an item whose IGroundUse is on for us now).</summary>
+        private bool SeatedUse(Interactable candidate) =>
+            candidate.TryGetComponent(out Items.IGroundUse use) && use.CanUseOnGround(_hub);
 
         private bool Usable(Interactable candidate, float distance) =>
             candidate != null && distance <= candidate.MaxDistance && CarryAllows(candidate) && (candidate.CanInteract(_hub) || candidate.CanSecondary(_hub));

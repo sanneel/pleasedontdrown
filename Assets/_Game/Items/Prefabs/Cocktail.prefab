@@ -20,6 +20,7 @@ GameObject:
   - component: {fileID: 4442613833195318838}
   - component: {fileID: 3333129438845829763}
   - component: {fileID: 2864352590589646097}
+  - component: {fileID: 7308227987363965645}
   m_Layer: 0
   m_Name: Cocktail
   m_TagString: Untagged
@@ -390,6 +391,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.World.ImpactSound
   _audio: {fileID: 2393901989803453177}
   _minSpeed: 2.2
+--- !u!114 &7308227987363965645
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3310312815643076810}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be01ec0b5cc601c4f89607ea5f49f089, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Fun.TableMeal
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 1426562134387404387}
+  _networkObjectCache: {fileID: 0}
+  _bites: 3
+  _pieceNames: []
 --- !u!1 &4500465714388668390
 GameObject:
   m_ObjectHideFlags: 0

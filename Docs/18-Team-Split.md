@@ -22,7 +22,7 @@ will find the spot.
 | # | The user's verdict | Next |
 |---|---|---|
 | A5 | Works but weird | **Redone** (12a08a88): put it down by the casualty, stand beside them, E on it; the other button picks it up again |
-| A6 | Works, bad visuals | Better looks for the bar ordering/eating (card, food, serving) |
+| A6 | Works, bad visuals | **Redone**: the order is put down in front of you (khinkali on a plate), never into your hand; sitting, E on it takes a bite: your hand cups the nearest khinkali off the plate and brings it up to eat (a drink is lifted by its side, tipped at the lips and put back), 3 each. Others see you lean in, reach and eat. The hotel bar's stools are 5 cm nearer the counter and the plates just in from its edge, within a seated arm's reach (no body touches the counter, measured) |
 | A7 | Needs better visuals | **Redone** (a2683701): cards dealt on the felt (E deal/hit, other button stand or bet, R double), no pop-up |
 | A8 / C7 | Octagon is inside the tavern | The octagon stands **next to** the tavern, outside (C7 builds it, A8's fight works wherever it is) |
 | A11 / C5 | No sewer anywhere; C5 done very badly | C5's drain/grate in the castle yard **removed**; a real sewer (entrance behind the back waterfall, tunnel, exit in the castle) still to be built, then A11 hooks the Pirate King beat to it |
