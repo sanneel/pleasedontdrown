@@ -552,6 +552,114 @@ namespace PleaseDontDrown.Editor
             return go;
         }
 
+        // ---------------------------------------------------------------- B13: island 2's gun shop
+
+        /// <summary>Batch: "Coral Arms", a walk-up gun boutique between the bar and the hotel, facing the beach: cream
+        /// walls, a teal awning, gold sign, the guns on a dark wall behind the window. Its counter is a copy of the
+        /// reception's shop counter (same guns and prices) that opens and closes with the reception (ShopFollowsAnother),
+        /// so the story's "buy the pistol" step works at either.</summary>
+        public static void TeamBGunShopBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform env = GameObject.Find("Environment").transform;
+            if (env.Find("Island2GunShop") is { } old) Object.DestroyImmediate(old.gameObject);
+            var root = new GameObject("Island2GunShop").transform;
+            root.SetParent(env, false);
+            Vector3 centre = new(-20f, 0f, -245.5f);
+            centre.y = GroundUnder(centre);
+            root.position = centre;
+            TagSurface(root.gameObject, SurfaceKind.Wood);
+
+            Material cream = GetMaterial("GunShopCream", new Color(.93f, .85f, .71f), smoothness: .12f);
+            Material teal = GetMaterial("CoralBarTeal", new Color(0.09f, 0.42f, 0.46f), smoothness: 0.45f);
+            Material gold = GetMaterial("CoralBarGold", new Color(1f, 0.78f, 0.38f), 1f, 0.78f);
+            Material dark = GetMaterial("GunShopWalnut", new Color(.16f, .09f, .05f), smoothness: .5f);
+            Material floorMat = GetMaterial("GunShopFloor", new Color(.55f, .5f, .45f), smoothness: .3f);
+            GameObject Box(string n, Vector3 p, Vector3 s, Material m, bool solid = true) => Primitive(PrimitiveType.Cube, n, root, p, s, m, solid);
+
+            // Shell (local: x across, z toward the beach = +z, y up from the sand). 10 x 5 m, 3.6 m tall.
+            const float w = 10f, d = 5f, h = 3.6f, winL = -3f, winR = 3f, sill = 1.15f, head = 2.75f;
+            Box("Floor", new Vector3(0f, 0.1f, 0f), new Vector3(w, 0.2f, d), floorMat);
+            Box("WallBack", new Vector3(0f, h * 0.5f, -d * 0.5f + 0.1f), new Vector3(w, h, 0.2f), cream);
+            Box("WallWest", new Vector3(-w * 0.5f + 0.1f, h * 0.5f, 0f), new Vector3(0.2f, h, d), cream);
+            Box("WallEast", new Vector3(w * 0.5f - 0.1f, h * 0.5f, 0f), new Vector3(0.2f, h, d), cream);
+            Box("FrontWest", new Vector3((-w * 0.5f + winL) * 0.5f, h * 0.5f, d * 0.5f - 0.1f), new Vector3(winL + w * 0.5f, h, 0.2f), cream);
+            Box("FrontEast", new Vector3((w * 0.5f + winR) * 0.5f, h * 0.5f, d * 0.5f - 0.1f), new Vector3(w * 0.5f - winR, h, 0.2f), cream);
+            Box("FrontBelow", new Vector3(0f, sill * 0.5f, d * 0.5f - 0.1f), new Vector3(winR - winL, sill, 0.2f), cream);
+            Box("FrontAbove", new Vector3(0f, (head + h) * 0.5f, d * 0.5f - 0.1f), new Vector3(winR - winL, h - head, 0.2f), cream);
+            Box("Roof", new Vector3(0f, h + 0.1f, 0f), new Vector3(w + 0.4f, 0.2f, d + 0.4f), cream);
+            Box("RoofTrim", new Vector3(0f, h + 0.22f, d * 0.5f + 0.2f), new Vector3(w + 0.44f, 0.06f, 0.06f), gold, false);
+            // Inside: walnut panelling on the back wall, a gold rail, the guns hung on it.
+            Box("Panelling", new Vector3(0f, 1.9f, -d * 0.5f + 0.22f), new Vector3(w - 0.6f, 2.4f, 0.04f), dark, false);
+            foreach (float y in new[] { 1.45f, 2.25f })
+                Box("GunRail", new Vector3(0f, y - 0.12f, -d * 0.5f + 0.26f), new Vector3(w - 1.2f, 0.03f, 0.04f), gold, false);
+            string[] guns = { "pistol", "smg", "shotgun", "rifle", "sniper", "pistol" };
+            for (int i = 0; i < guns.Length; i++)
+            {
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Art/Weapons/{guns[i]}.glb");
+                if (prefab == null) continue;
+                GameObject gun = Object.Instantiate(prefab, root, false);
+                gun.name = "Display_" + guns[i];
+                Vector3 at = new(-3.2f + (i % 3) * 3.2f, i < 3 ? 2.3f : 1.5f, -d * 0.5f + 0.34f);
+                // Lay it along the wall: its longest side across (x), side on to the customers.
+                gun.transform.localPosition = Vector3.zero;
+                gun.transform.localRotation = Quaternion.identity;
+                Bounds gb = RendererBounds(gun.transform);
+                Vector3 sz = gb.size;
+                if (sz.y >= sz.x && sz.y >= sz.z) gun.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                else if (sz.z >= sz.x) gun.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+                gb = RendererBounds(gun.transform);
+                float length = guns[i] switch { "pistol" => 0.32f, "smg" => 0.6f, "shotgun" => 1.05f, "rifle" => 0.95f, _ => 1.25f };
+                float fit = length / Mathf.Max(gb.size.x, 0.01f); // real length
+                gun.transform.localScale *= fit;
+                gb = RendererBounds(gun.transform);
+                gun.transform.position += root.TransformPoint(at) - gb.center;
+            }
+            var shopLight = new GameObject("ShopLight").AddComponent<Light>();
+            shopLight.transform.SetParent(root, false);
+            shopLight.transform.localPosition = new Vector3(0f, 3.1f, 0f);
+            shopLight.type = LightType.Point; shopLight.range = 7f; shopLight.intensity = 1.3f; shopLight.color = new Color(1f, 0.88f, 0.7f);
+            shopLight.shadows = LightShadows.None;
+
+            // The awning over the window, the sign above it.
+            GameObject awning = Box("Awning", new Vector3(0f, head + 0.35f, d * 0.5f + 0.75f), new Vector3(winR - winL + 1.2f, 0.08f, 1.6f), teal, false);
+            awning.transform.localRotation = Quaternion.Euler(-14f, 0f, 0f);
+            Box("AwningEdge", new Vector3(0f, head + 0.13f, d * 0.5f + 1.53f), new Vector3(winR - winL + 1.2f, 0.12f, 0.04f), gold, false);
+            Box("SignBoard", new Vector3(0f, h + 0.55f, d * 0.5f + 0.1f), new Vector3(4.6f, 0.5f, 0.06f), teal, false);
+            WorldText(root, "SignText", new Vector3(0f, h + 0.55f, d * 0.5f + 0.14f), "CORAL ARMS", 96, 0.04f, gold.color)
+                .transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+
+            // The counter: a copy of the reception's shop desk, in the window.
+            Transform reception = FindByPath("Environment/Hotel/ReceptionDesk") ?? throw new InvalidOperationException("No reception desk");
+            var receptionShop = reception.GetComponent<PleaseDontDrown.Story.ShopCounter>();
+            GameObject counter = Object.Instantiate(reception.gameObject, root, false);
+            counter.name = "GunShopCounter";
+            foreach (Transform child in counter.transform.Cast<Transform>().ToArray()) Object.DestroyImmediate(child.gameObject);
+            counter.transform.localRotation = Quaternion.identity;
+            counter.transform.localScale = new Vector3(winR - winL, 0.1f, 0.6f);
+            counter.transform.localPosition = new Vector3(0f, sill + 0.05f, d * 0.5f + 0.1f);
+            counter.GetComponent<MeshRenderer>().sharedMaterial = dark;
+            Box("CounterGold", new Vector3(0f, sill + 0.11f, d * 0.5f + 0.41f), new Vector3(winR - winL, 0.02f, 0.03f), gold, false);
+            var spawn = new GameObject("GunShopSpawn").transform;
+            spawn.SetParent(root, false);
+            spawn.localPosition = new Vector3(0f, sill + 0.3f, d * 0.5f + 0.15f);
+            var so = new SerializedObject(counter.GetComponent<PleaseDontDrown.Story.ShopCounter>());
+            Require(so, "_title").stringValue = "Coral Arms";
+            Require(so, "_spawnPoint").objectReferenceValue = spawn;
+            Require(so, "_startsOpen").boolValue = false;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            SetRef(counter.AddComponent<PleaseDontDrown.Story.ShopFollowsAnother>(), "_leader", receptionShop);
+
+            // The beach crowd walks round it.
+            NavKeepOut(root, new Vector3(0f, 1.8f, 0f), new Vector3(w + 1f, 3.6f, d + 1f));
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island2");
+            AssignSceneIds(scene);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[TeamB] PASS: gun shop built at {root.position}, counter {counter.GetComponent<Collider>().bounds}");
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
