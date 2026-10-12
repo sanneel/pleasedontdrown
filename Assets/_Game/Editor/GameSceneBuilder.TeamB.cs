@@ -456,6 +456,102 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[TeamB] PASS: bar dressed (eave {eave:0.00}, deck {deckTop:0.00}, {bulbCount} bulbs)");
         }
 
+        // ---------------------------------------------------------------- B12: the casino's interior
+
+        /// <summary>Batch: the casino (hotel west wing) gets its Tripo pieces: the six box slot machines (their own
+        /// combined meshes) become the Tripo one-armed bandit on the same stands; a Tripo roulette table in the back half;
+        /// two crystal chandeliers; velvet ropes inside the door; a champagne tower on a gold table. The blackjack table,
+        /// its colliders and everything A7 will use stay as they are.</summary>
+        public static void TeamBCasinoBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform lobby = FindByPath("Environment/Hotel/LobbyLuxury") ?? throw new InvalidOperationException("No lobby");
+            var log = new List<string>();
+
+            // The box slots out, the Tripo ones onto the stands (facing the stools, +x).
+            foreach (Transform t in lobby.Cast<Transform>().Where(t => t.name.StartsWith("Combined_CasinoSlot")).ToArray())
+            {
+                log.Add("removed " + t.name);
+                Object.DestroyImmediate(t.gameObject);
+            }
+            foreach (Transform t in lobby.Cast<Transform>().Where(t => t.name == "Tripo_slot_machine").ToArray()) Object.DestroyImmediate(t.gameObject);
+            foreach (Transform stand in lobby.Cast<Transform>().Where(t => t.name == "SlotBase").ToArray())
+            {
+                Bounds b = stand.GetComponent<Renderer>().bounds;
+                GameObject slot = TripoSlot(lobby, lobby.InverseTransformPoint(new Vector3(b.center.x, b.max.y, b.center.z)), 90f);
+                if (slot == null) throw new InvalidOperationException("Tripo slot machine missing");
+                log.Add($"slot on {b.center} ({RendererBounds(slot.transform).size})");
+            }
+
+            if (lobby.Find("CasinoTripo") is { } old) Object.DestroyImmediate(old.gameObject);
+            var root = new GameObject("CasinoTripo").transform;
+            root.SetParent(lobby, false);
+            root.position = Vector3.zero; root.rotation = Quaternion.identity;
+            float floor = RendererBounds(lobby.Find("Combined_CasinoCarpet")).max.y;
+            float ceiling = 4.95f;
+            Material gold = GetMaterial("LobbyGold", new Color(1f, .76f, .33f), .85f, .62f);
+            Material black = GetMaterial("CasinoBlack", new Color(.025f, .025f, .03f), 0f, .85f);
+
+            // Roulette in the back half, its long side along the room.
+            GameObject roulette = TripoPiece(root, "roulette_table", new Vector3(3.5f, floor, -258.6f), 90f, log, longest: 2.6f);
+            Bounds rb = RendererBounds(roulette.transform);
+            var rc = new GameObject("RouletteCollider").AddComponent<BoxCollider>();
+            rc.transform.SetParent(root, false);
+            rc.transform.position = rb.center; rc.size = rb.size;
+
+            // The casino's two drawn chandeliers (the lobby's style) give way to the Tripo crystal ones; the ceiling roses stay.
+            var casinoChandeliers = new[] { new Vector3(2.2f, 0f, -248.6f), new Vector3(2.2f, 0f, -258.4f) };
+            foreach (Transform t in lobby.Cast<Transform>().Where(t => t.name.StartsWith("Chandelier")).ToArray())
+                if (casinoChandeliers.Any(c => new Vector2(t.position.x - c.x, t.position.z - c.z).magnitude < 1.3f))
+                    Object.DestroyImmediate(t.gameObject);
+            foreach (Vector3 at in casinoChandeliers)
+            {
+                GameObject chandelier = TripoPiece(root, "crystal_chandelier", new Vector3(at.x, 0f, at.z), 0f, log, height: 1.3f);
+                Bounds cb = RendererBounds(chandelier.transform);
+                chandelier.transform.position += Vector3.up * (ceiling - 0.12f - cb.max.y);
+                var glow = new GameObject("ChandelierLight").AddComponent<Light>();
+                glow.transform.SetParent(root, false);
+                glow.transform.position = new Vector3(at.x, ceiling - 1.1f, at.z);
+                glow.type = LightType.Point; glow.range = 7f; glow.intensity = 1.6f; glow.color = new Color(1f, 0.86f, 0.62f);
+                glow.shadows = LightShadows.None;
+            }
+
+            // Velvet ropes inside the door, either side of the way in.
+            foreach (float z in new[] { -247.2f, -251.0f })
+                TripoPiece(root, "velvet_rope_stanchions", new Vector3(6.2f, floor, z), 0f, log, longest: 1.9f);
+
+            // Champagne tower on a round black-and-gold table in the corner by the cash wall.
+            Vector3 tableAt = new(6.6f, floor, -260.6f);
+            Primitive(PrimitiveType.Cylinder, "ChampagneTableLeg", root, tableAt + Vector3.up * 0.37f, new Vector3(0.12f, 0.37f, 0.12f), gold);
+            Primitive(PrimitiveType.Cylinder, "ChampagneTableTop", root, tableAt + Vector3.up * 0.76f, new Vector3(0.9f, 0.02f, 0.9f), black);
+            Primitive(PrimitiveType.Cylinder, "ChampagneTableRim", root, tableAt + Vector3.up * 0.74f, new Vector3(0.94f, 0.015f, 0.94f), gold, keepCollider: false);
+            TripoPiece(root, "champagne_tower", tableAt + Vector3.up * 0.78f, 0f, log, height: 0.75f);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Directory.CreateDirectory("Logs");
+            File.WriteAllLines("Logs/teamb-casino.txt", log);
+            Debug.Log("[TeamB] PASS: casino dressed\n" + string.Join("\n", log));
+        }
+
+        /// <summary>A Tripo island 2 model scaled to a height or a longest side, standing with its bottom middle on <paramref name="foot"/>.</summary>
+        private static GameObject TripoPiece(Transform parent, string model, Vector3 foot, float yaw, List<string> log, float height = 0f, float longest = 0f)
+        {
+            GameObject prefab = TripoIsland2(model) ?? throw new InvalidOperationException("Tripo model missing: " + model);
+            GameObject go = Object.Instantiate(prefab, parent, false);
+            go.name = "Tripo_" + model;
+            go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            go.transform.position = Vector3.zero;
+            Bounds b = RendererBounds(go.transform);
+            float scale = height > 0f ? height / b.size.y : longest / Mathf.Max(b.size.x, b.size.z);
+            go.transform.localScale *= scale;
+            b = RendererBounds(go.transform);
+            go.transform.position += foot - new Vector3(b.center.x, b.min.y, b.center.z);
+            foreach (Renderer r in go.GetComponentsInChildren<Renderer>()) r.allowOcclusionWhenDynamic = false;
+            log.Add($"{model}: scale {scale:0.###}, size {RendererBounds(go.transform).size}");
+            return go;
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
