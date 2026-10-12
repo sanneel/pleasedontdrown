@@ -21,12 +21,12 @@ will find the spot.
 
 | # | The user's verdict | Next |
 |---|---|---|
-| A5 | Works but weird | Put the defibrillator **down** (next to the casualty), then **E** on it to use it |
+| A5 | Works but weird | **Redone** (12a08a88): put it down by the casualty, stand beside them, E on it; the other button picks it up again |
 | A6 | Works, bad visuals | Better looks for the bar ordering/eating (card, food, serving) |
-| A7 | Needs better visuals | Blackjack played **on the table** (cards on the felt), not in a pop-up |
+| A7 | Needs better visuals | **Redone** (a2683701): cards dealt on the felt (E deal/hit, other button stand or bet, R double), no pop-up |
 | A8 / C7 | Octagon is inside the tavern | The octagon stands **next to** the tavern, outside (C7 builds it, A8's fight works wherever it is) |
 | A11 / C5 | No sewer anywhere; C5 done very badly | C5's drain/grate in the castle yard **removed**; a real sewer (entrance behind the back waterfall, tunnel, exit in the castle) still to be built, then A11 hooks the Pirate King beat to it |
-| A12 | Worse: hands very weird, lying on the stomach worst | Fix the arms/hands in the lying poses (front and back) on every body |
+| A12 | Worse: hands very weird, lying on the stomach worst | **Redone** (5bd265dc): propped on the elbows on the stomach, arms along the body on the back, every body |
 | A13 | Changed, not clearer | A cleaner on-screen text design |
 | B1 | Removed | — |
 | B4 | Wrong island | Coconut palms **back on island 1**; remove them from **island 3** |
