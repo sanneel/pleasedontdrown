@@ -145,7 +145,11 @@ namespace PleaseDontDrown.Editor
             return box;
         }
 
-        /// <summary>The casino's blackjack table plays (Fun.BlackjackTable): looking at its collision box opens the cards.</summary>
+        /// <summary>
+        /// The casino's blackjack table plays (Fun.BlackjackTable), on the felt: looking at its collision box deals and
+        /// plays; the cards (Resources/Cards, ArtSource/Tools/make_cards.py) are laid on the table. The table's dressed-up
+        /// fake cards and bet chips go (real ones are dealt now).
+        /// </summary>
         private static void AddBlackjackGame()
         {
             Collider table = Object.FindObjectsByType<BoxCollider>(FindObjectsInactive.Include, FindObjectsSortMode.None)
@@ -157,9 +161,88 @@ namespace PleaseDontDrown.Editor
             go.transform.SetParent(table.transform.parent, false);
             go.transform.SetPositionAndRotation(table.transform.position, table.transform.rotation);
             go.AddComponent<NetworkObject>();
-            go.AddComponent<BlackjackTable>();
+            var game = go.AddComponent<BlackjackTable>();
+            // The felt: the collider's box stands 0.75 m out over the arc from the dealer's straight edge, the felt top
+            // 0.906 m over the floor (GameSceneBuilder.HotelInterior: the half-moon table at t, the box at t + (0.75, 0.5, 0)).
+            var felt = new GameObject("Felt").transform;
+            felt.SetParent(go.transform, false);
+            felt.localPosition = new Vector3(-0.75f, 0.406f, 0f);
+            SetRef(game, "_felt", felt);
+            SetRef(game, "_textMaterial", WorldTextMaterial());
+            CardMaterial();
             ConfigureInteractable(go.AddComponent<Interactable>(), new[] { table }, new Renderer[0], 4f);
-            Debug.Log($"[BarDining] blackjack table at {table.bounds.center:F1}, size {table.bounds.size:F1}");
+            // The dressing's fake hands and bets on the felt.
+            int gone = 0;
+            foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (t == null || t.name is not ("Card" or "CardPip" or "DealerCardUp" or "DealerCardDown" or "BetChip")) continue;
+                Vector3 d = t.position - felt.position;
+                if (new Vector2(d.x, d.z).magnitude < 1.7f && Mathf.Abs(d.y) < 0.2f) { Object.DestroyImmediate(t.gameObject); gone++; }
+            }
+            // (Most of the dressing is baked into the casino's Combined_* meshes: cut the bits lying on the felt out of them.)
+            foreach (MeshFilter combined in Object.FindObjectsByType<MeshFilter>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (!combined.name.StartsWith("Combined_") || combined.sharedMesh == null) continue;
+                Mesh mesh = combined.sharedMesh;
+                Vector3[] v = mesh.vertices;
+                bool OnFelt(int i)
+                {
+                    Vector3 w = combined.transform.TransformPoint(v[i]) - felt.position;
+                    return new Vector2(w.x, w.z).magnitude < 1.4f && w.y > -0.004f && w.y < 0.006f;
+                }
+                bool changed = false;
+                for (int sub = 0; sub < mesh.subMeshCount; sub++)
+                {
+                    int[] tris = mesh.GetTriangles(sub);
+                    var keep = new List<int>(tris.Length);
+                    for (int t = 0; t < tris.Length; t += 3)
+                    {
+                        if (OnFelt(tris[t]) && OnFelt(tris[t + 1]) && OnFelt(tris[t + 2])) { gone++; continue; }
+                        keep.Add(tris[t]); keep.Add(tris[t + 1]); keep.Add(tris[t + 2]);
+                    }
+                    if (keep.Count == tris.Length) continue;
+                    mesh.SetTriangles(keep, sub);
+                    changed = true;
+                }
+                if (changed) EditorUtility.SetDirty(mesh);
+            }
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[BarDining] blackjack table at {table.bounds.center:F1}, size {table.bounds.size:F1}; {gone} fake cards and chips taken off it");
+        }
+
+        /// <summary>The cards' material (Resources/Cards/Card.mat): the atlas, its round corners cut out.</summary>
+        private static void CardMaterial()
+        {
+            const string atlas = "Assets/_Game/Resources/Cards/cards.png", path = "Assets/_Game/Resources/Cards/Card.mat";
+            if (AssetImporter.GetAtPath(atlas) is TextureImporter importer)
+            {
+                importer.textureType = TextureImporterType.Default;
+                importer.alphaIsTransparency = true;
+                importer.mipmapEnabled = true;
+                importer.filterMode = FilterMode.Trilinear;
+                importer.anisoLevel = 8;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.maxTextureSize = 4096;
+                importer.textureCompression = TextureImporterCompression.CompressedHQ;
+                importer.SaveAndReimport();
+            }
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(atlas) ?? throw new InvalidOperationException($"Card atlas missing ({atlas}: ArtSource/Tools/make_cards.py)");
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.SetTexture("_BaseMap", texture);
+            mat.mainTexture = texture;
+            mat.SetColor("_BaseColor", Color.white);
+            mat.SetFloat("_Smoothness", 0.3f);
+            mat.SetFloat("_AlphaClip", 1f);
+            mat.SetFloat("_Cutoff", 0.5f);
+            mat.EnableKeyword("_ALPHATEST_ON");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+            EditorUtility.SetDirty(mat);
+            AssetDatabase.SaveAssets();
         }
 
         /// <summary>

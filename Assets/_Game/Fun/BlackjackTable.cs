@@ -11,16 +11,25 @@ using UnityEngine;
 namespace PleaseDontDrown.Fun
 {
     /// <summary>
-    /// Blackjack at the hotel casino (a side quest, not an income: the house edge is real). Interact at the table and
-    /// the card window opens: pick a bet from the team's wallet, Deal, then Hit, Stand or Double. The dealer draws to 16
-    /// and stands on all 17s; a natural blackjack pays 3 to 2, a win 1 to 1, a push gives the bet back.
-    /// The host deals and keeps the shoe (nobody can peek at the hole card); each player plays their own hand.
+    /// Blackjack at the hotel casino (a side quest, not an income: the house edge is real), played right on the table
+    /// (the user, 2026-10-12: not in a pop-up). Stand at the half-moon table and E deals: your cards land on the felt in
+    /// front of your place, the dealer's in front of the dealer (the hole card face down), your bet in chips on the
+    /// circle, the totals over the cards; everyone round the table sees every hand. Then E hits, the other button stands,
+    /// Reload doubles; between hands the other button changes the bet (from the team's wallet).
+    /// The dealer draws to 16 and stands on all 17s; a natural blackjack pays 3 to 2, a win 1 to 1, a push gives the bet
+    /// back. The host deals and keeps the shoe (nobody can peek at the hole card); each player plays their own hand.
     /// After the gala robbery (beat 2.6 on) the casino is closed.
     /// </summary>
-    public class BlackjackTable : NetworkBehaviour, IInteractionHandler
+    public class BlackjackTable : NetworkBehaviour, IInteractionHandler, IInteractionSecondary
     {
         private static readonly int[] Bets = { 10, 25, 50, 100 };
         private const float Reach = 4f;
+        private const int Seats = 5;
+
+        [Tooltip("The middle of the felt's straight (dealer's) edge, +x out over the felt toward the players (the builder sets it).")]
+        [SerializeField] private Transform _felt;
+        [Tooltip("WorldText material, for the totals over the cards.")]
+        [SerializeField] private Material _textMaterial;
 
         // ------------------------------------------------------------------ the host's games
 
@@ -29,54 +38,75 @@ namespace PleaseDontDrown.Fun
             public readonly List<byte> Player = new(), Dealer = new();
             public int Bet;
             public bool Over;
+            public byte Seat;
         }
 
         private readonly Dictionary<int, Game> _games = new();
         private readonly List<byte> _shoe = new();
         private System.Random _rng;
 
-        // ------------------------------------------------------------------ the local window
+        // ------------------------------------------------------------------ the local player
 
-        private bool _open, _pushedUI;
         private int _betIndex;
-        private byte[] _myCards = new byte[0], _dealerCards = new byte[0];
-        private bool _inHand, _holeHidden;
-        private string _result = "", _moneyText;
-        private int _moneyShown = -1, _shownBet;
+        private byte[] _myCards = new byte[0];
+        private bool _inHand;
+        private int _shownBet;
+        private float _nextPress;
 
         private static bool Closed => StoryDirector.Instance != null && StoryDirector.Instance.BeatId is { } b &&
                                       (b.StartsWith("2.6") || b.StartsWith("2.7") || b.StartsWith("3.") || b.StartsWith("4."));
 
+        private int Bet => Bets[Mathf.Clamp(_betIndex, 0, Bets.Length - 1)];
+
         public bool CanInteract(PlayerHub player) => player != null && (player.transform.position - transform.position).sqrMagnitude < Reach * Reach;
-        public string GetPrompt(PlayerHub player) => Closed ? "Blackjack (closed since the robbery)" : $"Play blackjack (wallet ${Economy.Money})";
+
+        public string GetPrompt(PlayerHub player)
+        {
+            if (Closed) return "Blackjack (closed since the robbery)";
+            if (_inHand) return _myCards.Length == 2 && Economy.Money >= _shownBet ? $"Hit ({Total(_myCards)})   R: double" : $"Hit ({Total(_myCards)})";
+            return Economy.Money >= Bet ? $"Deal blackjack, bet ${Bet}" : $"Blackjack: ${Bet} bet, wallet ${Economy.Money}";
+        }
 
         public void OnInteract(PlayerHub player)
         {
-            if (player == null || !player.IsOwner) return;
+            if (player == null || !player.IsOwner || !Pressed()) return;
             if (Closed)
             {
                 PlayerHud.ShowToast("The casino's closed: the pirates cleaned it out.", 3f);
                 return;
             }
-            SetOpen(true);
+            if (_inHand) HitServer();
+            else if (Economy.Money < Bet) PlayerHud.ShowToast($"Not enough in the wallet for ${Bet}.", 2f);
+            else DealServer(Bet);
         }
 
-        private void SetOpen(bool open)
+        // The other button: stand in a hand, a different bet between hands.
+        public bool CanSecondary(PlayerHub player) => !Closed && CanInteract(player);
+        public string GetSecondaryPrompt(PlayerHub player) => _inHand ? "Stand" : $"Bet ${Bets[(_betIndex + 1) % Bets.Length]}";
+
+        public void OnSecondary(PlayerHub player)
         {
-            if (_open == open) return;
-            _open = open;
-            if (open && !_pushedUI) { GameInput.PushUI(); _pushedUI = true; }
-            if (!open && _pushedUI) { GameInput.PopUI(); _pushedUI = false; }
+            if (player == null || !player.IsOwner || !Pressed()) return;
+            if (_inHand) StandServer();
+            else _betIndex = (_betIndex + 1) % Bets.Length;
         }
 
-        private void OnDisable() => SetOpen(false);
+        // (One action per press: a held button doesn't hit three times.)
+        private bool Pressed()
+        {
+            if (Time.time < _nextPress) return false;
+            _nextPress = Time.time + 0.25f;
+            return true;
+        }
 
         private void Update()
         {
-            if (!_open) return;
             PlayerHub me = PlayerHub.Local;
-            if (GameInput.ToggleMenu.WasPressedThisFrame() || me == null || (me.transform.position - transform.position).sqrMagnitude > (Reach + 2f) * (Reach + 2f))
-                SetOpen(false);
+            if (me == null) return;
+            bool near = (me.transform.position - transform.position).sqrMagnitude < (Reach + 1f) * (Reach + 1f);
+            if (_inHand && near && GameInput.GameplayActive && GameInput.Reload.WasPressedThisFrame() && _myCards.Length == 2 && Pressed())
+                DoubleServer();
+            UpdateViews();
         }
 
         public override void OnStartClient()
@@ -93,12 +123,6 @@ namespace PleaseDontDrown.Fun
                     case "double": DoubleServer(); break;
                 }
             }, cheat: true, owner: this);
-        }
-
-        public override void OnStopClient()
-        {
-            base.OnStopClient();
-            DevCommands.Unregister("blackjack", this);
         }
 
         // ------------------------------------------------------------------ host: dealing
@@ -154,10 +178,10 @@ namespace PleaseDontDrown.Fun
             bet = Mathf.Clamp(bet, Bets[0], Bets[Bets.Length - 1]);
             if (Economy.Instance == null || !Economy.Instance.ServerSpend(bet, "blackjack bet"))
             {
-                StateTarget(caller, new byte[0], new byte[0], true, false, $"Not enough in the wallet for ${bet}.", 0);
+                Tell(caller, $"Not enough in the wallet for ${bet}.");
                 return;
             }
-            var game = new Game { Bet = bet };
+            var game = new Game { Bet = bet, Seat = SeatFor(caller.ClientId, player) };
             game.Player.Add(Draw());
             game.Dealer.Add(Draw());
             game.Player.Add(Draw());
@@ -165,6 +189,24 @@ namespace PleaseDontDrown.Fun
             _games[caller.ClientId] = game;
             if (Natural(game.Player) || Natural(game.Dealer)) Finish(caller, game);
             else Send(caller, game, "Hit or stand?");
+        }
+
+        /// <summary>The place at the table for this player: the one they had, or the free one nearest where they stand.</summary>
+        private byte SeatFor(int clientId, PlayerHub player)
+        {
+            if (_games.TryGetValue(clientId, out Game had)) return had.Seat;
+            var taken = new HashSet<byte>();
+            foreach (KeyValuePair<int, Game> g in _games)
+                if (g.Key != clientId) taken.Add(g.Value.Seat);
+            byte best = 2;
+            float bestDistance = float.MaxValue;
+            for (byte i = 0; i < Seats; i++)
+            {
+                if (taken.Contains(i)) continue;
+                float d = (SeatPoint(i, 2.0f) - player.transform.position).sqrMagnitude;
+                if (d < bestDistance) { bestDistance = d; best = i; }
+            }
+            return best;
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -190,7 +232,7 @@ namespace PleaseDontDrown.Fun
             if (caller == null || !_games.TryGetValue(caller.ClientId, out Game game) || game.Over || game.Player.Count != 2) return;
             if (Economy.Instance == null || !Economy.Instance.ServerSpend(game.Bet, "blackjack double"))
             {
-                Send(caller, game, "Not enough in the wallet to double.");
+                Tell(caller, "Not enough in the wallet to double.");
                 return;
             }
             game.Bet *= 2;
@@ -222,86 +264,189 @@ namespace PleaseDontDrown.Fun
             Send(caller, game, result);
         }
 
-        private void Send(NetworkConnection caller, Game game, string text) =>
-            StateTarget(caller, game.Player.ToArray(), game.Dealer.ToArray(), game.Over, !game.Over, text, game.Bet);
+        private void Send(NetworkConnection caller, Game game, string text)
+        {
+            byte[] dealer = game.Dealer.ToArray();
+            if (!game.Over && dealer.Length > 1) dealer[1] = BlackjackCards.Back; // the hole card stays the host's
+            HandObservers(caller.ClientId, game.Seat, game.Player.ToArray(), dealer, game.Over, text, game.Bet);
+        }
 
         [TargetRpc]
-        private void StateTarget(NetworkConnection target, byte[] mine, byte[] dealer, bool over, bool holeHidden, string text, int bet)
+        private void Tell(NetworkConnection target, string text) => PlayerHud.ShowToast(text, 2.5f);
+
+        /// <summary>A player's hand as it stands now, for everyone at the table (the hole card's face isn't sent until the end).</summary>
+        [ObserversRpc]
+        private void HandObservers(int clientId, byte seat, byte[] mine, byte[] dealer, bool over, string text, int bet)
         {
-            _myCards = mine;
-            _dealerCards = dealer;
-            _inHand = !over;
-            _holeHidden = holeHidden;
-            _result = text;
-            _shownBet = bet;
-            DevCommands.Print($"[blackjack] you {Total(mine)}, dealer {(holeHidden ? "?" : Total(dealer).ToString())}: {text}");
+            if (!over && dealer.Length > 1) dealer[1] = BlackjackCards.Back; // (the client never needs the hole card early)
+            bool local = LocalConnection != null && LocalConnection.ClientId == clientId;
+            if (local)
+            {
+                _myCards = mine;
+                _inHand = !over;
+                _shownBet = bet;
+                if (over) PlayerHud.ShowToast(text, 3.5f);
+                DevCommands.Print($"[blackjack] you {Total(mine)}, dealer {(over ? Total(dealer).ToString() : "?")}: {text}");
+            }
+            if (!_views.TryGetValue(clientId, out HandView view))
+                _views[clientId] = view = new HandView(this);
+            view.Show(seat, mine, dealer, over, text, bet);
         }
 
-        // ------------------------------------------------------------------ the window
+        // ------------------------------------------------------------------ the cards on the table
 
-        private static readonly string[] Ranks = { "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K" };
-        private static readonly string[] Suits = { "♠", "♥", "♦", "♣" };
+        private readonly Dictionary<int, HandView> _views = new();
 
-        private void OnGUI()
+        /// <summary>A point round the arc for place <paramref name="seat"/> (0..4, -60..60 degrees), this far out from the dealer's edge.</summary>
+        private Vector3 SeatPoint(int seat, float radius)
         {
-            if (!_open) return;
-            if (_moneyShown != Economy.Money || _moneyText == null)
-            {
-                _moneyShown = Economy.Money;
-                _moneyText = "Wallet $" + _moneyShown;
-            }
-            Hud.Dim(0.45f);
-            const float width = 900f, height = 640f;
-            var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f, width, height);
-            Hud.Panel(panel, 0.94f);
-            Hud.Fill(new Rect(panel.x + 20f, panel.y + 90f, width - 40f, 380f), new Color(0.04f, 0.32f, 0.18f, 0.95f), 18f);
-            Hud.Label(new Rect(panel.x + 36f, panel.y + 18f, 400f, 56f), "BLACKJACK", 40f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            Hud.Label(new Rect(panel.xMax - 336f, panel.y + 18f, 300f, 56f), _moneyText, 28f, new Color(0.56f, 1f, 0.56f), TextAnchor.MiddleRight, heavy: true, shadow: false);
+            float a = (-60f + seat * 30f) * Mathf.Deg2Rad;
+            Transform f = _felt != null ? _felt : transform;
+            return f.TransformPoint(new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius));
+        }
 
-            Hud.Label(new Rect(panel.x + 44f, panel.y + 104f, 400f, 30f), _dealerCards.Length == 0 ? "DEALER" :
-                $"DEALER  {(_holeHidden ? "?" : Total(_dealerCards).ToString())}", 22f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            DrawCards(_dealerCards, panel.x + 44f, panel.y + 140f, _holeHidden);
-            Hud.Label(new Rect(panel.x + 44f, panel.y + 290f, 400f, 30f), _myCards.Length == 0 ? "YOU" : $"YOU  {Total(_myCards)}" + (_shownBet > 0 ? $"   (bet ${_shownBet})" : ""),
-                22f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            DrawCards(_myCards, panel.x + 44f, panel.y + 326f, false);
-            Hud.Label(new Rect(panel.x + 36f, panel.y + 478f, width - 72f, 44f), _result, 26f, Hud.Sand, TextAnchor.MiddleCenter, heavy: true, shadow: false);
+        /// <summary>A hand laid on the felt without a game (review renders: ReviewCapture's "bjhand").</summary>
+        public void ReviewHand(int player, byte seat, byte[] mine, byte[] dealer, bool over, string text, int bet)
+        {
+            if (!_views.TryGetValue(player, out HandView view)) _views[player] = view = new HandView(this);
+            view.Show(seat, mine, dealer, over, text, bet);
+        }
 
-            float y = panel.yMax - 92f;
-            if (_inHand)
+        private void UpdateViews()
+        {
+            foreach (HandView view in _views.Values) view.Tick();
+        }
+
+        public override void OnStopClient()
+        {
+            base.OnStopClient();
+            DevCommands.Unregister("blackjack", this);
+            foreach (HandView view in _views.Values) view.Clear();
+            _views.Clear();
+        }
+
+        /// <summary>
+        /// One player's hand on the felt: their cards fanned in front of their place (tops toward the dealer, so they read
+        /// them the right way up), the dealer's cards for them in front of the dealer, the bet in chips on the circle, and
+        /// the totals over them. A finished hand stays a while, then the cards are cleared away.
+        /// </summary>
+        private sealed class HandView
+        {
+            private readonly BlackjackTable _table;
+            private readonly Transform _root;
+            private readonly List<GameObject> _mine = new(), _dealer = new(), _chips = new();
+            private readonly TextMesh _mineText, _dealerText;
+            private float _clearAt = float.PositiveInfinity;
+
+            public HandView(BlackjackTable table)
             {
-                if (Hud.Button(new Rect(panel.x + 36f, y, 200f, 60f), "HIT", centred: true, primary: true)) HitServer();
-                if (Hud.Button(new Rect(panel.x + 256f, y, 200f, 60f), "STAND", centred: true)) StandServer();
-                GUI.enabled = _myCards.Length == 2 && Economy.Money >= _shownBet;
-                if (Hud.Button(new Rect(panel.x + 476f, y, 200f, 60f), "DOUBLE", centred: true)) DoubleServer();
-                GUI.enabled = true;
+                _table = table;
+                _root = new GameObject("Hand").transform;
+                _root.SetParent(table.transform, false);
+                _mineText = Label("Total");
+                _dealerText = Label("DealerTotal");
             }
-            else
+
+            private TextMesh Label(string name)
             {
-                for (int i = 0; i < Bets.Length; i++)
+                var go = new GameObject(name);
+                go.transform.SetParent(_root, false);
+                var text = go.AddComponent<TextMesh>();
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                go.GetComponent<MeshRenderer>().sharedMaterial = _table._textMaterial != null ? _table._textMaterial : text.font.material;
+                text.fontSize = 64;
+                text.characterSize = 0.005f;
+                text.anchor = TextAnchor.MiddleCenter;
+                text.alignment = TextAlignment.Center;
+                text.color = new Color(1f, 0.93f, 0.75f);
+                return text;
+            }
+
+            public void Show(byte seat, byte[] mine, byte[] dealer, bool over, string result, int bet)
+            {
+                Transform felt = _table._felt != null ? _table._felt : _table.transform;
+                float a = (-60f + seat * 30f) * Mathf.Deg2Rad;
+                Vector3 outward = felt.TransformDirection(new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)));
+                Vector3 along = Vector3.Cross(Vector3.up, outward); // across the player's place, left to right as they sit
+                Quaternion faceSeat = Quaternion.LookRotation(-outward, Vector3.up); // card tops toward the dealer
+                const float lift = 0.002f;
+
+                // Theirs: fanned in front of their place.
+                Lay(_mine, mine, i =>
                 {
-                    GUI.enabled = Economy.Money >= Bets[i];
-                    if (Hud.Button(new Rect(panel.x + 36f + i * 120f, y, 108f, 60f), "$" + Bets[i], centred: true, small: true, selected: _betIndex == i)) _betIndex = i;
-                }
-                GUI.enabled = Economy.Money >= Bets[_betIndex];
-                if (Hud.Button(new Rect(panel.x + 516f, y, 160f, 60f), "DEAL", centred: true, primary: true)) DealServer(Bets[_betIndex]);
-                GUI.enabled = true;
-            }
-            if (Hud.Button(new Rect(panel.xMax - 196f, y, 160f, 60f), "LEAVE", centred: true)) SetOpen(false);
-        }
+                    Vector3 p = _table.SeatPoint(seat, 0.8f) + along * ((i - (mine.Length - 1) * 0.5f) * 0.085f) + Vector3.up * (lift + i * 0.0012f);
+                    return (p, faceSeat * Quaternion.Euler(0f, (i - (mine.Length - 1) * 0.5f) * 6f, 0f));
+                });
+                // The dealer's: in a row in front of the dealer, toward this place.
+                Vector3 dealerSpot = felt.TransformPoint(new Vector3(0.26f, 0f, Mathf.Sin(a) * 0.36f));
+                Vector3 dealerAlong = felt.TransformDirection(Vector3.forward);
+                Quaternion faceTable = Quaternion.LookRotation(felt.TransformDirection(Vector3.left), Vector3.up);
+                Lay(_dealer, dealer, i => (dealerSpot + dealerAlong * ((i - (dealer.Length - 1) * 0.5f) * 0.095f) + Vector3.up * (lift + i * 0.0012f), faceTable));
 
-        private static void DrawCards(byte[] cards, float x, float y, bool holeHidden)
-        {
-            for (int i = 0; i < cards.Length; i++)
+                // The bet: a stack of chips on the circle (a chip per $10, at most 10).
+                int chips = Mathf.Clamp(bet / 10, bet > 0 ? 1 : 0, 10);
+                while (_chips.Count < chips) _chips.Add(BlackjackCards.Chip(bet >= 100 ? 100 : bet >= 25 ? 25 : 10, _root));
+                for (int i = 0; i < _chips.Count; i++)
+                {
+                    _chips[i].SetActive(i < chips && !over);
+                    _chips[i].transform.SetPositionAndRotation(_table.SeatPoint(seat, 1.06f) + Vector3.up * (0.004f + i * 0.0082f), Quaternion.identity);
+                }
+
+                // The totals beside the cards, lying back on the felt so they read from the player's place (a TextMesh
+                // reads from behind its +z: that points away from them).
+                Quaternion readable = Quaternion.LookRotation(-outward, Vector3.up) * Quaternion.Euler(65f, 0f, 0f);
+                float fan = (mine.Length - 1) * 0.5f * 0.085f + BlackjackCards.Width * 0.5f;
+                int myTotal = Total(mine);
+                _mineText.text = mine.Length == 0 ? "" : over ? $"{myTotal}  {Short(result)}" : (myTotal > 21 ? $"BUST {myTotal}" : myTotal.ToString());
+                _mineText.characterSize = 0.011f;
+                _mineText.anchor = TextAnchor.MiddleRight; // (it runs away from the cards)
+                _mineText.transform.SetPositionAndRotation(_table.SeatPoint(seat, 0.8f) + along * (fan + 0.04f) + Vector3.up * 0.03f, readable);
+                bool holeShown = dealer.Length < 2 || dealer[1] != BlackjackCards.Back;
+                _dealerText.text = dealer.Length == 0 ? "" : holeShown ? $"DEALER {Total(dealer)}" : "DEALER";
+                _dealerText.characterSize = 0.008f;
+                _dealerText.anchor = TextAnchor.MiddleRight;
+                float dealerFan = (dealer.Length - 1) * 0.5f * 0.095f + BlackjackCards.Width * 0.5f;
+                _dealerText.transform.SetPositionAndRotation(dealerSpot - dealerAlong * (dealerFan + 0.04f) + Vector3.up * 0.03f, readable);
+                _clearAt = over ? Time.time + 8f : float.PositiveInfinity;
+                _root.gameObject.SetActive(true);
+            }
+
+            /// <summary>A few words for the result over the cards ("WIN +$25", "BUST", "PUSH", "LOSE").</summary>
+            private static string Short(string result)
             {
-                var r = new Rect(x + i * 104f, y, 92f, 130f);
-                bool hidden = holeHidden && i == 1;
-                Hud.Fill(r, hidden ? new Color(0.65f, 0.08f, 0.1f) : new Color(0.98f, 0.97f, 0.94f), 10f);
-                Hud.Frame(r, new Color(0f, 0f, 0f, 0.35f), 2f, 10f);
-                if (hidden) continue;
-                int rank = cards[i] % 13, suit = cards[i] / 13 % 4;
-                Color ink = suit is 1 or 2 ? new Color(0.8f, 0.1f, 0.12f) : new Color(0.08f, 0.08f, 0.1f);
-                Hud.Label(new Rect(r.x + 8f, r.y + 4f, 76f, 40f), Ranks[rank], 30f, ink, TextAnchor.UpperLeft, heavy: true, shadow: false);
-                Hud.Label(new Rect(r.x, r.y + 40f, r.width, 80f), Suits[suit], 52f, ink, TextAnchor.MiddleCenter, shadow: false);
+                if (result.StartsWith("BLACKJACK")) return "BLACKJACK!";
+                if (result.Contains("push")) return "PUSH";
+                if (result.Contains("You win")) return "WIN";
+                if (result.StartsWith("Bust")) return "BUST";
+                return "LOSE";
+            }
+
+            private void Lay(List<GameObject> laid, byte[] cards, System.Func<int, (Vector3, Quaternion)> where)
+            {
+                while (laid.Count < cards.Length) laid.Add(BlackjackCards.Make(BlackjackCards.Back, _root));
+                for (int i = 0; i < laid.Count; i++)
+                {
+                    bool on = i < cards.Length;
+                    laid[i].SetActive(on);
+                    if (!on) continue;
+                    BlackjackCards.Show(laid[i], cards[i]);
+                    (Vector3 p, Quaternion r) = where(i);
+                    laid[i].transform.SetPositionAndRotation(p, r);
+                }
+            }
+
+            public void Tick()
+            {
+                if (Time.time >= _clearAt)
+                {
+                    _root.gameObject.SetActive(false);
+                    _clearAt = float.PositiveInfinity;
+                }
+            }
+
+            public void Clear()
+            {
+                if (_root != null) Destroy(_root.gameObject);
             }
         }
     }
