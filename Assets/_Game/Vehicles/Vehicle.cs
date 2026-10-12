@@ -39,8 +39,10 @@ namespace PleaseDontDrown.Vehicles
         [SerializeField] private bool _restHands;
         [Tooltip("A seat that never moves (a bar stool): sit down and stand up, no driving. Frozen in place.")]
         [SerializeField] private bool _chair;
-        [Tooltip("A tall bar stool (a chair): the legs hang down its sides, outside the round cushion (the counter is right in front).")]
+        [Tooltip("A bar stool (a chair, Art/Props/bar_stool.glb): knees bent, feet on its footrest ring, hands on the knees.")]
         [SerializeField] private bool _stool;
+        [Tooltip("A chair: its cushion's front edge this far ahead of the seat point (the knees bend over it and the legs hang in front of it). 0: not known.")]
+        [SerializeField] private float _seatEdge;
         [Tooltip("Drives on land (the golf cart): wheels on the ground push and steer it; it rolls to a stop off the throttle.")]
         [SerializeField] private bool _land;
         [Tooltip("Needed in the driver's inventory to start it (item display name). Empty = no key.")]
@@ -79,6 +81,7 @@ namespace PleaseDontDrown.Vehicles
         public string DisplayName => _displayName;
         public bool IsChair => _chair;
         public bool IsStool => _stool;
+        public float SeatEdge => _seatEdge;
         /// <summary>A land vehicle (the golf cart): sat on a bench, not astride.</summary>
         public bool IsLand => _land;
         public PlayerHub Driver => _driver.Value;

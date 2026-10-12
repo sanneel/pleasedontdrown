@@ -6,7 +6,9 @@ using FishNet.Object;
 using PleaseDontDrown.Fun;
 using PleaseDontDrown.Interaction;
 using PleaseDontDrown.Items;
+using PleaseDontDrown.Story;
 using PleaseDontDrown.Vehicles;
+using PleaseDontDrown.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -24,12 +26,18 @@ namespace PleaseDontDrown.Editor
     /// </summary>
     public static partial class GameSceneBuilder
     {
-        // Armchairs measured from the bar model (side render of the LOD2 GLB, bar space): x = +/-10.36, two per table.
-        // Each faces its table: (chair z, table z).
-        private static readonly (float chair, float table)[] BarTableChairs = { (2.47f, 4.02f), (5.58f, 4.02f), (-4.55f, -3.12f), (-1.7f, -3.12f) };
-        /// <summary>A bar stool's seat point: on the cushion, a touch forward so the knees clear its edge and the shins hang in front of it (further back they went through the cushion; the counter is 0.42 ahead).</summary>
-        private static readonly Vector3 StoolSeat = new(0f, StoolCushion - 0.01f, 0.0f); // the cushion top (1.13, measured): the bottom sits on it (AvatarAnimator.SeatDrop)
-        private const float BarTableX = 10.36f, ArmchairSeat = 0.83f, BarTableTop = 0.74f;
+        // The lounge's armchairs, measured on the bar model (rays on LOD0, bar space): x = +/-10.2, in pairs facing each
+        // other; each one's cushion front edge (z) and which way it faces. Each pair's low table (ours, Art/Props/
+        // bar_table.glb: the model's own stood 5-14 cm from one of them) goes halfway between, 28 cm clear of both.
+        private static readonly (float edge, float facing)[] BarArmchairs = { (2.877f, 1f), (4.0f, -1f), (-3.825f, 1f), (-2.68f, -1f) };
+        // The bar stools (Art/Props/bar_stool.glb, ArtSource/Tools/model_bar_stool.py), made for the players' goofy lifeguard:
+        // the cushion 1.07 m over the deck (his waist then about level with the counter top, 1.55), its footrest ring where
+        // his feet land with the thighs level, each stool 0.55 m back from the counter top's edge so his knees clear it.
+        private const float BarStoolTop = 1.07f;                              // cushion top over its feet (the model's)
+        private const float BarStoolSeat = BarDeckTop + BarStoolTop;          // ...in the bar's frame: the seat point
+        private const float BarStoolFromCounter = 0.55f;                      // the counter top's edge this far ahead
+        private const float BarTableX = 10.2f, ArmchairSeat = 0.83f, ArmchairSeatZ = 0.2f, ArmchairEdge = 0.38f;
+        private const float BarTableTop = BarDeckTop + 0.484f, BarTableWidth = 0.97f, BarTableDepth = 0.58f; // (model_bar_table.py)
 
         /// <summary>What the hotel bar sells (item, label, price).</summary>
         private static readonly (string item, string label, int price)[] HotelBarMenu =
@@ -66,33 +74,10 @@ namespace PleaseDontDrown.Editor
             Directory.CreateDirectory("Logs");
             EditorSceneManager.SaveScene(scene, $"Logs/Game-before-bar-tables-{DateTime.Now:yyyyMMdd-HHmmss}.unity", true);
 
+            // The stools (new ones, back from the counter) and their guests, then the tables' armchairs.
+            SetRefs(barista, "_seats", BuildBarStools(bar, hotel, barista).ToArray());
             List<Object> seats = AddBarTables(bar, hotel, barista);
             SetHotelBarMenu(barista);
-            // The stools' seats, back from the counter (stools built before this keep their old spot otherwise).
-            Transform stoolRoot = hotel.Find("HotelBarStools");
-            if (stoolRoot != null)
-                foreach (Transform stool in stoolRoot)
-                {
-                    if (stool.Find("Seat") is { } stoolSeat) stoolSeat.localPosition = StoolSeat;
-                    if (!stool.TryGetComponent(out Vehicle stoolVehicle)) continue;
-                    SetBool(stoolVehicle, "_stool", true);
-                    // Hands resting on the bar top in front (the front row's counter edge is 0.18 m from the stool, the
-                    // side counters' 0.52 m): the seated pose's hands go there.
-                    bool front = int.TryParse(stool.name.Replace("BarStool", ""), out int n) && n < 4;
-                    float z = front ? 0.3f : 0.64f;
-                    Transform Grip(string name, float x)
-                    {
-                        Transform old = stool.Find(name);
-                        if (old != null) Object.DestroyImmediate(old.gameObject);
-                        var g = new GameObject(name).transform;
-                        g.SetParent(stool, false);
-                        g.localPosition = new Vector3(x, CounterTop + 0.03f, z);
-                        g.localRotation = Quaternion.identity; // fingers on toward the bartender, palm down
-                        return g;
-                    }
-                    SetRef(stoolVehicle, "_gripLeft", Grip("GripLeft", -0.16f));
-                    SetRef(stoolVehicle, "_gripRight", Grip("GripRight", 0.16f));
-                }
             AddBlackjackGame();
             AddGolfCart(bar, hotel);
             AssignSceneIds(scene); // the new seats and the card table are networked scene objects
@@ -103,6 +88,62 @@ namespace PleaseDontDrown.Editor
 
         /// <summary>Batch: the same.</summary>
         public static void BuildBarDiningBatch() => BuildBarDining();
+
+        /// <summary>
+        /// The bar stools and the two guests on theirs. The bar model's own stools (squashed with it to 1.2 x 0.7 m ovals
+        /// right against the counter: nobody could sit on them like a person) are cut out of it by
+        /// ArtSource/Tools/remove_bar_stools.py; these are Art/Props/bar_stool.glb, made to fit the players' body.
+        /// </summary>
+        private static List<Object> BuildBarStools(Transform bar, Transform hotel, Barista barista)
+        {
+            foreach (string old in new[] { "HotelBarStools", "HotelBarGuests" })
+            {
+                Transform t = hotel.Find(old);
+                if (t != null) Object.DestroyImmediate(t.gameObject);
+            }
+            var stools = new GameObject("HotelBarStools").transform;
+            stools.SetParent(hotel, false);
+            var seats = new List<Object>();
+            for (int i = 0; i < HotelBarStools.Length; i++)
+                seats.Add(BuildBarStool(stools, bar, i, HotelBarStools[i].at, HotelBarStools[i].yaw, barista));
+            for (int i = 0; i < 4; i++) // where the bartender stands to serve the front row
+                if (bar.Find("ServeSpot" + i) is { } spot) spot.localPosition = new Vector3(HotelBarStools[i].at.x, CounterTop + .1f, 4.85f);
+
+            // Two guests chatting over their drinks, sat on their stools as a player sits (AvatarPose.SitStool).
+            GameObject npcPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(NpcPrefabPath);
+            if (npcPrefab == null) return seats;
+            var guests = new GameObject("HotelBarGuests").transform;
+            guests.SetParent(hotel, false);
+            foreach (var g in HotelBarGuests)
+            {
+                var stool = new GameObject("GuestStool_" + g.name).transform;
+                stool.SetParent(guests, false);
+                stool.SetPositionAndRotation(bar.TransformPoint(g.at), bar.rotation * Quaternion.Euler(0f, g.yaw, 0f));
+                BarStoolLooks(stool);
+                var seatPoint = new GameObject("Seat").transform; // (where she sits: for the review renders)
+                seatPoint.SetParent(stool, false);
+                seatPoint.localPosition = new Vector3(0f, BarStoolSeat, 0f);
+                Vector3 at = bar.TransformPoint(g.at + Vector3.up * (BarStoolSeat - 0.5f)); // (the seat 0.5 m over the root)
+                StoryNpc npc = PlaceNpc(npcPrefab, guests, "BarGuest_" + g.name, at, bar.eulerAngles.y + g.yaw);
+                var customer = npc.gameObject.AddComponent<BarCustomer>();
+                SetField(customer, "_name", p => p.stringValue = g.name);
+                SetField(customer, "_body", p => p.intValue = g.body);
+            }
+            return seats;
+        }
+
+        /// <summary>A stool's model on the deck under <paramref name="stool"/> (which stands at the bar's base), and its collision.</summary>
+        private static BoxCollider BarStoolLooks(Transform stool)
+        {
+            if (PropModel("bar_stool", stool, new Vector3(0f, BarDeckTop, 0f)) == null)
+                throw new InvalidOperationException("Bar stool model missing (Art/Props/bar_stool.glb: ArtSource/Tools/model_bar_stool.py)");
+            var hull = new GameObject("Hull");
+            hull.transform.SetParent(stool, false);
+            var box = hull.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, BarDeckTop + BarStoolTop * 0.5f, 0f);
+            box.size = new Vector3(0.42f, BarStoolTop, 0.42f);
+            return box;
+        }
 
         /// <summary>The casino's blackjack table plays (Fun.BlackjackTable): looking at its collision box opens the cards.</summary>
         private static void AddBlackjackGame()
@@ -223,13 +264,14 @@ namespace PleaseDontDrown.Editor
             var seats = new List<Object>();
             int n = 0;
             foreach (float side in new[] { -1f, 1f })
-                foreach (var (chair, table) in BarTableChairs)
+                for (int i = 0; i < BarArmchairs.Length; i++)
                 {
-                    float yaw = table > chair ? 0f : 180f; // facing its table
-                    Vector3 local = new(side * BarTableX, 0f, chair);
-                    float towardSeat = Mathf.Sign(chair - table);
-                    Vector3 serve = new(side * BarTableX, BarTableTop + 0.12f, table + towardSeat * 0.24f);
-                    seats.Add(BuildTableSeat(root, bar, n++, local, yaw, serve, barista));
+                    var (edge, facing) = BarArmchairs[i];
+                    float table = (edge + BarArmchairs[i ^ 1].edge) * 0.5f; // the pair's table, halfway between them
+                    if (i % 2 == 0) BuildLoungeTable(root, bar, n / 2, new Vector3(side * BarTableX, 0f, table));
+                    Vector3 local = new(side * BarTableX, 0f, edge - facing * ArmchairEdge); // (its point 0.38 behind the cushion's edge)
+                    Vector3 serve = new(side * BarTableX, BarTableTop + 0.06f, table - facing * BarTableDepth * 0.22f); // on the table, its own half
+                    seats.Add(BuildTableSeat(root, bar, n++, local, facing > 0f ? 0f : 180f, serve, barista));
                 }
 
             // The barista serves the stools and the tables alike.
@@ -242,6 +284,20 @@ namespace PleaseDontDrown.Editor
             all.AddRange(seats);
             SetRefs(barista, "_seats", all.ToArray());
             return seats;
+        }
+
+        /// <summary>A low table between two armchairs: the model on the deck, and a box to bump into and put things on.</summary>
+        private static void BuildLoungeTable(Transform parent, Transform bar, int index, Vector3 local)
+        {
+            var go = new GameObject("LoungeTable" + index);
+            go.transform.SetParent(parent, false);
+            go.transform.SetPositionAndRotation(bar.TransformPoint(local), bar.rotation);
+            if (PropModel("bar_table", go.transform, new Vector3(0f, BarDeckTop, 0f)) == null)
+                throw new InvalidOperationException("Bar table model missing (Art/Props/bar_table.glb: ArtSource/Tools/model_bar_table.py)");
+            TagSurface(go, SurfaceKind.Wood);
+            var box = go.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, (BarDeckTop + BarTableTop) * 0.5f, 0f);
+            box.size = new Vector3(BarTableWidth, BarTableTop - BarDeckTop, BarTableDepth);
         }
 
         /// <summary>One armchair at a table: a chair that never moves, the seat in its cushion, orders put down on the table.</summary>
@@ -260,11 +316,14 @@ namespace PleaseDontDrown.Editor
             var hull = new GameObject("Hull");
             hull.transform.SetParent(go.transform, false);
             var box = hull.AddComponent<BoxCollider>();
-            box.center = new Vector3(0f, 0.65f, 0f);
-            box.size = new Vector3(1.5f, 0.78f, 1.35f);
+            // The whole sofa: arms, cushion (1.05 deep, its front edge 0.38 ahead) and back.
+            box.center = new Vector3(0f, 0.65f, ArmchairEdge - 0.78f);
+            box.size = new Vector3(2.4f, 0.78f, 1.56f);
             var seat = new GameObject("Seat").transform;
             seat.SetParent(go.transform, false);
-            seat.localPosition = new Vector3(0f, ArmchairSeat, 0.15f); // on the cushion (0.82 high, measured), near its front edge (0.38 ahead) so the knees bend over it: further back the short legs went into the cushion
+            // On the cushion (0.82 high, measured), forward on it as at a table, its front edge (0.38 ahead) 0.18 ahead of
+            // the seat: the knees bend over it and the legs hang in front (further back they went down through it).
+            seat.localPosition = new Vector3(0f, ArmchairSeat, ArmchairSeatZ);
             var serve = new GameObject("ServePoint").transform;
             serve.SetParent(bar, false);
             serve.localPosition = serveLocal;
@@ -275,6 +334,7 @@ namespace PleaseDontDrown.Editor
             Require(so, "_displayName").stringValue = "armchair";
             Require(so, "_seat").objectReferenceValue = seat;
             Require(so, "_chair").boolValue = true;
+            Require(so, "_seatEdge").floatValue = ArmchairEdge - ArmchairSeatZ;
             Require(so, "_thrust").floatValue = 0f;
             Require(so, "_reverseThrust").floatValue = 0f;
             Require(so, "_maxSpeed").floatValue = 1f;

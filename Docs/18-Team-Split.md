@@ -78,9 +78,17 @@ Island 3 always night, mountain dock, sleepers: see `Docs/16`.
 ## After merging part A's branch (`sancho-dev`)
 Part A's scene changes are made by a script, so they survive anyone's scene: after merging, keep the other person's
 `Game.unity` and run **PLEASE DON'T DROWN → Part A: scene additions (bar tables, khinkali, blackjack)** once (it also
-places the golf cart), then save.
+places the golf cart and the bar's new stools and lounge tables), then save.
 
 ## Notes on what's done (part A, 2026-10-12)
+- Sitting at the hotel bar (the user, 2026-10-12: sit like a person): the bar model's own twelve stools (1.2 x 0.7 m
+  ovals right against the counter) and the lounge's four low tables (5-14 cm from the armchairs) are cut out of the
+  coloured bar LODs (`ArtSource/Tools/remove_bar_furniture.py`; B: don't re-colour the LODs from `source.glb` without
+  running it again). New `bar_stool.glb` (sized for the goofy lifeguard: cushion 1.07 m, footrest ring 0.29 under it)
+  0.55 m back from the counter, and `bar_table.glb` halfway between each pair of armchairs. Seated poses by IK on the
+  body's measured shape: on a stool thighs forward, heels on the ring, hands on the knees; in an armchair knees over
+  the cushion's edge, legs hanging in front of it. The bar guests sit the same way (`AvatarPose.SitStool`).
+  `ReviewCapture` (`seat:<name>`) counts vertices inside the cushions, the counter and the tables: all 0.
 - Text: `Fun/TrickShots.cs` only logs now; the pop-up words are gone from about 15 files; damage numbers, money,
   SAVED/REVIVED stay.
 - Cannon and throws: `PlayerMotor.Launch` keeps a flight going until landing (the walking model used to brake it after

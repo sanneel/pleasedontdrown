@@ -112,6 +112,7 @@ namespace PleaseDontDrown.Story
             AvatarPose.Down or AvatarPose.Lie or AvatarPose.LieFront => transform.position + Vector3.up * 0.3f,
             AvatarPose.Sit => transform.position + Vector3.up * 1f - transform.forward * SitBack,
             AvatarPose.SitChair => transform.position + Vector3.up * 1.35f,
+            AvatarPose.SitStool => transform.position + Vector3.up * 1.55f, // (the root half a metre under the seat)
             AvatarPose.Kneel => transform.position + Vector3.up * 1.3f,
             _ => transform.position + Vector3.up * 1.75f
         };
@@ -209,7 +210,8 @@ namespace PleaseDontDrown.Story
                 case AvatarPose.Sit:
                 case AvatarPose.Kneel:
                 case AvatarPose.SitChair:
-                    float h = pose == AvatarPose.Sit ? 0.95f : 1.35f;
+                case AvatarPose.SitStool:
+                    float h = pose == AvatarPose.Sit ? 0.95f : pose == AvatarPose.SitStool ? 1.65f : 1.35f;
                     float back = pose == AvatarPose.Sit ? -SitBack : 0f; // sitting on a towel: behind the feet (see SitBack)
                     _bodyCollider.direction = 1;
                     _bodyCollider.center = new Vector3(0f, h * 0.5f, back);
@@ -785,7 +787,7 @@ namespace PleaseDontDrown.Story
                 Vector3.Dot(transform.forward, went.normalized) < 0.55f)
                 Face(went, dt, 12f);
             // Spawned in the air or into a dune: onto the ground. (Not someone placed on a seat: feet on a stool's footrest.)
-            if (!_moveTarget.HasValue && _pose.Value != AvatarPose.SitChair) transform.position = Grounded(transform.position);
+            if (!_moveTarget.HasValue && _pose.Value is not (AvatarPose.SitChair or AvatarPose.SitStool)) transform.position = Grounded(transform.position);
         }
 
         /// <summary>Don't stand inside each other (a gang of pirates spreads out around their target).</summary>

@@ -232,6 +232,7 @@ namespace PleaseDontDrown.Player
                 m.FloatSeat = seat.RestHands;
                 m.ChairSeat = seat.IsChair || seat.IsLand; // a chair, a stool, the golf cart's bench
                 m.HighSeat = seat.IsStool;
+                m.SeatEdge = seat.SeatEdge;
                 // Sat on a chair the body faces the way it does (looking about turns the head, not the legs through
                 // the table or the counter).
                 if (seat.IsChair || seat.IsLand) _seatFacing = Quaternion.Euler(0f, seat.transform.eulerAngles.y, 0f);
