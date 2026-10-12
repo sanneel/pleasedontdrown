@@ -122,13 +122,23 @@ namespace PleaseDontDrown.UI
             DrawHurt(local, cx, cy);
 
             _toasts.RemoveAll(t => t.Until < Time.unscaledTime);
+            // Each message on its own dark pill under the top of the screen (the team, 2026-10-12: words floating in the
+            // sky read as a log), sliding in and fading out.
             for (int i = 0; i < _toasts.Count; i++)
             {
                 Toast toast = _toasts[i];
                 float alpha = Mathf.Clamp01((Time.unscaledTime - toast.From) / 0.15f) * Mathf.Clamp01((toast.Until - Time.unscaledTime) / 0.4f);
-                Hud.Label(new Rect(cx - 700f, Hud.Height * 0.15f + i * 40f, 1400f, 40f), toast.Text, 28f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, alpha));
+                float slide = (1f - Mathf.Clamp01((Time.unscaledTime - toast.From) / 0.2f)) * 12f;
+                const float size = 22f, height = 44f;
+                float width = Mathf.Min(1300f, Hud.TextWidth(StripTags(toast.Text), size, heavy: true) + 56f);
+                var pill = new Rect(cx - width * 0.5f, Hud.Height * 0.11f + i * (height + 8f) - slide, width, height);
+                Hud.Fill(pill, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.78f * alpha), height * 0.5f);
+                Hud.Label(pill, toast.Text, size, new Color(1f, 1f, 1f, alpha), TextAnchor.MiddleCenter, heavy: true, shadow: false);
             }
         }
+
+        /// <summary>The words without their colour/bold tags (to measure them).</summary>
+        private static string StripTags(string text) => System.Text.RegularExpressions.Regex.Replace(text, "<[^>]+>", "");
 
         private static string Key(UnityEngine.InputSystem.InputAction action) => $"<color=#ffd24a>[{GameInput.KeyLabel(action)}]</color>";
 

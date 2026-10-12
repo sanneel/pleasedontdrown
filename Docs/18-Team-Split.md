@@ -12,7 +12,7 @@ work (Git can't merge it). So:
 - Planned fix: move each island into its own prefab so B and C can work in parallel (one-time job, one person).
 
 ## Branches
-Each person has their own branch (A: `shako-dev`; B and C: their own `<name>-dev`). Merge `origin/main` in before
+Each person has their own branch (A: `sancho-dev`; Shako: `shako-dev`; the third: their own `<name>-dev`). Merge `origin/main` in before
 every push, push your branch only, and merge to `main` in small pieces (every day or two), never straight to `main`.
 
 ## The full list, in order (pick from the top of your part)
@@ -21,7 +21,7 @@ Status: **done** = in code on a branch, waiting for a playtest; **open** = nobod
 someone is on it. When you take an item, write your name next to it here (and in the team chat) so nobody does it twice.
 Order rule (the user's): gameplay logic first, then visuals, then money. Quick removals first because they're cheap.
 
-### A: gameplay and code (owner: `shako-dev`)
+### A: gameplay and code (owner: `sancho-dev`)
 | # | Task | Status |
 |---|---|---|
 | A1 | On-screen text: no BOP/WHAP/BONK/OOF..., no "LONG SHOT! X flew 21 m", no stunt or cannonball money | **done** |
@@ -29,14 +29,14 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | A3 | Cannon: the one inside is hidden in the barrel; a loaded cannon only turns and aims, doesn't roll about | **done** |
 | A4 | Throwing a carried lifeguard works exactly like throwing a tourist (hold Drop, same speed, real flight) | **done** |
 | A5 | Defibrillator: a paddle in each hand, kneel, paddles on the chest, the shock | **done** (side view still to check) |
-| A6 | Bar: fix the orders | open |
-| A7 | Casino working (blackjack side quest) | open |
-| A8 | Octagon (tavern cage fight): its own punches | open |
-| A9 | Golf cart driving (needs C's model; can start on a greybox) | open |
-| A10 | More local pirates walking the village | open |
-| A11 | Island 3 story: the sewer behind the back waterfall → the palace → beat the Pirate King → he says where to go | open |
-| A12 | Character poses: feet in the ground, sitting, lying; nobody inside anybody (people and animals) | open |
-| A13 | On-screen text: a cleaner design for what's left | open |
+| A6 | Bar: a real menu card (mouse or number keys), khinkali, the tables' armchairs as seats, the order into your hand, eating seated | **done** |
+| A7 | Casino working (blackjack side quest) | **done** (`Fun/BlackjackTable.cs`) |
+| A8 | Octagon (tavern cage fight): its own punches | **done**: LMB jab, RMB hook, crouch+LMB uppercut, jab-jab-hook combo |
+| A9 | Golf cart driving (needs C's model; can start on a greybox) | **done** on a greybox (`Vehicle._land`), C's Tripo model to drop in |
+| A10 | More local pirates walking the village | **done**: tavern regulars, the village drunk |
+| A11 | Island 3 story: the sewer behind the back waterfall → the palace → beat the Pirate King → he says where to go | **done** (beat 3.7b), waits for C's `SewerEntrance` / `PalaceThrone` points |
+| A12 | Character poses: feet in the ground, sitting, lying; nobody inside anybody (people and animals) | **done**: lying arms, chair/stool sitting, CPR at the side, towels in decks skipped, only GLB characters; NpcWatch clean on all islands |
+| A13 | On-screen text: a cleaner design for what's left | **done**: messages on dark pills, no timers |
 
 ### B: islands 1 and 2, scene work
 | # | Task | Status |
@@ -64,7 +64,7 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | C2 | Buildings overlapping each other | **checked, nothing found** (Shako) — an overlap report over island 3 (`TeamBSceneTools.OverlapReport`) finds no two houses, the tavern, the gun stall or the castle overlapping each other (only the castle walls joining their towers, and tree crowns over house 13); needs a screenshot of the spot meant |
 | C3 | Octopus overlapping itself (and animals overlapping things) | **octopus done** (Shako) — the Kleptopus's two working arms now leave its body on the side facing their tip (they used to come out of the front and run back through its body and its own tentacles), `Creature.Tentacles.cs`; `kleptocheck` ALL PASS. Other animals: not checked yet |
 | C4 | Main waterfall: water reaches the ocean; fix the texture where the water starts | **done** (Shako) — the sea cave falls: the flat 13 m plate where the roof stream met the edge is now a fan widening smoothly from the stream and curling over the edge (streaks flow toward it); the falling sheets go 1 m under the sea so no gap opens in a wave trough (`TeamCWaterfallBatch`, mesh `FallsLipFan`). Checked in the build |
-| C5 | Palace: sewer exit, gate shut so you can't walk in | **done** (Shako) — the castle gate shut (iron-banded doors, barred, a solid blocker `GateShut`); a stone drain with an iron grate in the castle yard (west half): `SewerExitDrain`, the grate on `SewerGrateHinge` (swings up, for A11), the climb-out point `SewerExit`. Island 3 navmesh baked again (`TeamCPalaceBatch`) |
+| C5 | Palace: sewer exit, gate shut so you can't walk in | **done** (Shako) — the castle gate shut (iron-banded doors, barred, a solid blocker `GateShut`); a stone drain with an iron grate in the castle yard (west half): `SewerExitDrain`, the grate on `SewerGrateHinge` (swings up, for A11), the climb-out point `SewerExit`. Island 3 navmesh baked again (`TeamCPalaceBatch`). **Still needed for A11:** two empty GameObjects under `Environment/Island3/Story/`: `SewerEntrance` (the way into the sewer, behind the back waterfall) and `PalaceThrone` (in front of the throne, facing the room); until they exist the Pirate King beat (3.7b) is skipped |
 | C6 | Jungle bigger | **done** (Shako) — a 14 m band of jungle all round its old edge: +59 trees, +120 bushes, +150 ferns (723 → 952 plants), clear of roads, river, falls, castle, houses, tavern, gun stall and night arrival; plants settled on the ground; island 3 navmesh baked again; `chapter3check` ALL PASS (`TeamCJungleBatch`). The jungle-floor ground colour was not extended (needs an island 3 ground rebuild) |
 | C7 | Tavern bar look; octagon arena | **done** (Shako) — an 8-sided cage (6 m, canvas floor with a red ring, padded posts, padded lower walls with bars above, solid sides) in the middle of the tavern, its open side toward the front door; Iron Jaw Jack already stands in it. The 4 tables and their stools had to go (no room). Bar: "THE RUSTY ANCHOR" sign, a Jolly Roger on the back wall, 3 hanging lanterns with warm light. Navmesh baked; `chapter3check` ALL PASS incl. 3.4 (`TeamCTavernBatch`) |
 | C8 | Gun shop (island 3) as a real building | **done** (Shako) — the Tripo `gun_shop` (from `ArtSource/Tripo/island3`, now in `Art/Tripo/Island3`) stands at the stall's spot, 7 m wide, its open front toward the road; the working "Skull Cove guns" counter sits on the model's own counter (its box hidden), bought guns appear there; the stall's awning/posts/sign removed; a body collider; navmesh baked; `chapter3check` ALL PASS incl. 3.3 (`TeamCGunShopBatch`) |
@@ -75,7 +75,20 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 
 Island 3 always night, mountain dock, sleepers: see `Docs/16`.
 
+## After merging part A's branch (`sancho-dev`)
+Part A's scene changes are made by a script, so they survive anyone's scene: after merging, keep the other person's
+`Game.unity` and run **PLEASE DON'T DROWN → Part A: scene additions (bar tables, khinkali, blackjack)** once (it also
+places the golf cart and the bar's new stools and lounge tables), then save.
+
 ## Notes on what's done (part A, 2026-10-12)
+- Sitting at the hotel bar (the user, 2026-10-12: sit like a person): the bar model's own twelve stools (1.2 x 0.7 m
+  ovals right against the counter) and the lounge's four low tables (5-14 cm from the armchairs) are cut out of the
+  coloured bar LODs (`ArtSource/Tools/remove_bar_furniture.py`; B: don't re-colour the LODs from `source.glb` without
+  running it again). New `bar_stool.glb` (sized for the goofy lifeguard: cushion 1.07 m, footrest ring 0.29 under it)
+  0.55 m back from the counter, and `bar_table.glb` halfway between each pair of armchairs. Seated poses by IK on the
+  body's measured shape: on a stool thighs forward, heels on the ring, hands on the knees; in an armchair knees over
+  the cushion's edge, legs hanging in front of it. The bar guests sit the same way (`AvatarPose.SitStool`).
+  `ReviewCapture` (`seat:<name>`) counts vertices inside the cushions, the counter and the tables: all 0.
 - Text: `Fun/TrickShots.cs` only logs now; the pop-up words are gone from about 15 files; damage numbers, money,
   SAVED/REVIVED stay.
 - Cannon and throws: `PlayerMotor.Launch` keeps a flight going until landing (the walking model used to brake it after

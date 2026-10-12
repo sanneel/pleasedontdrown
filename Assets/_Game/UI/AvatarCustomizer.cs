@@ -217,15 +217,13 @@ namespace PleaseDontDrown.UI
             bool changed = false;
             bool presetApplied = false;
             float x = panel.x + 540f, y = panel.y + 92f;
-            bool goofy = look.IsGoofy;
-            if (Arrows(x, ref y, "CHARACTER", goofy ? "Goofy" : "Classic") != 0)
+            // Always the goofy lifeguard: the code-built "Classic" body is gone (the team, 2026-10-12).
+            if (!look.IsGoofy)
             {
-                look.Body = goofy ? (byte)0 : AvatarLook.Bodies.Goofy;
-                goofy = !goofy;
-                if (!goofy) look.Glasses = (GlassesStyle)((int)look.Glasses % 4);
-                look = look.Tame();
+                look.Body = AvatarLook.Bodies.Goofy;
                 changed = true;
             }
+            bool goofy = true;
             if (goofy)
             {
                 int direction = Arrows(x, ref y, "OUTFIT PRESET", _preset < 0 ? "Custom" : AvatarPresets.Names[_preset]);

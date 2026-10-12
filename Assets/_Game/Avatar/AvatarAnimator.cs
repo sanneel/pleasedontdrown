@@ -6,8 +6,11 @@ namespace PleaseDontDrown.Avatars
     /// <summary>One-off moves that play over whatever the body is doing.</summary>
     public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot, JumpShot, Burp }
 
-    /// <summary>Whole-body poses held for a while (story characters, knockouts).</summary>
-    public enum AvatarPose : byte { Normal, Down, Kneel, Scared, HandsUp, Lie, LieFront, Sit, SitChair, Carried }
+    /// <summary>
+    /// Whole-body poses held for a while (story characters, knockouts). SitStool: on a bar stool exactly as a player
+    /// sits on one (its seat point 0.5 m over the root; see <see cref="AvatarMotion.HighSeat"/>).
+    /// </summary>
+    public enum AvatarPose : byte { Normal, Down, Kneel, Scared, HandsUp, Lie, LieFront, Sit, SitChair, Carried, SitStool }
 
     /// <summary>Face on top of the automatic expression.</summary>
     public enum AvatarMood : byte { Neutral, Happy, Scared, Angry, Hurt }
@@ -39,6 +42,9 @@ namespace PleaseDontDrown.Avatars
         public bool Seated;           // on a vehicle seat (hands come from the grips)
         public bool Straddle;         // seated astride a fat seat (a banana boat): knees well apart, feet back down its sides
         public bool FloatSeat;        // seated on a ring: knees together so the legs fit its opening
+        public bool ChairSeat;        // seated on a chair or a stool: the bottom right on the seat, hands on the seat beside the lap
+        public bool HighSeat;         // ...a bar stool (Art/Props/bar_stool.glb): knees bent, feet on its footrest, hands on the knees
+        public float SeatEdge;        // ...a chair: its cushion's front edge this far ahead of the seat point (0: not known)
         public bool Flying;           // shot through the air (a cannon, a throw, flung off the banana): superman, arms out ahead
         public bool StarJump;         // bounced high (a trampoline): arms and legs flung out in a star
         public AvatarPose Pose;
@@ -66,6 +72,11 @@ namespace PleaseDontDrown.Avatars
         /// sitting up blends in place instead of jumping.
         /// </summary>
         public const float SitBack = 0.8f;
+
+        // The bar stool (ArtSource/Tools/model_bar_stool.py), from its cushion top: the footrest ring this far down and
+        // this wide, and the lower rail's front bar for longer legs.
+        private const float StoolRingDrop = 0.29f, StoolRingRadius = 0.24f, StoolRingTube = 0.014f;
+        private const float StoolRailDrop = 0.56f, StoolRailFront = 0.13f, StoolRailTube = 0.014f;
 
         private float _phase;
         private float _swimPhase;
@@ -241,6 +252,14 @@ namespace PleaseDontDrown.Avatars
         {
             if (_rig == null || !_rig.IsBuilt) return;
             _dt = dt;
+            if (Motion.Pose == AvatarPose.SitStool)
+            {
+                // A bar guest: sat on the stool just as a player is.
+                Motion.Pose = AvatarPose.Normal;
+                Motion.Seated = Motion.ChairSeat = Motion.HighSeat = true;
+                Motion.Velocity = Vector3.zero;
+                Motion.Grounded = true;
+            }
             UpdateBlends(dt);
             UpdateIdle();
             SampleGround(dt);
@@ -255,6 +274,17 @@ namespace PleaseDontDrown.Avatars
             KeepHandsOutOfOthers();
             PoseFace();
             _rig.DriveShoulders();
+            // Sitting on a chair: measure the seat of the pants now the whole sitting pose is on (see SeatDrop).
+            if (_seatDropWanted && MeasureSeatDrop(out float drop, out float stoolDrop, out float chairDrop))
+            {
+                // (Never lower on the second pass: that would sink it back in.)
+                _seatDrop = Mathf.Max(_seatDrop, drop);
+                _stoolDrop = Mathf.Max(_stoolDrop, stoolDrop);
+                _chairDrop = Mathf.Max(_chairDrop, chairDrop);
+                _seatDropPasses++;
+                _seatDropFrames = 0;
+            }
+            _seatDropWanted = false;
         }
 
         /// <summary>
@@ -696,12 +726,148 @@ namespace PleaseDontDrown.Avatars
                 Vector3 seatedHip = _rig.RestPosition(Bone.Hips);
                 // The float's anchor is 0.5 m above the player root; match it
                 // independently of body height so short bodies do not sink into the ring.
-                seatedHip.y = Motion.FloatSeat ? 0.5f : seatedHip.y - 0.4f * s;
+                // A chair's seat point is its cushion top: the seat of the pants sits right on it. How far that is under
+                // the hip bone is measured on the posed body (the goofy lifeguard's round bottom: 24 cm).
+                seatedHip.y = Motion.ChairSeat ? 0.5f + SeatDrop() : Motion.FloatSeat ? 0.5f : seatedHip.y - 0.4f * s;
                 hips.localPosition = Vector3.Lerp(hips.localPosition, seatedHip, _seat);
-                hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(8f, 0f, 0f), _seat);
+                // (On a chair: upright, not leaning back off the seat as on a jet ski.)
+                hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(Motion.ChairSeat ? 0f : 8f, 0f, 0f), _seat);
                 if (Motion.Straddle) // leaning on toward the handle in front, like on a horse
                     B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(14f, 0f, 0f), _seat);
+                else if (Motion.HighSeat) // at the bar: a little forward over the knees
+                    B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(6f, 0f, 0f), _seat);
             }
+        }
+
+        /// <summary>
+        /// A hand laid on a point (seated: on the knee, on the cushion): the arm reaches so the palm lands right there,
+        /// the fingers pointing <paramref name="fingers"/>, the palm facing <paramref name="palm"/>. (Reaching only for
+        /// the middle of the hand, it kept the forearm's slope and the fingers went down into the cushion.)
+        /// </summary>
+        private void PlaceHand(bool right, Vector3 point, Vector3 fingers, Vector3 palm, Vector3 elbow, float weight, HandPose pose)
+        {
+            Transform upper = B(right ? Bone.UpperArmR : Bone.UpperArmL), fore = B(right ? Bone.ForearmR : Bone.ForearmL);
+            HandBones hand = _rig.Hand(right);
+            if (hand == null)
+            {
+                IK.Solve(upper, fore, _rig.UpperArmLength, _rig.ForearmLength + _rig.HandLength * 0.5f, point, elbow, weight, false);
+                return;
+            }
+            Quaternion turn = HandBones.Orient(fingers, palm, right ? 1f : -1f);
+            Vector3 wrist = point - turn * Vector3.Scale(hand.PalmContact, hand.Hand.lossyScale);
+            IK.Solve(upper, fore, _rig.UpperArmLength, _rig.ForearmLength, wrist, elbow, weight, false);
+            hand.Hand.rotation = Quaternion.Slerp(hand.Hand.rotation, turn, weight);
+            hand.Pose(pose);
+        }
+
+        private float _seatDrop = -1f;
+        private float _stoolDrop = -1f;      // ...on a bar stool: over its round cushion, the whole width of the bottom
+        private float _chairDrop = -1f;      // ...in an armchair: over its whole cushion, back to its front edge (the thighs too)
+        private int _seatDropVersion = -1;
+        private int _seatDropFrames;
+        private int _seatDropPasses;
+        private bool _seatDropWanted;
+        private float _lapHalfWidth = -1f;   // half the width of the legs and shorts when sitting (where the hands go beside them)
+        private float _kneeTop = -1f;        // sitting: how far the top of the leg is over the bone just behind the knee (the hands rest there)
+        private float _heelBack = -1f;       // how far the heel sticks out behind the ankle (the goofy lifeguard's cartoon feet: 12 cm)
+        private const float StoolCushionRadius = 0.2f;
+
+        /// <summary>How far the heel sticks out behind the ankle (measured with the seat drop; a guess before).</summary>
+        private float HeelBack() => _heelBack >= 0f && _seatDropVersion == _rig.BuildVersion ? _heelBack : 0.06f * _rig.Scale;
+
+        /// <summary>Sitting: the top of the leg over the thigh bone just behind the knee (measured with the seat drop; a guess before).</summary>
+        private float KneeTop() => _kneeTop >= 0f && _seatDropVersion == _rig.BuildVersion ? _kneeTop : 0.09f * _rig.Scale;
+
+        /// <summary>
+        /// Sitting on a chair: how far the seat of the pants is below the hip bone, measured per body on the mesh as it
+        /// sits (thighs forward), so the bottom rests on the cushion instead of in it. A guess until measured; measured
+        /// twice (the second time with the hips at the first measure: the thighs lie a little differently then).
+        /// </summary>
+        private float SeatDrop()
+        {
+            if (_seatDropVersion != _rig.BuildVersion)
+            {
+                _seatDropVersion = _rig.BuildVersion;
+                _seatDrop = _stoolDrop = _chairDrop = -1f;
+                _seatDropFrames = _seatDropPasses = 0;
+            }
+            // Measured at the end of the frame (the legs are posed after the hips), once the sitting pose is fully in.
+            if (_seatDropPasses < 2 && _seat > 0.98f && ++_seatDropFrames > 3) _seatDropWanted = true;
+            if (_seatDropPasses == 0) return 0.2f * _rig.Scale;
+            return Motion.HighSeat ? _stoolDrop : Motion.SeatEdge > 0f ? _chairDrop : _seatDrop;
+        }
+
+        private bool MeasureSeatDrop(out float drop, out float stoolDrop, out float chairDrop)
+        {
+            drop = stoolDrop = chairDrop = 0f;
+            SkinnedMeshRenderer body = null;
+            foreach (SkinnedMeshRenderer r in _rig.GetComponentsInChildren<SkinnedMeshRenderer>())
+                if (r.sharedMesh != null && (body == null || r.sharedMesh.vertexCount > body.sharedMesh.vertexCount)) body = r;
+            if (body == null) return false;
+            var baked = new Mesh();
+            body.BakeMesh(baked, true);
+            Transform hips = B(Bone.Hips);
+            float bottom = float.MaxValue, lap = 0f;
+            Quaternion toLocal = Quaternion.Inverse(transform.rotation);
+            Vector3[] vertices = baked.vertices;
+            // What each vertex is (by its heaviest bone): the seat of the pants is the hips' and the thighs' (a heel tucked
+            // under a stool, the girls' long hair, the goofy lifeguard's big head hanging over his knees: none of it).
+            BoneWeight[] weights = body.sharedMesh.boneWeights;
+            Transform[] bones = body.bones;
+            bool weighted = weights.Length == vertices.Length && bones != null;
+            Transform upperL = B(Bone.UpperArmL), upperR = B(Bone.UpperArmR), neck = B(Bone.Neck), shinL = B(Bone.ShinL), shinR = B(Bone.ShinR);
+            // Just behind each knee, on the thigh bone (where the hands rest on a stool).
+            Vector3 kneeL = Vector3.Lerp(B(Bone.ThighL).position, shinL.position, 0.72f);
+            Vector3 kneeR = Vector3.Lerp(B(Bone.ThighR).position, shinR.position, 0.72f);
+            float kneeTop = float.MinValue, near = 0.07f * _rig.Scale, onCushion = float.MaxValue, onChair = float.MaxValue, heel = 0f;
+            Transform footL = B(Bone.FootL), footR = B(Bone.FootR);
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                Vector3 world = body.transform.position + body.transform.rotation * vertices[i];
+                Vector3 local = toLocal * (world - hips.position);
+                Transform bone = null;
+                if (weighted)
+                {
+                    int b = weights[i].boneIndex0;
+                    bone = b >= 0 && b < bones.Length ? bones[b] : null;
+                }
+                bool arm = bone != null && (bone.IsChildOf(upperL) || bone.IsChildOf(upperR));
+                bool head = bone != null && bone.IsChildOf(neck);
+                bool lowerLeg = bone != null && (bone.IsChildOf(shinL) || bone.IsChildOf(shinR));
+                if (arm || head) continue;
+                // The top of each leg just behind the knee.
+                if (new Vector2(world.x - kneeL.x, world.z - kneeL.z).sqrMagnitude < near * near) kneeTop = Mathf.Max(kneeTop, world.y - kneeL.y);
+                if (new Vector2(world.x - kneeR.x, world.z - kneeR.z).sqrMagnitude < near * near) kneeTop = Mathf.Max(kneeTop, world.y - kneeR.y);
+                // The heel: how far the foot reaches back behind the ankle, low down (within a hand over the ankle).
+                if (lowerLeg)
+                {
+                    Vector3 ankle = bone.IsChildOf(shinL) ? footL.position : footR.position;
+                    if (world.y < ankle.y + 0.1f * _rig.Scale) heel = Mathf.Max(heel, Vector3.Dot(ankle - world, transform.forward));
+                    continue;
+                }
+                // On a bar stool: anything over its round cushion (the seat point is straight over the root).
+                Vector3 fromSeat = toLocal * (world - transform.position);
+                if (new Vector2(fromSeat.x, fromSeat.z).sqrMagnitude < StoolCushionRadius * StoolCushionRadius)
+                    onCushion = Mathf.Min(onCushion, world.y - hips.position.y);
+                // In an armchair: anything over its cushion, out to its front edge.
+                if (Motion.SeatEdge > 0f && Mathf.Abs(fromSeat.x) < 0.4f && fromSeat.z < Motion.SeatEdge && fromSeat.z > -0.45f)
+                    onChair = Mathf.Min(onChair, world.y - hips.position.y);
+                // The seat of the pants: under the pelvis, not out along the thighs (ahead).
+                if (Mathf.Abs(local.x) < 0.14f * _rig.Scale && local.z < 0.06f && local.z > -0.25f && local.y < 0f) bottom = Mathf.Min(bottom, local.y);
+                // The lap: legs and shorts from the seat up to a hand over the hips, from the back to the knees.
+                if (local.y > 0.12f * _rig.Scale || local.z < -0.25f || local.z > 0.45f || local.y < -0.4f) continue;
+                lap = Mathf.Max(lap, Mathf.Abs(local.x));
+            }
+            if (Application.isPlaying) Destroy(baked); else DestroyImmediate(baked);
+            if (bottom == float.MaxValue) return false;
+            drop = Mathf.Clamp(-bottom, 0.05f, 0.45f);
+            stoolDrop = onCushion < float.MaxValue ? Mathf.Clamp(-onCushion, 0.05f, 0.45f) : drop;
+            chairDrop = onChair < float.MaxValue ? Mathf.Clamp(-onChair, 0.05f, 0.45f) : drop;
+            _lapHalfWidth = Mathf.Clamp(lap, 0.08f, 0.45f);
+            _kneeTop = kneeTop > 0f ? Mathf.Clamp(kneeTop, 0.02f, 0.3f) : -1f;
+            if (heel > 0f) _heelBack = Mathf.Clamp(heel, 0.03f, 0.2f);
+            Debug.Log($"[Avatar] {name}: sitting, the bottom {drop * 100f:F0} cm under the hips ({stoolDrop * 100f:F0} on a stool, {chairDrop * 100f:F0} in an armchair), the knees' top {kneeTop * 100f:F0} cm over the bone, the heels {heel * 100f:F0} cm behind the ankles");
+            return true;
         }
 
         /// <summary>
@@ -1261,7 +1427,10 @@ namespace PleaseDontDrown.Avatars
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     // Astride something fat (a banana): like on a horse, thighs down and apart round it (not out in
                     // front as on a chair: that bunched the shorts up into a balloon), shins hanging down its sides.
-                    Quaternion thighPose = Motion.Straddle ? Quaternion.Euler(-30f, 0f, 58f * side) : Quaternion.Euler(-78f, 0f, 16f * side);
+                    // On a chair or stool the knees go a little apart: out past a round stool cushion's edge (straight
+                    // ahead the shins came down through it) and clear of the counter in front.
+                    Quaternion thighPose = Motion.Straddle ? Quaternion.Euler(-30f, 0f, 58f * side)
+                        : Quaternion.Euler(-78f, 0f, (Motion.ChairSeat ? 34f : 16f) * side);
                     Quaternion shinPose = Quaternion.Euler(Motion.Straddle ? 38f : 84f, 0f, Motion.Straddle ? -12f * side : 0f);
                     if (Motion.FloatSeat)
                     {
@@ -1271,6 +1440,77 @@ namespace PleaseDontDrown.Avatars
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, thighPose, _seat);
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, shinPose, _seat);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(Motion.FloatSeat ? 12f : Motion.Straddle ? 20f : -6f, 0f, 0f), _seat);
+                }
+                if (Motion.ChairSeat && !Motion.HighSeat && Motion.SeatEdge > 0f)
+                {
+                    // An armchair: the knees bent over the cushion's front edge, the shins hanging straight down just in
+                    // front of it, the toes pointing down like a child's whose feet don't reach the floor (hanging straight
+                    // down from fixed angles his shins went down through the cushion; reaching forward, his toes went
+                    // into the low table in front).
+                    Vector3 fwd = transform.forward, across = transform.right;
+                    Vector3 seatTop = transform.position + Vector3.up * 0.5f;
+                    for (int leg = 0; leg < 2; leg++)
+                    {
+                        float side = leg == 0 ? -1f : 1f;
+                        Transform thigh = B(leg == 0 ? Bone.ThighL : Bone.ThighR), shin = B(leg == 0 ? Bone.ShinL : Bone.ShinR);
+                        Transform foot = B(leg == 0 ? Bone.FootL : Bone.FootR);
+                        // (The foot bone is in the middle of the foot: the heel, the bottom of the leg, is HeelBack behind it.)
+                        Vector3 ankle = seatTop + fwd * (Motion.SeatEdge + HeelBack() + 0.02f * s) + across * (side * 0.12f * s);
+                        ankle.y = thigh.position.y - _rig.ShinLength * 0.97f;
+                        IK.Solve(thigh, shin, _rig.ThighLength, _rig.ShinLength, ankle, fwd + Vector3.up * 0.3f + across * (side * 0.2f), _seat, true);
+                        foot.rotation = Quaternion.Slerp(foot.rotation, transform.rotation * Quaternion.Euler(55f, 0f, 0f), _seat);
+                    }
+                }
+                if (Motion.HighSeat)
+                {
+                    // A bar stool, as a person sits on one: thighs forward about level, knees bent, the feet on its brass
+                    // ring (the goofy lifeguard's short legs) or on the rail further down (the tall girls': on the ring
+                    // their knees came up to their chins), whichever is nearer where the foot hangs with the thigh level.
+                    Vector3 fwd = transform.forward, across = transform.right;
+                    Vector3 seatTop = transform.position + Vector3.up * 0.5f; // the stool's seat point (Vehicle.DriverFeetPosition)
+                    for (int leg = 0; leg < 2; leg++)
+                    {
+                        float side = leg == 0 ? -1f : 1f;
+                        Transform thigh = B(leg == 0 ? Bone.ThighL : Bone.ThighR), shin = B(leg == 0 ? Bone.ShinL : Bone.ShinR);
+                        Transform foot = B(leg == 0 ? Bone.FootL : Bone.FootR);
+                        float hangs = thigh.position.y - _rig.ShinLength - _rig.AnkleHeight;
+                        float ring = seatTop.y - StoolRingDrop + StoolRingTube, rail = seatTop.y - StoolRailDrop + StoolRailTube;
+                        bool onRail = Mathf.Abs(hangs - rail) < Mathf.Abs(hangs - ring);
+                        float spread = 0.13f * s; // the feet apart, either side of the middle (the goofy lifeguard's big ones touched)
+                        float ahead = onRail ? StoolRailFront : Mathf.Sqrt(StoolRingRadius * StoolRingRadius - spread * spread);
+                        // The heel hooked on the bar, the ankle in front of it by the heel's length (with the ankle over
+                        // the bar, the goofy lifeguard's long cartoon heels went up into the cushion).
+                        Vector3 rest = seatTop + fwd * (ahead + HeelBack() - 0.02f * s) + across * (side * spread);
+                        rest.y = (onRail ? rail : ring) + _rig.AnkleHeight;
+                        IK.Solve(thigh, shin, _rig.ThighLength, _rig.ShinLength, rest, fwd + Vector3.up * 0.3f + across * (side * 0.25f), _seat, true);
+                        // The foot level along the bar, the toes a little down.
+                        foot.rotation = Quaternion.Slerp(foot.rotation, transform.rotation * Quaternion.Euler(12f, 0f, 0f), _seat);
+                    }
+                    // Hands resting on the knees (just behind them, on top of the legs as measured on the body), or the
+                    // free one there while the other holds a drink.
+                    for (int arm = 0; arm < 2; arm++)
+                    {
+                        bool right = arm == 1;
+                        if (Motion.Holding && (right || Motion.TwoHanded || Motion.CarryingPerson)) continue;
+                        float side = right ? 1f : -1f;
+                        Transform thigh = B(right ? Bone.ThighR : Bone.ThighL), shin = B(right ? Bone.ShinR : Bone.ShinL);
+                        Vector3 knee = Vector3.Lerp(thigh.position, shin.position, 0.72f);
+                        Vector3 along = (shin.position - thigh.position).normalized;
+                        PlaceHand(right, knee + Vector3.up * KneeTop(), along - Vector3.up * 0.3f, Vector3.down,
+                            across * (side * 0.8f) - Vector3.up * 0.5f - fwd * 0.2f, _seat, HandPose.Lerp(HandPose.Flat, HandPose.Relaxed, 0.4f));
+                    }
+                }
+                else if (Motion.ChairSeat && !Motion.Holding)
+                {
+                    // Nothing in the hands: palms down on the seat either side of the lap, just outside the widest of the
+                    // legs and shorts (measured on the body). "On the thighs" by fixed joint angles put the hands through
+                    // the goofy lifeguard's legs: they came out under his shorts.
+                    Vector3 fwd = transform.forward, across = transform.right;
+                    // (The width measured on the mesh caught the arms too; the players' shorts are this wide.)
+                    float lap = 0.27f * s;
+                    Vector3 seatTop = transform.position + Vector3.up * 0.502f + fwd * (0.06f * s); // the cushion (the seat point: 0.5 over the root)
+                    PlaceHand(false, seatTop - across * (lap + 0.07f * s), fwd, Vector3.down, -across - fwd * 0.4f, _seat, HandPose.Flat);
+                    PlaceHand(true, seatTop + across * (lap + 0.07f * s), fwd, Vector3.down, across - fwd * 0.4f, _seat, HandPose.Flat);
                 }
             }
 
@@ -1500,21 +1740,26 @@ namespace PleaseDontDrown.Avatars
                     bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
-                    bool kneeUp = !left;
+                    bool kneeUp = !left && _rig.Look.Feminine; // (the round dads' raised thigh went into their belly)
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, kneeUp ? Quaternion.Euler(-45f, 0f, 6f * side) : Quaternion.Euler(0f, 0f, 8f * side), w);
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kneeUp ? 85f : 4f, 0f, 0f), w);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(kneeUp ? -40f : -45f, 0f, 0f), w);
                 }
-                // Hands under the back of the head, elbows out to the sides. By IK: the fixed forearm bend above
-                // folded the hands forward, onto the face, on bodies with other arm lengths (the Meshy ones).
-                Transform head = B(Bone.Head);
+                // Arms resting on the towel beside the body, a hand's width clear of it, palms down. (Hands under the
+                // head looked lazier, but the round dads' and the Meshy girls' arms don't reach round their big heads:
+                // the hands stopped half way, in the chest or the belly. The team, 2026-10-12: no more of that.)
                 float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
-                // Elbows out and a little up off the ground: flat on it, the arms swung so far back that the armpits
-                // stretched thin.
-                Vector3 nape = head.position + head.up * (0.1f * s) - head.forward * (0.08f * s);
                 Vector3 across = B(Bone.Chest).right;
-                IK.Solve(upperL, foreL, la, lb, nape - across * (0.04f * s), -across + head.up * 0.4f + head.forward * 0.35f, w, false);
-                IK.Solve(upperR, foreR, la, lb, nape + across * (0.04f * s), across + head.up * 0.4f + head.forward * 0.35f, w, false);
+                float half = 0.5f * Vector3.Distance(upperL.position, upperR.position);
+                float clear = half * 1.25f + 0.12f * s; // past the widest of a big belly
+                Vector3 toFeet = Vector3.ProjectOnPlane(hips.position - B(Bone.Head).position, Vector3.up);
+                toFeet = toFeet.sqrMagnitude > 1e-4f ? toFeet.normalized : -transform.forward;
+                float ground = transform.position.y + 0.05f * s;
+                Vector3 handL = hips.position - across * clear + toFeet * (0.04f * s);
+                Vector3 handR = hips.position + across * clear + toFeet * (0.04f * s);
+                handL.y = handR.y = Mathf.Max(ground, hips.position.y - 0.06f * s);
+                IK.Solve(upperL, foreL, la, lb, handL, -across + Vector3.up * 0.3f, w, false);
+                IK.Solve(upperR, foreR, la, lb, handR, across + Vector3.up * 0.3f, w, false);
             }
 
             if (_carried > 0.01f)
@@ -1554,11 +1799,8 @@ namespace PleaseDontDrown.Avatars
                 B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(-12f, 0f, 0f), w);
                 B(Bone.Neck).localRotation = Quaternion.Slerp(B(Bone.Neck).localRotation, Quaternion.Euler(-35f, 0f, 0f), w);
                 B(Bone.Head).localRotation = Quaternion.Slerp(B(Bone.Head).localRotation, Quaternion.Euler(-25f, 0f, 0f), w);
-                // Propped on the elbows, chin on the hands.
-                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(-150f, 0f, -18f), w);
-                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-95f, 0f, 0f), w);
-                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-150f, 0f, 18f), w);
-                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-95f, 0f, 0f), w);
+                // Arms folded on the towel in front of the head, elbows out to the sides (by IK, on every body: the
+                // fixed elbow bends put the round dads' arms up in the air through their shoulders).
                 for (int leg = 0; leg < 2; leg++)
                 {
                     bool left = leg == 0;
@@ -1568,6 +1810,21 @@ namespace PleaseDontDrown.Avatars
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(0f, 0f, 6f * side), w);
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kick, 0f, 0f), w);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(40f, 0f, 0f), w);
+                }
+                {
+                    float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+                    Transform head = B(Bone.Head);
+                    Vector3 toHead = Vector3.ProjectOnPlane(head.position - hips.position, Vector3.up);
+                    toHead = toHead.sqrMagnitude > 1e-4f ? toHead.normalized : -transform.forward;
+                    Vector3 across = Vector3.Cross(Vector3.up, toHead);
+                    float half = 0.5f * Vector3.Distance(upperL.position, upperR.position);
+                    float ground = transform.position.y + 0.06f * s;
+                    // Under the chin, a little apart; the chest is propped on the elbows.
+                    Vector3 chin = head.position + toHead * (0.12f * s);
+                    Vector3 handL = chin + across * (half * 0.45f), handR = chin - across * (half * 0.45f);
+                    handL.y = handR.y = ground;
+                    IK.Solve(upperL, foreL, la, lb, handL, across * 1.2f - Vector3.up * 0.4f, w, false);
+                    IK.Solve(upperR, foreR, la, lb, handR, -across * 1.2f - Vector3.up * 0.4f, w, false);
                 }
             }
 
@@ -1599,17 +1856,29 @@ namespace PleaseDontDrown.Avatars
                 hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.14f * s, -SitBack), w);
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(-14f, 0f, 0f), w);
                 B(Bone.Spine).localRotation = Quaternion.Slerp(B(Bone.Spine).localRotation, Quaternion.Euler(4f, 0f, 0f), w);
-                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(38f, 0f, -16f), w);
-                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
-                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(38f, 0f, 16f), w);
-                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
+                // Sitting up on the towel, leaning back on the hands; one leg out, the other knee up. All by IK to points
+                // on the sand (fixed joint angles crossed the Tripo girls' legs into each other).
+                Vector3 fwd = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
+                Vector3 across = Vector3.Cross(Vector3.up, fwd);
+                float ground = transform.position.y + 0.04f * s;
+                float half = 0.5f * Vector3.Distance(upperL.position, upperR.position);
+                float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+                Vector3 handL = hips.position - fwd * (0.22f * s) - across * (half + 0.12f * s);
+                Vector3 handR = hips.position - fwd * (0.22f * s) + across * (half + 0.12f * s);
+                handL.y = handR.y = ground;
+                IK.Solve(upperL, foreL, la, lb, handL, -across - fwd * 0.6f, w, false);
+                IK.Solve(upperR, foreR, la, lb, handR, across - fwd * 0.6f, w, false);
+                float legLength = _rig.ThighLength + _rig.ShinLength;
                 for (int leg = 0; leg < 2; leg++)
                 {
                     bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
-                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-80f, 0f, 9f * side), w);
-                    shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(left ? 20f : 55f, 0f, 0f), w);
+                    // Left leg out along the towel, right knee up with the foot flat on it, the feet a hip apart.
+                    float reach = left ? 0.92f : 0.6f;
+                    Vector3 heel = thigh.position + fwd * (legLength * reach) + across * (side * 0.06f * s);
+                    heel.y = ground + 0.04f * s;
+                    IK.Solve(thigh, shin, _rig.ThighLength, _rig.ShinLength, heel, Vector3.up + fwd * 0.5f + across * (side * 0.2f), w, true);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(-20f, 0f, 0f), w);
                 }
                 _rig.LeftHand?.Pose(HandPose.Flat);

@@ -170,6 +170,7 @@ namespace PleaseDontDrown.Story
             for (int i = 0; i < _towels.Length; i++)
             {
                 if (_rng.NextDouble() > _towelsTaken) continue;
+                if (!TowelClear(i)) continue; // half under a deck or a hut: nobody lies in the planks
                 AvatarPose pose = Pick(AvatarPose.Lie, AvatarPose.Lie, AvatarPose.LieFront, AvatarPose.Sit);
                 Member m = AddMember(Activity.Sunbathe, TowelPlace(i, out float yaw), yaw, i, pose);
                 m.NextThink = Time.time + 20f + (float)_rng.NextDouble() * 60f;
@@ -225,6 +226,43 @@ namespace PleaseDontDrown.Story
             _members.Add(m);
             return m;
         }
+
+        /// <summary>
+        /// Room to lie on this towel: nothing solid (a deck, a hut, a crate, a rock) in the space a body takes on it, from a
+        /// hand above the sand to knee height. (The team, 2026-10-12: Rita lay half inside the wooden deck.)
+        /// </summary>
+        private bool TowelClear(int towel)
+        {
+            Transform t = _towels[towel];
+            if (t == null) return false;
+            // Straight down from waist height over the body's length and width: the first solid thing must be the sand
+            // (or the towel), not a deck, a step or a hut floor standing above it. (Waist height: a parasol over the
+            // towel is fine.)
+            foreach (float along in new[] { -0.85f, -0.35f, 0.15f, 0.65f })
+                foreach (float side in new[] { -0.3f, 0f, 0.3f })
+                {
+                    Vector3 from = t.position + t.right * side + t.forward * along + Vector3.up * 0.9f;
+                    int count = Physics.RaycastNonAlloc(from, Vector3.down, _hits, 1.6f, ~0, QueryTriggerInteraction.Ignore);
+                    float top = float.NegativeInfinity;
+                    Collider blocker = null;
+                    for (int i = 0; i < count; i++)
+                    {
+                        Collider c = _hits[i].collider;
+                        if (c.transform.IsChildOf(t)) continue;
+                        if (c.attachedRigidbody != null && !c.attachedRigidbody.isKinematic) continue; // a ball, a loose item
+                        if (c.GetComponentInParent<StoryNpc>() != null || c.GetComponentInParent<PlayerHub>() != null) continue;
+                        if (_hits[i].point.y > top) { top = _hits[i].point.y; blocker = c; }
+                    }
+                    if (blocker != null && top > t.position.y + 0.15f)
+                    {
+                        Debug.Log($"[Crowd] {name}: towel {t.name} skipped, {blocker.name} is in the way");
+                        return false;
+                    }
+                }
+            return true;
+        }
+
+        private readonly RaycastHit[] _hits = new RaycastHit[16];
 
         /// <summary>
         /// Where the character's root goes for its towel: the feet end. Lying on the back or belly and sitting up all

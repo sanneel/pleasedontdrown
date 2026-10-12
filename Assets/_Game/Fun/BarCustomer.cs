@@ -7,7 +7,8 @@ namespace PleaseDontDrown.Fun
 {
     /// <summary>
     /// A guest sitting at a bar on a tall stool, facing the counter: one of the tourist women, chatting now and then.
-    /// The host seats her where the builder put her (exactly: the stool is higher than the floor under her).
+    /// The host seats her where the builder put her: half a metre under the stool's seat, as a player sits on one
+    /// (<see cref="AvatarPose.SitStool"/>; exactly there: the stool is higher than the floor under her).
     /// </summary>
     [RequireComponent(typeof(StoryNpc))]
     public class BarCustomer : MonoBehaviour
@@ -42,7 +43,7 @@ namespace PleaseDontDrown.Fun
             float yaw = _yaw;
             var look = new AvatarLook { Body = _body, Figure = (byte)(AvatarLook.Bodies.IsFeminine(_body) ? 1 : 0) };
             npc.ServerSetup(_name, NpcRole.Bystander, look);
-            npc.ServerSetPose(AvatarPose.SitChair);
+            npc.ServerSetPose(AvatarPose.SitStool);
             npc.ServerTeleport(at, yaw, keepExact: true);
             npc.ServerFace(at + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * 4f);
             var wait = new WaitForSeconds(Random.Range(18f, 30f));

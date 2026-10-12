@@ -196,6 +196,11 @@ namespace PleaseDontDrown.Avatars
         /// <summary>(Re)builds skeleton and mesh for a look. Keeps the same bone transforms when rebuilding.</summary>
         public void Build(AvatarLook look)
         {
+            // Only the modelled (GLB) characters are used (the team, 2026-10-12): a code-built look (body 0, the classic
+            // lifeguard) or a retired body id becomes the nearest model. (With no model library at all, e.g. a bare
+            // editor test, the code-built body is still the fallback.)
+            if (AvatarBodyLibrary.Get(look.Body) == null && AvatarBodyLibrary.Get(AvatarLook.Bodies.Goofy) != null)
+                look.Body = AvatarLook.Bodies.Modelled(look);
             Look = look;
             GeneratedBody = AvatarBodyLibrary.Get(look.Body);
             Scale = GeneratedBody != null ? GeneratedBody.Scale : 0.93f + look.Height * 0.05f;

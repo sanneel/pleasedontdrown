@@ -322,6 +322,26 @@ namespace PleaseDontDrown.Editor
                 m.GripRight = new HandGrip(rideR.position, rideR.forward, -rideR.up, HandPose.Fist);
                 pose = "ride";
             }
+            // "seat:Name": on that chair, stool or cart seat exactly as in the game (Vehicle.GlueDriver: feet half a metre
+            // under the seat point; a chair's hips sit on it: AvatarMotion.ChairSeat). The x y z yaw given are ignored.
+            if (pose.StartsWith("seat:") && GameObject.Find(pose.Substring(5)) is { } chairGo)
+            {
+                Transform chair = chairGo.transform, seatPoint = chair.Find("Seat") ?? chair;
+                yaw = chair.eulerAngles.y;
+                forward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+                go.transform.SetPositionAndRotation(seatPoint.position - Vector3.up * 0.5f, Quaternion.Euler(0f, yaw, 0f));
+                m.FacingYaw = yaw;
+                m.Seated = m.ChairSeat = true;
+                m.HighSeat = (chair.TryGetComponent(out Vehicles.Vehicle seatVehicle) && seatVehicle.IsStool) || chair.name.StartsWith("GuestStool");
+                m.SeatEdge = seatVehicle != null ? seatVehicle.SeatEdge : 0f;
+                if (chair.Find("GripLeft") is { } wl && chair.Find("GripRight") is { } wr)
+                {
+                    m.Holding = m.TwoHanded = true;
+                    m.GripLeft = new HandGrip(wl.position, wl.forward, -wl.up, HandPose.Fist);
+                    m.GripRight = new HandGrip(wr.position, wr.forward, -wr.up, HandPose.Fist);
+                }
+                pose = "ride";
+            }
             switch (pose)
             {
                 case "walk": m.Velocity = forward * 2.2f; break;
@@ -382,6 +402,7 @@ namespace PleaseDontDrown.Editor
                 AvatarAnimator.TimeOverride = 100f + i / 30f;
                 animator.Tick(1f / 30f);
             }
+            if (m.ChairSeat) LogSeatGap(go, rig, m.SeatEdge);
             // "bottle" / "drink": a beer in the right hand as someone else sees it (BottleHold's remote offset from the
             // eyes, shrunk like PlayerHands does), or tipped up at the lips (PlayerHands' drinking), the hand on its grip.
             if (pose.StartsWith("bottle") || pose.StartsWith("drink"))
@@ -497,6 +518,119 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>Seat N of the banana boat in the scene (0 the front) and the handles its rider holds.</summary>
+        /// <summary>
+        /// A seated avatar: how far its bottom is above the seat point it was put on (negative: sunk into the seat), and
+        /// the lowest point of its thighs, from the posed mesh. (Seat point = root + 0.5 m.)
+        /// </summary>
+        private static void LogSeatGap(GameObject go, AvatarRig rig, float seatEdge)
+        {
+            Vector3 seat = go.transform.position + Vector3.up * 0.5f;
+            Transform hips = rig[AvatarRig.Bone.Hips];
+            foreach (var skin in go.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (!skin.enabled || skin.sharedMesh == null) continue;
+                var baked = new Mesh();
+                skin.BakeMesh(baked, true);
+                float bottom = float.MaxValue, lowest = float.MaxValue;
+                foreach (Vector3 v in baked.vertices)
+                {
+                    Vector3 w = skin.transform.position + skin.transform.rotation * v; // (baked with its scale)
+                    lowest = Mathf.Min(lowest, w.y);
+                    Vector3 local = Quaternion.Inverse(go.transform.rotation) * (w - hips.position);
+                    // The seat of the pants: under the pelvis, not out along the thighs (forward) or the arms (sides).
+                    if (Mathf.Abs(local.x) < 0.14f && local.z < 0.06f && local.z > -0.25f && local.y < 0f) bottom = Mathf.Min(bottom, w.y);
+                }
+                Debug.Log($"[Review] seat gap ({skin.name}): bottom {(bottom - seat.y) * 100f:F1} cm above the seat point, lowest vertex {(lowest - seat.y) * 100f:F1}, hips bone {(hips.position.y - seat.y) * 100f:F1} cm");
+                // Where the joints are, from the seat point in the body's frame (x right, y up, z ahead), in cm.
+                string J(AvatarRig.Bone b) => (Quaternion.Inverse(go.transform.rotation) * (rig[b].position - seat) * 100f).ToString("F0");
+                Debug.Log($"[Review] joints: hips {J(AvatarRig.Bone.Hips)} thighL {J(AvatarRig.Bone.ThighL)} kneeL {J(AvatarRig.Bone.ShinL)} ankleL {J(AvatarRig.Bone.FootL)} " +
+                          $"shoulderL {J(AvatarRig.Bone.UpperArmL)} elbowL {J(AvatarRig.Bone.ForearmL)} handL {J(AvatarRig.Bone.HandL)} head {J(AvatarRig.Bone.Head)}");
+                // An armchair: anything of the body under its cushion's top, from its back to its front edge.
+                if (seatEdge > 0f)
+                {
+                    int inChair = 0;
+                    float chairDeepest = 0f;
+                    Vector3 chairDeepestAt = Vector3.zero;
+                    var byBone = new System.Collections.Generic.Dictionary<string, int>();
+                    BoneWeight[] chairWeights = skin.sharedMesh.boneWeights;
+                    Vector3[] chairVerts = baked.vertices;
+                    for (int i = 0; i < chairVerts.Length; i++)
+                    {
+                        Vector3 local = Quaternion.Inverse(go.transform.rotation) * (skin.transform.position + skin.transform.rotation * chairVerts[i] - seat);
+                        if (Mathf.Abs(local.x) < 0.4f && local.z > -0.45f && local.z < seatEdge && local.y < -0.01f && local.y > -0.5f)
+                        {
+                            inChair++;
+                            float depth = Mathf.Min(-local.y, seatEdge - local.z);
+                            if (depth > chairDeepest) chairDeepestAt = local;
+                            chairDeepest = Mathf.Max(chairDeepest, depth);
+                            string boneName = chairWeights.Length == chairVerts.Length ? skin.bones[chairWeights[i].boneIndex0].name : "?";
+                            byBone[boneName] = byBone.TryGetValue(boneName, out int c) ? c + 1 : 1;
+                        }
+                    }
+                    Debug.Log($"[Review] clipping ({skin.name}): {inChair} vertices inside the armchair's cushion, at most {chairDeepest * 100f:F1} cm in at {chairDeepestAt * 100f:F0} ({string.Join(", ", System.Linq.Enumerable.Select(byBone, kv => kv.Key + " " + kv.Value))})");
+                    // ...and the low tables (their top slab: 6 cm under the top of their box, GameSceneBuilder.BuildLoungeTable).
+                    var tables = System.Array.FindAll(Object.FindObjectsByType<BoxCollider>(FindObjectsSortMode.None), c => c.name.StartsWith("LoungeTable"));
+                    if (tables.Length > 0)
+                    {
+                        int inTable = 0;
+                        float tableNearest = float.MaxValue;
+                        foreach (Vector3 v in chairVerts)
+                        {
+                            Vector3 w = skin.transform.position + skin.transform.rotation * v;
+                            foreach (BoxCollider t in tables)
+                            {
+                                Vector3 b = t.transform.InverseTransformPoint(w) - t.center;
+                                Vector3 half = t.size * 0.5f;
+                                if (Mathf.Abs(b.x) > half.x || Mathf.Abs(b.z) > half.z) continue;
+                                if (b.y < half.y && b.y > half.y - 0.06f) inTable++;
+                                // (its legs: 5 cm square, 8 cm in from the corners)
+                                if (b.y < half.y && Mathf.Abs(Mathf.Abs(b.x) - (half.x - 0.08f)) < 0.03f && Mathf.Abs(Mathf.Abs(b.z) - (half.z - 0.08f)) < 0.03f) inTable++;
+                                tableNearest = Mathf.Min(tableNearest, Mathf.Abs(b.y - (half.y - 0.03f)) - 0.03f);
+                            }
+                        }
+                        Debug.Log($"[Review] clipping ({skin.name}): {inTable} vertices inside a low table's top" + (tableNearest < float.MaxValue ? $" (the closest {tableNearest * 100f:F0} cm from it)" : " (nothing over one)"));
+                    }
+                }
+                // At the hotel bar: anything of the body inside a bar stool's cushion, or inside the counter (its top
+                // slab 1.44-1.56 out to its edge, the panel under it 0.1 further in; measured on the bar model).
+                Transform bar = GameObject.Find("HotelBeachBar")?.transform;
+                if (bar != null)
+                {
+                    int cushion = 0, counter = 0;
+                    float deepest = 0f;
+                    Vector3 deepestAt = Vector3.zero;
+                    var inCushion = new System.Collections.Generic.Dictionary<string, int>();
+                    BoneWeight[] weights = skin.sharedMesh.boneWeights;
+                    Vector3[] verts = baked.vertices;
+                    for (int i = 0; i < verts.Length; i++)
+                    {
+                        Vector3 w = skin.transform.position + skin.transform.rotation * verts[i];
+                        Vector3 flat = w - seat;
+                        float r = new Vector2(flat.x, flat.z).magnitude;
+                        if (r < 0.195f && flat.y < -0.01f && flat.y > -0.08f)
+                        {
+                            cushion++;
+                            float depth = Mathf.Min(-flat.y, 0.2f - r);
+                            if (depth > deepest) deepestAt = Quaternion.Inverse(go.transform.rotation) * flat;
+                            deepest = Mathf.Max(deepest, depth);
+                            string boneName = weights.Length == verts.Length ? skin.bones[weights[i].boneIndex0].name : "?";
+                            if (weights.Length == verts.Length && depth > 0.02f)
+                                Debug.Log($"[Review]   in the cushion: {(Quaternion.Inverse(go.transform.rotation) * flat * 100f):F0} {skin.bones[weights[i].boneIndex0].name} {weights[i].weight0:F2} / {skin.bones[weights[i].boneIndex1].name} {weights[i].weight1:F2}, rest {skin.sharedMesh.vertices[i] * 100f:F0}");
+                            inCushion[boneName] = inCushion.TryGetValue(boneName, out int c) ? c + 1 : 1;
+                        }
+                        Vector3 b = bar.InverseTransformPoint(w);
+                        bool slab = b.y > 1.44f && b.y < 1.56f, panel = b.y > 0.27f && b.y <= 1.44f;
+                        float ax = Mathf.Abs(b.x);
+                        bool front = b.z > 4.0f && ax < 4.84f && (slab ? b.z < 4.84f : panel && b.z < 4.74f);
+                        bool sides = b.z > -3.3f && b.z < 4.84f && ax > 4.0f && (slab ? ax < 5.02f : panel && ax < 4.87f);
+                        if (front || sides) counter++;
+                    }
+                    Debug.Log($"[Review] clipping ({skin.name}): {cushion} vertices inside the stool's cushion, at most {deepest * 100f:F1} cm in at {deepestAt * 100f:F0} ({string.Join(", ", System.Linq.Enumerable.Select(inCushion, kv => kv.Key + " " + kv.Value))}), {counter} inside the bar counter");
+                }
+                Object.DestroyImmediate(baked);
+            }
+        }
+
         private static bool RideSeat(int index, out Transform seat, out Transform gripL, out Transform gripR)
         {
             seat = gripL = gripR = null;

@@ -121,9 +121,23 @@ namespace PleaseDontDrown.Story
                 });
 
             // The tavern's champion, waiting for someone to ask about the treasure.
-            if (GameObject.Find("Environment/Island3/PirateTavern/RoomFloor") is { } floor)
+            GameObject floor = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor");
+            if (floor != null)
+            {
                 AddResident("I3Tavern", () =>
                     SpawnNpc("Iron Jaw Jack", NpcRole.Pirate, PirateLookOf(AvatarLook.Bodies.PirateFat), floor.transform.position + Vector3.forward * 2f, 180f, 160).gameObject);
+                // The regulars round the ring, mugs up, waiting for a fight to bet on (they cheer the cage fight, 3.4).
+                Vector3 ring = floor.transform.position + Vector3.forward * 2f;
+                for (int i = 0; i < TavernRegulars.Length; i++)
+                {
+                    int k = i;
+                    AddResident("I3Tavern", () => TavernRegular(k, ring).gameObject);
+                }
+            }
+
+            // A drunk staggering between the tavern and the campfire, singing (too drunk to notice anyone sneaking by).
+            if (NightPoint("Campfire") is { } fire && floor != null)
+                AddResident("I3Locals", () => Drunk(fire.position, floor.transform.position).gameObject);
 
             // The jungle between the west road and the river: three guards on their beats, three monkeys.
             string[] names = { "Mangy Mo", "Long Tom", "Grog" };
@@ -140,6 +154,18 @@ namespace PleaseDontDrown.Story
             for (int i = 0; i < 2; i++)
                 if (Island3Point($"Gator_{i}") is { } g)
                     AddResident("I3River", () => SpawnCreature(CreatureKind.Alligator, g.position, g.eulerAngles.y, "Alligator")?.gameObject);
+
+            // The Pirate King on his throne in the palace, two guards at his side (3.7b; only once part C has built the
+            // palace: Environment/Island3/Story/PalaceThrone).
+            if (BeatBefore("3.8") && GameObject.Find(Island3Story + "PalaceThrone") is { } throne)
+            {
+                AddResident("I3Palace", () => PirateKing(throne.transform).gameObject);
+                for (int i = 0; i < 2; i++)
+                {
+                    int k = i;
+                    AddResident("I3Palace", () => PalaceGuard(k, throne.transform).gameObject);
+                }
+            }
 
             // Old Snapper, asleep in its pond under the crag falls until someone comes for the gold (not once beaten).
             if (BeatBefore("3.8") && Island3Point("SnapperPond") is { } pond)

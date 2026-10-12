@@ -525,13 +525,13 @@ namespace PleaseDontDrown.Rescue
             if (held) _item.ServerForceDrop(); // put down in the shallows
             if (rescuer != null)
             {
-                SetState(VictimState.Saved, VictimEvent.Saved, byRing ? $"{Name} rode {rescuer.DisplayName}'s ring all the way in! ({took})" : $"{Name} was saved by {rescuer.DisplayName}! ({took})", rescuer);
+                SetState(VictimState.Saved, VictimEvent.Saved, byRing ? $"{Name} rode {rescuer.DisplayName}'s ring all the way in!" : $"{Name} was saved by {rescuer.DisplayName}!", rescuer);
                 Debug.Log($"[Victim] {Name} saved by {rescuer.DisplayName} after {took}");
             }
             else
             {
                 string how = _body.HeldFloat != null ? " hanging onto a float" : "";
-                SetState(VictimState.Saved, VictimEvent.SelfRescue, $"{Name} made it back{how}. ({took})");
+                SetState(VictimState.Saved, VictimEvent.SelfRescue, $"{Name} made it back{how}.");
                 Debug.Log($"[Victim] {Name} made it back on their own{how} after {took}");
             }
         }
@@ -642,7 +642,7 @@ namespace PleaseDontDrown.Rescue
             if (_cpr.Value < 1f) return;
 
             string took = _troubleSince >= 0f ? FormatTime(Time.time - _troubleSince) : "?";
-            Revive(pumper, VictimEvent.Revived, $"{Name} was revived! CPR by {string.Join(" & ", _cprHelpers)} ({took})");
+            Revive(pumper, VictimEvent.Revived, $"{Name} was revived! CPR by {string.Join(" & ", _cprHelpers)}");
             Debug.Log($"[Victim] {Name} revived by {string.Join(", ", _cprHelpers)} after {took}");
         }
 

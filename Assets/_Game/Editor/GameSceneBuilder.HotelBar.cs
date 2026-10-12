@@ -25,21 +25,21 @@ namespace PleaseDontDrown.Editor
     {
         private static readonly Vector3 HotelBarLocal = new(-68f, 0f, -10f); // in the hotel's frame: ~18 m west of it
 
-        // Stools measured from the bar model (top-down render + cushion vertices): front row facing the counter (-z),
-        // the sides facing in toward the side counters. Cushion top 1.14 m over the model's base.
+        // The stools (GameSceneBuilder.BarDining.BuildBarStools): front row facing the counter (-z), the sides facing in
+        // toward the side counters, each 0.55 m back from the counter top's edge (front z 4.84, sides x +/-5.02).
         private static readonly (Vector3 at, float yaw)[] HotelBarStools =
         {
-            (new Vector3(3.42f, 0f, 5.25f), 180f), (new Vector3(1.11f, 0f, 5.25f), 180f), (new Vector3(-1.01f, 0f, 5.25f), 180f), (new Vector3(-3.38f, 0f, 5.25f), 180f),
-            (new Vector3(5.82f, 0f, 0.46f), 270f), (new Vector3(5.82f, 0f, 1.43f), 270f), (new Vector3(5.82f, 0f, 2.65f), 270f), (new Vector3(5.82f, 0f, 3.99f), 270f),
-            (new Vector3(-5.78f, 0f, 0.46f), 90f), (new Vector3(-5.78f, 0f, 1.43f), 90f),
+            (new Vector3(3.4f, 0f, 5.39f), 180f), (new Vector3(1.12f, 0f, 5.39f), 180f), (new Vector3(-1.12f, 0f, 5.39f), 180f), (new Vector3(-3.4f, 0f, 5.39f), 180f),
+            (new Vector3(5.57f, 0f, 0.5f), 270f), (new Vector3(5.57f, 0f, 1.65f), 270f), (new Vector3(5.57f, 0f, 2.8f), 270f), (new Vector3(5.57f, 0f, 3.95f), 270f),
+            (new Vector3(-5.57f, 0f, 0.5f), 90f), (new Vector3(-5.57f, 0f, 1.65f), 90f),
         };
         // The last two stools on the west side: the guests'.
         private static readonly (Vector3 at, float yaw, byte body, string name)[] HotelBarGuests =
         {
-            (new Vector3(-5.78f, 0f, 2.65f), 90f, AvatarLook.Bodies.GirlPink, "Kayla"),
-            (new Vector3(-5.78f, 0f, 3.99f), 90f, AvatarLook.Bodies.GirlLavender, "Mia"),
+            (new Vector3(-5.57f, 0f, 2.8f), 90f, AvatarLook.Bodies.GirlPink, "Kayla"),
+            (new Vector3(-5.57f, 0f, 3.95f), 90f, AvatarLook.Bodies.GirlLavender, "Mia"),
         };
-        private const float StoolCushion = 1.14f;
+        private const float BarDeckTop = 0.266f; // the bar model's deck (measured)
         private const float CounterTop = 1.54f;
 
         private static void BuildHotelBar(Transform hotel)
@@ -98,48 +98,16 @@ namespace PleaseDontDrown.Editor
             BuildBarista(root, AvatarLook.Bodies.Bartender);
             Transform barista = root.Find("Barista");
             barista.localPosition = new Vector3(.25f, .26f, 3.72f);
-            for (int i = 0; i < 4; i++) root.Find("ServeSpot" + i).localPosition = new Vector3(HotelBarStools[i].at.x, CounterTop + .1f, 4.85f);
             root.Find("WipeFrom").localPosition = new Vector3(-.25f, CounterTop + .02f, 4.35f);
             root.Find("WipeTo").localPosition = new Vector3(.75f, CounterTop + .02f, 4.35f);
             barista.Find("Rag").localPosition = new Vector3(.3f, CounterTop - .25f, .7f);
 
-            // The stools you sit on (each its own networked chair, beside the bar: not nested in its network object).
-            var stools = new GameObject("HotelBarStools").transform;
-            stools.SetParent(hotel, false);
-            var seats = new List<Object>();
-            for (int i = 0; i < HotelBarStools.Length; i++)
-                seats.Add(BuildBarStool(stools, root, i, HotelBarStools[i].at, HotelBarStools[i].yaw, barista.GetComponent<Barista>()));
+            // The stools you sit on, two guests on stools of their own (GameSceneBuilder.BarDining.cs), and the armchairs
+            // at the four tables: seats too.
             var bar = barista.GetComponent<Barista>();
-            SetRefs(bar, "_seats", seats.ToArray());
-            SetField(bar, "_menu", p =>
-            {
-                (string item, string label, int price)[] menu = { ("Fries", "Fries", 3), ("Cola", "Cola", 2), ("Beer", "Beer", 4), ("Cocktail", "Cocktail", 8) };
-                p.arraySize = menu.Length;
-                for (int i = 0; i < menu.Length; i++)
-                {
-                    SerializedProperty e = p.GetArrayElementAtIndex(i);
-                    e.FindPropertyRelative("Item").stringValue = menu[i].item;
-                    e.FindPropertyRelative("Label").stringValue = menu[i].label;
-                    e.FindPropertyRelative("Price").intValue = menu[i].price;
-                }
-            });
-
-            // Two guests on the west stools, chatting over their drinks.
-            GameObject npcPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(NpcPrefabPath);
-            if (npcPrefab != null)
-            {
-                var guests = new GameObject("HotelBarGuests").transform;
-                guests.SetParent(hotel, false);
-                foreach (var g in HotelBarGuests)
-                {
-                    // Feet on the stool's rail: the sitting pose puts the hips 0.48 m over the feet.
-                    Vector3 at = root.TransformPoint(g.at + new Vector3(0f, StoolCushion + 0.08f - 0.48f, 0f));
-                    StoryNpc npc = PlaceNpc(npcPrefab, guests, "BarGuest_" + g.name, at, root.eulerAngles.y + g.yaw);
-                    var customer = npc.gameObject.AddComponent<BarCustomer>();
-                    SetField(customer, "_name", p => p.stringValue = g.name);
-                    SetField(customer, "_body", p => p.intValue = g.body);
-                }
-            }
+            SetRefs(bar, "_seats", BuildBarStools(root, hotel, bar).ToArray());
+            AddBarTables(root, hotel, bar);
+            SetHotelBarMenu(bar);
         }
 
         /// <summary>One stool: a chair that never moves, the seat at the cushion, its order put down on the counter in front.</summary>
@@ -155,24 +123,21 @@ namespace PleaseDontDrown.Editor
             go.AddComponent<NetworkObject>();
             go.AddComponent<ItemSync>();
 
-            var hull = new GameObject("Hull");
-            hull.transform.SetParent(go.transform, false);
-            var box = hull.AddComponent<BoxCollider>();
-            box.center = new Vector3(0f, StoolCushion * 0.5f, 0f);
-            box.size = new Vector3(0.5f, StoolCushion, 0.5f);
+            BoxCollider box = BarStoolLooks(go.transform);
             var seat = new GameObject("Seat").transform;
             seat.SetParent(go.transform, false);
-            seat.localPosition = new Vector3(0f, StoolCushion + 0.08f, 0f);
-            // In front of the stool, on the counter (front row: 0.4 m forward; sides: over the side counter).
+            seat.localPosition = new Vector3(0f, BarStoolSeat, 0f);
+            // In front of the stool, on the counter (its edge half a metre ahead).
             var serve = new GameObject("ServePoint").transform;
             serve.SetParent(go.transform, false);
-            serve.localPosition = new Vector3(0f, CounterTop + 0.1f, index < 4 ? 0.42f : 0.85f); // (the stool stands on the bar's base)
+            serve.localPosition = new Vector3(0f, CounterTop + 0.1f, BarStoolFromCounter + 0.15f);
 
             var vehicle = go.AddComponent<Vehicle>();
             var so = new SerializedObject(vehicle);
             Require(so, "_displayName").stringValue = "bar stool";
             Require(so, "_seat").objectReferenceValue = seat;
             Require(so, "_chair").boolValue = true;
+            Require(so, "_stool").boolValue = true;
             Require(so, "_thrust").floatValue = 0f;
             Require(so, "_reverseThrust").floatValue = 0f;
             Require(so, "_maxSpeed").floatValue = 1f; // (never 0: it divides)

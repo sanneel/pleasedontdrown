@@ -100,12 +100,12 @@ namespace PleaseDontDrown.Fun
 
         public bool CanInteract(PlayerHub player) => player != null && (player.transform.position - transform.position).sqrMagnitude < ServeRange * ServeRange;
 
-        public string GetPrompt(PlayerHub player) => HasMenu ? "Take a stool to order (the menu shows when you sit)" : "Order a beer";
+        public string GetPrompt(PlayerHub player) => HasMenu ? "Sit at the bar or at a table to order (the menu opens)" : "Order a beer";
 
         public void OnInteract(PlayerHub player)
         {
             if (player == null || !player.IsOwner) return;
-            if (HasMenu) PlayerHud.ShowToast("Sit on one of the stools: the menu shows and the number keys order.", 3f);
+            if (HasMenu) PlayerHud.ShowToast("Sit on a stool or at one of the tables: the menu opens.", 3f);
             else OrderServer(player);
         }
 
@@ -146,8 +146,21 @@ namespace PleaseDontDrown.Fun
             at = FreeSpotNear(at, seat.transform.right);
             Item order = Instantiate(prefab, at, Quaternion.Euler(0f, seat.transform.eulerAngles.y, 0f));
             Spawn(order.gameObject);
+            ServedTarget(caller, order.NetworkObject);
             Debug.Log($"[Bar] {player.DisplayName} ordered {wanted.Item} for ${wanted.Price}");
             SayTextObservers(OrderLines[Random.Range(0, OrderLines.Length)].Replace("{0}", wanted.Label.ToLowerInvariant()).Replace("{1}", wanted.Price.ToString()), at, true);
+        }
+
+        /// <summary>The one who ordered: it's put in their hand if it's free (they're sitting: they can't reach for it).</summary>
+        [TargetRpc]
+        private void ServedTarget(NetworkConnection target, NetworkObject order) => StartCoroutine(TakeServed(order));
+
+        private System.Collections.IEnumerator TakeServed(NetworkObject order)
+        {
+            yield return new WaitForSeconds(0.5f); // (she puts it down first)
+            PlayerHub me = PlayerHub.Local;
+            if (order == null || me == null || me.Hands == null || me.Hands.HeldItem != null) yield break;
+            if (order.TryGetComponent(out Item item) && !item.IsHeld) me.Hands.TryPickUp(item);
         }
 
         /// <summary>Along the counter beside the serving spot, the first place nothing already stands (orders used to stack).</summary>

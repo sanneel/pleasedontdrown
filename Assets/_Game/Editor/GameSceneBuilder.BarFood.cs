@@ -39,6 +39,8 @@ namespace PleaseDontDrown.Editor
                 DressProp(root, "cocktail");
             }, linearDamping: 0.1f, angularDamping: 0.4f, density: 0.7f, waterDrag: 1.0f,
                 configure: go => BarFood(go, food: 0.15f, seconds: 3f, drink: true, burp: 12f, lip: new Vector3(-0.03f, 0.15f, 0.012f)));
+
+            yield return BuildKhinkali(); // (GameSceneBuilder.BarDining.cs)
         }
 
         /// <summary>One-handed, pocketable, eaten or drunk with Secondary; drinks are held like the beer bottle.</summary>
