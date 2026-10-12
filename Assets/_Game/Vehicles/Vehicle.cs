@@ -39,6 +39,8 @@ namespace PleaseDontDrown.Vehicles
         [SerializeField] private bool _restHands;
         [Tooltip("A seat that never moves (a bar stool): sit down and stand up, no driving. Frozen in place.")]
         [SerializeField] private bool _chair;
+        [Tooltip("Drives on land (the golf cart): wheels on the ground push and steer it; it rolls to a stop off the throttle.")]
+        [SerializeField] private bool _land;
         [Tooltip("Needed in the driver's inventory to start it (item display name). Empty = no key.")]
         [SerializeField] private string _keyItem = "";
         [Header("Driving")]
@@ -74,6 +76,8 @@ namespace PleaseDontDrown.Vehicles
         public static IReadOnlyList<Vehicle> All => _all;
         public string DisplayName => _displayName;
         public bool IsChair => _chair;
+        /// <summary>A land vehicle (the golf cart): sat on a bench, not astride.</summary>
+        public bool IsLand => _land;
         public PlayerHub Driver => _driver.Value;
         public bool IsLocked => _locked.Value;
         public Rigidbody Body => _rb;
@@ -719,6 +723,11 @@ namespace PleaseDontDrown.Vehicles
             _throttle = Mathf.MoveTowards(_throttle, throttle, Time.fixedDeltaTime * 3f);
             Vector3 thrustAt = _thrustPoint != null ? _thrustPoint.position : _rb.position - transform.forward * 1f;
             bool inWater = WaterSurface.Exists && WaterSurface.DepthOf(thrustAt) > -0.15f;
+            if (_land)
+            {
+                DriveOnLand(throttle, steer);
+                return;
+            }
             Vector3 forward = Flat(transform.forward);
             Vector3 right = Flat(transform.right);
             Vector3 v = _rb.linearVelocity;
@@ -747,6 +756,51 @@ namespace PleaseDontDrown.Vehicles
 
             // Stay upright (it's a toy, not a simulator).
             Vector3 tilt = Vector3.Cross(transform.up, Vector3.up);
+            _rb.AddTorque(tilt * _uprightStrength - new Vector3(_rb.angularVelocity.x, 0f, _rb.angularVelocity.z) * 3f, ForceMode.Acceleration);
+        }
+
+        /// <summary>
+        /// A land vehicle (the golf cart): with its wheels on the ground the throttle pushes it along the ground, the
+        /// tyres kill sideways sliding, steering turns it like a car (needs speed, flips in reverse), and off the
+        /// throttle it rolls to a stop. In the air or in deep water it just falls / floats.
+        /// </summary>
+        private float _landLogAt;
+
+        private void DriveOnLand(float throttle, float steer)
+        {
+            Vector3 v = _rb.linearVelocity;
+            // The ground under the middle, from above the hull down past the wheels (not the cart itself, nor the riders).
+            bool grounded = false;
+            RaycastHit ground = default;
+            int count = Physics.RaycastNonAlloc(_rb.position + transform.up * 1.0f, -transform.up, _overhead, 1.5f, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                Collider c = _overhead[i].collider;
+                if (c.transform.IsChildOf(transform) || c.GetComponentInParent<PlayerHub>() != null) continue;
+                if (_overhead[i].distance < nearest) { nearest = _overhead[i].distance; ground = _overhead[i]; grounded = true; }
+            }
+            if (grounded)
+            {
+                Vector3 forward = Vector3.ProjectOnPlane(transform.forward, ground.normal).normalized;
+                Vector3 right = Vector3.Cross(ground.normal, forward);
+                float forwardSpeed = Vector3.Dot(v, forward);
+                float push = _throttle >= 0f ? _throttle * _thrust : _throttle * _reverseThrust;
+                if ((forwardSpeed > _maxSpeed && push > 0f) || (forwardSpeed < -_maxSpeed * 0.4f && push < 0f)) push = 0f;
+                _rb.AddForce(forward * push, ForceMode.Acceleration);
+                _rb.AddForce(-right * Vector3.Dot(v, right) * _sideGrip, ForceMode.Acceleration);
+                if (Mathf.Abs(throttle) < 0.05f) _rb.AddForce(-forward * forwardSpeed * 1.2f, ForceMode.Acceleration); // rolling to a stop
+                float authority = Mathf.Clamp01(Mathf.Abs(forwardSpeed) / 2.5f) * (forwardSpeed < -0.3f ? -1f : 1f);
+                float wantYaw = steer * _turnRate * authority;
+                _rb.AddTorque(Vector3.up * ((wantYaw - _rb.angularVelocity.y) * 6f), ForceMode.Acceleration);
+            }
+            if (_driver.Value != null && Time.time > _landLogAt)
+            {
+                _landLogAt = Time.time + 1f;
+                Debug.Log($"[Cart] {_displayName}: throttle {_throttle:F2}, grounded {grounded}, speed {v.magnitude:F1} m/s at {_rb.position:F1}");
+            }
+            // Stay upright (on four wheels it shouldn't roll, but a kerb or a jump might try).
+            Vector3 tilt = Vector3.Cross(transform.up, grounded ? ground.normal : Vector3.up);
             _rb.AddTorque(tilt * _uprightStrength - new Vector3(_rb.angularVelocity.x, 0f, _rb.angularVelocity.z) * 3f, ForceMode.Acceleration);
         }
 

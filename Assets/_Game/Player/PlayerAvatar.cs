@@ -228,7 +228,7 @@ namespace PleaseDontDrown.Player
                 m.Velocity = Vector3.zero; // no walking legs
                 m.Straddle = seat.Straddle;
                 m.FloatSeat = seat.RestHands;
-                m.ChairSeat = seat.IsChair;
+                m.ChairSeat = seat.IsChair || seat.IsLand; // a chair, a stool, the golf cart's bench
                 if (!m.Holding && seat.GetGrips(_hub, out HandGrip left, out HandGrip right))
                 {
                     m.GripLeft = left;
