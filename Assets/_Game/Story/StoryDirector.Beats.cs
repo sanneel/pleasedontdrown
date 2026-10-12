@@ -92,6 +92,7 @@ namespace PleaseDontDrown.Story
             Add("3.5", "The jungle", Jungle);
             Add("3.6", "The river", River);
             Add("3.7", "Old Snapper", SnapperBeat);
+            Add("3.7b", "The Pirate King", PirateKingBeat);
             Add("3.8", "The gold vault", MoneyCave);
         }
 

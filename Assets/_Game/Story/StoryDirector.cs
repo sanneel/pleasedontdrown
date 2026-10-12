@@ -802,6 +802,18 @@ namespace PleaseDontDrown.Story
                 me.Look.LookAt(p + Vector3.up * 0.4f);
                 DevCommands.Print($"at {target.name} {p:F1}");
             }, cheat: true, owner: this);
+            DevCommands.Register("mkpoint", "<name> [dx dy dz]", "Make an island 3 story point here (tests of places part C hasn't built yet, e.g. PalaceThrone).", args =>
+            {
+                if (args.Length == 0) throw new ArgumentException("name?");
+                PlayerHub me = PlayerHub.Local;
+                Transform story = GameObject.Find("Environment/Island3/Story")?.transform;
+                if (me == null || story == null) throw new InvalidOperationException("no player or no island 3");
+                Vector3 offset = args.Length >= 4 ? new Vector3(DevCommands.ParseFloat(args, 1), DevCommands.ParseFloat(args, 2), DevCommands.ParseFloat(args, 3)) : Vector3.zero;
+                var point = new GameObject(args[0]).transform;
+                point.SetParent(story, true);
+                point.SetPositionAndRotation(me.transform.position + offset, Quaternion.Euler(0f, me.transform.eulerAngles.y + 180f, 0f));
+                DevCommands.Print($"point {args[0]} at {point.position:F1}");
+            }, cheat: true, owner: this);
             DevCommands.Register("aimat", "<name part> [head]", "Look at a character's chest, or head (gun tests).", args =>
             {
                 if (args.Length == 0) throw new ArgumentException("who?");

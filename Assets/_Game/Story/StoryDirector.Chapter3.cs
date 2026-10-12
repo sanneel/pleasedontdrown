@@ -555,6 +555,79 @@ namespace PleaseDontDrown.Story
 
         // ------------------------------------------------------------------ 3.8 the gold vault
 
+        // ------------------------------------------------------------------ 3.7b the sewer, the palace and the Pirate King
+
+        /// <summary>
+        /// Behind the back waterfall a sewer runs to the palace; the Pirate King and his two guards are there. Beat him
+        /// (fists or a blade put him down, he's needed alive) and he tells you where the gold is (3.8). The places are
+        /// part C's: Environment/Island3/Story/SewerEntrance (the way in, behind the back waterfall) and PalaceThrone
+        /// (in front of the throne, facing the room). Until they exist this beat is skipped.
+        /// </summary>
+        private IEnumerator PirateKingBeat()
+        {
+            EnsureOnIsland3();
+            Transform sewer = GameObject.Find(Island3Story + "SewerEntrance")?.transform;
+            Transform throne = GameObject.Find(Island3Story + "PalaceThrone")?.transform;
+            if (sewer == null || throne == null)
+            {
+                Debug.Log("[Story] 3.7b skipped: no SewerEntrance / PalaceThrone on island 3 yet (part C builds them)");
+                yield break;
+            }
+            if (ResidentsOf<StoryNpc>("I3Palace").Count == 0) // (the palace went up after the island was populated)
+            {
+                AddResident("I3Palace", () => PirateKing(throne).gameObject);
+                for (int i = 0; i < 2; i++)
+                {
+                    int k = i;
+                    AddResident("I3Palace", () => PalaceGuard(k, throne).gameObject);
+                }
+            }
+            SetObjective("Behind the back waterfall: the sewer to the palace");
+            Marker("The sewer", sewer.position + Vector3.up * 2f);
+            yield return Reach(sewer.position, 4f);
+            SetObjective("Follow the sewer up into the palace");
+            Marker("The palace", throne.position + Vector3.up * 2f);
+            yield return Reach(throne.position, 9f);
+            NoMarker();
+            PlayerHub first = StoryNpc.NearestPlayer(throne.position, 10f);
+            yield return RunMission("The Pirate King", first != null ? first.transform.position : throne.position, PirateKingBody, () => ResetResidents("I3Palace"));
+        }
+
+        private IEnumerator PirateKingBody()
+        {
+            List<StoryNpc> court = ResidentsOf<StoryNpc>("I3Palace");
+            StoryNpc king = court.Find(n => n.Name == "The Pirate King");
+            if (king == null) yield break;
+            yield return Say(king, "Lifeguards? In MY palace? Through the SEWER? Guards! ...Oh, forget it. I'll do it meself.");
+            BossIntroObservers("THE PIRATE KING", "His guards first, or him: he's slow but he hits like a cannon.");
+            king.ServerSetPose(Avatars.AvatarPose.Normal);
+            foreach (StoryNpc n in court)
+                n.ServerFight(n == king ? FighterProfile.Pirate(NpcWeaponKind.Cutlass) : FighterProfile.Pirate(NpcWeaponKind.Fists), n.transform.position);
+            while (!king.IsDefeated)
+            {
+                MissionObjective("Beat the Pirate King (put him down: he knows where the gold is)");
+                yield return new WaitForSeconds(0.25f);
+            }
+            foreach (StoryNpc n in court) n.ServerStopFighting();
+            yield return new WaitForSeconds(1.5f);
+            yield return Say(king, "Arr... enough! Ye want the casino's gold? It's not in me palace, ye fools.");
+            yield return Say(king, "It's in the heart of the mountain. Behind the crag falls: swim in, up the ramp, through the tunnel.");
+        }
+
+        private StoryNpc PirateKing(Transform throne)
+        {
+            StoryNpc king = SpawnNpc("The Pirate King", NpcRole.Pirate, PirateLookOf(AvatarLook.Bodies.PirateQuartermaster), throne.position, throne.eulerAngles.y, 300);
+            king.ServerSetMood(AvatarMood.Angry);
+            return king;
+        }
+
+        private StoryNpc PalaceGuard(int i, Transform throne)
+        {
+            Vector3 at = throne.position + throne.right * (i == 0 ? -2.2f : 2.2f) + throne.forward * 1.2f;
+            StoryNpc guard = SpawnNpc(i == 0 ? "Crown Guard Krusty" : "Crown Guard Moss", NpcRole.Pirate, PirateLook(i + 2), at, throne.eulerAngles.y, 120);
+            return guard;
+        }
+
         private IEnumerator MoneyCave()
         {
             EnsureOnIsland3();

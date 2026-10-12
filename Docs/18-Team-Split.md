@@ -64,7 +64,7 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | C2 | Buildings overlapping each other | open |
 | C3 | Octopus overlapping itself (and animals overlapping things) | open |
 | C4 | Main waterfall: water reaches the ocean; fix the texture where the water starts | open |
-| C5 | Palace: sewer exit, gate shut so you can't walk in | open |
+| C5 | Palace: sewer exit, gate shut so you can't walk in. **Put two empty GameObjects under `Environment/Island3/Story/`:** `SewerEntrance` (the way into the sewer, behind the back waterfall) and `PalaceThrone` (in front of the throne, facing the room). The Pirate King beat (3.7b, part A) uses them; until they exist it's skipped. | open |
 | C6 | Jungle bigger | open |
 | C7 | Tavern bar look; octagon arena | open |
 | C8 | Gun shop (island 3) as a real building | open |

@@ -155,6 +155,18 @@ namespace PleaseDontDrown.Story
                 if (Island3Point($"Gator_{i}") is { } g)
                     AddResident("I3River", () => SpawnCreature(CreatureKind.Alligator, g.position, g.eulerAngles.y, "Alligator")?.gameObject);
 
+            // The Pirate King on his throne in the palace, two guards at his side (3.7b; only once part C has built the
+            // palace: Environment/Island3/Story/PalaceThrone).
+            if (BeatBefore("3.8") && GameObject.Find(Island3Story + "PalaceThrone") is { } throne)
+            {
+                AddResident("I3Palace", () => PirateKing(throne.transform).gameObject);
+                for (int i = 0; i < 2; i++)
+                {
+                    int k = i;
+                    AddResident("I3Palace", () => PalaceGuard(k, throne.transform).gameObject);
+                }
+            }
+
             // Old Snapper, asleep in its pond under the crag falls until someone comes for the gold (not once beaten).
             if (BeatBefore("3.8") && Island3Point("SnapperPond") is { } pond)
                 AddResident("I3Snapper", () =>
