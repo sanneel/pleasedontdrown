@@ -88,7 +88,6 @@ namespace PleaseDontDrown.Story
                 $"{Vector3.Distance(me.transform.position, NightDock):F1} m off");
             Check("3.1 it's night on Skull Cove", World.IslandNight.NightAt(me.transform.position) > 0.95f);
             Transform lookout = NightPoint("Lookout");
-            Check("3.1 the lookout tower is built", lookout != null);
             yield return new WaitForSeconds(6f);
             if (lookout != null) Stand(lookout.position);
             float waited = Time.time; // the radio lines, then the mission
@@ -246,10 +245,10 @@ namespace PleaseDontDrown.Story
             TitleObservers("CHAPTER 3", "Skull Cove, by night");
             yield return new WaitForSeconds(2f);
             yield return Say(_sandy, "(on the radio) Skull Cove. You came in round the back, under the mountain. Nobody watches this side.");
-            yield return Say(_sandy, "(on the radio) See that old pirate tower against the cliff? Climb it. From up there you'll see the whole village.");
-            Transform lookout = NightPoint("Lookout");
+            Transform lookout = NightPoint("Lookout"); // the stair tower was taken out (Docs/18 C1): then straight to the sneak
             if (lookout != null)
             {
+                yield return Say(_sandy, "(on the radio) See that old pirate tower against the cliff? Climb it. From up there you'll see the whole village.");
                 SetObjective("Climb the lookout tower against the cliff");
                 Marker("Lookout", lookout.position + Vector3.up * 1.5f);
                 yield return Reach(lookout.position, 4f);

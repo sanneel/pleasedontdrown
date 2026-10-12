@@ -55,12 +55,12 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | B12 | Island 2: casino interior (Tripo tables/chandelier already in `Art/Tripo/Island2/`) | **done** (Shako) — the 6 box slots → Tripo slot machines on the same stands; Tripo roulette table (with a collider) in the back half; the 2 drawn chandeliers → Tripo crystal ones (+ warm lights); velvet ropes funnelling the door; champagne tower on a gold table. The existing blackjack table is left for A7 (`TeamBCasinoBatch`) |
 | B13 | Island 2: gun shop | **done** (Shako) — "Coral Arms", a walk-up boutique between the bar and the hotel facing the beach (teal awning, gold sign, guns on a walnut wall). Its counter is a copy of the reception's shop (same guns and prices) and opens/closes with the reception (`Story/ShopFollowsAnother.cs`, a tiny host script): the "buy the pistol" step (2.2) passes when bought here, tested in the build. A6/A: the objective still says "at reception" (`TeamBGunShopBatch`) |
 | B14 | List what an expensive island still lacks (show the team before building) | **list written** (Shako) — `Docs/19-Island-2-What-It-Lacks.md` (14 items, suggested order); waiting for the team to pick before building |
-| B15 | Island 1 restyle (get a reference picture first) | open |
+| B15 | Island 1 restyle (get a reference picture first) | **waiting for a reference picture** — not started (no picture yet). Note: after B4 island 1 has no palms left; the restyle should bring new trees |
 
 ### C: island 3 and the Tripo models
 | # | Task | Status |
 |---|---|---|
-| C1 | Remove the wooden structure | open |
+| C1 | Remove the wooden structure | **done** (Shako, from shako-dev) — read as the wooden stair tower + lookout deck against the crags (night arrival); `TowerFoot` kept (sneak start); the story skips the climb (Sandy's tower line only plays if a lookout exists); the builder no longer makes it; `chapter3check` ALL PASS (`TeamCRemoveTowerBatch`) |
 | C2 | Buildings overlapping each other | open |
 | C3 | Octopus overlapping itself (and animals overlapping things) | open |
 | C4 | Main waterfall: water reaches the ocean; fix the texture where the water starts | open |

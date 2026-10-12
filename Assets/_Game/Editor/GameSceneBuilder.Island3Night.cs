@@ -149,8 +149,18 @@ namespace PleaseDontDrown.Editor
 
         // ------------------------------------------------------------------ the stair tower and the lookout
 
+        // The wooden stair tower was taken out (Docs/18 C1, 2026-10-12): only its foot stays, the sneak's start and restart.
+        private static readonly bool LookoutTowerRemoved = true;
+
         private static void BuildLookoutTower(Transform root, Material wood, Material plank, Material rope, Material lamp)
         {
+            if (LookoutTowerRemoved)
+            {
+                var start = new GameObject("TowerFoot").transform;
+                start.SetParent(root, false);
+                start.SetPositionAndRotation(new Vector3(TowerLaneE, TowerGround + 0.1f, TowerNorthZ + TowerLanding + 1.5f), Quaternion.Euler(0f, 180f, 0f));
+                return;
+            }
             var tower = new GameObject("LookoutTower").transform;
             tower.SetParent(root, false);
             float rise = (TowerTop - TowerGround) / 3f;
@@ -393,8 +403,9 @@ namespace PleaseDontDrown.Editor
         {
             Physics.SyncTransforms();
             Transform night = island.Find("NightArrival");
-            foreach (string name in new[] { "Dock", "Lookout", "TowerFoot", "Sleeper_0", "Campfire" })
+            foreach (string name in new[] { "Dock", "TowerFoot", "Sleeper_0", "Campfire" })
                 if (night.Find(name) == null) throw new InvalidOperationException($"Night arrival has no {name}");
+            if (LookoutTowerRemoved) return;
             // Walk the tower's centre lines: each sample stands on something (the ramp or a landing) and has headroom.
             float rise = (TowerTop - TowerGround) / 3f;
             (float x, float z0, float y0, float z1, float y1)[] flights =

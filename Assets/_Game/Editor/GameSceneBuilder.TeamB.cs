@@ -660,6 +660,24 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[TeamB] PASS: gun shop built at {root.position}, counter {counter.GetComponent<Collider>().bounds}");
         }
 
+        // ---------------------------------------------------------------- Part C on island 3 (done from this branch)
+
+        /// <summary>Batch: C1, the wooden stair tower against the crags (and its lookout deck) taken out of the saved
+        /// scene. TowerFoot stays (the sneak mission starts and restarts there); the story skips the climb without a
+        /// Lookout point. Island 3's navmesh is baked again.</summary>
+        public static void TeamCRemoveTowerBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var log = new List<string>();
+            foreach (string name in new[] { "LookoutTower", "LookoutDeck", "Lookout" })
+                Remove("Environment/Island3/NightArrival/" + name, log);
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island3");
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[TeamB] PASS: C1 tower removed\n" + string.Join("\n", log));
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
