@@ -669,7 +669,7 @@ namespace PleaseDontDrown.Avatars
             float grounded = (_hipDrop * _groundWeight + _landing.Value) * land;
             hips.localPosition = _rig.RestPosition(Bone.Hips) +
                                  new Vector3(sway * 0.03f * s, stepBob - drop - pumpDip + lift + breathe + swimBob + StandTall() * land + grounded, 0f);
-            float lean = (4f + 9f * _run) * _move * land + _crouch * 18f * land + _cpr * 34f + _air * -6f + _leanForward.Value * standing;
+            float lean = (4f + 9f * _run) * _move * land + _crouch * 18f * land + _cpr * 24f + _air * -6f + _leanForward.Value * standing;
             float tip = (_leanSide.Value + _turnLag.Value * 0.25f - sway * 2.2f) * standing;
             // The crawl rolls the whole body round its long axis: the shoulder of the arm coming over is the high one.
             Quaternion roll = Quaternion.AngleAxis(CrawlRoll * crawl, Vector3.up);

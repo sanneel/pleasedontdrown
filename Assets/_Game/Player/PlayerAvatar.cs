@@ -27,6 +27,11 @@ namespace PleaseDontDrown.Player
         private float _remoteChargeTime;
         private float _lastPumpTime = -10f;
         private Vector3 _cprPoint, _kneelPoint; // where the hands press; where the body kneels beside it
+        private Vector3 _kneelHead;             // their head: the body lies chest to head along this
+        private float _kneelSide;               // which side of them we kneel on (+1/-1, kept for the whole CPR; 0 = not chosen)
+        private Quaternion? _kneelFacing;       // turned square to their chest while kneeling
+        private float _kneelTurn;
+        private Quaternion _kneelFacingTarget = Quaternion.identity;
         private float _kneelReach = 0.55f;      // how far out from the middle of their body (clear of a big belly)
         private bool _inCannon;                 // drawn up a cannon's barrel, at _cannonBody
         private Vector3 _cannonBody;
@@ -98,6 +103,7 @@ namespace PleaseDontDrown.Player
         {
             _lastPumpTime = Time.time;
             _cprPoint = chest;
+            _kneelHead = head;
             _kneelPoint = Rescue.VictimBody.KneelSpot(chest, head);
             _kneelReach = reach;
         }
@@ -107,6 +113,7 @@ namespace PleaseDontDrown.Player
         {
             _lastPumpTime = Time.time;
             _cprPoint = chest;
+            _kneelHead = head;
             _kneelPoint = Rescue.VictimBody.KneelSpot(chest, head);
             _kneelReach = reach;
             _animator.Play(AvatarGesture.Pump);
@@ -278,7 +285,7 @@ namespace PleaseDontDrown.Player
                 HideInCannon(true);
                 return;
             }
-            _animator.RootOverride = null;
+            _animator.RootOverride = _kneelFacing;
             _inCannon = false;
             HideInCannon(false);
             if (!m.Holding && Fun.HumanCannon.PushGrips(_hub, out HandGrip left, out HandGrip right))
@@ -325,7 +332,9 @@ namespace PleaseDontDrown.Player
 
         /// <summary>
         /// CPR is allowed from a couple of metres away, but hands pressing on thin air next to the tourist look wrong:
-        /// while it goes on, the body (not the player) kneels right beside the chest it is pressing.
+        /// while it goes on, the body (not the player) kneels right beside the chest it is pressing: at their side
+        /// (whichever side we came from), turned square to them, so the hands on the chest show from outside. (It
+        /// used to kneel wherever we stood, at their head or feet, bent over them along the body and hiding it.)
         /// </summary>
         private void KneelBeside(bool kneeling, Vector3 position, float dt)
         {
@@ -339,15 +348,38 @@ namespace PleaseDontDrown.Player
                 _bodyRestKnown = true;
             }
             Vector3 shift = Vector3.zero;
+            Quaternion? facing = null;
             if (kneeling)
             {
+                // Square to their side: along = their body (chest to head), across = out to the side we're on.
+                Vector3 along = _kneelHead != Vector3.zero ? _kneelHead - _cprPoint : Vector3.zero;
+                along.y = 0f;
                 Vector3 to = _kneelPoint - position;
                 to.y = 0f;
-                float distance = to.magnitude;
-                // Pulled in from further away; pushed back out when standing too close (knees inside a big belly).
-                if (distance > arm) shift = to / distance * Mathf.Min(distance - arm, most);
-                else if (distance > 0.05f) shift = to / distance * (distance - arm);
+                if (along.sqrMagnitude > 1e-4f)
+                {
+                    along.Normalize();
+                    Vector3 across = Vector3.Cross(Vector3.up, along);
+                    if (_kneelSide == 0f) _kneelSide = Vector3.Dot(position - _kneelPoint, across) >= 0f ? 1f : -1f;
+                    Vector3 spot = _kneelPoint + across * (_kneelSide * arm);
+                    shift = new Vector3(spot.x - position.x, 0f, spot.z - position.z);
+                    shift = Vector3.ClampMagnitude(shift, most);
+                    facing = Quaternion.LookRotation(-across * _kneelSide, Vector3.up);
+                }
+                else
+                {
+                    float distance = to.magnitude;
+                    // Pulled in from further away; pushed back out when standing too close (knees inside a big belly).
+                    if (distance > arm) shift = to / distance * Mathf.Min(distance - arm, most);
+                    else if (distance > 0.05f) shift = to / distance * (distance - arm);
+                }
             }
+            else _kneelSide = 0f;
+            // Turn square to them (and back to where we look after).
+            _kneelTurn = Mathf.MoveTowards(_kneelTurn, facing.HasValue ? 1f : 0f, dt * 5f);
+            if (facing.HasValue) _kneelFacingTarget = facing.Value;
+            Quaternion free = Quaternion.Euler(0f, _animator.Motion.FacingYaw, 0f);
+            _kneelFacing = _kneelTurn > 0f ? Quaternion.Slerp(free, _kneelFacingTarget, Mathf.SmoothStep(0f, 1f, _kneelTurn)) : null;
             _kneelShift = Vector3.Lerp(_kneelShift, shift, 1f - Mathf.Exp(-9f * dt));
             if (_kneelShift.sqrMagnitude < 1e-6f && shift == Vector3.zero) _kneelShift = Vector3.zero;
             body.position = _inCannon ? _cannonBody : transform.TransformPoint(_bodyRest) + _kneelShift;
