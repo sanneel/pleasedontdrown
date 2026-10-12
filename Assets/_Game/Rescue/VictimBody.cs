@@ -196,11 +196,14 @@ namespace PleaseDontDrown.Rescue
             Debug.Log($"[Victim] {name}: chest skin {depth * 100f:F1} cm out from the bones{(down > 0f ? $", {down * 100f:F0} cm down, under the bust" : "")}, torso {half * 200f:F0} cm wide");
         }
         /// <summary>
-        /// Where a rescuer kneels beside them: level with a point some 20% of the way from the chest to the head (level with
-        /// the chest, so from outside the hands show instead of a head hanging over the face), from
-        /// where the hands reach the breastbone and the lips reach theirs.
+        /// Where a rescuer kneels beside them for the compressions: level with a point a little below the chest (toward
+        /// the hips), so the rescuer's big cartoon head hangs over their middle, not over their face, and from outside
+        /// you see the hands on the breastbone (the team, 2026-10-12). See <see cref="BreathSpot"/> for the kiss of life.
         /// </summary>
-        public static Vector3 KneelSpot(Vector3 chest, Vector3 head) => head == Vector3.zero ? chest : Vector3.Lerp(chest, head, 0.22f);
+        public static Vector3 KneelSpot(Vector3 chest, Vector3 head) => head == Vector3.zero ? chest : Vector3.LerpUnclamped(chest, head, -0.15f);
+
+        /// <summary>Where a rescuer kneels for a rescue breath: up level with the shoulders, so the lips reach theirs.</summary>
+        public static Vector3 BreathSpot(Vector3 chest, Vector3 head) => head == Vector3.zero ? chest : Vector3.Lerp(chest, head, 0.42f);
 
         /// <summary>The mouth (rescue breaths).</summary>
         public Vector3 MouthPoint => _avatar != null && _avatar.IsBuilt && _avatar[AvatarRig.Bone.Mouth] != null

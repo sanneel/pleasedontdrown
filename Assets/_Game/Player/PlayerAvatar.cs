@@ -31,6 +31,7 @@ namespace PleaseDontDrown.Player
         private float _kneelSide;               // which side of them we kneel on (+1/-1, kept for the whole CPR; 0 = not chosen)
         private Quaternion? _kneelFacing;       // turned square to their chest while kneeling
         private float _kneelTurn;
+        private float _breathUntil = float.NegativeInfinity;
         private Quaternion _kneelFacingTarget = Quaternion.identity;
         private float _kneelReach = 0.55f;      // how far out from the middle of their body (clear of a big belly)
         private bool _inCannon;                 // drawn up a cannon's barrel, at _cannonBody
@@ -70,6 +71,7 @@ namespace PleaseDontDrown.Player
         public void OnCprGesture(AvatarGesture gesture, Vector3 point)
         {
             _lastPumpTime = Time.time;
+            if (gesture == AvatarGesture.Breath) _breathUntil = Time.time + 1.4f; // slide up to their face for it
             _animator.Play(gesture, point);
         }
 
@@ -354,14 +356,16 @@ namespace PleaseDontDrown.Player
                 // Square to their side: along = their body (chest to head), across = out to the side we're on.
                 Vector3 along = _kneelHead != Vector3.zero ? _kneelHead - _cprPoint : Vector3.zero;
                 along.y = 0f;
-                Vector3 to = _kneelPoint - position;
+                Vector3 kneelPoint = Time.time < _breathUntil && _kneelHead != Vector3.zero
+                    ? Rescue.VictimBody.BreathSpot(_cprPoint, _kneelHead) : _kneelPoint;
+                Vector3 to = kneelPoint - position;
                 to.y = 0f;
                 if (along.sqrMagnitude > 1e-4f)
                 {
                     along.Normalize();
                     Vector3 across = Vector3.Cross(Vector3.up, along);
-                    if (_kneelSide == 0f) _kneelSide = Vector3.Dot(position - _kneelPoint, across) >= 0f ? 1f : -1f;
-                    Vector3 spot = _kneelPoint + across * (_kneelSide * arm);
+                    if (_kneelSide == 0f) _kneelSide = Vector3.Dot(position - kneelPoint, across) >= 0f ? 1f : -1f;
+                    Vector3 spot = kneelPoint + across * (_kneelSide * arm);
                     shift = new Vector3(spot.x - position.x, 0f, spot.z - position.z);
                     shift = Vector3.ClampMagnitude(shift, most);
                     facing = Quaternion.LookRotation(-across * _kneelSide, Vector3.up);

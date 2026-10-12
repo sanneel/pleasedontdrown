@@ -1779,7 +1779,7 @@ namespace PleaseDontDrown.Avatars
             pitch = pitch * (1f - 0.4f * aiming) + 3f * aiming; // (bowed all the way, the big head lands on the gun)
             tilt -= 12f * aiming;
             B(Bone.Neck).localRotation = Quaternion.Euler(pitch * 0.3f + swimTilt * 0.4f, yaw * 0.25f + turn * 0.4f, tilt * 0.4f);
-            B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 15f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
+            B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 30f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
         }
 
         private void PoseFace()
