@@ -146,8 +146,9 @@ start()
 for x in (-1.1, 1.1):
     cube('Lounge base', (x, .36, 0), (.9, .32, 2.3), 'resort_wood', .06)
     cube('Lounge cushion', (x, .58, .25), (.86, .17, 1.65), 'resort_ivory', .06)
-    cube('Reclining back cushion', (x, .86, -.78), (.86, .14, .85), 'resort_teal', .055, -35)
-    cube('Lounge pillow', (x, 1.08, -1.04), (.62, .16, .33), 'resort_coral', .055, -35)
+    # The back rises from the cushion's head end and reclines away from it (55 deg); the pillow lies on its upper part.
+    cube('Reclining back cushion', (x, .968, -.794), (.86, .14, .85), 'resort_teal', .055, 55)
+    cube('Lounge pillow', (x, 1.263, -.817), (.62, .16, .33), 'resort_coral', .055, 55)
 cylinder('Cocktail table', (0, .62, .4), .40, .10, 'resort_wood_dark')
 cylinder('Cocktail pedestal', (0, .35, .4), .075, .5, 'resort_brass')
 finish('resort_lounge_set')

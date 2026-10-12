@@ -90,6 +90,7 @@ namespace PleaseDontDrown.World.Water
 
         public static float HeightAt(float x, float z)
         {
+            if (PoolWater.TryLevel(x, z, out float pool)) return pool; // still water in a pool above the sea
             WaterSurface w = _instance;
             if (w == null) return float.NegativeInfinity;
             float t = WaveTime;
@@ -103,6 +104,7 @@ namespace PleaseDontDrown.World.Water
         /// <summary>Surface normal at a world position.</summary>
         public static Vector3 NormalAt(Vector3 position)
         {
+            if (PoolWater.TryLevel(position.x, position.z, out _)) return Vector3.up;
             WaterSurface w = _instance;
             if (w == null) return Vector3.up;
             float t = WaveTime;

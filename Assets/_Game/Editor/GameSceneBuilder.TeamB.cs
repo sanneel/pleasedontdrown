@@ -73,6 +73,84 @@ namespace PleaseDontDrown.Editor
             return terrain.Raycast(new Ray(new Vector3(p.x, 200f, p.z), Vector3.down), out RaycastHit hit, 400f) ? hit.point.y : 0f;
         }
 
+        /// <summary>Batch: B5 as Shako meant it (his screenshot, 2026-10-12): Sandy's house is the Lost &amp; Found shack.
+        /// Its plank base (the model's bottom 0.83 m, up to the floor inside) goes under the sand: the whole shack comes
+        /// down so its floor sits just above the sand, its step goes; the alarm bell (on its own post) stays put, and
+        /// Sandy (who sits at her saved spot in the booth) comes down with her stool.</summary>
+        public static void TeamBSandyHouseBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform shack = FindByPath("Environment/Station_Shack") ?? throw new InvalidOperationException("No shack");
+            Transform sandy = FindByPath("Story/Npc_Sandy");
+            const float FloorInside = 0.575f * ShackScale; // the model's floor height (GameSceneBuilder: shelf etc. stand on it)
+            // The highest sand under the shack's footprint: the floor stays 4 cm over it.
+            float sand = float.MinValue;
+            Vector3 c = shack.position + new Vector3(0.4f, 0f, -0.4f);
+            for (float dx = -1.6f; dx <= 1.6f; dx += 0.4f)
+                for (float dz = -1.4f; dz <= 1.4f; dz += 0.4f)
+                    sand = Mathf.Max(sand, GroundUnder(c + new Vector3(dx, 0f, dz)));
+            float floorNow = shack.position.y + FloorInside;
+            float drop = floorNow - (sand + 0.04f);
+            if (drop < 0.2f) { Debug.Log($"[TeamB] PASS: Sandy's house already down (floor {floorNow:0.00}, sand {sand:0.00})"); return; }
+            Transform bell = shack.Find("AlarmBell");
+            Vector3 bellAt = bell != null ? bell.position : Vector3.zero;
+            shack.position += Vector3.down * drop;
+            if (bell != null) bell.position = bellAt;
+            if (shack.Find("StepsCollision") is { } steps) Object.DestroyImmediate(steps.gameObject);
+            if (sandy != null) sandy.position += Vector3.down * drop;
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island1");
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[TeamB] PASS: Sandy's house down {drop:0.00} m (floor {floorNow:0.00} -> {floorNow - drop:0.00}, sand {sand:0.00}), Sandy at {(sandy != null ? sandy.position : Vector3.zero)}");
+        }
+
+        /// <summary>Batch: every beach towel (islands 1 and 2) lies on the sand under it again: after island 2 was
+        /// reshaped (B8) they kept their old heights and tilts, half sunk or tipped. Each towel follows the slope under
+        /// it (its own yaw kept), 2 cm over the sand; umbrellas stand upright on the sand at their own spot.</summary>
+        public static void TeamBTowelsOnSandBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var terrain = GameObject.Find("Environment/BeachTerrain").GetComponent<MeshCollider>();
+            var log = new List<string>();
+            foreach (string group in new[] { "Environment/BeachTowels_Island1", "Environment/BeachTowels_Island2" })
+            {
+                Transform towels = FindByPath(group);
+                if (towels == null) continue;
+                foreach (Transform towel in towels)
+                {
+                    Vector3 p = towel.position;
+                    if (!terrain.Raycast(new Ray(new Vector3(p.x, p.y + 50f, p.z), Vector3.down), out RaycastHit hit, 100f)) continue;
+                    float yaw = towel.eulerAngles.y;
+                    // Children keep their places on the towel; the root lies on the sand, tipped to its slope.
+                    var kids = towel.Cast<Transform>().Select(k => (k, k.position, k.rotation)).ToList();
+                    Vector3 before = towel.position;
+                    towel.SetPositionAndRotation(hit.point + hit.normal * 0.02f,
+                        Quaternion.FromToRotation(Vector3.up, hit.normal) * Quaternion.Euler(0f, yaw, 0f));
+                    foreach ((Transform k, Vector3 at, Quaternion rot) in kids)
+                    {
+                        if (k.name == "Umbrella")
+                        {
+                            // Upright, its foot on the sand where it stands.
+                            Vector3 u = at;
+                            if (terrain.Raycast(new Ray(new Vector3(u.x, u.y + 50f, u.z), Vector3.down), out RaycastHit uh, 100f))
+                                k.SetPositionAndRotation(new Vector3(u.x, uh.point.y, u.z), Quaternion.Euler(0f, rot.eulerAngles.y, 0f));
+                        }
+                        else
+                        {
+                            // The towel cloth: flat on the root (no leftover tilt), at the root's height.
+                            k.localPosition = new Vector3(k.localPosition.x, 0f, k.localPosition.z);
+                            k.localRotation = Quaternion.Euler(0f, k.localEulerAngles.y, 0f);
+                        }
+                    }
+                    log.Add($"{group}/{towel.name}: {before} -> {towel.position} (slope {Vector3.Angle(hit.normal, Vector3.up):0} deg)");
+                }
+            }
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[TeamB] PASS: towels on the sand\n" + string.Join("\n", log));
+        }
+
         private static void LowerStiltHouse(Transform tower, List<string> log)
         {
             if (tower == null) { log.Add("no Tower"); return; }
@@ -179,13 +257,34 @@ namespace PleaseDontDrown.Editor
 
         // ---------------------------------------------------------------- B9: island 2's pool
 
-        // The pool east of the hotel. The ground is dug out (Island2Ground asks PoolDig) down to its floor, so the sea's
-        // own water fills it: swimming, diving, drowning and rescues work there as in the sea, with no new water code.
-        // Its edges sit on the terrain's 2 m grid: the slope from the deck down to the floor is inside the 2 m thick
-        // tiled walls. Outer box x 52..72, z -258..-244; water x 54..70, z -256..-246 (16 x 10 m), 2.2 m deep.
+        // The pool east of the hotel. The ground is dug out (Island2Ground asks PoolDig) down to its floor, just above the
+        // sea (so the sea's surface stays hidden under it); the water is the pool's own, 15 cm under the edge
+        // (World/Water/PoolWater: WaterSurface answers its level there, so swimming, drowning and rescues work as in the
+        // sea). Its edges sit on the terrain's 2 m grid: the slope from the deck down to the floor is inside the 2 m thick
+        // tiled walls. Outer box x 52..72, z -258..-244; water x 54..70, z -256..-246 (16 x 10 m), about 1.6 m deep.
         private static readonly Rect PoolOuter = new(52f, -258f, 20f, 14f);
-        private const float PoolFloor = -2.55f;
+        private const float PoolFloor = -0.3f;
+        private const float PoolWaterBelowEdge = 0.15f;
         private static Rect PoolWater => new(PoolOuter.xMin + 2f, PoolOuter.yMin + 2f, PoolOuter.width - 4f, PoolOuter.height - 4f);
+
+        /// <summary>Clear turquoise pool water, both sides drawn (seen from under it too).</summary>
+        private static Material PoolWaterMaterial()
+        {
+            Material mat = LoadOrCreateMaterial("PoolWaterSurface", Shader.Find("Universal Render Pipeline/Lit"));
+            mat.SetColor("_BaseColor", new Color(0.22f, 0.72f, 0.86f, 0.55f));
+            mat.SetFloat("_Smoothness", 0.95f);
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 0f);
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.SetFloat("_Cull", 0f);
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
 
         /// <summary>The pool's floor height where (x, z) is inside the water (grid points on its edge included).</summary>
         private static float? PoolDig(float x, float z)
@@ -271,6 +370,17 @@ namespace PleaseDontDrown.Editor
                     BeachProp(root, $"Lounge{(side > 0 ? "N" : "S")}{i}", "resort_lounge_set", new Vector3(x, deck + 0.06f, z), side > 0 ? 180f : 0f);
                     BeachProp(root, $"Parasol{(side > 0 ? "N" : "S")}{i}", "resort_parasol", new Vector3(x + 2.4f, deck + 0.06f, z));
                 }
+            // The water: a clear turquoise surface just under the edge, and the pool's water for the game (PoolWater).
+            float waterLevel = deck - PoolWaterBelowEdge;
+            GameObject surface = Primitive(PrimitiveType.Quad, "PoolWaterSurface", root, new Vector3(w.center.x, waterLevel, w.center.y),
+                new Vector3(w.width, w.height, 1f), PoolWaterMaterial(), keepCollider: false);
+            surface.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            surface.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            var water = new GameObject("PoolWater").AddComponent<PleaseDontDrown.World.Water.PoolWater>();
+            water.transform.SetParent(root, false);
+            water.transform.position = new Vector3(w.center.x, waterLevel, w.center.y);
+            SetField(water, "_size", p => p.vector2Value = new Vector2(w.width, w.height));
+
             // The beach crowd walks round the pool, not into it.
             NavKeepOut(root, new Vector3(o.center.x, deck, o.center.y), new Vector3(o.width, 4f, o.height));
 
