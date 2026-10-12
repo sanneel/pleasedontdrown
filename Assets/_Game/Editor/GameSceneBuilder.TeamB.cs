@@ -904,6 +904,105 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[TeamB] PASS: C6 jungle {before} -> {jungle.childCount} plants (+{addedTrees} trees, +{addedBushes} bushes, +{addedFerns} ferns)");
         }
 
+        /// <summary>Batch: C7, the tavern: an octagon cage in the middle of the room for the cage fight (3.4: Iron Jaw Jack
+        /// already stands in its middle), its gate toward the front door; the tables and stools in its way go. The bar
+        /// gets a sign, a Jolly Roger on the back wall and hanging lanterns.</summary>
+        public static void TeamCTavernBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform tavern = FindByPath("Environment/Island3/PirateTavern") ?? throw new InvalidOperationException("No tavern");
+            foreach (string old in new[] { "Octagon", "TavernDress" })
+                if (tavern.Find(old) is { } t) Object.DestroyImmediate(t.gameObject);
+            Bounds floorBox = tavern.Find("RoomFloor").GetComponent<Renderer>().bounds;
+            float floor = floorBox.max.y;
+            var centre = new Vector3(86f, floor, -966.8f);
+            const float R = 3.1f, PostH = 1.95f; // corner radius, cage height
+            var removed = 0;
+            foreach (Transform t in tavern.Cast<Transform>().ToArray())
+                if (t.name is "RoundTable" or "TableFoot" or "Stool" or "Candle" or "Mug" &&
+                    new Vector2(t.position.x - centre.x, t.position.z - centre.z).magnitude < R + 1.1f)
+                { Object.DestroyImmediate(t.gameObject); removed++; }
+
+            Material canvas = GetMaterial("OctagonCanvas", new Color(0.86f, 0.82f, 0.72f), smoothness: 0.1f);
+            Material pad = GetMaterial("OctagonPad", new Color(0.08f, 0.08f, 0.09f), smoothness: 0.35f);
+            Material red = GetMaterial("OctagonRed", new Color(0.62f, 0.07f, 0.06f), smoothness: 0.3f);
+            Material wire = GetMaterial("OctagonWire", new Color(0.2f, 0.2f, 0.21f), 0.7f, 0.4f);
+            var cage = new GameObject("Octagon").transform;
+            cage.SetParent(tavern, false);
+            cage.position = centre;
+            TagSurface(cage.gameObject, SurfaceKind.Wood);
+            GameObject Part(PrimitiveType type, string n, Vector3 local, Vector3 scale, Material m, bool solid = false) =>
+                Primitive(type, n, cage, local, scale, m, solid);
+            // The canvas: an octagon of 8 wedges (a flat cylinder reads round), a red ring painted near the edge.
+            Part(PrimitiveType.Cylinder, "Canvas", new Vector3(0f, 0.03f, 0f), new Vector3(R * 2f * 0.97f, 0.03f, R * 2f * 0.97f), canvas);
+            Part(PrimitiveType.Cylinder, "CanvasRing", new Vector3(0f, 0.062f, 0f), new Vector3(R * 1.5f, 0.002f, R * 1.5f), red);
+            Part(PrimitiveType.Cylinder, "CanvasInner", new Vector3(0f, 0.064f, 0f), new Vector3(R * 1.42f, 0.002f, R * 1.42f), canvas);
+            var corners = new Vector3[8];
+            for (int i = 0; i < 8; i++)
+            {
+                float a = (i + 0.5f) * Mathf.PI / 4f; // flat sides face the four walls
+                corners[i] = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * R;
+                Part(PrimitiveType.Cylinder, "Post", corners[i] + Vector3.up * PostH * 0.5f, new Vector3(0.16f, PostH * 0.5f, 0.16f), pad, solid: true);
+                Part(PrimitiveType.Cylinder, "PostPad", corners[i] + Vector3.up * 1.2f, new Vector3(0.24f, 0.45f, 0.24f), red);
+            }
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 a = corners[i], b = corners[(i + 1) % 8], mid = (a + b) * 0.5f;
+                float len = Vector3.Distance(a, b) - 0.16f;
+                Quaternion yaw = Quaternion.LookRotation(b - a) * Quaternion.Euler(0f, 90f, 0f); // x along the side
+                bool gate = mid.z > R * 0.8f; // the side toward the front door stays open
+                if (gate) continue; // the way in, open
+                var side = new GameObject("Side").transform;
+                side.SetParent(cage, false);
+                side.localPosition = mid;
+                side.localRotation = yaw;
+                Primitive(PrimitiveType.Cube, "Pad", side, new Vector3(0f, 0.45f, 0f), new Vector3(len, 0.9f, 0.14f), pad, keepCollider: false);
+                Primitive(PrimitiveType.Cube, "PadStripe", side, new Vector3(0f, 0.86f, 0f), new Vector3(len, 0.06f, 0.16f), red, keepCollider: false);
+                for (int k = 1; k < 7; k++) // the fence over the pad: thin uprights and two rails
+                    Primitive(PrimitiveType.Cube, "Wire", side, new Vector3(-len * 0.5f + k * len / 7f, 1.42f, 0f), new Vector3(0.025f, 1.06f, 0.025f), wire, keepCollider: false);
+                foreach (float y in new[] { 1.4f, PostH - 0.03f })
+                    Primitive(PrimitiveType.Cube, "Rail", side, new Vector3(0f, y, 0f), new Vector3(len, 0.04f, 0.04f), wire, keepCollider: false);
+                var block = side.gameObject.AddComponent<BoxCollider>();
+                block.center = new Vector3(0f, PostH * 0.5f, 0f);
+                block.size = new Vector3(len, PostH, 0.2f);
+            }
+
+            // The bar's look: a sign over it, the Jolly Roger on the back wall, lanterns hanging over the counter.
+            var dress = new GameObject("TavernDress").transform;
+            dress.SetParent(tavern, false);
+            dress.SetPositionAndRotation(Vector3.zero, Quaternion.identity); // parts below are placed in world space
+            Bounds bar = tavern.Find("BarCounter").GetComponent<Renderer>().bounds;
+            Bounds back = tavern.Find("RoomBack").GetComponent<Renderer>().bounds;
+            float ceiling = tavern.Find("RoomCeiling").GetComponent<Renderer>().bounds.min.y;
+            Material plank = GetMaterial("PirateWoodPlank", new Color(0.46f, 0.33f, 0.2f));
+            Material brass = GetMaterial("PirateGold", new Color(0.95f, 0.72f, 0.2f), metallic: 0.7f, smoothness: 0.6f, emission: new Color(0.25f, 0.16f, 0.02f));
+            Material lampGlow = GetMaterial("PirateLantern", new Color(1f, 0.75f, 0.35f), emission: new Color(2.2f, 1.3f, 0.4f));
+            Vector3 signAt = new(bar.center.x, ceiling - 0.45f, bar.max.z + 0.2f);
+            Primitive(PrimitiveType.Cube, "SignBoard", dress, signAt, new Vector3(3.4f, 0.5f, 0.08f), plank, keepCollider: false);
+            WorldText(dress, "SignText", signAt + new Vector3(0f, 0f, 0.05f), "THE RUSTY ANCHOR", 96, 0.03f, brass.color)
+                .transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            GameObject roger = Primitive(PrimitiveType.Quad, "JollyRoger", dress, new Vector3(back.center.x, ceiling - 0.75f, back.max.z + 0.03f),
+                new Vector3(1.6f, 1.1f, 1f), JollyRogerMaterial(), keepCollider: false);
+            roger.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            for (int i = 0; i < 3; i++)
+            {
+                var at = new Vector3(Mathf.Lerp(bar.min.x + 1f, bar.max.x - 1f, i / 2f), ceiling - 0.7f, bar.center.z);
+                Primitive(PrimitiveType.Cylinder, "LanternChain", dress, at + Vector3.up * 0.4f, new Vector3(0.02f, 0.3f, 0.02f), brass, keepCollider: false);
+                Primitive(PrimitiveType.Cube, "Lantern", dress, at, new Vector3(0.22f, 0.3f, 0.22f), lampGlow, keepCollider: false);
+                var light = new GameObject("LanternLight").AddComponent<Light>();
+                light.transform.SetParent(dress, false);
+                light.transform.position = at + Vector3.down * 0.3f;
+                light.type = LightType.Point; light.range = 5f; light.intensity = 1.1f; light.color = new Color(1f, 0.72f, 0.4f);
+                light.shadows = LightShadows.None;
+            }
+
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island3");
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[TeamB] PASS: C7 octagon at {centre} (removed {removed} tables/stools), bar dressed");
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
