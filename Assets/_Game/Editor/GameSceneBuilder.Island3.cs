@@ -323,6 +323,7 @@ namespace PleaseDontDrown.Editor
         private static void RefreshBeachTerrain(GameObject terrain)
         {
             Mesh mesh = GetBeachMesh();
+            ShadeBeachSand(mesh); // the wet sand line and patches (GameSceneBuilder.TeamB)
             terrain.GetComponent<MeshFilter>().sharedMesh = mesh;
             terrain.GetComponent<MeshCollider>().sharedMesh = null;
             terrain.GetComponent<MeshCollider>().sharedMesh = mesh;

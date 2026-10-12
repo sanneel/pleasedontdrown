@@ -129,6 +129,65 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
+
+        private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
+
+        /// <summary>Batch: islands 1 and 2 get island 3's sand scan (grain, ripples, bumps) instead of the flat colour,
+        /// with wet, darker sand along the waterline.</summary>
+        public static void TeamBSandBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject terrain = GameObject.Find("Environment/BeachTerrain");
+            ShadeBeachSand(terrain.GetComponent<MeshFilter>().sharedMesh);
+            terrain.GetComponent<MeshRenderer>().sharedMaterial = BeachSandMaterial();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[TeamB] PASS: beach sand textured");
+        }
+
+        private static Material BeachSandMaterial()
+        {
+            Material mat = Island3SurfaceMaterial("BeachSand", "Ground");
+            mat.SetTexture("_SandD", Island3Scan("Sand_D"));
+            mat.SetTexture("_SandN", Island3Scan("Sand_N"));
+            mat.SetColor("_SandColor", BeachSandColour);
+            mat.SetVector("_Scales", new Vector4(4.5f, 3f, 4f, 5f));
+            mat.SetVector("_Contrast", new Vector4(0.8f, 1f, 1f, 1f));
+            mat.SetFloat("_NormalStrength", 1.1f);
+            mat.SetFloat("_VertexColor", 1f);
+            mat.SetFloat("_VertexScale", 2f);
+            mat.SetFloat("_Smoothness", 0.08f);
+            mat.SetFloat("_Occlusion", 0.6f);
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>The shared terrain's vertex shade (0.5 = the sand colour): wet and darker from just above the
+        /// waterline down, broad soft patches on the dry sand. uv1 (the other layers) is zero: all sand.</summary>
+        private static void ShadeBeachSand(Mesh mesh)
+        {
+            Vector3[] v = mesh.vertices;
+            var colours = new Color[v.Length];
+            var layers = new Vector4[v.Length];
+            for (int i = 0; i < v.Length; i++)
+            {
+                Vector3 p = v[i];
+                float patches = (Mathf.PerlinNoise(p.x * 0.045f + 31.7f, p.z * 0.045f + 7.3f) - 0.5f) * 0.07f
+                              + (Mathf.PerlinNoise(p.x * 0.17f + 3.1f, p.z * 0.17f + 91.4f) - 0.5f) * 0.03f;
+                float dry = 0.5f + patches;
+                float wet = 0.27f + patches * 0.5f; // damp sand at and under the water
+                float t = Mathf.InverseLerp(WaterLevel - 0.15f, WaterLevel + 0.45f, p.y);
+                float shade = Mathf.Lerp(wet, dry, t * t * (3f - 2f * t));
+                colours[i] = new Color(shade, shade * 0.99f, shade * 0.97f, 1f);
+            }
+            mesh.colors = colours;
+            Debug.Log($"[TeamB] sand shade: {v.Length} vertices, {colours.Count(c => c.r < 0.4f)} wet, y {v.Min(p => p.y):0.0}..{v.Max(p => p.y):0.0}, at (0,-12): {v.Where(p => Mathf.Abs(p.x) < 1.1f && Mathf.Abs(p.z + 12f) < 1.1f).Select(p => p.y).DefaultIfEmpty(99f).First():0.00}");
+            mesh.SetUVs(1, layers);
+            EditorUtility.SetDirty(mesh);
+        }
+
         private static Bounds RendererBounds(Transform t)
         {
             var rs = t.GetComponentsInChildren<Renderer>();
