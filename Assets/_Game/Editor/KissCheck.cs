@@ -68,7 +68,7 @@ namespace PleaseDontDrown.Editor
 
             // The lifeguard kneeling at the chest, facing it.
             var body = new GameObject("KissCheckLifeguard");
-            Vector3 kneel = VictimBody.KneelSpot(chest, victim.HeadPosition); // (as PlayerAvatar.KneelBeside puts the body)
+            Vector3 kneel = VictimBody.BreathSpot(chest, victim.HeadPosition); // (as PlayerAvatar.KneelBeside puts the body for a breath)
             Vector3 feet = new Vector3(kneel.x, spot.y, kneel.z - victim.KneelReach); // (as KneelBeside keeps it)
             body.transform.SetPositionAndRotation(feet, Quaternion.identity);
             AvatarLook look = AvatarLook.Lifeguard;
