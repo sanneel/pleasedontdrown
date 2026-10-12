@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using PleaseDontDrown.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -174,6 +175,111 @@ namespace PleaseDontDrown.Editor
             Directory.CreateDirectory("Logs");
             File.WriteAllLines("Logs/teamb-island2.txt", log);
             Debug.Log("[TeamB] PASS: island 2 reshaped\n" + string.Join("\n", log));
+        }
+
+        // ---------------------------------------------------------------- B9: island 2's pool
+
+        // The pool east of the hotel. The ground is dug out (Island2Ground asks PoolDig) down to its floor, so the sea's
+        // own water fills it: swimming, diving, drowning and rescues work there as in the sea, with no new water code.
+        // Its edges sit on the terrain's 2 m grid: the slope from the deck down to the floor is inside the 2 m thick
+        // tiled walls. Outer box x 52..72, z -258..-244; water x 54..70, z -256..-246 (16 x 10 m), 2.2 m deep.
+        private static readonly Rect PoolOuter = new(52f, -258f, 20f, 14f);
+        private const float PoolFloor = -2.55f;
+        private static Rect PoolWater => new(PoolOuter.xMin + 2f, PoolOuter.yMin + 2f, PoolOuter.width - 4f, PoolOuter.height - 4f);
+
+        /// <summary>The pool's floor height where (x, z) is inside the water (grid points on its edge included).</summary>
+        private static float? PoolDig(float x, float z)
+        {
+            Rect w = PoolWater;
+            return x > w.xMin - 0.5f && x < w.xMax + 0.5f && z > w.yMin - 0.5f && z < w.yMax + 0.5f ? PoolFloor : null;
+        }
+
+        /// <summary>Batch: digs the pool, builds its walls, steps, deck and loungers, bakes island 2's navmesh.</summary>
+        public static void TeamBPoolBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform env = GameObject.Find("Environment").transform;
+            GameObject terrain = GameObject.Find("Environment/BeachTerrain");
+            RefreshBeachTerrain(terrain);
+            Physics.SyncTransforms();
+
+            if (env.Find("Island2Pool") is { } old) Object.DestroyImmediate(old.gameObject);
+            var root = new GameObject("Island2Pool").transform;
+            root.SetParent(env, false);
+            TagSurface(root.gameObject, SurfaceKind.Rock);
+
+            Rect o = PoolOuter, w = PoolWater;
+            float deck = GroundUnder(new Vector3(o.xMin - 1f, 0f, o.center.y)); // the plateau beside it
+            float top = deck + 0.12f;
+            Material tile = GetMaterial("PoolTile", new Color(0.86f, 0.94f, 0.97f), smoothness: 0.75f);
+            Material deep = GetMaterial("PoolTileBlue", new Color(0.18f, 0.62f, 0.78f), smoothness: 0.7f);
+            Material stone = GetMaterial("PoolCoping", new Color(0.95f, 0.92f, 0.85f), smoothness: 0.3f);
+            Material line = GetMaterial("PoolLaneLine", new Color(0.06f, 0.25f, 0.45f), smoothness: 0.6f);
+
+            float wallH = top - PoolFloor;
+            void Wall(string name, Vector3 centre, Vector3 size) =>
+                Primitive(PrimitiveType.Cube, name, root, centre, size, tile);
+            float midY = (top + PoolFloor) * 0.5f;
+            Wall("WallNorth", new Vector3(o.center.x, midY, w.yMax + 1f), new Vector3(o.width, wallH, 2f));
+            Wall("WallSouth", new Vector3(o.center.x, midY, w.yMin - 1f), new Vector3(o.width, wallH, 2f));
+            Wall("WallWest", new Vector3(w.xMin - 1f, midY, w.center.y), new Vector3(2f, wallH, w.height));
+            Wall("WallEast", new Vector3(w.xMax + 1f, midY, w.center.y), new Vector3(2f, wallH, w.height));
+            // The coping: a stone lip round the water, a hand's width proud of the tiles.
+            foreach ((string n, Vector3 c, Vector3 s) in new[]
+            {
+                ("CopingNorth", new Vector3(w.center.x, top + 0.04f, w.yMax + 0.3f), new Vector3(w.width + 1.2f, 0.08f, 0.6f)),
+                ("CopingSouth", new Vector3(w.center.x, top + 0.04f, w.yMin - 0.3f), new Vector3(w.width + 1.2f, 0.08f, 0.6f)),
+                ("CopingWest", new Vector3(w.xMin - 0.3f, top + 0.04f, w.center.y), new Vector3(0.6f, 0.08f, w.height)),
+                ("CopingEast", new Vector3(w.xMax + 0.3f, top + 0.04f, w.center.y), new Vector3(0.6f, 0.08f, w.height)),
+            })
+                Primitive(PrimitiveType.Cube, n, root, c, s, stone);
+            // The floor, blue tiles, with two dark lane lines.
+            Primitive(PrimitiveType.Cube, "Floor", root, new Vector3(w.center.x, PoolFloor + 0.02f, w.center.y), new Vector3(w.width, 0.1f, w.height), deep);
+            foreach (float dz in new[] { -2.5f, 2.5f })
+                Primitive(PrimitiveType.Cube, "LaneLine", root, new Vector3(w.center.x, PoolFloor + 0.075f, w.center.y + dz), new Vector3(w.width - 2f, 0.01f, 0.25f), line, keepCollider: false);
+
+            // Steps down into the water at the west end (and up out of it): 0.3 m each.
+            int steps = Mathf.CeilToInt((top - (PoolFloor + 0.6f)) / 0.3f);
+            for (int i = 0; i < steps; i++)
+            {
+                float stepTop = top - 0.3f * (i + 1);
+                float x0 = w.xMin + i * 0.45f;
+                Primitive(PrimitiveType.Cube, "Step", root, new Vector3(x0 + 0.225f, (stepTop + PoolFloor) * 0.5f, w.center.y),
+                    new Vector3(0.45f, stepTop - PoolFloor, 3f), tile);
+            }
+            // Rails either side of the steps.
+            foreach (float dz in new[] { -1.6f, 1.6f })
+                Primitive(PrimitiveType.Cylinder, "StepRail", root, new Vector3(w.xMin + 0.9f, top + 0.45f, w.center.y + dz),
+                    new Vector3(0.06f, 0.5f, 0.06f), GetMaterial("Chrome", new Color(0.85f, 0.87f, 0.9f), 0.9f, 0.85f), keepCollider: false);
+
+            // A paved deck round the pool, loungers with parasols on the long sides.
+            // The paving: four slabs round the tiled walls (not over the water).
+            const float pave = 4f;
+            foreach ((string n, Vector3 c, Vector3 s) in new[]
+            {
+                ("DeckNorth", new Vector3(o.center.x, deck + 0.03f, o.yMax + pave * 0.5f), new Vector3(o.width + pave * 2f, 0.06f, pave)),
+                ("DeckSouth", new Vector3(o.center.x, deck + 0.03f, o.yMin - pave * 0.5f), new Vector3(o.width + pave * 2f, 0.06f, pave)),
+                ("DeckWest", new Vector3(o.xMin - pave * 0.5f, deck + 0.03f, o.center.y), new Vector3(pave, 0.06f, o.height)),
+                ("DeckEast", new Vector3(o.xMax + pave * 0.5f, deck + 0.03f, o.center.y), new Vector3(pave, 0.06f, o.height)),
+            })
+                Primitive(PrimitiveType.Cube, n, root, c, s, stone);
+            foreach (float side in new[] { -1f, 1f })
+                for (int i = 0; i < 3; i++)
+                {
+                    float x = o.xMin + 3f + i * 7f;
+                    float z = side > 0 ? o.yMax + 2f : o.yMin - 2f;
+                    BeachProp(root, $"Lounge{(side > 0 ? "N" : "S")}{i}", "resort_lounge_set", new Vector3(x, deck + 0.06f, z), side > 0 ? 180f : 0f);
+                    BeachProp(root, $"Parasol{(side > 0 ? "N" : "S")}{i}", "resort_parasol", new Vector3(x + 2.4f, deck + 0.06f, z));
+                }
+            // The beach crowd walks round the pool, not into it.
+            NavKeepOut(root, new Vector3(o.center.x, deck, o.center.y), new Vector3(o.width, 4f, o.height));
+
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island2");
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[TeamB] PASS: pool built (deck {deck:0.00}, water {WaterLevel}, floor {PoolFloor}, {steps} steps)");
         }
 
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2

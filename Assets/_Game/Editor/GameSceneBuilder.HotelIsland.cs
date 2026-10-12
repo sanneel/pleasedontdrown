@@ -28,6 +28,7 @@ namespace PleaseDontDrown.Editor
 
         private static float Island2Ground(float x, float z)
         {
+            if (PoolDig(x, z) is float floor) return floor; // the pool (GameSceneBuilder.TeamB)
             float shore = Island2Shore(x, z);
             return ProfileHeight(shore, x, z, false) + Island2Rise(shore);
         }

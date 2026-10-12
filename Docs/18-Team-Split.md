@@ -49,7 +49,7 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | B6 | Towels and shells overlapping the dock (islands 1 and 2) | **done** (Shako) — one towel under Milo's pier moved onto the sand; no shell objects exist on islands 1-2 |
 | B7 | Sand texture prettier (islands 1 and 2) | **done** (Shako) — island 3's sand scan (ripples, grain) on the shared beach ground, darker wet sand from the waterline down (`TeamBSandBatch`, material `BeachSand`) |
 | B8 | Island 2 smaller (more fun) | **done** (Shako) — 360 x 260 m cut to 180 x 110 m (x -95..85, z -330..-220); the hotel, bar, dock and north beach did not move; room behind the hotel for B9, B10, B13 (`TeamBShrinkIsland2Batch`) |
-| B9 | Island 2: pool | open |
+| B9 | Island 2: pool | **done** (Shako) — east of the hotel, 16 x 10 m, 2.2 m deep; the ground is dug out so the sea's own water fills it (swimming, drowning, rescues work as in the sea); tiled walls, steps at the west end, paved deck, 6 loungers + parasols (`TeamBPoolBatch`). The water is 1.85 m below the deck (the island is raised 1.5 m): a sunken pool |
 | B10 | Island 2: golf cart road | open |
 | B11 | Island 2: bar restyle (look only; orders are A6) | open |
 | B12 | Island 2: casino interior (Tripo tables/chandelier already in `Art/Tripo/Island2/`) | open |
