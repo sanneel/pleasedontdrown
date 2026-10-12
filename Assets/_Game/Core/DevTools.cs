@@ -29,6 +29,15 @@ namespace PleaseDontDrown.Core
             }, owner: this);
             DevCommands.Register("frameshot", "<name>", "Capture the final displayed frame, including post-processing and HUD.", args =>
                 StartCoroutine(CaptureFrame(args.Length > 0 ? args[0] : "frame")), owner: this);
+            DevCommands.Register("where", "", "Where the camera is and where it looks (to report a spot that needs fixing).", _ =>
+            {
+                Camera cam = Camera.main;
+                if (cam == null) { DevCommands.Print("no camera"); return; }
+                Vector3 p = cam.transform.position, at = p + cam.transform.forward * 5f;
+                string line = $"where {p.x:0.0} {p.y:0.0} {p.z:0.0} looking at {at.x:0.0} {at.y:0.0} {at.z:0.0}";
+                DevCommands.Print(line);
+                GUIUtility.systemCopyBuffer = line; // pasted straight into a message
+            }, owner: this);
         }
 
         private void OnDisable()
@@ -38,6 +47,7 @@ namespace PleaseDontDrown.Core
             DevCommands.Unregister("viewshot", this);
             DevCommands.Unregister("skin", this);
             DevCommands.Unregister("frameshot", this);
+            DevCommands.Unregister("where", this);
         }
 
         private static IEnumerator CaptureFrame(string name)
