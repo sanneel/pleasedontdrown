@@ -68,10 +68,10 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | C6 | Jungle bigger | **done** (Shako) — a 14 m band of jungle all round its old edge: +59 trees, +120 bushes, +150 ferns (723 → 952 plants), clear of roads, river, falls, castle, houses, tavern, gun stall and night arrival; plants settled on the ground; island 3 navmesh baked again; `chapter3check` ALL PASS (`TeamCJungleBatch`). The jungle-floor ground colour was not extended (needs an island 3 ground rebuild) |
 | C7 | Tavern bar look; octagon arena | **done** (Shako) — an 8-sided cage (6 m, canvas floor with a red ring, padded posts, padded lower walls with bars above, solid sides) in the middle of the tavern, its open side toward the front door; Iron Jaw Jack already stands in it. The 4 tables and their stools had to go (no room). Bar: "THE RUSTY ANCHOR" sign, a Jolly Roger on the back wall, 3 hanging lanterns with warm light. Navmesh baked; `chapter3check` ALL PASS incl. 3.4 (`TeamCTavernBatch`) |
 | C8 | Gun shop (island 3) as a real building | **done** (Shako) — the Tripo `gun_shop` (from `ArtSource/Tripo/island3`, now in `Art/Tripo/Island3`) stands at the stall's spot, 7 m wide, its open front toward the road; the working "Skull Cove guns" counter sits on the model's own counter (its box hidden), bought guns appear there; the stall's awning/posts/sign removed; a body collider; navmesh baked; `chapter3check` ALL PASS incl. 3.3 (`TeamCGunShopBatch`) |
-| C9 | Tripo: Milo (new character) | open |
-| C10 | Tripo: jet ski (model + texture; it's blurry now) | open |
-| C11 | Tripo: golf cart | open |
-| C12 | Tripo: custom characters for island 2 | open |
+| C9 | Tripo: Milo (new character) | open — needs Shako signed in to Tripo and a "yes" on the credit cost (not started overnight) |
+| C10 | Tripo: jet ski (model + texture; it's blurry now) | open — needs Shako signed in to Tripo and a "yes" on the credit cost (not started overnight) |
+| C11 | Tripo: golf cart | open — needs Shako signed in to Tripo and a "yes" on the credit cost (not started overnight) |
+| C12 | Tripo: custom characters for island 2 | open — needs Shako signed in to Tripo and a "yes" on the credit cost (not started overnight) |
 
 Island 3 always night, mountain dock, sleepers: see `Docs/16`.
 
