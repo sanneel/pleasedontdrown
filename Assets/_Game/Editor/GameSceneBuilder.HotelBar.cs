@@ -163,6 +163,7 @@ namespace PleaseDontDrown.Editor
             Require(so, "_displayName").stringValue = "bar stool";
             Require(so, "_seat").objectReferenceValue = seat;
             Require(so, "_chair").boolValue = true;
+            Require(so, "_stool").boolValue = true;
             Require(so, "_thrust").floatValue = 0f;
             Require(so, "_reverseThrust").floatValue = 0f;
             Require(so, "_maxSpeed").floatValue = 1f; // (never 0: it divides)

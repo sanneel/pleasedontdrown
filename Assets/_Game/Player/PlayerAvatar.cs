@@ -32,6 +32,7 @@ namespace PleaseDontDrown.Player
         private Quaternion? _kneelFacing;       // turned square to their chest while kneeling
         private float _kneelTurn;
         private float _breathUntil = float.NegativeInfinity;
+        private Quaternion? _seatFacing;
         private Quaternion _kneelFacingTarget = Quaternion.identity;
         private float _kneelReach = 0.55f;      // how far out from the middle of their body (clear of a big belly)
         private bool _inCannon;                 // drawn up a cannon's barrel, at _cannonBody
@@ -219,6 +220,7 @@ namespace PleaseDontDrown.Player
 
             // On a vehicle: sitting, hands on the handlebars.
             Vehicles.Vehicle seat = Vehicles.Vehicle.RideOf(_hub);
+            _seatFacing = null;
             if (seat != null)
             {
                 m.Seated = true;
@@ -229,6 +231,10 @@ namespace PleaseDontDrown.Player
                 m.Straddle = seat.Straddle;
                 m.FloatSeat = seat.RestHands;
                 m.ChairSeat = seat.IsChair || seat.IsLand; // a chair, a stool, the golf cart's bench
+                m.HighSeat = seat.IsStool;
+                // Sat on a chair the body faces the way it does (looking about turns the head, not the legs through
+                // the table or the counter).
+                if (seat.IsChair || seat.IsLand) _seatFacing = Quaternion.Euler(0f, seat.transform.eulerAngles.y, 0f);
                 if (!m.Holding && seat.GetGrips(_hub, out HandGrip left, out HandGrip right))
                 {
                     m.GripLeft = left;
@@ -288,7 +294,7 @@ namespace PleaseDontDrown.Player
                 HideInCannon(true);
                 return;
             }
-            _animator.RootOverride = _kneelFacing;
+            _animator.RootOverride = _kneelFacing ?? _seatFacing;
             _inCannon = false;
             HideInCannon(false);
             if (!m.Holding && Fun.HumanCannon.PushGrips(_hub, out HandGrip left, out HandGrip right))

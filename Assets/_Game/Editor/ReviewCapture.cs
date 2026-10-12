@@ -332,6 +332,7 @@ namespace PleaseDontDrown.Editor
                 go.transform.SetPositionAndRotation(seatPoint.position - Vector3.up * 0.5f, Quaternion.Euler(0f, yaw, 0f));
                 m.FacingYaw = yaw;
                 m.Seated = m.ChairSeat = true;
+                m.HighSeat = chair.TryGetComponent(out Vehicles.Vehicle seatVehicle) && seatVehicle.IsStool;
                 if (chair.Find("GripLeft") is { } wl && chair.Find("GripRight") is { } wr)
                 {
                     m.Holding = m.TwoHanded = true;

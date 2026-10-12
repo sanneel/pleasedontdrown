@@ -72,7 +72,27 @@ namespace PleaseDontDrown.Editor
             Transform stoolRoot = hotel.Find("HotelBarStools");
             if (stoolRoot != null)
                 foreach (Transform stool in stoolRoot)
+                {
                     if (stool.Find("Seat") is { } stoolSeat) stoolSeat.localPosition = StoolSeat;
+                    if (!stool.TryGetComponent(out Vehicle stoolVehicle)) continue;
+                    SetBool(stoolVehicle, "_stool", true);
+                    // Hands resting on the bar top in front (the front row's counter edge is 0.18 m from the stool, the
+                    // side counters' 0.52 m): the seated pose's hands go there.
+                    bool front = int.TryParse(stool.name.Replace("BarStool", ""), out int n) && n < 4;
+                    float z = front ? 0.3f : 0.64f;
+                    Transform Grip(string name, float x)
+                    {
+                        Transform old = stool.Find(name);
+                        if (old != null) Object.DestroyImmediate(old.gameObject);
+                        var g = new GameObject(name).transform;
+                        g.SetParent(stool, false);
+                        g.localPosition = new Vector3(x, CounterTop + 0.03f, z);
+                        g.localRotation = Quaternion.identity; // fingers on toward the bartender, palm down
+                        return g;
+                    }
+                    SetRef(stoolVehicle, "_gripLeft", Grip("GripLeft", -0.16f));
+                    SetRef(stoolVehicle, "_gripRight", Grip("GripRight", 0.16f));
+                }
             AddBlackjackGame();
             AddGolfCart(bar, hotel);
             AssignSceneIds(scene); // the new seats and the card table are networked scene objects

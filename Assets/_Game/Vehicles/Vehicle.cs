@@ -39,6 +39,8 @@ namespace PleaseDontDrown.Vehicles
         [SerializeField] private bool _restHands;
         [Tooltip("A seat that never moves (a bar stool): sit down and stand up, no driving. Frozen in place.")]
         [SerializeField] private bool _chair;
+        [Tooltip("A tall bar stool (a chair): the legs hang down its sides, outside the round cushion (the counter is right in front).")]
+        [SerializeField] private bool _stool;
         [Tooltip("Drives on land (the golf cart): wheels on the ground push and steer it; it rolls to a stop off the throttle.")]
         [SerializeField] private bool _land;
         [Tooltip("Needed in the driver's inventory to start it (item display name). Empty = no key.")]
@@ -76,6 +78,7 @@ namespace PleaseDontDrown.Vehicles
         public static IReadOnlyList<Vehicle> All => _all;
         public string DisplayName => _displayName;
         public bool IsChair => _chair;
+        public bool IsStool => _stool;
         /// <summary>A land vehicle (the golf cart): sat on a bench, not astride.</summary>
         public bool IsLand => _land;
         public PlayerHub Driver => _driver.Value;
@@ -621,7 +624,7 @@ namespace PleaseDontDrown.Vehicles
         {
             left = right = default;
             if (_gripLeft == null || _gripRight == null) return false;
-            HandPose pose = _restHands ? HandPose.Flat : HandPose.LooseFist;
+            HandPose pose = _restHands || _chair ? HandPose.Flat : HandPose.LooseFist; // (a chair's "grips": hands resting flat on the bar)
             left = new HandGrip(_gripLeft.position, _gripLeft.forward, -_gripLeft.up, pose);
             right = new HandGrip(_gripRight.position, _gripRight.forward, -_gripRight.up, pose);
             return true;
