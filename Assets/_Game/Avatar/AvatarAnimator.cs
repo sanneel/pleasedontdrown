@@ -1745,21 +1745,25 @@ namespace PleaseDontDrown.Avatars
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kneeUp ? 85f : 4f, 0f, 0f), w);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(kneeUp ? -40f : -45f, 0f, 0f), w);
                 }
-                // Arms resting on the towel beside the body, a hand's width clear of it, palms down. (Hands under the
-                // head looked lazier, but the round dads' and the Meshy girls' arms don't reach round their big heads:
-                // the hands stopped half way, in the chest or the belly. The team, 2026-10-12: no more of that.)
-                float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
-                Vector3 across = B(Bone.Chest).right;
-                float half = 0.5f * Vector3.Distance(upperL.position, upperR.position);
-                float clear = half * 1.25f + 0.12f * s; // past the widest of a big belly
+                // Arms lying on the towel along the body, nearly straight, a little out from it, palms down. (Reaching
+                // for a point beside the hips bent the goofy lifeguard's arms double, elbows up, his torso being so
+                // short; the hands followed the forearm's twist and lay on their backs. The user, 2026-10-12: "very
+                // weird".) Each arm goes 20 degrees out from the body's line, so the hand clears a big belly or hips.
                 Vector3 toFeet = Vector3.ProjectOnPlane(hips.position - B(Bone.Head).position, Vector3.up);
                 toFeet = toFeet.sqrMagnitude > 1e-4f ? toFeet.normalized : -transform.forward;
-                float ground = transform.position.y + 0.05f * s;
-                Vector3 handL = hips.position - across * clear + toFeet * (0.04f * s);
-                Vector3 handR = hips.position + across * clear + toFeet * (0.04f * s);
-                handL.y = handR.y = Mathf.Max(ground, hips.position.y - 0.06f * s);
-                IK.Solve(upperL, foreL, la, lb, handL, -across + Vector3.up * 0.3f, w, false);
-                IK.Solve(upperR, foreR, la, lb, handR, across + Vector3.up * 0.3f, w, false);
+                Vector3 across = Vector3.Cross(-toFeet, Vector3.up); // the body's right, lying on its back (face up)
+                float arm = (_rig.UpperArmLength + _rig.ForearmLength + _rig.HandLength * 0.5f) * 0.97f;
+                float ground = transform.position.y + 0.025f * s;
+                for (int i = 0; i < 2; i++)
+                {
+                    bool right = i == 1;
+                    float side = right ? 1f : -1f;
+                    Vector3 shoulder = (right ? upperR : upperL).position;
+                    Vector3 along = (toFeet * Mathf.Cos(20f * Mathf.Deg2Rad) + across * (side * Mathf.Sin(20f * Mathf.Deg2Rad))).normalized;
+                    Vector3 palm = shoulder + along * arm;
+                    palm.y = ground;
+                    PlaceHand(right, palm, along, Vector3.down, across * side - Vector3.up * 0.5f, w, HandPose.Lerp(HandPose.Flat, HandPose.Relaxed, 0.5f));
+                }
             }
 
             if (_carried > 0.01f)
@@ -1795,12 +1799,26 @@ namespace PleaseDontDrown.Avatars
                 float w = _lieFront;
                 hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.13f * s, -0.45f * s), w);
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(90f, 0f, 0f), w);
-                B(Bone.Spine).localRotation = Quaternion.Slerp(B(Bone.Spine).localRotation, Quaternion.Euler(-8f, 0f, 0f), w);
-                B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(-12f, 0f, 0f), w);
-                B(Bone.Neck).localRotation = Quaternion.Slerp(B(Bone.Neck).localRotation, Quaternion.Euler(-35f, 0f, 0f), w);
-                B(Bone.Head).localRotation = Quaternion.Slerp(B(Bone.Head).localRotation, Quaternion.Euler(-25f, 0f, 0f), w);
-                // Arms folded on the towel in front of the head, elbows out to the sides (by IK, on every body: the
-                // fixed elbow bends put the round dads' arms up in the air through their shoulders).
+                // Propped up on the elbows (reading on the towel): the chest arches up just far enough for the shoulders to
+                // stand an upper arm over the sand, so the elbows rest on it right under them. (A fixed arch left the
+                // chest hanging in the air with the arms hovering in front of it on some bodies.) Measured flat first.
+                Transform spine = B(Bone.Spine), chest = B(Bone.Chest);
+                Quaternion spineWas = spine.localRotation, chestWas = chest.localRotation;
+                Quaternion hipsWas = hips.localRotation;
+                hips.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                spine.localRotation = chest.localRotation = Quaternion.identity;
+                float sand = transform.position.y;
+                Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
+                float torso = Vector3.Distance(shoulders, spine.position);
+                float lift = sand + 0.04f * s + _rig.UpperArmLength * 0.95f - shoulders.y;
+                float arch = torso > 0.01f ? Mathf.Asin(Mathf.Clamp(lift / torso, 0f, 0.9f)) * Mathf.Rad2Deg : 20f;
+                hips.localRotation = hipsWas;
+                spine.localRotation = Quaternion.Slerp(spineWas, Quaternion.Euler(-arch * 0.45f, 0f, 0f), w);
+                chest.localRotation = Quaternion.Slerp(chestWas, Quaternion.Euler(-arch * 0.55f, 0f, 0f), w);
+                // The face looks ahead over the hands, a little down.
+                float look = Mathf.Max(0f, 80f - arch);
+                B(Bone.Neck).localRotation = Quaternion.Slerp(B(Bone.Neck).localRotation, Quaternion.Euler(-look * 0.6f, 0f, 0f), w);
+                B(Bone.Head).localRotation = Quaternion.Slerp(B(Bone.Head).localRotation, Quaternion.Euler(-look * 0.4f, 0f, 0f), w);
                 for (int leg = 0; leg < 2; leg++)
                 {
                     bool left = leg == 0;
@@ -1812,19 +1830,22 @@ namespace PleaseDontDrown.Avatars
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(40f, 0f, 0f), w);
                 }
                 {
-                    float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
-                    Transform head = B(Bone.Head);
-                    Vector3 toHead = Vector3.ProjectOnPlane(head.position - hips.position, Vector3.up);
+                    // Elbows on the sand under the shoulders (a little out), forearms flat on it pointing ahead and in, the
+                    // hands palms down in front of the chest, near each other.
+                    Vector3 toHead = Vector3.ProjectOnPlane(B(Bone.Head).position - hips.position, Vector3.up);
                     toHead = toHead.sqrMagnitude > 1e-4f ? toHead.normalized : -transform.forward;
-                    Vector3 across = Vector3.Cross(Vector3.up, toHead);
-                    float half = 0.5f * Vector3.Distance(upperL.position, upperR.position);
-                    float ground = transform.position.y + 0.06f * s;
-                    // Under the chin, a little apart; the chest is propped on the elbows.
-                    Vector3 chin = head.position + toHead * (0.12f * s);
-                    Vector3 handL = chin + across * (half * 0.45f), handR = chin - across * (half * 0.45f);
-                    handL.y = handR.y = ground;
-                    IK.Solve(upperL, foreL, la, lb, handL, across * 1.2f - Vector3.up * 0.4f, w, false);
-                    IK.Solve(upperR, foreR, la, lb, handR, -across * 1.2f - Vector3.up * 0.4f, w, false);
+                    Vector3 across = Vector3.Cross(Vector3.up, toHead); // the body's right, lying face down
+                    float sandTop = transform.position.y + 0.025f * s;
+                    for (int i = 0; i < 2; i++)
+                    {
+                        bool right = i == 1;
+                        float side = right ? 1f : -1f;
+                        Vector3 elbow = (right ? upperR : upperL).position + toHead * (0.04f * s) + across * (side * 0.03f * s);
+                        elbow.y = sandTop;
+                        Vector3 along = (toHead * 0.85f - across * (side * 0.4f)).normalized;
+                        Vector3 palm = elbow + along * (_rig.ForearmLength + _rig.HandLength * 0.55f);
+                        PlaceHand(right, palm, along, Vector3.down, across * side - Vector3.up - toHead * 0.4f, w, HandPose.Lerp(HandPose.Flat, HandPose.Relaxed, 0.5f));
+                    }
                 }
             }
 

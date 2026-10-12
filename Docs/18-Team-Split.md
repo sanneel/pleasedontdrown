@@ -15,6 +15,33 @@ work (Git can't merge it). So:
 Each person has their own branch (A: `sancho-dev`; Shako: `shako-dev`; the third: their own `<name>-dev`). Merge `origin/main` in before
 every push, push your branch only, and merge to `main` in small pieces (every day or two), never straight to `main`.
 
+## Playtest 1 (the user, 2026-10-12, on `main` 2425c265): what's accepted, what's next
+**Accepted:** A1, A2, A3, A4, A9 (the user adds a car model), B2, B3, B7, C1, C6. A10: not testable yet. C2: the user
+will find the spot.
+
+| # | The user's verdict | Next |
+|---|---|---|
+| A5 | Works but weird | Put the defibrillator **down** (next to the casualty), then **E** on it to use it |
+| A6 | Works, bad visuals | Better looks for the bar ordering/eating (card, food, serving) |
+| A7 | Needs better visuals | Blackjack played **on the table** (cards on the felt), not in a pop-up |
+| A8 / C7 | Octagon is inside the tavern | The octagon stands **next to** the tavern, outside (C7 builds it, A8's fight works wherever it is) |
+| A11 / C5 | No sewer anywhere; C5 done very badly | C5's drain/grate in the castle yard **removed**; a real sewer (entrance behind the back waterfall, tunnel, exit in the castle) still to be built, then A11 hooks the Pirate King beat to it |
+| A12 | Worse: hands very weird, lying on the stomach worst | Fix the arms/hands in the lying poses (front and back) on every body |
+| A13 | Changed, not clearer | A cleaner on-screen text design |
+| B1 | Removed | — |
+| B4 | Wrong island | Coconut palms **back on island 1**; remove them from **island 3** |
+| B5 | Fixed, but the white house still has stairs | Remove the white house's stairs (not needed) |
+| B6 | Only island 1 | Same on island 2 |
+| B8 | Smaller, but bare | Restyle island 2 and place more things |
+| B9 | Pool done | Redesign it |
+| B10 | Cart road done but bad | Redo it |
+| B11 | **Not done** | Bar textures missing; you can walk into the bar's walls; the barista stands inside a wall (only the head shows) |
+| B12 | Casino added | Needs changes |
+| B13 | Gun shop added | Restyle; **no pop-up** for buying |
+| C3 | Kleptopus | Faster; it **grabs** people and pulls them into the sea, picks up and throws (not makes them walk) |
+| C4 | **Not done** | The waterfall's water isn't open and doesn't reach the ocean |
+| C8 | Gun shop | Restyle; guns (and silencers, upgrades) on display: **click one to buy it**, simply |
+
 ## The full list, in order (pick from the top of your part)
 
 Status: **done** = in code on a branch, waiting for a playtest; **open** = nobody has started; **taken (name)** =
