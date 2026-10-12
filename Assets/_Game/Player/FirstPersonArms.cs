@@ -423,7 +423,13 @@ namespace PleaseDontDrown.Player
             int itemId = 0;
             Item held = hands != null ? hands.HeldItem : null;
             _rigidGrip = held != null && held.RigidInHand;
-            if (held != null)
+            if (hands != null && Combat.DefibPaddles.ActiveFor(_hub) is { } paddles)
+            {
+                // Giving a shock: the hands on the defibrillator's paddles (it lies on the ground).
+                kind = hands.GetGrip(out gripL, out gripR);
+                itemId = paddles.GetInstanceID();
+            }
+            else if (held != null)
             {
                 kind = hands.GetGrip(out gripL, out gripR);
                 itemId = held.GetInstanceID();

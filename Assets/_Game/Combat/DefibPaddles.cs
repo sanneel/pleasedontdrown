@@ -6,12 +6,13 @@ using UnityEngine;
 namespace PleaseDontDrown.Combat
 {
     /// <summary>
-    /// The defibrillator's two paddles (every machine). On the case they sit in their places on the lid; in someone's
-    /// hands there's one in each hand (the case hangs at the hip, a cable from it to each paddle). A shock: kneel by
-    /// the chest, both paddles go down on it, the shock, and back up (<see cref="PlayShock"/>).
-    /// The hands follow <see cref="GetGrips"/> (PlayerHands asks for them) and the paddles follow the hands, so the
-    /// two never part. The paddle is the model's own (Resources/Props/DefibPaddle.glb, split off the case by
-    /// ArtSource/Tools/split_defibrillator.py): origin at the middle of its contact plate, handle up (+y).
+    /// The defibrillator's two paddles (every machine). They sit in their places on the case's lid (carried, it's just
+    /// the case). A shock, given with the case on the ground beside the casualty (<see cref="Defibrillator"/>): the
+    /// lifeguard kneels, a paddle in each hand on a cable from the case, both go down on the chest, the shock, back up
+    /// and onto the lid again (<see cref="UseFrom"/>, <see cref="PlayShock"/>).
+    /// The hands follow <see cref="GetGrips"/> (PlayerHands asks for them, see <see cref="ActiveFor"/>) and the paddles
+    /// follow the hands, so the two never part. The paddle is the model's own (Resources/Props/DefibPaddle.glb, split
+    /// off the case by ArtSource/Tools/split_defibrillator.py): origin at the middle of its contact plate, handle up (+y).
     /// </summary>
     [DefaultExecutionOrder(200)] // after the third-person animator (50) and the first-person arms (100)
     public class DefibPaddles : MonoBehaviour
@@ -33,7 +34,9 @@ namespace PleaseDontDrown.Combat
         private Transform _paddleR, _paddleL;
         private LineRenderer _cableR, _cableL;
         private Renderer[] _caseRenderers;
-        private bool _wasHeld;
+        private bool _parked;
+        private PlayerHub _user;           // who's giving a shock with them now (the case on the ground)
+        private static readonly System.Collections.Generic.List<DefibPaddles> All = new();
         private float _shockStart = float.NegativeInfinity;
         private Vector3 _chest;
         private Light _flash;
@@ -54,6 +57,23 @@ namespace PleaseDontDrown.Combat
             _paddleL = MakePaddle("PaddleL", out _cableL);
             Park();
         }
+
+        private void OnEnable() => All.Add(this);
+        private void OnDisable() => All.Remove(this);
+
+        /// <summary>Paddles this player is giving a shock with right now (their hands go on them), if any.</summary>
+        public static DefibPaddles ActiveFor(PlayerHub player)
+        {
+            if (player == null) return null;
+            foreach (DefibPaddles p in All)
+                if (p._user == player && p.InUse) return p;
+            return null;
+        }
+
+        private bool InUse => _user != null && Time.time - _shockStart <= Done;
+
+        /// <summary>This player takes the paddles off the case for a shock (then <see cref="PlayShock"/>).</summary>
+        public void UseFrom(PlayerHub user) => _user = user;
 
         private Transform MakePaddle(string name, out LineRenderer cable)
         {
@@ -98,6 +118,8 @@ namespace PleaseDontDrown.Combat
             _cableR.enabled = _cableL.enabled = false;
             SetCaseVisible(true);
             _shockStart = float.NegativeInfinity;
+            _user = null;
+            _parked = true;
         }
 
         private void SetCaseVisible(bool visible)
@@ -173,35 +195,21 @@ namespace PleaseDontDrown.Combat
 
         private void LateUpdate()
         {
-            PlayerHub holder = _item != null ? _item.Holder : null;
-            if (holder == null)
+            // Carried, or lying there unused: the paddles on the lid.
+            if (!InUse || (_item != null && _item.IsHeld))
             {
-                if (_wasHeld) Park();
-                _wasHeld = false;
+                if (!_parked) Park();
                 return;
             }
-            _wasHeld = true;
-            bool firstPerson = holder.IsOwner;
-
-            // The case at the hip (our own: out of sight, it would float by an unseen body).
-            SetCaseVisible(!firstPerson);
-            Vector3 port;
-            AvatarRig rig = holder.Avatar != null ? holder.Avatar.Rig : null;
-            Transform hips = rig != null ? rig[AvatarRig.Bone.Hips] : null;
-            Transform body = rig != null ? rig.transform : holder.transform;
-            if (hips != null)
-            {
-                // Lid out, carry handle (the model's -z) up, against the right hip.
-                Vector3 bodyRight = body.right;
-                _model.SetPositionAndRotation(hips.position + bodyRight * 0.2f - Vector3.up * 0.06f,
-                    Quaternion.LookRotation(Vector3.down, bodyRight));
-                port = _model.TransformPoint((PortRight + PortLeft) * 0.5f);
-            }
-            else port = holder.transform.position + Vector3.up * 0.9f + holder.transform.right * 0.2f;
-
-            GetGrips(holder, out HandGrip left, out HandGrip right);
-            Place(_paddleR, _cableR, right, true, holder, rig, firstPerson, port);
-            Place(_paddleL, _cableL, left, false, holder, rig, firstPerson, port);
+            _parked = false;
+            PlayerHub user = _user;
+            bool firstPerson = user.IsOwner;
+            AvatarRig rig = user.Avatar != null ? user.Avatar.Rig : null;
+            // The cables come out of the case where it lies.
+            Vector3 portR = _model.TransformPoint(PortRight), portL = _model.TransformPoint(PortLeft);
+            GetGrips(user, out HandGrip left, out HandGrip right);
+            Place(_paddleR, _cableR, right, true, user, rig, firstPerson, portR);
+            Place(_paddleL, _cableL, left, false, user, rig, firstPerson, portL);
             UpdateFlash();
         }
 

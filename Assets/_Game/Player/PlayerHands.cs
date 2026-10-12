@@ -671,7 +671,13 @@ namespace PleaseDontDrown.Player
         /// palm directions and a finger pose per hand. Both hands on the near sides of boxes, spread over a ball,
         /// one hand cupped under small things or hooked over the rim of a ring, under the back and knees of a person.
         /// </summary>
-        public GripKind GetGrip(out HandGrip left, out HandGrip right) => GetGrip(HeldItem, out left, out right);
+        public GripKind GetGrip(out HandGrip left, out HandGrip right)
+        {
+            // Giving a shock with a defibrillator on the ground: the hands are on its paddles.
+            if (Combat.DefibPaddles.ActiveFor(_hub) is { } paddles)
+                return paddles.GetGrips(_hub, out left, out right);
+            return GetGrip(HeldItem, out left, out right);
+        }
 
         /// <summary>The same for any item (hands that stay with a thrown item for a moment use this).</summary>
         public GripKind GetGrip(Item item, out HandGrip left, out HandGrip right)
@@ -680,8 +686,6 @@ namespace PleaseDontDrown.Player
             if (item == null) return GripKind.None;
             if (item.TryGetComponent(out Fun.BasketballDribble dribble))
                 return dribble.GetGrips(_hub, out left, out right);
-            if (item.TryGetComponent(out Combat.DefibPaddles paddles))
-                return paddles.GetGrips(_hub, out left, out right);
             // Hand-placed grips on the item win (fingers along the grip's forward, palm toward its down).
             if (item.GripRight != null || item.GripLeft != null)
             {

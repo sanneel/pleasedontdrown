@@ -168,6 +168,7 @@ namespace PleaseDontDrown.Items
         {
             _sync = GetComponent<ItemSync>();
             _holdPose = GetComponent<IHoldPose>();
+            _groundUse = GetComponent<IGroundUse>();
             _colliders = GetComponentsInChildren<Collider>(true);
             _renderers = GetComponentsInChildren<Renderer>(true);
             _bodyColliders = System.Array.FindAll(_colliders, c => c.attachedRigidbody == _sync.Body);
@@ -204,14 +205,24 @@ namespace PleaseDontDrown.Items
 
         public bool CanInteract(PlayerHub player) => !IsHeld && player.Hands != null;
 
+        private IGroundUse _groundUse;
+
+        /// <summary>Lying here, it can be used where it is (E) instead of picked up.</summary>
+        private bool GroundUse(PlayerHub player) => _groundUse != null && !IsHeld && _groundUse.CanUseOnGround(player);
+
         public string GetPrompt(PlayerHub player)
         {
+            if (GroundUse(player)) return _groundUse.GroundUsePrompt(player);
             Item current = player.Hands != null ? player.Hands.HeldItem : null;
             bool swap = current != null && (!current.Pocketable || player.Hands.FirstFreeSlot() < 0);
             return swap ? $"Swap for {_displayName}" : $"{_pickUpVerb} {_displayName}";
         }
 
-        public void OnInteract(PlayerHub player) => player.Hands.TryPickUp(this);
+        public void OnInteract(PlayerHub player)
+        {
+            if (GroundUse(player)) _groundUse.UseOnGround(player);
+            else player.Hands.TryPickUp(this);
+        }
 
         // ------------------------------------------------------------------ pick up
 

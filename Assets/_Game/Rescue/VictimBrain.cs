@@ -589,7 +589,7 @@ namespace PleaseDontDrown.Rescue
         {
             if (_flatline.Value)
             {
-                PlayerHud.ShowToast($"{Name} has no pulse. Get the <b>defibrillator</b> (hold it, left mouse on them).", 3f);
+                PlayerHud.ShowToast($"{Name} has no pulse. Bring the <b>defibrillator</b>, put it down next to them and press E on it.", 3f);
                 return;
             }
             CprStep step = _cprStep.Value;

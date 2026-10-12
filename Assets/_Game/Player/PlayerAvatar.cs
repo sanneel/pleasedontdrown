@@ -175,7 +175,7 @@ namespace PleaseDontDrown.Player
             if (hands != null)
             {
                 m.Basketball = hands.HeldItem != null && hands.HeldItem.GetComponent<Fun.BasketballDribble>() != null;
-                m.Defib = hands.HeldItem != null && hands.HeldItem.GetComponent<Combat.DefibPaddles>() != null;
+                m.Defib = Combat.DefibPaddles.ActiveFor(_hub) != null; // (a shock from a defibrillator on the ground)
                 PlayerHands.GripKind grip = hands.GetGrip(out m.GripLeft, out m.GripRight);
                 m.Holding = grip != PlayerHands.GripKind.None;
                 m.TwoHanded = grip == PlayerHands.GripKind.TwoHands;

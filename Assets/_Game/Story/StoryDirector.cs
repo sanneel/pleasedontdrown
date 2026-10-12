@@ -822,7 +822,8 @@ namespace PleaseDontDrown.Story
                 if (target == null || me == null) throw new InvalidOperationException($"nothing called '{args[0]}'");
                 bool head = args.Length > 1 && args[1] == "head";
                 Vector3 chest = target.TryGetComponent(out StoryNpc npc) ? npc.HeadPosition - Vector3.up * (head ? 0.02f : 0.35f)
-                    : target.TryGetComponent(out Creature creature) ? creature.TopPosition - Vector3.up * 0.6f : target.position + Vector3.up;
+                    : target.TryGetComponent(out Creature creature) ? creature.TopPosition - Vector3.up * 0.6f
+                    : target.TryGetComponent(out Items.Item _) ? target.position : target.position + Vector3.up; // (an item: itself, e.g. on the ground)
                 me.Look.LookAt(chest);
                 DevCommands.Print($"aiming at {target.name} {(chest - me.Head.position).magnitude:F1} m away");
             }, cheat: true, owner: this);
