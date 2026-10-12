@@ -19,6 +19,8 @@ namespace PleaseDontDrown.Combat
     /// fist gets there in 1/10 s, locked to the spot it's going for, and lands on arrival; it comes back in 1/4 s.
     /// The next punch can go as soon as the last fist has landed, so a quick one-two is quick; a press while a fist
     /// is still on its way is kept and thrown the moment it can be.
+    /// The fighting moves (the octagon's, everywhere with empty hands): Primary jabs (25), Secondary throws a hook (35,
+    /// a beat slower), crouch + Primary an uppercut (40, slowest); jab, jab, hook inside 1.2 s is a combo (+15 on the hook).
     /// </summary>
     public partial class PlayerCombat : NetworkBehaviour
     {
@@ -37,6 +39,8 @@ namespace PleaseDontDrown.Combat
         private bool _lastLeft = true;
         private bool _queued;
         private float _lastServerPunch;
+        private float _recoverUntil;                 // heavy blows: the next one waits this long
+        private readonly float[] _jabs = { -10f, -10f }; // the last two jabs (for the jab-jab-hook combo)
 
         public float LastKnockedTime { get; private set; } = -10f;
 
@@ -73,13 +77,19 @@ namespace PleaseDontDrown.Combat
                 else _queued = true;
             }
             else if (_queued && CanPunch()) Punch();
+            // A hook with the other button (unless something we look at wants it: CPR on a friend).
+            else if (GameInput.Secondary.WasPressedThisFrame() && (interactor == null || interactor.CurrentSecondaryPrompt == null) && CanPunch())
+            {
+                _forced = (PunchKind.Hook, !_lastLeft);
+                Punch();
+            }
         }
 
         private bool Striking(int fist) => Time.time - _punchedAt[fist] < StrikeTime;
         private bool Returning(int fist) => Time.time - _punchedAt[fist] < StrikeTime + ReturnTime;
 
         /// <summary>Not while a fist is still on its way; and not while both are still coming back.</summary>
-        private bool CanPunch() => !Striking(0) && !Striking(1) && !(Returning(0) && Returning(1));
+        private bool CanPunch() => Time.time >= _recoverUntil && !Striking(0) && !Striking(1) && !(Returning(0) && Returning(1));
 
         public override void OnStartClient()
         {
@@ -122,7 +132,20 @@ namespace PleaseDontDrown.Combat
         {
             _queued = false;
             bool left = _forced is { } forced ? forced.left : !_lastLeft;
+            PunchKind kind = _forced is { } f ? f.kind : _hub.Motor != null && _hub.Motor.IsCrouching ? PunchKind.Uppercut : PunchKind.Straight;
             _forced = null;
+            int damage = kind switch { PunchKind.Hook => 35, PunchKind.Uppercut => 40, PunchKind.Overhand => 45, _ => Damage.Punch };
+            _recoverUntil = Time.time + kind switch { PunchKind.Hook => 0.35f, PunchKind.Uppercut => 0.45f, PunchKind.Overhand => 0.5f, _ => 0f };
+            if (kind == PunchKind.Straight)
+            {
+                _jabs[0] = _jabs[1];
+                _jabs[1] = Time.time;
+            }
+            else if (kind == PunchKind.Hook && Time.time - _jabs[0] < 1.2f)
+            {
+                damage += 15; // jab, jab, hook
+                _jabs[0] = _jabs[1] = -10f;
+            }
             _lastLeft = left;
             _punchedAt[left ? 1 : 0] = Time.time;
             Transform view = _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _hub.Head;
@@ -130,13 +153,13 @@ namespace PleaseDontDrown.Combat
             Transform target = found ? hit.collider.transform : null;
             Vector3 local = found ? target.InverseTransformPoint(hit.point - view.forward * 0.15f) : Vector3.zero; // stop short of the surface
             _hub.Gesture(AvatarGesture.Punch, found ? hit.point : view.position + view.forward * 1.1f);
-            if (_hub.Arms != null) _hub.Arms.PlayPunch(PunchKind.Straight, left, target, local);
+            if (_hub.Arms != null) _hub.Arms.PlayPunch(kind, left, target, local);
             PlaySwish();
-            StartCoroutine(LandPunch(found, hit, target, local));
+            StartCoroutine(LandPunch(found, hit, target, local, damage, kind == PunchKind.Uppercut));
         }
 
         /// <summary>The fist arrives: the target picked at the press is hit (or, if there was none, whatever is there now).</summary>
-        private System.Collections.IEnumerator LandPunch(bool found, RaycastHit hit, Transform target, Vector3 local)
+        private System.Collections.IEnumerator LandPunch(bool found, RaycastHit hit, Transform target, Vector3 local, int damage, bool upward)
         {
             yield return new WaitForSeconds(StrikeTime);
             Transform view = _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _hub.Head;
@@ -144,7 +167,8 @@ namespace PleaseDontDrown.Combat
             if (found && target != null) hit.point = target.TransformPoint(local);
             else if (!FindTarget(view.position, dir, out hit)) yield break; // swung at nothing
 
-            ApplyHit(hit, dir, Damage.Punch, 4f, ProceduralAudio.Punch);
+            if (upward) dir = (new Vector3(dir.x, 0f, dir.z).normalized + Vector3.up * 0.8f).normalized; // lifts them
+            ApplyHit(hit, dir, damage, upward ? 6f : 4f, ProceduralAudio.Punch);
         }
 
         /// <summary>

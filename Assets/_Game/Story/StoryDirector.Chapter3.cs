@@ -409,11 +409,11 @@ namespace PleaseDontDrown.Story
             if (jack.Count == 0) yield break;
             StoryNpc champ = jack[0];
             yield return Say(champ, "Fresh meat! Nobody asks about the treasure without going a round with Iron Jaw Jack.");
-            BossIntroObservers("IRON JAW JACK", "Fists only. He guards: hit him after he swings.");
+            BossIntroObservers("IRON JAW JACK", "Fists only. LMB jab, RMB hook, crouch + LMB uppercut. Jab, jab, hook: combo.");
             champ.ServerFight(FighterProfile.Brawler(0.75f), champ.transform.position);
             while (!champ.IsDefeated)
             {
-                MissionObjective("Beat Iron Jaw Jack. Step back from his swings, then hit him.");
+                MissionObjective("Beat Iron Jaw Jack: dodge his swings, then jab, jab, hook (RMB) or uppercut (crouch + LMB).");
                 yield return new WaitForSeconds(0.25f);
             }
             champ.ServerStopFighting();

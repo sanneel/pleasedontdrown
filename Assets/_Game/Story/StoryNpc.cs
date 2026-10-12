@@ -536,6 +536,7 @@ namespace PleaseDontDrown.Story
             if (head) damage *= 2; // (StoryNpc.HitFeel)
             damage = FightOnHit(damage, kind, attacker, direction); // a fighter's guard, interrupted blows, knockdowns
             _health.Value = Mathf.Max(0, _health.Value - damage);
+            if (attacker != null) Debug.Log($"[Hit] {attacker.DisplayName} hits {Name}: -{damage} ({kind}{(head ? ", head" : "")}), {_health.Value} left");
             // The last of their health to a gun or a bite kills them; to fists and blades it knocks them out (StoryNpc.Rivals).
             bool killed = _health.Value <= 0 && KillsOutright(kind);
             Vector3 push = new Vector3(direction.x, 0f, direction.z).normalized;
