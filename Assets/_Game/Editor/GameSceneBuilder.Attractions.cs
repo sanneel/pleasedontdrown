@@ -117,7 +117,7 @@ namespace PleaseDontDrown.Editor
                 for (int i = 0; i < radii.Count; i++) p.GetArrayElementAtIndex(i).floatValue = radii[i];
             });
             SetRef(cannon, "_mouth", mouth);
-            SetField(cannon, "_power", p => p.floatValue = 28f); // ~25 m out: deep enough for a splash rating
+            SetField(cannon, "_power", p => p.floatValue = 28f); // ~50 m out at 35 degrees (PlayerMotor.Launch)
             SetRef(cannon, "_audio", SpatialAudio(root.gameObject, 4f, 80f));
             ConfigureInteractable(root.gameObject.AddComponent<Interactable>(), new Collider[] { box, barrelBox }, root.GetComponentsInChildren<Renderer>(), 3f);
         }

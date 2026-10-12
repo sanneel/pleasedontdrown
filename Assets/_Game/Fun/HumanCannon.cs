@@ -22,8 +22,8 @@ namespace PleaseDontDrown.Fun
     /// <item>Climb in yourself (Secondary): with nobody pushing, you aim (look) and fire (click) yourself, or the
     /// fuse does it; Jump climbs back out. With somebody pushing, they fire you.</item>
     /// </list>
-    /// Whoever is inside sticks out of the muzzle, head and hands up, for everyone (their own view looks out of
-    /// it). BOOM, and they sail out over the sea (the cannonball judge rates the splash). The pusher moves the cannon
+    /// Whoever is inside is hidden down the barrel (their own view looks out of the muzzle); a loaded cannon only
+    /// turns and aims, it doesn't roll. BOOM, and they sail out over the sea. The pusher moves the cannon
     /// on their own machine and the host passes it on; the one inside flies themselves on theirs.
     /// </summary>
     public class HumanCannon : NetworkBehaviour, IInteractionHandler, IInteractionSecondary
@@ -221,9 +221,6 @@ namespace PleaseDontDrown.Fun
         [ObserversRpc]
         private void LoadedObservers(string loader, string loaded)
         {
-            PlayerHud.ShowToast($"<b>{loader}</b> stuffs <b>{loaded}</b> into the cannon!", 2.5f);
-            if (!IsInside(PlayerHub.Local)) // (not right in the face of the one looking out of the muzzle)
-                FloatingText.Spawn(_mouth.position + Vector3.up * 0.4f, "IN YOU GO!", new Color(1f, 0.85f, 0.3f), 1.2f, 1.4f);
         }
 
         [TargetRpc]
@@ -312,6 +309,14 @@ namespace PleaseDontDrown.Fun
             Vector3 feet = me.transform.position;
             Vector3 spot = feet + facing * Vector3.forward * PushBack;
             spot.y = Ground(spot, transform.position.y);
+            if (Busy)
+            {
+                // Somebody's in it: it only turns and aims, it doesn't roll about with them inside (the team,
+                // 2026-10-12). Our feet stay at the push bar.
+                spot = transform.position;
+                Vector3 bar = OnGround(spot - facing * Vector3.forward * PushBack) + Vector3.up * 0.05f;
+                if ((new Vector3(feet.x, bar.y, feet.z) - bar).sqrMagnitude > 0.05f * 0.05f) me.Motor.Teleport(bar);
+            }
             if (WaterSurface.Exists && WaterSurface.HeightAt(spot) - spot.y > 0.5f)
             {
                 PlayerHud.ShowToast("The cannon won't roll into the sea.", 2f);
@@ -370,7 +375,6 @@ namespace PleaseDontDrown.Fun
         private void ClickObservers()
         {
             if (_audio != null) _audio.PlayOneShot(FunSounds.BallBounce, 0.5f);
-            FloatingText.Spawn(_mouth.position + Vector3.up * 0.3f, "*click* (empty!)", new Color(1f, 1f, 1f, 0.9f), 0.8f, 1.2f);
         }
 
         /// <summary>The sand (or deck) under a point, not the cannon itself or anybody standing about.</summary>
@@ -463,7 +467,7 @@ namespace PleaseDontDrown.Fun
                 {
                     if (!Pushed) AimServer(_shownYaw, _shownPitch);
                     player.Motor.Teleport(_mouth.position + _mouth.forward * 0.6f - Vector3.up * 1.0f);
-                    player.Motor.AddImpulse(_mouth.forward * _power);
+                    player.Motor.Launch(_mouth.forward * _power); // a real flight: ~50 m at the usual 35 degrees
                     BoomServer();
                     Debug.Log($"[Cannon] {player.DisplayName} fired: barrel up {_mouth.forward.y * 90f:F0}ish deg, toward {_mouth.forward}");
                 }
@@ -547,9 +551,6 @@ namespace PleaseDontDrown.Fun
                 _audio.PlayOneShot(Core.ProceduralAudio.Shot(Combat.GunSound.Shotgun), 1f);
                 _audio.PlayOneShot(FunSounds.Whoop, 0.8f);
             }
-            FloatingText.Spawn(_mouth.position + Vector3.up * 0.5f, "BOOM!", new Color(1f, 0.55f, 0.2f), 1.6f, 1.4f);
-            for (int i = 0; i < 6; i++)
-                FloatingText.Spawn(_mouth.position + Random.insideUnitSphere * 0.5f, "~", new Color(0.85f, 0.85f, 0.85f, 0.8f), 2f, 1.2f); // puffs of smoke
         }
 
         private static PlayerHub HubOf(NetworkConnection conn)

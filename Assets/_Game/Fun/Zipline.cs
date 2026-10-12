@@ -40,7 +40,6 @@ namespace PleaseDontDrown.Fun
         private IEnumerator Ride(PlayerHub player)
         {
             _busy = true;
-            PlayerHud.ShowToast("WHEEEEE!", 1.5f);
             if (_audio != null) _audio.PlayOneShot(FunSounds.Whoop, 0.9f);
             Vector3 a = _start.position, b = _end.position;
             float length = Vector3.Distance(a, b);
@@ -63,7 +62,6 @@ namespace PleaseDontDrown.Fun
             {
                 // Let go: on out over the water with the speed it had.
                 player.Motor.AddImpulse(dir * speed * 0.6f + Vector3.up * 1.5f);
-                PlayerHud.ShowToast("...and let go!", 1.2f);
             }
             yield return new WaitForSeconds(0.8f);
             // The handle slides back up to the tower for the next one.

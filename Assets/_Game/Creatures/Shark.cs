@@ -59,7 +59,6 @@ namespace PleaseDontDrown.Creatures
         [ObserversRpc]
         private void FinObservers()
         {
-            FloatingText.Spawn(transform.position + Vector3.up * 1.2f, "!!!", new Color(1f, 0.3f, 0.25f), 1.4f, 1.5f);
             PlayerHud.ShowToast("<color=#ff7060><b>SHARK!</b></color>", 3f);
         }
 
@@ -138,6 +137,6 @@ namespace PleaseDontDrown.Creatures
         }
 
         [ObserversRpc]
-        private void HitObservers(Vector3 point, bool fled) => FloatingText.Spawn(point + Vector3.up * 0.5f, fled ? "IT FLED!" : "HIT!", new Color(1f, 0.6f, 0.3f), 1f, 1f);
+        private void HitObservers(Vector3 point, bool fled) { } // (the "HIT!" / "IT FLED!" words are gone: the team, 2026-10-12)
     }
 }

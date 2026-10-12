@@ -752,19 +752,15 @@ namespace PleaseDontDrown.Rescue
                     if (!_silent.Value) FloatingText.Spawn(above, "PANIC!", new Color(1f, 0.55f, 0.2f), 0.9f);
                     break;
                 case VictimEvent.GoingUnder:
-                    FloatingText.Spawn(above, "blub...", new Color(0.6f, 0.85f, 1f), 0.8f);
                     PlayerHud.ShowToast($"{Name} is going under!");
                     break;
                 case VictimEvent.Collapsed:
-                    FloatingText.Spawn(above, "*collapses*", new Color(1f, 0.45f, 0.3f), 1.1f, 1.6f);
                     PlayerHud.ShowToast($"<color=#ff7060><b>{text}</b></color>", 5f);
                     break;
                 case VictimEvent.Unconscious:
-                    FloatingText.Spawn(above, "!!!", new Color(1f, 0.3f, 0.25f), 1.2f);
                     PlayerHud.ShowToast($"<color=#ff7060><b>{Name} is unconscious!</b></color> Get {They} onto the sand for CPR.", 5f);
                     break;
                 case VictimEvent.Calmed:
-                    FloatingText.Spawn(above, "phew", new Color(0.7f, 1f, 0.7f), 0.7f);
                     break;
                 case VictimEvent.Saved:
                 case VictimEvent.SelfRescue:

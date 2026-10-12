@@ -65,7 +65,6 @@ namespace PleaseDontDrown.Creatures
             {
                 bool water = WaterSurface.Exists && Rescue.Shore.WaterDepthAt(_to + Vector3.up) > 0.3f;
                 if (water) SplashFx.Spawn(new Vector3(_to.x, WaterSurface.HeightAt(_to), _to.z), 1.2f);
-                else FloatingText.Spawn(_to + Vector3.up * 0.5f, "THUD!", new Color(1f, 0.6f, 0.3f), 1f, 0.8f);
                 Destroy(gameObject);
                 return;
             }

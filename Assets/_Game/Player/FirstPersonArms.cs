@@ -365,6 +365,14 @@ namespace PleaseDontDrown.Player
             return true;
         }
 
+        /// <summary>Where a hand's palm is right now (world), once the arms are built (the defibrillator's paddles sit in it).</summary>
+        public bool TryGetPalm(bool right, out Vector3 palm)
+        {
+            Hand hand = right ? _right : _left;
+            palm = _built && hand.Wrist != null ? hand.Wrist.position + hand.Wrist.rotation * hand.Bones.PalmContact : default;
+            return _built && hand.Wrist != null;
+        }
+
         /// <summary>We pressed a chest (CPR).</summary>
         public void OnPump(Vector3 chest)
         {

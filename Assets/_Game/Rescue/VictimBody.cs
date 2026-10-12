@@ -288,7 +288,6 @@ namespace PleaseDontDrown.Rescue
             _breathAt = Time.time;
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Kiss, 0.9f);
             if (_jiggle != null) _jiggle.Shake(transform.forward * 0.7f, transform.right * 0.3f, 1.6f, 1.2f);
-            FloatingText.Spawn(HeadPosition + Vector3.up * 0.35f, "MMMPPPH", new Color(1f, 0.6f, 0.75f), 0.7f, 1.1f);
         }
 
         /// <summary>How long after the press the hand lands (the swing: Player.FirstPersonArms.PlaySlap, the avatar's punch).</summary>
@@ -313,7 +312,6 @@ namespace PleaseDontDrown.Rescue
             _squishAt = Time.time;
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Zap, 1f);
             if (_jiggle != null) _jiggle.Shake(transform.forward * 1.2f, transform.right * 0.8f, 2f, 1f);
-            FloatingText.Spawn(ChestPoint + Vector3.up * 0.4f, "BZZZT!", new Color(0.6f, 0.9f, 1f), 1.3f, 1.2f);
             if (!_rb.isKinematic) _rb.AddForce(Vector3.up * 2.5f, ForceMode.VelocityChange);
         }
 
@@ -505,7 +503,6 @@ namespace PleaseDontDrown.Rescue
             {
                 _punchLanded = true;
                 if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Punch, 1f);
-                FloatingText.Spawn(HeadPosition + Vector3.up * 0.3f, "SLAP!", new Color(1f, 0.85f, 0.25f), 1.1f, 1f);
             }
             if (sincePunch >= 0f && sincePunch < 0.6f)
             {

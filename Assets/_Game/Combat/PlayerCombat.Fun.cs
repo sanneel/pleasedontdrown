@@ -63,7 +63,6 @@ namespace PleaseDontDrown.Combat
                 _audio.PlayOneShot(FunSounds.Tweet, 0.6f);
             }
             Vector3 head = _hub.Head != null ? _hub.Head.position : transform.position + Vector3.up * 1.6f;
-            FloatingText.Spawn(head + Vector3.up * 0.5f, Random.value < 0.5f ? "SEEING STARS!" : "K.O.!", new Color(1f, 0.9f, 0.3f), 1.1f, 1.6f);
             AvatarRig rig = _hub.Avatar != null ? _hub.Avatar.Rig : null;
             if (rig != null)
             {
@@ -73,7 +72,6 @@ namespace PleaseDontDrown.Combat
             if (IsOwner)
             {
                 if (_hub.Motor != null) _hub.Motor.Stun(_dazeLength);
-                PlayerHud.ShowToast(string.IsNullOrEmpty(byWhom) ? "Seeing stars..." : $"<b>{byWhom}</b> {how}! Seeing stars...", 2.5f);
             }
         }
 
@@ -108,7 +106,6 @@ namespace PleaseDontDrown.Combat
         [ObserversRpc]
         private void BonkObservers(Vector3 point, float impact)
         {
-            FloatingText.Spawn(point + Vector3.up * 0.25f, impact > BonkDazeImpact ? "BONK!!" : "BONK!", new Color(1f, 0.75f, 0.3f), 1f, 1f);
             AudioSource.PlayClipAtPoint(ProceduralAudio.Bonk, point, 1f);
             if (impact > BonkDazeImpact) AudioSource.PlayClipAtPoint(FunSounds.Boing, point, 0.7f);
         }
@@ -177,10 +174,7 @@ namespace PleaseDontDrown.Combat
             SplashFx.Spawn(p, 1.4f);
             for (int i = 0; i < 4; i++)
                 SplashFx.Spawn(p + Quaternion.Euler(0f, i * 90f + 45f, 0f) * Vector3.forward * 0.8f, 0.7f);
-            string verdict = score >= 9.5f ? "PERFECT!" : score >= 8f ? "HUGE!" : score >= 6.5f ? "NICE" : "BELLY FLOP";
-            FloatingText.Spawn(p + Vector3.up * 1.8f, $"CANNONBALL! {score:0.0}/10 {verdict}", new Color(0.5f, 0.9f, 1f), 1.2f, 2.2f);
             AudioSource.PlayClipAtPoint(score >= 8f ? FunSounds.Cheer : FunSounds.Whoop, p, 0.8f);
-            if (IsOwner) PlayerHud.ShowToast($"Cannonball rated <b>{score:0.0}</b>. {verdict}", 2.5f);
         }
     }
 }

@@ -64,7 +64,6 @@ namespace PleaseDontDrown.World
                 _audio.pitch = Random.Range(0.97f, 1.03f);
                 _audio.PlayOneShot(ProceduralAudio.Bell);
             }
-            FloatingText.Spawn(_swingPivot.position + Vector3.up * 0.5f, "DING!", new Color(1f, 0.85f, 0.3f));
             Debug.Log($"[Bell] DING ({who})");
         }
 

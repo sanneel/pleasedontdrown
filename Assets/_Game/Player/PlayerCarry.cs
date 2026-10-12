@@ -3,6 +3,7 @@ using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using PleaseDontDrown.Audio;
+using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Interaction;
 using PleaseDontDrown.UI;
@@ -12,8 +13,8 @@ namespace PleaseDontDrown.Player
 {
     /// <summary>
     /// Picking up another lifeguard: look at them and press Interact and you scoop them up in your arms (they lie
-    /// back and enjoy the ride). Tap Drop to put them down, hold Drop and let go to throw them (or click to fling them
-    /// at once), or carry them to the human cannon and load them in. Mash Jump to wriggle free.
+    /// back and enjoy the ride). Tap Drop to put them down, hold Drop and let go to throw them (exactly as a tourist is
+    /// thrown), or carry them to the human cannon and load them in. Mash Jump to wriggle free.
     /// The host decides who carries whom; the carried lifeguard's own machine keeps their body in the carrier's arms.
     /// </summary>
     [DefaultExecutionOrder(-10)] // before the avatar animator, so the body is in the arms when it's posed
@@ -21,7 +22,10 @@ namespace PleaseDontDrown.Player
     {
         [SerializeField] private PlayerHub _hub;
 
-        private const float MaxReach = 3.2f, ThrowCharge = 0.6f, MaxCarry = 25f;
+        // Thrown just as a tourist is (PlayerHands): half a second to full charge, under 30% it's a put-down, and up
+        // to 10 m/s where we look on top of how we're moving.
+        private const float MaxReach = 3.2f, ThrowCharge = 0.5f, ThrowThreshold = 0.3f, MaxThrowSpeed = 10f, MaxCarry = 25f;
+        private bool _windUpShown;
         private const int WrigglesToEscape = 6;
 
         private static readonly List<PlayerCarry> All = new();
@@ -82,12 +86,12 @@ namespace PleaseDontDrown.Player
                 target.OnInteract(_hub);
                 DevCommands.Print($"picking up {best.DisplayName}");
             }, owner: this);
-            DevCommands.Register("yeet", "[speed]", "Throw whoever you carry where you look (automated tests).", args =>
+            DevCommands.Register("yeet", "[charge 0..1]", "Throw whoever you carry where you look, as a full (or given) Drop charge would (automated tests).", args =>
             {
                 PlayerHub carried = CarriedBy(_hub);
                 if (carried == null) { DevCommands.Print("not carrying anybody"); return; }
-                float speed = args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 13f;
-                Release(carried, _hub.Head.forward * speed + Vector3.up * 4f, true);
+                float charge = args.Length > 0 ? Mathf.Clamp01(DevCommands.ParseFloat(args, 0)) : 1f;
+                Release(carried, _hub.Motor.Velocity + _hub.Head.forward * (charge * MaxThrowSpeed), true);
             }, owner: this);
             DevCommands.Register("cannon", "[in|fire]", "The nearest cannon: push it / load whoever you carry / let go; 'in' climbs in; 'fire' clicks fire (automated tests).", args =>
             {
@@ -153,7 +157,6 @@ namespace PleaseDontDrown.Player
                 PlayerHud.ShowToast($"<b>{carrier}</b> picked you up! Mash [{GameInput.KeyLabel(GameInput.Jump)}] to wriggle free.", 3f);
             else if (me != null && me.NetworkObject == carrierObject)
                 PlayerHud.ShowToast($"You've got <b>{carried}</b>! Tap [{GameInput.KeyLabel(GameInput.Drop)}] to put them down, hold it to throw, or load them into the cannon.", 4f);
-            FloatingText.Spawn(transform.position + Vector3.up * 2.2f, "UPSY-DAISY!", new Color(1f, 0.9f, 0.5f), 1f, 1.4f);
         }
 
         // ------------------------------------------------------------------ every frame
@@ -165,7 +168,12 @@ namespace PleaseDontDrown.Player
             if (Carrier != null && Time.time >= _letGoUntil) UpdateWriggle();
             PlayerHub carried = CarriedBy(_hub);
             if (carried != null) UpdateCarrying(carried);
-            else _dropHeldSince = -1f;
+            else
+            {
+                _dropHeldSince = -1f;
+                if (_windUpShown) _hub.Gesture(AvatarGesture.ChargeEnd); // they wriggled free mid wind-up
+                _windUpShown = false;
+            }
         }
 
         private void FixedUpdate()
@@ -186,26 +194,39 @@ namespace PleaseDontDrown.Player
             if (carrier != null) transform.position = HoldPoint(carrier, out _);
         }
 
-        /// <summary>Carrier: tap Drop to put them down, hold it to throw; Primary flings them at once.</summary>
+        /// <summary>Carrier: tap Drop to put them down, hold it and let go to throw them (as a tourist is thrown).</summary>
         private void UpdateCarrying(PlayerHub carried)
         {
             if (!GameInput.GameplayActive) return;
             Transform aim = _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _hub.Head;
             Vector3 forward = aim.forward;
-            if (GameInput.Primary.WasPressedThisFrame())
+            if (GameInput.Drop.WasPressedThisFrame())
             {
-                Release(carried, forward * 13f + Vector3.up * 4f, true);
+                _dropHeldSince = Time.time;
+                _windUpShown = false;
+            }
+            if (_dropHeldSince < 0f) return;
+            float charge = Mathf.Clamp01((Time.time - _dropHeldSince) / ThrowCharge);
+            if (!_windUpShown && charge >= ThrowThreshold)
+            {
+                _windUpShown = true;
+                _hub.Gesture(AvatarGesture.ChargeStart); // others see the wind-up
+            }
+            if (!GameInput.Drop.WasReleasedThisFrame()) return;
+            _dropHeldSince = -1f;
+            Vector3 flat = new Vector3(forward.x, 0f, forward.z).normalized;
+            if (charge < ThrowThreshold)
+            {
+                if (_windUpShown) _hub.Gesture(AvatarGesture.ChargeEnd);
+                _windUpShown = false;
+                Release(carried, flat * 1.5f, false);
                 return;
             }
-            if (GameInput.Drop.WasPressedThisFrame()) _dropHeldSince = Time.time;
-            if (_dropHeldSince >= 0f && GameInput.Drop.WasReleasedThisFrame())
-            {
-                float charge = Mathf.Clamp01((Time.time - _dropHeldSince) / ThrowCharge);
-                _dropHeldSince = -1f;
-                Vector3 flat = new Vector3(forward.x, 0f, forward.z).normalized;
-                if (charge < 0.3f) Release(carried, flat * 1.5f, false);
-                else Release(carried, forward * (5f + 9f * charge) + Vector3.up * (2.5f + 2.5f * charge), true);
-            }
+            Vector3 moving = _hub.Motor != null ? _hub.Motor.Velocity : Vector3.zero;
+            Release(carried, moving + forward * (charge * MaxThrowSpeed), true);
+            _windUpShown = false;
+            _hub.Gesture(AvatarGesture.Throw);
+            BeachAudio.PlayLocal(BeachAudio.Throw, 0.6f);
         }
 
         private static void Release(PlayerHub carried, Vector3 velocity, bool thrown) => Of(carried)?.ReleaseServer(velocity, thrown);
@@ -241,7 +262,9 @@ namespace PleaseDontDrown.Player
             if (_hub == null || _hub.Motor == null) return;
             StopHolding();
             _hub.Motor.Teleport(at);
-            if (velocity.sqrMagnitude > 0.01f) _hub.Motor.AddImpulse(velocity);
+            // A throw flies like a thrown tourist: on until we land, plain gravity (no walking model braking it).
+            if (velocity.sqrMagnitude > 4f) _hub.Motor.Launch(velocity, 0f);
+            else if (velocity.sqrMagnitude > 0.01f) _hub.Motor.AddImpulse(velocity);
         }
 
         /// <summary>Owner: stop keeping the body in the arms right now (the host's word follows).</summary>
@@ -250,8 +273,6 @@ namespace PleaseDontDrown.Player
         [ObserversRpc]
         private void ThrownObservers(string shout, Vector3 at)
         {
-            FloatingText.Spawn(at + Vector3.up * 1.2f, "YEEEET!", new Color(1f, 0.6f, 0.2f), 1.5f, 1.4f);
-            PlayerHud.ShowToast(shout, 2f);
             AudioSource.PlayClipAtPoint(FunSounds.Whoop, at, 0.9f);
         }
 
@@ -280,8 +301,6 @@ namespace PleaseDontDrown.Player
         [ObserversRpc]
         private void WriggledObservers(string carried, string carrier)
         {
-            PlayerHud.ShowToast($"<b>{carried}</b> wriggled free from <b>{carrier}</b>!", 2f);
-            FloatingText.Spawn(transform.position + Vector3.up * 2f, "LET ME GO!", new Color(1f, 0.5f, 0.5f), 1f, 1.3f);
         }
 
         private void IgnoreCarrier(NetworkObject carrier)

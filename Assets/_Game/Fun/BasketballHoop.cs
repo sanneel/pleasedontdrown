@@ -290,9 +290,8 @@ namespace PleaseDontDrown.Fun
         private void ScoredObservers(string who, int points, bool swish, int total, float distance)
         {
             Vector3 at = _rim.position + Vector3.up * 0.5f;
-            string word = swish ? (points == 3 ? "SWISH! +3" : "SWISH! +2") : points == 3 ? "THREE! +3" : "+2";
+            string word = $"+{points}";
             FloatingText.Spawn(at, word, swish ? new Color(0.4f, 1f, 0.6f) : new Color(1f, 0.8f, 0.25f), 1.4f, 2f);
-            PlayerHud.ShowToast($"<b>{who}</b> scores {points}{(points == 3 ? $" from {distance:F0} m" : "")}! ({total} today)", 3f);
             if (_audio != null)
             {
                 _audio.PlayOneShot(FunSounds.Swish, 1f);

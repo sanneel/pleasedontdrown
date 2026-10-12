@@ -680,6 +680,8 @@ namespace PleaseDontDrown.Player
             if (item == null) return GripKind.None;
             if (item.TryGetComponent(out Fun.BasketballDribble dribble))
                 return dribble.GetGrips(_hub, out left, out right);
+            if (item.TryGetComponent(out Combat.DefibPaddles paddles))
+                return paddles.GetGrips(_hub, out left, out right);
             // Hand-placed grips on the item win (fingers along the grip's forward, palm toward its down).
             if (item.GripRight != null || item.GripLeft != null)
             {

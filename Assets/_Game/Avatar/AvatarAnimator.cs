@@ -35,6 +35,7 @@ namespace PleaseDontDrown.Avatars
         public bool Drinking;         // eating a drink: the hand keeps its grip on the bottle (tipped up at the lips), the head goes back
         public bool Cpr;
         public Vector3 CprPoint;      // world, the chest being pressed
+        public bool Defib;            // holding the defibrillator's paddles: kneeling (Cpr) keeps the hands on them
         public bool Seated;           // on a vehicle seat (hands come from the grips)
         public bool Straddle;         // seated astride a fat seat (a banana boat): knees well apart, feet back down its sides
         public bool FloatSeat;        // seated on a ring: knees together so the legs fit its opening
@@ -970,11 +971,11 @@ namespace PleaseDontDrown.Avatars
                 bool usesGrip = grip.Active && (right || m.TwoHanded || m.CarryingPerson);
                 if (usesGrip && _hold > 0.01f)
                 {
-                    weight = _hold * (1f - _cpr);
+                    weight = _hold * (m.Defib ? 1f : 1f - _cpr);
                     rotation = grip.Rotation(side);
                     pose = HandPose.Lerp(pose, grip.Pose, weight);
                 }
-                if (_cpr > 0.01f)
+                if (_cpr > 0.01f && !m.Defib)
                 {
                     rotation = HandBones.Orient(fwd, Vector3.down, side);
                     weight = _cpr;
@@ -1110,7 +1111,7 @@ namespace PleaseDontDrown.Avatars
 
             if (_hold > 0.01f)
             {
-                float w = _hold * (1f - _cpr);
+                float w = _hold * (m.Defib ? 1f : 1f - _cpr);
                 Vector3 gl = m.GripLeft.Point, gr = m.GripRight.Point;
                 if (m.Basketball)
                 {
@@ -1161,8 +1162,8 @@ namespace PleaseDontDrown.Avatars
 
             if (_cpr > 0.01f)
             {
-                // Arms straight down, hands stacked on the chest.
-                Vector3 point = m.CprPoint;
+                // Arms straight down, hands stacked on the chest (with the defibrillator: on its two paddles).
+                Vector3 point = m.Defib ? (m.GripLeft.Point + m.GripRight.Point) * 0.5f : m.CprPoint;
                 if (point == Vector3.zero) point = transform.position + fwd * 0.55f + up * 0.15f;
                 // Leaning further over a chest the straight arms don't reach (a wide round dad is knelt beside from
                 // further out): the shoulders come over the hands, the way compressions are really done, instead of
@@ -1178,6 +1179,13 @@ namespace PleaseDontDrown.Avatars
                     float step = Mathf.Min(gap / torso * Mathf.Rad2Deg, 40f - leaned);
                     Turn(spine, right, step * _cpr);
                     leaned += step;
+                }
+                if (m.Defib)
+                {
+                    // Leaned over: the hands again on the paddles' handles.
+                    IK.Solve(upperL, foreL, la, lb, m.GripLeft.Point, elbowL, _hold, false);
+                    IK.Solve(upperR, foreR, la, lb, m.GripRight.Point, elbowR, _hold, false);
+                    return;
                 }
                 // (One right on top of the other, on the middle of the chest: 5 cm apart sideways they read as two
                 // hands side by side.)

@@ -252,7 +252,6 @@ namespace PleaseDontDrown.Creatures
         private void BiteObservers(Vector3 at)
         {
             if (_audio != null) _audio.PlayOneShot(Core.ProceduralAudio.Crunch, 1f);
-            FloatingText.Spawn(at + Vector3.up * 1.2f, "SNAP!", new Color(1f, 0.35f, 0.25f), 1.4f, 1f);
         }
 
         [ObserversRpc]
@@ -260,7 +259,6 @@ namespace PleaseDontDrown.Creatures
         {
             if (_audio != null) _audio.PlayOneShot(Core.ProceduralAudio.Thump, 1f);
             if (WaterSurface.Exists && Rescue.Shore.WaterDepthAt(at + Vector3.up) > 0.3f) SplashFx.Spawn(new Vector3(at.x, WaterSurface.HeightAt(at), at.z), 2.5f);
-            FloatingText.Spawn(at + Vector3.up * 3f, "SLAM!", new Color(1f, 0.55f, 0.2f), 1.5f, 1f);
             PlayerHub local = PlayerHub.Local;
             if (local != null && local.Look != null && (local.transform.position - at).sqrMagnitude < 20f * 20f) local.Look.Shake(1.6f, 1f);
         }

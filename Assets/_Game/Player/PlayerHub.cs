@@ -236,6 +236,14 @@ namespace PleaseDontDrown.Player
             if (IsOwner && Look != null) Look.KneelAt(chest, head, reach); // our own view kneels beside them
         }
 
+        /// <summary>A defibrillator shock by this player (every machine): kneel by the chest, the paddles go down on it.</summary>
+        public void ShowZap(Combat.DefibPaddles paddles, Vector3 chest, Vector3 head, float reach)
+        {
+            _avatar.OnKneel(chest, head, reach);
+            if (paddles != null) paddles.PlayShock(chest);
+            if (IsOwner && Look != null) Look.KneelAt(chest, head, reach);
+        }
+
         /// <summary>The other CPR steps: a rescue breath at the mouth, or a punch to the face (every machine).</summary>
         public void ShowCprAction(Rescue.CprStep step, Vector3 point)
         {
@@ -304,7 +312,6 @@ namespace PleaseDontDrown.Player
             _burpAudio.PlayOneShot(BurpSound.Burp(UnityEngine.Random.Range(0, BurpSound.Variants)), 1f);
             // Above the head for everyone else; just in front of our own eyes for us.
             Vector3 at = IsOwner ? _head.position + _head.forward * 1.4f + Vector3.up * 0.25f : _head.position + Vector3.up * 0.35f;
-            FloatingText.Spawn(at, UnityEngine.Random.value < 0.75f ? "BUUUURP!" : "BUUURRRP... pardon.", new Color(0.72f, 0.95f, 0.35f), IsOwner ? 0.7f : 1.15f, 1.9f);
             Debug.Log($"[Player] {DisplayName} burped");
         }
 

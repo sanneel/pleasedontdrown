@@ -182,8 +182,6 @@ namespace PleaseDontDrown.Fun
         [ObserversRpc]
         private void FlungObservers(string who, Vector3 at)
         {
-            FloatingText.Spawn(at + Vector3.up * 0.8f, "WAAAAAH!", new Color(1f, 0.95f, 0.4f), 1.3f, 1.6f);
-            PlayerHud.ShowToast($"<b>{who}</b> flew off the banana!", 2f);
             AudioSource.PlayClipAtPoint(FunSounds.SlideDown, at, 0.9f);
         }
 
@@ -192,7 +190,6 @@ namespace PleaseDontDrown.Fun
         {
             if (hitched) PlayerHud.ShowToast($"The banana boat is hitched to <b>{driver}</b>'s jet ski. Someone hop on the banana!", 2.5f);
             else PlayerHud.ShowToast("The banana boat is untied.", 2f);
-            FloatingText.Spawn(_nose.position + Vector3.up * 0.6f, hitched ? "HITCHED!" : "UNTIED", new Color(1f, 0.95f, 0.4f), 1f, 1.5f);
         }
     }
 }

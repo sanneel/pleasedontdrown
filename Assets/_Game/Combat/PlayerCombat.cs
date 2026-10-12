@@ -243,8 +243,6 @@ namespace PleaseDontDrown.Combat
         private void PlayHit(Vector3 point, bool blade = false)
         {
             if (_audio != null) _audio.PlayOneShot(blade ? ProceduralAudio.Stab : ProceduralAudio.Punch, 1f);
-            string word = blade ? (Random.value < 0.5f ? "SHNK!" : "STAB!") : Random.value < 0.5f ? "WHAP!" : "BOP!";
-            FloatingText.Spawn(point + Vector3.up * 0.2f, word, blade ? new Color(1f, 0.35f, 0.3f) : new Color(1f, 0.85f, 0.3f), 0.8f, 0.8f);
         }
 
         private void PlaySwish()
@@ -268,7 +266,6 @@ namespace PleaseDontDrown.Combat
             LastKnockedTime = Time.time;
             if (GodMode.On) return; // god mode: nothing knocks you about
             if (_hub.Motor != null && _hub.Motor.Seat == null) _hub.Motor.AddImpulse(velocity);
-            PlayerHud.ShowToast(string.IsNullOrEmpty(byWhom) ? "OOF!" : $"OOF! {byWhom} got you.", 1.5f);
         }
 
         [ObserversRpc]

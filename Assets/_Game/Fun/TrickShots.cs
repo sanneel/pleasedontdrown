@@ -8,17 +8,14 @@ using UnityEngine;
 namespace PleaseDontDrown.Fun
 {
     /// <summary>
-    /// The pay for the other half of the loop (host): fish a tourist out of the sea, then throw them back for a bonus.
-    /// Watches every tourist someone throws and every lifeguard who sails through the air (thrown by a friend, fired
-    /// from the cannon, flung off a vehicle) and, when they land, pays the team by distance, height and splash.
-    /// Nothing here knows about islands or the story, so the same shot pays on every island, in the story or after it.
-    /// A tourist you keep re-throwing pays less each time, so the sea is not an infinite money machine.
+    /// Tracks flights (host): every tourist someone throws and every lifeguard who sails through the air (thrown by a
+    /// friend, fired from the cannon, flung off a vehicle), and logs distance, height and splash when they land.
+    /// It used to pay and announce "LONG SHOT!"; the team removed that (2026-10-12), so it's only a test log now.
     /// </summary>
     public class TrickShots : MonoBehaviour
     {
         private const float TouristSpeed = 7f, PlayerSpeed = 9f;   // m/s measured from movement: fast enough that somebody must have launched it
         private const float MinDistance = 12f, LandedSpeed = 2.5f, MaxAir = 25f, TeleportJump = 6f;
-        private const int MaxPay = 150;
 
         private class Flight
         {
@@ -137,20 +134,10 @@ namespace PleaseDontDrown.Fun
                 _repeats[victim] = (shots + 1, Time.time);
                 share = Mathf.Max(0.3f, 1f / (1f + 0.35f * shots));
             }
-            int pay = Mathf.Clamp(Mathf.RoundToInt(raw * share), 5, MaxPay);
-            string tier = distance >= 45f ? "ORBITAL!" : distance >= 30f ? "TRICKSHOT!" : distance >= 20f ? "LONG SHOT!" : "NICE THROW!";
-            string who = victim != null
-                ? $"{(thrower != null ? thrower.DisplayName : "Somebody")} sent {name} flying"
-                : $"{name} flew";
-            string text = $"<color=#ffd060><b>{tier}</b></color> {who} {distance:F0} m" +
-                          $"{(height >= 6f ? $", {height:F0} m up" : "")}{(splash ? " into the sea" : "")}! +${pay}";
-            Debug.Log($"[Trickshot] {who}: {distance:F1} m, {height:F1} m up, {air:F1} s, splash {splash}, +${pay}");
-            if (Economy.Instance != null) Economy.Instance.ServerAdd(pay, "trickshot", at + Vector3.up * 1.2f);
-            if (RescueService.Instance != null)
-            {
-                RescueService.Instance.ServerAnnounce(text);
-                RescueService.Instance.ServerCallout(at, $"+${pay}", pay >= 60);
-            }
+            // No pay and nothing on screen (the team, 2026-10-12: stunt money and "LONG SHOT! X flew 21 m" lines are
+            // clutter). The flight is only logged, for tests.
+            string who = victim != null ? $"{(thrower != null ? thrower.DisplayName : "Somebody")} threw {name}" : $"{name} flew";
+            Debug.Log($"[Trickshot] {who}: {distance:F1} m, {height:F1} m up, {air:F1} s, splash {splash}, score {raw * share:F0}");
         }
     }
 }

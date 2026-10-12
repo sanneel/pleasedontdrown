@@ -93,6 +93,15 @@ namespace PleaseDontDrown.Player
             _animator.Play(gesture, point);
         }
 
+        /// <summary>Kneel beside a chest as for CPR, without pressing it (the defibrillator's shock).</summary>
+        public void OnKneel(Vector3 chest, Vector3 head = default, float reach = 0.55f)
+        {
+            _lastPumpTime = Time.time;
+            _cprPoint = chest;
+            _kneelPoint = Rescue.VictimBody.KneelSpot(chest, head);
+            _kneelReach = reach;
+        }
+
         /// <summary>A CPR compression by this player on a chest at <paramref name="chest"/>.</summary>
         public void OnPump(Vector3 chest, Vector3 head = default, float reach = 0.55f)
         {
@@ -156,6 +165,7 @@ namespace PleaseDontDrown.Player
             if (hands != null)
             {
                 m.Basketball = hands.HeldItem != null && hands.HeldItem.GetComponent<Fun.BasketballDribble>() != null;
+                m.Defib = hands.HeldItem != null && hands.HeldItem.GetComponent<Combat.DefibPaddles>() != null;
                 PlayerHands.GripKind grip = hands.GetGrip(out m.GripLeft, out m.GripRight);
                 m.Holding = grip != PlayerHands.GripKind.None;
                 m.TwoHanded = grip == PlayerHands.GripKind.TwoHands;
@@ -228,9 +238,25 @@ namespace PleaseDontDrown.Player
         }
 
         /// <summary>
-        /// The cannon: stuffed up the barrel, the head and both hands sticking out of the muzzle (for everyone, whatever
-        /// the body's network position is doing); or pushing it about, both hands on its push bar.
+        /// The cannon: stuffed down the barrel, out of sight (the team, 2026-10-12: a body sticking out of the muzzle
+        /// looked wrong); or pushing it about, both hands on its push bar.
         /// </summary>
+        private Renderer[] _hiddenInCannon;
+
+        private void HideInCannon(bool hide)
+        {
+            if (hide == (_hiddenInCannon != null) || _rig == null) return;
+            if (hide)
+            {
+                _hiddenInCannon = System.Array.FindAll(_rig.GetComponentsInChildren<Renderer>(), r => r.enabled);
+                foreach (Renderer r in _hiddenInCannon) r.enabled = false;
+                return;
+            }
+            foreach (Renderer r in _hiddenInCannon)
+                if (r != null) r.enabled = true;
+            _hiddenInCannon = null;
+        }
+
         private void CannonPoses(ref AvatarMotion m)
         {
             if (Fun.HumanCannon.InBarrel(_hub, out Vector3 muzzle, out Quaternion rotation))
@@ -249,10 +275,12 @@ namespace PleaseDontDrown.Player
                 float s = _rig != null ? _rig.Scale : 1f;
                 _cannonBody = muzzle - rotation * Vector3.up * Mathf.Max(0.4f, eyes - 0.2f * s);
                 _inCannon = true;
+                HideInCannon(true);
                 return;
             }
             _animator.RootOverride = null;
             _inCannon = false;
+            HideInCannon(false);
             if (!m.Holding && Fun.HumanCannon.PushGrips(_hub, out HandGrip left, out HandGrip right))
             {
                 m.Holding = m.TwoHanded = true;

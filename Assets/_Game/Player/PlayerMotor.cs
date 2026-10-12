@@ -85,6 +85,10 @@ namespace PleaseDontDrown.Player
         private float _lastGroundedTime = float.NegativeInfinity;
         private float _lastJumpTime = float.NegativeInfinity;
         private float _controlLossUntil = float.NegativeInfinity;
+        private const float LaunchGravityShare = 0.25f;
+        private float _launchGravity = LaunchGravityShare;
+        private bool _launched;                  // fired from the cannon: a ballistic flight until we land
+        private float _launchedAt;
         private float _height;
         private Vector3 _groundNormal = Vector3.up;
         private Vector3 _spawnPoint;
@@ -218,6 +222,7 @@ namespace PleaseDontDrown.Player
             _lastJumpPressedTime = float.NegativeInfinity;
             _hopUntil = float.NegativeInfinity;
             _controlLossUntil = float.NegativeInfinity;
+            _launched = false;
             _height = _standHeight;
             if (vehicle != null)
             {
@@ -324,6 +329,26 @@ namespace PleaseDontDrown.Player
                 _lastJumpTime = Time.time; // airborne like a jump, so ground snapping doesn't eat the launch
         }
 
+        /// <summary>
+        /// Fired from the cannon or thrown: fly at this velocity until we land (no walking model braking us mid-air,
+        /// lighter gravity), so the flight goes as far as it looks. Ends on the ground, in the water or after 15 s.
+        /// </summary>
+        public void Launch(Vector3 velocity, float extraGravityShare = LaunchGravityShare)
+        {
+            if (_rb.isKinematic || GodMode.On) return;
+            _rb.linearVelocity = velocity;
+            _moveVelocity = new Vector3(velocity.x, 0f, velocity.z);
+            _launched = true;
+            _launchGravity = extraGravityShare;
+            _launchedAt = Time.time;
+            _controlLossUntil = Time.time + 0.3f;
+            IsGrounded = false;
+            _lastJumpTime = Time.time; // ground snapping must not eat the launch
+        }
+
+        /// <summary>In a cannon flight right now (see <see cref="Launch"/>).</summary>
+        public bool IsLaunched => _launched;
+
         // ------------------------------------------------------------------ input (per frame)
 
         private void Update()
@@ -365,6 +390,7 @@ namespace PleaseDontDrown.Player
             UpdateWater();
             if (IsSwimming)
             {
+                _launched = false;
                 SwimMove(dt);
                 Vector3 swum = _rb.linearVelocity;
                 _moveVelocity = new Vector3(swum.x, 0f, swum.z); // walking out of the water carries on from here
@@ -375,6 +401,7 @@ namespace PleaseDontDrown.Player
             bool wasGrounded = IsGrounded;
             float fallSpeed = -_rb.linearVelocity.y;
             GroundCheck();
+            if (_launched && ((IsGrounded && Time.time - _launchedAt > 0.3f) || Time.time - _launchedAt > 15f)) _launched = false;
             UpdateCrouch(dt);
 
             // Sprinting: holding sprint and moving (any direction), on the ground (or already sprinting when leaving
@@ -392,7 +419,7 @@ namespace PleaseDontDrown.Player
             }
 
             Vector3 v = _rb.linearVelocity;
-            bool knocked = Time.time < _controlLossUntil;
+            bool knocked = Time.time < _controlLossUntil || _launched;
             Vector3 input = _moveInput.sqrMagnitude > 1f ? (Vector3)_moveInput.normalized : (Vector3)_moveInput;
             Vector3 wish = Facing * new Vector3(input.x, 0f, input.y);
             if (knocked)
@@ -436,7 +463,8 @@ namespace PleaseDontDrown.Player
             }
             else
             {
-                vy -= _extraGravity * dt; // extra gravity, on the ground too (keeps us pressed to it)
+                // Extra gravity, on the ground too (keeps us pressed to it); a quarter of it on a cannon flight.
+                vy -= (_launched ? _extraGravity * _launchGravity : _extraGravity) * dt;
             }
 
             _rb.linearVelocity = new Vector3(horizontal.x, vy, horizontal.z);

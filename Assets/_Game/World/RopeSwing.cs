@@ -87,7 +87,6 @@ namespace PleaseDontDrown.World
                 yield return null;
             }
             if (player.Motor != null) player.Motor.Teleport(to);
-            PlayerHud.ShowToast("Wheee!", 1f);
             yield return new WaitForSeconds(0.3f);
             transform.SetPositionAndRotation(_restPosition, _restRotation);
             transform.localScale = _restScale;
