@@ -126,6 +126,17 @@ namespace PleaseDontDrown.Avatars
                 body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender or PirateGirl || body >= VariantFirst && body < VariantFirst + 48;
 
             public static byte PickVariant(System.Random rng, byte baseBody) => Variant(baseBody, rng.Next(VariantsPerBase + 1));
+
+            /// <summary>
+            /// A modelled body for a look that has none (body 0 = code-built, or a retired id): the goofy lifeguard for the
+            /// code-built lifeguard, else a tourist woman or the flowery-trunks dad, by the look's figure.
+            /// </summary>
+            public static byte Modelled(AvatarLook look)
+            {
+                if (look.Body == 0) return Goofy;
+                if (look.Feminine || IsFeminine(look.Body)) return TouristWomen[(look.Skin + look.HairColor) % TouristWomen.Length];
+                return TouristBuddy;
+            }
         }
 
         public static readonly string[] BuildNames = { "Slim", "Regular", "Broad", "Round" };

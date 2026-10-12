@@ -1505,16 +1505,21 @@ namespace PleaseDontDrown.Avatars
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kneeUp ? 85f : 4f, 0f, 0f), w);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(kneeUp ? -40f : -45f, 0f, 0f), w);
                 }
-                // Hands under the back of the head, elbows out to the sides. By IK: the fixed forearm bend above
-                // folded the hands forward, onto the face, on bodies with other arm lengths (the Meshy ones).
-                Transform head = B(Bone.Head);
+                // Arms resting on the towel beside the body, a hand's width clear of it, palms down. (Hands under the
+                // head looked lazier, but the round dads' and the Meshy girls' arms don't reach round their big heads:
+                // the hands stopped half way, in the chest or the belly. The team, 2026-10-12: no more of that.)
                 float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
-                // Elbows out and a little up off the ground: flat on it, the arms swung so far back that the armpits
-                // stretched thin.
-                Vector3 nape = head.position + head.up * (0.1f * s) - head.forward * (0.08f * s);
                 Vector3 across = B(Bone.Chest).right;
-                IK.Solve(upperL, foreL, la, lb, nape - across * (0.04f * s), -across + head.up * 0.4f + head.forward * 0.35f, w, false);
-                IK.Solve(upperR, foreR, la, lb, nape + across * (0.04f * s), across + head.up * 0.4f + head.forward * 0.35f, w, false);
+                float half = 0.5f * Vector3.Distance(upperL.position, upperR.position);
+                float clear = half * 1.25f + 0.12f * s; // past the widest of a big belly
+                Vector3 toFeet = Vector3.ProjectOnPlane(hips.position - B(Bone.Head).position, Vector3.up);
+                toFeet = toFeet.sqrMagnitude > 1e-4f ? toFeet.normalized : -transform.forward;
+                float ground = transform.position.y + 0.05f * s;
+                Vector3 handL = hips.position - across * clear + toFeet * (0.04f * s);
+                Vector3 handR = hips.position + across * clear + toFeet * (0.04f * s);
+                handL.y = handR.y = Mathf.Max(ground, hips.position.y - 0.06f * s);
+                IK.Solve(upperL, foreL, la, lb, handL, -across + Vector3.up * 0.3f, w, false);
+                IK.Solve(upperR, foreR, la, lb, handR, across + Vector3.up * 0.3f, w, false);
             }
 
             if (_carried > 0.01f)
