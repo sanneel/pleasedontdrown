@@ -50,7 +50,7 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | B7 | Sand texture prettier (islands 1 and 2) | **done** (Shako) — island 3's sand scan (ripples, grain) on the shared beach ground, darker wet sand from the waterline down (`TeamBSandBatch`, material `BeachSand`) |
 | B8 | Island 2 smaller (more fun) | **done** (Shako) — 360 x 260 m cut to 180 x 110 m (x -95..85, z -330..-220); the hotel, bar, dock and north beach did not move; room behind the hotel for B9, B10, B13 (`TeamBShrinkIsland2Batch`) |
 | B9 | Island 2: pool | **done** (Shako) — east of the hotel, 16 x 10 m, 2.2 m deep; the ground is dug out so the sea's own water fills it (swimming, drowning, rescues work as in the sea); tiled walls, steps at the west end, paved deck, 6 loungers + parasols (`TeamBPoolBatch`). The water is 1.85 m below the deck (the island is raised 1.5 m): a sunken pool |
-| B10 | Island 2: golf cart road | open |
+| B10 | Island 2: golf cart road | **done** (Shako) — 3.5 m paved road in a U (hotel front-west → past the bar → round the back → the pool), kerbs, dashed line, parking bays `CartParkingHotel` and `CartParkingPool` (markers for A9/C11), no colliders (it lies on the sand) (`TeamBCartRoadBatch`) |
 | B11 | Island 2: bar restyle (look only; orders are A6) | open |
 | B12 | Island 2: casino interior (Tripo tables/chandelier already in `Art/Tripo/Island2/`) | open |
 | B13 | Island 2: gun shop | open |

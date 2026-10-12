@@ -253,14 +253,14 @@ namespace PleaseDontDrown.Editor
                     new Vector3(0.06f, 0.5f, 0.06f), GetMaterial("Chrome", new Color(0.85f, 0.87f, 0.9f), 0.9f, 0.85f), keepCollider: false);
 
             // A paved deck round the pool, loungers with parasols on the long sides.
-            // The paving: four slabs round the tiled walls (not over the water).
+            // The paving: four slabs round the tiled walls, solid down into the sand (a raised terrace where it slopes).
             const float pave = 4f;
             foreach ((string n, Vector3 c, Vector3 s) in new[]
             {
-                ("DeckNorth", new Vector3(o.center.x, deck + 0.03f, o.yMax + pave * 0.5f), new Vector3(o.width + pave * 2f, 0.06f, pave)),
-                ("DeckSouth", new Vector3(o.center.x, deck + 0.03f, o.yMin - pave * 0.5f), new Vector3(o.width + pave * 2f, 0.06f, pave)),
-                ("DeckWest", new Vector3(o.xMin - pave * 0.5f, deck + 0.03f, o.center.y), new Vector3(pave, 0.06f, o.height)),
-                ("DeckEast", new Vector3(o.xMax + pave * 0.5f, deck + 0.03f, o.center.y), new Vector3(pave, 0.06f, o.height)),
+                ("DeckNorth", new Vector3(o.center.x, (deck - 0.54f) * 0.5f, o.yMax + pave * 0.5f), new Vector3(o.width + pave * 2f, deck + 0.66f, pave)),
+                ("DeckSouth", new Vector3(o.center.x, (deck - 0.54f) * 0.5f, o.yMin - pave * 0.5f), new Vector3(o.width + pave * 2f, deck + 0.66f, pave)),
+                ("DeckWest", new Vector3(o.xMin - pave * 0.5f, (deck - 0.54f) * 0.5f, o.center.y), new Vector3(pave, deck + 0.66f, o.height)),
+                ("DeckEast", new Vector3(o.xMax + pave * 0.5f, (deck - 0.54f) * 0.5f, o.center.y), new Vector3(pave, deck + 0.66f, o.height)),
             })
                 Primitive(PrimitiveType.Cube, n, root, c, s, stone);
             foreach (float side in new[] { -1f, 1f })
@@ -280,6 +280,82 @@ namespace PleaseDontDrown.Editor
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
             Debug.Log($"[TeamB] PASS: pool built (deck {deck:0.00}, water {WaterLevel}, floor {PoolFloor}, {steps} steps)");
+        }
+
+        // ---------------------------------------------------------------- B10: island 2's golf cart road
+
+        // A 3.5 m cart road in a U: from beside the hotel's front, west past the bar, round the back of the island and
+        // up to the pool's south side. Paved in 2 m tiles laid on the sand (they follow the ground), a dashed middle line,
+        // and a parking bay with a marker at each end (CartParkingHotel, CartParkingPool) for the golf cart (A9, C11).
+        private static readonly Vector2[] CartRoad =
+        {
+            new(-12f, -235f), new(-70f, -235f), new(-70f, -306f), new(62f, -306f), new(62f, -268f), new(50f, -268f),
+        };
+        private const float CartRoadWidth = 3.5f;
+
+        /// <summary>Batch: lays the cart road and its parking bays on island 2.</summary>
+        public static void TeamBCartRoadBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform env = GameObject.Find("Environment").transform;
+            if (env.Find("Island2CartRoad") is { } old) Object.DestroyImmediate(old.gameObject);
+            var root = new GameObject("Island2CartRoad").transform;
+            root.SetParent(env, false);
+            Material paving = GetMaterial("CartRoad", new Color(0.66f, 0.63f, 0.58f), smoothness: 0.15f);
+            Material kerb = GetMaterial("CartRoadKerb", new Color(0.93f, 0.91f, 0.86f), smoothness: 0.2f);
+            Material paint = GetMaterial("CartRoadPaint", new Color(0.97f, 0.96f, 0.9f), smoothness: 0.3f);
+            int tiles = 0;
+            for (int s = 0; s < CartRoad.Length - 1; s++)
+            {
+                Vector2 a = CartRoad[s], b = CartRoad[s + 1];
+                Vector2 dir = (b - a).normalized;
+                float length = (b - a).magnitude;
+                // Run each leg on half a road width past its corners, so the corners are filled.
+                float from = s == 0 ? 0f : -CartRoadWidth * 0.5f, to = s == CartRoad.Length - 2 ? length : length + CartRoadWidth * 0.5f;
+                Quaternion yaw = Quaternion.LookRotation(new Vector3(dir.x, 0f, dir.y));
+                for (float d = from; d < to - 0.01f; d += 2f)
+                {
+                    float piece = Mathf.Min(2f, to - d);
+                    Vector2 c = a + dir * (d + piece * 0.5f);
+                    float ground = GroundUnder(new Vector3(c.x, 0f, c.y));
+                    // A slab from under the sand up to 4 cm proud of it; kerbs either side.
+                    GameObject tile = Primitive(PrimitiveType.Cube, "Paving", root, new Vector3(c.x, ground - 0.13f, c.y),
+                        new Vector3(CartRoadWidth, 0.34f, piece + 0.02f), paving, keepCollider: false);
+                    tile.transform.rotation = yaw;
+                    bool corner = (s > 0 && d < CartRoadWidth * 0.5f) || (s < CartRoad.Length - 2 && d + piece > length - CartRoadWidth * 0.5f);
+                    if (!corner)
+                    foreach (float side in new[] { -1f, 1f })
+                    {
+                        Vector3 edge = new Vector3(c.x, 0f, c.y) + yaw * Vector3.right * side * (CartRoadWidth * 0.5f + 0.1f);
+                        Primitive(PrimitiveType.Cube, "Kerb", root, new Vector3(edge.x, ground - 0.1f, edge.z), new Vector3(0.2f, 0.36f, piece + 0.02f), kerb, keepCollider: false)
+                            .transform.rotation = yaw;
+                    }
+                    if (Mathf.Repeat(d, 4f) < 1f && d > 0f && d < length - 2f)
+                        Primitive(PrimitiveType.Cube, "Dash", root, new Vector3(c.x, ground + 0.045f, c.y), new Vector3(0.15f, 0.01f, 1.2f), paint, keepCollider: false)
+                            .transform.rotation = yaw;
+                    tiles++;
+                }
+            }
+            // Parking bays: a widened pad with white bay lines and a marker where a cart waits.
+            ParkingBay(root, "CartParkingHotel", CartRoad[0], (CartRoad[0] - CartRoad[1]).normalized, paving, paint);
+            ParkingBay(root, "CartParkingPool", CartRoad[^1], (CartRoad[^1] - CartRoad[^2]).normalized, paving, paint);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[TeamB] PASS: cart road laid ({tiles} tiles, {CartRoad.Length - 1} legs)");
+        }
+
+        private static void ParkingBay(Transform root, string name, Vector2 end, Vector2 outward, Material paving, Material paint)
+        {
+            var bay = new GameObject(name).transform;
+            bay.SetParent(root, false);
+            Vector2 c = end + outward * 2.5f;
+            float ground = GroundUnder(new Vector3(c.x, 0f, c.y));
+            bay.position = new Vector3(c.x, ground + 0.05f, c.y);
+            bay.rotation = Quaternion.LookRotation(new Vector3(-outward.x, 0f, -outward.y)); // a parked cart faces back up the road
+            Primitive(PrimitiveType.Cube, "BayPaving", bay, new Vector3(0f, -0.18f, 0f), new Vector3(7f, 0.34f, 5f), paving, keepCollider: false);
+            foreach (float x in new[] { -3.4f, 0f, 3.4f })
+                Primitive(PrimitiveType.Cube, "BayLine", bay, new Vector3(x, 0f, 0f), new Vector3(0.12f, 0.01f, 4.6f), paint, keepCollider: false);
         }
 
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2

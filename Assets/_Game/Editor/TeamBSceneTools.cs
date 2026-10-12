@@ -87,6 +87,26 @@ namespace PleaseDontDrown.Editor
             Debug.Log("[TeamB] bounds report written");
         }
 
+        /// <summary>Terrain heights over PDD_BOX ("minx maxx minz maxz step") as a text grid, to PDD_DUMP.</summary>
+        public static void HeightGrid()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            float[] b = System.Environment.GetEnvironmentVariable("PDD_BOX").Split(' ')
+                .Select(s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            var terrain = GameObject.Find("Environment/BeachTerrain").GetComponent<MeshCollider>();
+            var sb = new StringBuilder("z\\x");
+            for (float x = b[0]; x <= b[1]; x += b[4]) sb.Append($"{x,6:0}");
+            sb.Append('\n');
+            for (float z = b[3]; z >= b[2]; z -= b[4])
+            {
+                sb.Append($"{z,5:0}");
+                for (float x = b[0]; x <= b[1]; x += b[4])
+                    sb.Append(terrain.Raycast(new Ray(new Vector3(x, 100f, z), Vector3.down), out RaycastHit hit, 200f) ? $"{hit.point.y,6:0.0}" : "     -");
+                sb.Append('\n');
+            }
+            File.WriteAllText(System.Environment.GetEnvironmentVariable("PDD_DUMP"), sb.ToString());
+        }
+
         private static void Dump(Transform t, string parent, StringBuilder sb)
         {
             string path = parent.Length == 0 ? t.name : parent + "/" + t.name;
