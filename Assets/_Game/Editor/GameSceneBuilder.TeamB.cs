@@ -814,6 +814,96 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[TeamB] PASS: C5 gate shut at {gate.position}, sewer exit at {exit.position}");
         }
 
+        /// <summary>Batch: C6, the jungle bigger: a 14 m band of trees, bushes and ferns all round its edge (same models
+        /// and rules as BuildIsland3Jungle), clear of the roads, the river, the falls, the castle, the houses, the tavern,
+        /// the gun stall and the night arrival; then everything settles onto the ground (SettleIsland3Plants).</summary>
+        public static void TeamCJungleBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform island = FindByPath("Environment/Island3") ?? throw new InvalidOperationException("No island 3");
+            Transform jungle = island.Find("Jungle");
+            const float Band = 14f;
+            // What stands on the island and must stay clear (their drawn boxes, 3 m round).
+            var keepClear = new List<Bounds>();
+            foreach (string group in new[] { "PirateVillage", "PirateTavern", "PirateCastle", "Story", "NightArrival", "CragFalls", "GoldVault", "PirateDock" })
+                if (island.Find(group) is { } g)
+                    foreach (Transform t in g)
+                    {
+                        if (t.name == "VillageDressing") { foreach (Transform d in t) Add(d); continue; }
+                        Add(t);
+                    }
+            void Add(Transform t)
+            {
+                var rs = t.GetComponentsInChildren<Renderer>();
+                if (rs.Length == 0) { keepClear.Add(new Bounds(t.position, new Vector3(4f, 4f, 4f))); return; }
+                Bounds b = rs[0].bounds;
+                foreach (Renderer r in rs) b.Encapsulate(r.bounds);
+                if (b.size.x > 60f || b.size.z > 60f) return; // a whole group, not one thing
+                b.Expand(new Vector3(6f, 0f, 6f));
+                keepClear.Add(b);
+            }
+            var trees = new List<Vector2>(); var bushes = new List<Vector2>(); var ferns = new List<Vector2>();
+            foreach (Transform t in jungle)
+            {
+                var p = new Vector2(t.position.x, t.position.z);
+                if (t.name.Contains("tree") || t.name.Contains("palm")) trees.Add(p);
+                else if (t.name.Contains("bush")) bushes.Add(p); else ferns.Add(p);
+            }
+            int before = jungle.childCount;
+            bool Near(List<Vector2> list, Vector2 p, float d) => list.Any(q => (q - p).sqrMagnitude < d * d);
+            float EdgeDistance(Vector2 p) => JunglePolygons.Min(poly => DistanceToLine(p, poly.Append(poly[0]).ToArray()));
+            var rng = new System.Random(6611);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+            float minX = JunglePolygons.SelectMany(q => q).Min(q => q.x) - Band, maxX = JunglePolygons.SelectMany(q => q).Max(q => q.x) + Band;
+            float minZ = JunglePolygons.SelectMany(q => q).Min(q => q.y) - Band, maxZ = JunglePolygons.SelectMany(q => q).Max(q => q.y) + Band;
+            int addedTrees = 0, addedBushes = 0, addedFerns = 0;
+            for (int i = 0; i < 40000; i++)
+            {
+                int kind = i < 15000 ? 0 : i < 27000 ? 1 : 2;
+                if ((kind == 0 && addedTrees >= 70) || (kind == 1 && addedBushes >= 120) || (kind == 2 && addedFerns >= 150)) continue;
+                var p = new Vector2(R(minX, maxX), R(minZ, maxZ));
+                if (InJungle(p) || EdgeDistance(p) > Band) continue;
+                float h = BeachHeight(p.x, p.y);
+                if (h < 0.4f || h > 26f) continue;
+                float boxOut = BoxDistanceOut(p.x, p.y, Island3Center, Island3HalfSize, Island3CornerRadius);
+                if (Island3Shore(p.x, p.y, boxOut) < 8f) continue;
+                if (DistanceToLine(p, Island3River) < 5f || Vector2.Distance(p, Island3Spring) < 10f || InCragFalls(p, 4f)) continue;
+                if (DistanceToLine(p, Island3Stream) < 4f) continue;
+                if (BoxDistanceOut(p.x, p.y, CastleCenter, CastleHalf, 0f) < 6f) continue;
+                if (keepClear.Any(b => p.x > b.min.x && p.x < b.max.x && p.y > b.min.z && p.y < b.max.z)) continue;
+                float road = DistanceToRoads(p);
+                var feet = new Vector3(p.x, h - 0.1f, p.y);
+                float yaw = R(0f, 360f);
+                if (kind == 0)
+                {
+                    if (road < 4.5f || Near(trees, p, 5.5f)) continue;
+                    GameObject tree = TripoModel("jungle_tree", jungle, feet, yaw, Vector3.one * R(0.8f, 1.3f));
+                    if (tree == null) break;
+                    var trunk = tree.AddComponent<CapsuleCollider>();
+                    trunk.height = 6f; trunk.radius = 0.35f; trunk.center = Vector3.up * 3f;
+                    trees.Add(p); addedTrees++;
+                }
+                else if (kind == 1)
+                {
+                    if (road < 2.6f || Near(trees, p, 1.8f) || Near(bushes, p, 2.8f)) continue;
+                    if (TripoModel("jungle_bush", jungle, feet, yaw, Vector3.one * R(0.8f, 1.6f)) == null) break;
+                    bushes.Add(p); addedBushes++;
+                }
+                else
+                {
+                    if (road < 2.2f || Near(trees, p, 1.2f) || Near(bushes, p, 1.5f) || Near(ferns, p, 1.5f)) continue;
+                    if (TripoModel("jungle_fern", jungle, feet, yaw, Vector3.one * R(0.8f, 1.5f)) == null) break;
+                    ferns.Add(p); addedFerns++;
+                }
+            }
+            SettleIsland3Plants(island, dryRun: false);
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island3");
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[TeamB] PASS: C6 jungle {before} -> {jungle.childCount} plants (+{addedTrees} trees, +{addedBushes} bushes, +{addedFerns} ferns)");
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
