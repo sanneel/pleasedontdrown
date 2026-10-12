@@ -27,7 +27,9 @@ namespace PleaseDontDrown.Editor
         // Armchairs measured from the bar model (side render of the LOD2 GLB, bar space): x = +/-10.36, two per table.
         // Each faces its table: (chair z, table z).
         private static readonly (float chair, float table)[] BarTableChairs = { (2.47f, 4.02f), (5.58f, 4.02f), (-4.55f, -3.12f), (-1.7f, -3.12f) };
-        private const float BarTableX = 10.36f, ArmchairSeat = 0.84f, BarTableTop = 0.74f;
+        /// <summary>A bar stool's seat point: on the cushion, a little back from the counter (on the middle the knees went into it).</summary>
+        private static readonly Vector3 StoolSeat = new(0f, StoolCushion + 0.13f, -0.16f);
+        private const float BarTableX = 10.36f, ArmchairSeat = 0.9f, BarTableTop = 0.74f;
 
         /// <summary>What the hotel bar sells (item, label, price).</summary>
         private static readonly (string item, string label, int price)[] HotelBarMenu =
@@ -66,6 +68,11 @@ namespace PleaseDontDrown.Editor
 
             List<Object> seats = AddBarTables(bar, hotel, barista);
             SetHotelBarMenu(barista);
+            // The stools' seats, back from the counter (stools built before this keep their old spot otherwise).
+            Transform stoolRoot = hotel.Find("HotelBarStools");
+            if (stoolRoot != null)
+                foreach (Transform stool in stoolRoot)
+                    if (stool.Find("Seat") is { } stoolSeat) stoolSeat.localPosition = StoolSeat;
             AddBlackjackGame();
             AddGolfCart(bar, hotel);
             AssignSceneIds(scene); // the new seats and the card table are networked scene objects
@@ -237,7 +244,7 @@ namespace PleaseDontDrown.Editor
             box.size = new Vector3(1.5f, 0.78f, 1.35f);
             var seat = new GameObject("Seat").transform;
             seat.SetParent(go.transform, false);
-            seat.localPosition = new Vector3(0f, ArmchairSeat, -0.08f); // the cushion top, back against the backrest (the hips sit right on it: AvatarMotion.ChairSeat)
+            seat.localPosition = new Vector3(0f, ArmchairSeat, 0.15f); // on the cushion (0.82 high, measured), near its front edge (0.38 ahead) so the knees bend over it: further back the short legs went into the cushion
             var serve = new GameObject("ServePoint").transform;
             serve.SetParent(bar, false);
             serve.localPosition = serveLocal;

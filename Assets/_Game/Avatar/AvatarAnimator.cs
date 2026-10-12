@@ -701,7 +701,8 @@ namespace PleaseDontDrown.Avatars
                 // into the bar's big armchairs, only the head showing over them).
                 seatedHip.y = Motion.FloatSeat || Motion.ChairSeat ? 0.5f : seatedHip.y - 0.4f * s;
                 hips.localPosition = Vector3.Lerp(hips.localPosition, seatedHip, _seat);
-                hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(8f, 0f, 0f), _seat);
+                // (On a chair: upright, not leaning back off the seat as on a jet ski.)
+                hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(Motion.ChairSeat ? 0f : 8f, 0f, 0f), _seat);
                 if (Motion.Straddle) // leaning on toward the handle in front, like on a horse
                     B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(14f, 0f, 0f), _seat);
             }

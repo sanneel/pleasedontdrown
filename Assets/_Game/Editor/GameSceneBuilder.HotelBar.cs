@@ -152,7 +152,7 @@ namespace PleaseDontDrown.Editor
             box.size = new Vector3(0.5f, StoolCushion, 0.5f);
             var seat = new GameObject("Seat").transform;
             seat.SetParent(go.transform, false);
-            seat.localPosition = new Vector3(0f, StoolCushion + 0.08f, 0f);
+            seat.localPosition = StoolSeat;
             // In front of the stool, on the counter (front row: 0.4 m forward; sides: over the side counter).
             var serve = new GameObject("ServePoint").transform;
             serve.SetParent(go.transform, false);

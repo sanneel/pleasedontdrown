@@ -322,6 +322,24 @@ namespace PleaseDontDrown.Editor
                 m.GripRight = new HandGrip(rideR.position, rideR.forward, -rideR.up, HandPose.Fist);
                 pose = "ride";
             }
+            // "seat:Name": on that chair, stool or cart seat exactly as in the game (Vehicle.GlueDriver: feet half a metre
+            // under the seat point; a chair's hips sit on it: AvatarMotion.ChairSeat). The x y z yaw given are ignored.
+            if (pose.StartsWith("seat:") && GameObject.Find(pose.Substring(5)) is { } chairGo)
+            {
+                Transform chair = chairGo.transform, seatPoint = chair.Find("Seat") ?? chair;
+                yaw = chair.eulerAngles.y;
+                forward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+                go.transform.SetPositionAndRotation(seatPoint.position - Vector3.up * 0.5f, Quaternion.Euler(0f, yaw, 0f));
+                m.FacingYaw = yaw;
+                m.Seated = m.ChairSeat = true;
+                if (chair.Find("GripLeft") is { } wl && chair.Find("GripRight") is { } wr)
+                {
+                    m.Holding = m.TwoHanded = true;
+                    m.GripLeft = new HandGrip(wl.position, wl.forward, -wl.up, HandPose.Fist);
+                    m.GripRight = new HandGrip(wr.position, wr.forward, -wr.up, HandPose.Fist);
+                }
+                pose = "ride";
+            }
             switch (pose)
             {
                 case "walk": m.Velocity = forward * 2.2f; break;
