@@ -358,6 +358,104 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "BayLine", bay, new Vector3(x, 0f, 0f), new Vector3(0.12f, 0.01f, 4.6f), paint, keepCollider: false);
         }
 
+        // ---------------------------------------------------------------- B11: the hotel bar's look
+
+        /// <summary>Batch: the beach bar dressed in the hotel's colours (teal, cream, gold): a "CORAL BAR" sign under the
+        /// front beam, warm string lights along the eaves, palm planters at the deck's corners. Look only: the bar model,
+        /// its colliders, the barista and the serving spots are untouched (orders are A6).</summary>
+        public static void TeamBBarLookBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform bar = FindByPath("Environment/Hotel/HotelBeachBar") ?? throw new InvalidOperationException("No hotel bar");
+            if (bar.Find("BarDress") is { } old) Object.DestroyImmediate(old.gameObject);
+            var root = new GameObject("BarDress").transform;
+            root.SetParent(bar, false);
+            root.position = Vector3.zero; root.rotation = Quaternion.identity; root.localScale = Vector3.one;
+
+            Bounds model = RendererBounds(bar.Find("ColouredTripoBar"));
+            float deckTop = RendererBounds(bar.Find("DeckSkirt")).max.y;
+            Bounds deckBox = RendererBounds(bar.Find("DeckSkirt"));
+            float front = deckBox.max.z, back = deckBox.min.z, west = deckBox.min.x, east = deckBox.max.x, mid = model.center.x;
+            float beam = deckTop + 3.35f; // under the front and back beams (the model's posts carry them about 3.5 m up)
+            // The eaves: find the roof's underside along the front from the model's colliders/renderers by a ray up.
+            float eave = deckTop + 3.1f;
+            if (Physics.Raycast(new Vector3(mid, deckTop + 0.5f, front - 1.2f), Vector3.up, out RaycastHit roofHit, 8f)) eave = roofHit.point.y - 0.15f;
+
+            Material teal = GetMaterial("CoralBarTeal", new Color(0.09f, 0.42f, 0.46f), smoothness: 0.45f);
+            Material gold = GetMaterial("CoralBarGold", new Color(1f, 0.78f, 0.38f), 1f, 0.78f);
+            Material wire = GetMaterial("CoralBarWire", new Color(0.08f, 0.07f, 0.06f));
+            Material[] bulbs =
+            {
+                GetMaterial("CoralBarBulbWarm", new Color(1f, 0.82f, 0.5f), emission: new Color(1f, 0.7f, 0.35f) * 2.2f),
+                GetMaterial("CoralBarBulbCoral", new Color(1f, 0.55f, 0.45f), emission: new Color(1f, 0.42f, 0.32f) * 2f),
+                GetMaterial("CoralBarBulbTeal", new Color(0.5f, 0.95f, 0.9f), emission: new Color(0.3f, 0.85f, 0.8f) * 1.8f),
+            };
+
+            // The sign: a teal board with a gold frame, hung under the front beam, lettering on both faces.
+            var sign = new GameObject("CoralBarSign").transform;
+            sign.SetParent(root, false);
+            sign.position = new Vector3(mid, eave - 0.55f, front - 0.6f);
+            Primitive(PrimitiveType.Cube, "Board", sign, Vector3.zero, new Vector3(4.2f, 0.85f, 0.12f), teal, keepCollider: false);
+            foreach ((Vector3 at, Vector3 size) in new[]
+            {
+                (new Vector3(0f, 0.45f, 0f), new Vector3(4.36f, 0.08f, 0.16f)), (new Vector3(0f, -0.45f, 0f), new Vector3(4.36f, 0.08f, 0.16f)),
+                (new Vector3(-2.14f, 0f, 0f), new Vector3(0.08f, 0.98f, 0.16f)), (new Vector3(2.14f, 0f, 0f), new Vector3(0.08f, 0.98f, 0.16f)),
+            })
+                Primitive(PrimitiveType.Cube, "Frame", sign, at, size, gold, keepCollider: false);
+            foreach (float x in new[] { -1.6f, 1.6f })
+                Primitive(PrimitiveType.Cylinder, "Chain", sign, new Vector3(x, 0.75f, 0f), new Vector3(0.03f, 0.3f, 0.03f), gold, keepCollider: false);
+            foreach (float face in new[] { 1f, -1f })
+            {
+                TextMesh text = WorldText(sign, "Lettering", new Vector3(0f, 0f, 0.07f * face), "CORAL BAR", 96, 0.045f, gold.color);
+                text.transform.localRotation = Quaternion.Euler(0f, face > 0 ? 180f : 0f, 0f);
+            }
+
+            // String lights along the front and back eaves: a sagging wire with bulbs every 0.9 m.
+            int bulbCount = 0;
+            foreach ((string name, float z) in new[] { ("LightsFront", front - 0.4f), ("LightsBack", back + 0.4f) })
+            {
+                var strand = new GameObject(name).transform;
+                strand.SetParent(root, false);
+                Vector3 a = new(west + 1f, beam, z), b = new(east - 1f, beam, z);
+                const int spans = 3; // sags between four hooks
+                for (int sp = 0; sp < spans; sp++)
+                {
+                    Vector3 p0 = Vector3.Lerp(a, b, sp / (float)spans), p1 = Vector3.Lerp(a, b, (sp + 1) / (float)spans);
+                    Vector3 Sag(float t) => Vector3.Lerp(p0, p1, t) + Vector3.down * (0.35f * 4f * t * (1f - t));
+                    int n = Mathf.Max(2, Mathf.RoundToInt((p1 - p0).magnitude / 0.9f));
+                    for (int i = 0; i < n; i++)
+                    {
+                        Vector3 q0 = Sag(i / (float)n), q1 = Sag((i + 1) / (float)n);
+                        GameObject seg = Primitive(PrimitiveType.Cylinder, "Wire", strand, (q0 + q1) * 0.5f, new Vector3(0.02f, (q1 - q0).magnitude * 0.5f, 0.02f), wire, keepCollider: false);
+                        seg.transform.up = (q1 - q0).normalized;
+                        Primitive(PrimitiveType.Sphere, "Bulb", strand, q0 + Vector3.down * 0.09f, Vector3.one * 0.13f, bulbs[bulbCount % bulbs.Length], keepCollider: false);
+                        bulbCount++;
+                    }
+                }
+            }
+            // Warm light from the strands at night (soft, no shadows).
+            foreach (float x in new[] { mid - 7f, mid, mid + 7f })
+            {
+                var lamp = new GameObject("StrandGlow").AddComponent<Light>();
+                lamp.transform.SetParent(root, false);
+                lamp.transform.position = new Vector3(x, beam - 0.6f, (front + back) * 0.5f);
+                lamp.type = LightType.Point; lamp.range = 9f; lamp.intensity = 1.2f; lamp.color = new Color(1f, 0.78f, 0.5f);
+                lamp.shadows = LightShadows.None;
+            }
+
+            // Palms in planters at the deck's four corners.
+            foreach (Vector3 corner in new[]
+            {
+                new Vector3(west + 1.3f, deckTop, front - 1.1f), new Vector3(east - 1.3f, deckTop, front - 1.1f),
+                new Vector3(west + 1.3f, deckTop, back + 1.1f), new Vector3(east - 1.3f, deckTop, back + 1.1f),
+            })
+                BeachProp(root, "CornerPlanter", "resort_planter", corner, 90f);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[TeamB] PASS: bar dressed (eave {eave:0.00}, deck {deckTop:0.00}, {bulbCount} bulbs)");
+        }
+
         // ---------------------------------------------------------------- B7: the sand of islands 1 and 2
 
         private static readonly Color BeachSandColour = new(0.96f, 0.87f, 0.67f);
