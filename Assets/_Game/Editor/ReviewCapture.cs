@@ -400,6 +400,7 @@ namespace PleaseDontDrown.Editor
                 AvatarAnimator.TimeOverride = 100f + i / 30f;
                 animator.Tick(1f / 30f);
             }
+            if (m.ChairSeat) LogSeatGap(go, rig);
             // "bottle" / "drink": a beer in the right hand as someone else sees it (BottleHold's remote offset from the
             // eyes, shrunk like PlayerHands does), or tipped up at the lips (PlayerHands' drinking), the hand on its grip.
             if (pose.StartsWith("bottle") || pose.StartsWith("drink"))
@@ -515,6 +516,33 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>Seat N of the banana boat in the scene (0 the front) and the handles its rider holds.</summary>
+        /// <summary>
+        /// A seated avatar: how far its bottom is above the seat point it was put on (negative: sunk into the seat), and
+        /// the lowest point of its thighs, from the posed mesh. (Seat point = root + 0.5 m.)
+        /// </summary>
+        private static void LogSeatGap(GameObject go, AvatarRig rig)
+        {
+            Vector3 seat = go.transform.position + Vector3.up * 0.5f;
+            Transform hips = rig[AvatarRig.Bone.Hips];
+            foreach (var skin in go.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (!skin.enabled || skin.sharedMesh == null) continue;
+                var baked = new Mesh();
+                skin.BakeMesh(baked, true);
+                float bottom = float.MaxValue, lowest = float.MaxValue;
+                foreach (Vector3 v in baked.vertices)
+                {
+                    Vector3 w = skin.transform.position + skin.transform.rotation * v; // (baked with its scale)
+                    lowest = Mathf.Min(lowest, w.y);
+                    Vector3 local = Quaternion.Inverse(go.transform.rotation) * (w - hips.position);
+                    // The seat of the pants: under the pelvis, not out along the thighs (forward) or the arms (sides).
+                    if (Mathf.Abs(local.x) < 0.14f && local.z < 0.06f && local.z > -0.25f && local.y < 0f) bottom = Mathf.Min(bottom, w.y);
+                }
+                Debug.Log($"[Review] seat gap ({skin.name}): bottom {(bottom - seat.y) * 100f:F1} cm above the seat point, lowest vertex {(lowest - seat.y) * 100f:F1}, hips bone {(hips.position.y - seat.y) * 100f:F1} cm");
+                Object.DestroyImmediate(baked);
+            }
+        }
+
         private static bool RideSeat(int index, out Transform seat, out Transform gripL, out Transform gripR)
         {
             seat = gripL = gripR = null;

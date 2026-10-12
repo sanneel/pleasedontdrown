@@ -256,6 +256,9 @@ namespace PleaseDontDrown.Avatars
             KeepHandsOutOfOthers();
             PoseFace();
             _rig.DriveShoulders();
+            // Sitting on a chair: measure the seat of the pants now the whole sitting pose is on (see SeatDrop).
+            if (_seatDropWanted && _seatDrop < 0f && MeasureSeatDrop(out float drop)) _seatDrop = drop;
+            _seatDropWanted = false;
         }
 
         /// <summary>
@@ -697,15 +700,62 @@ namespace PleaseDontDrown.Avatars
                 Vector3 seatedHip = _rig.RestPosition(Bone.Hips);
                 // The float's anchor is 0.5 m above the player root; match it
                 // independently of body height so short bodies do not sink into the ring.
-                // A chair's seat point is its cushion: the hips sit right on it (the vehicles' drop sank us 25 cm
-                // into the bar's big armchairs, only the head showing over them).
-                seatedHip.y = Motion.FloatSeat || Motion.ChairSeat ? 0.5f : seatedHip.y - 0.4f * s;
+                // A chair's seat point is its cushion top: the seat of the pants sits right on it. How far that is under
+                // the hip bone is measured on the posed body (the goofy lifeguard's round bottom: 24 cm).
+                seatedHip.y = Motion.ChairSeat ? 0.5f + SeatDrop() : Motion.FloatSeat ? 0.5f : seatedHip.y - 0.4f * s;
                 hips.localPosition = Vector3.Lerp(hips.localPosition, seatedHip, _seat);
                 // (On a chair: upright, not leaning back off the seat as on a jet ski.)
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(Motion.ChairSeat ? 0f : 8f, 0f, 0f), _seat);
                 if (Motion.Straddle) // leaning on toward the handle in front, like on a horse
                     B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(14f, 0f, 0f), _seat);
             }
+        }
+
+        private float _seatDrop = -1f;
+        private int _seatDropVersion = -1;
+        private int _seatDropFrames;
+        private bool _seatDropWanted;
+
+        /// <summary>
+        /// Sitting on a chair: how far the seat of the pants is below the hip bone, measured once per body on the mesh
+        /// as it sits (thighs forward), so the bottom rests on the cushion instead of in it. A guess until measured.
+        /// </summary>
+        private float SeatDrop()
+        {
+            if (_seatDropVersion != _rig.BuildVersion)
+            {
+                _seatDropVersion = _rig.BuildVersion;
+                _seatDrop = -1f;
+                _seatDropFrames = 0;
+            }
+            if (_seatDrop >= 0f) return _seatDrop;
+            // Measured at the end of the frame (the legs are posed after the hips), once the sitting pose is fully in.
+            if (_seat > 0.98f && ++_seatDropFrames > 3) _seatDropWanted = true;
+            return 0.2f * _rig.Scale;
+        }
+
+        private bool MeasureSeatDrop(out float drop)
+        {
+            drop = 0f;
+            SkinnedMeshRenderer body = null;
+            foreach (SkinnedMeshRenderer r in _rig.GetComponentsInChildren<SkinnedMeshRenderer>())
+                if (r.sharedMesh != null && (body == null || r.sharedMesh.vertexCount > body.sharedMesh.vertexCount)) body = r;
+            if (body == null) return false;
+            var baked = new Mesh();
+            body.BakeMesh(baked, true);
+            Transform hips = B(Bone.Hips);
+            float bottom = float.MaxValue;
+            Quaternion toLocal = Quaternion.Inverse(transform.rotation);
+            foreach (Vector3 v in baked.vertices)
+            {
+                Vector3 local = toLocal * (body.transform.position + body.transform.rotation * v - hips.position);
+                // The seat of the pants: under the pelvis, not out along the thighs (ahead) or the arms (to the sides).
+                if (Mathf.Abs(local.x) < 0.14f * _rig.Scale && local.z < 0.06f && local.z > -0.25f && local.y < 0f) bottom = Mathf.Min(bottom, local.y);
+            }
+            if (Application.isPlaying) Destroy(baked); else DestroyImmediate(baked);
+            if (bottom == float.MaxValue) return false;
+            drop = Mathf.Clamp(-bottom, 0.05f, 0.45f);
+            return true;
         }
 
         /// <summary>
@@ -1265,7 +1315,10 @@ namespace PleaseDontDrown.Avatars
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
                     // Astride something fat (a banana): like on a horse, thighs down and apart round it (not out in
                     // front as on a chair: that bunched the shorts up into a balloon), shins hanging down its sides.
-                    Quaternion thighPose = Motion.Straddle ? Quaternion.Euler(-30f, 0f, 58f * side) : Quaternion.Euler(-78f, 0f, 16f * side);
+                    // On a chair or stool the knees go a little apart: out past a round stool cushion's edge (straight
+                    // ahead the shins came down through it) and clear of the counter in front.
+                    Quaternion thighPose = Motion.Straddle ? Quaternion.Euler(-30f, 0f, 58f * side)
+                        : Quaternion.Euler(-78f, 0f, (Motion.ChairSeat ? 34f : 16f) * side);
                     Quaternion shinPose = Quaternion.Euler(Motion.Straddle ? 38f : 84f, 0f, Motion.Straddle ? -12f * side : 0f);
                     if (Motion.FloatSeat)
                     {

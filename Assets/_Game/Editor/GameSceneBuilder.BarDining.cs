@@ -28,8 +28,8 @@ namespace PleaseDontDrown.Editor
         // Each faces its table: (chair z, table z).
         private static readonly (float chair, float table)[] BarTableChairs = { (2.47f, 4.02f), (5.58f, 4.02f), (-4.55f, -3.12f), (-1.7f, -3.12f) };
         /// <summary>A bar stool's seat point: on the cushion, a touch forward so the knees clear its edge and the shins hang in front of it (further back they went through the cushion; the counter is 0.42 ahead).</summary>
-        private static readonly Vector3 StoolSeat = new(0f, StoolCushion + 0.13f, 0.04f);
-        private const float BarTableX = 10.36f, ArmchairSeat = 0.9f, BarTableTop = 0.74f;
+        private static readonly Vector3 StoolSeat = new(0f, StoolCushion - 0.01f, 0.0f); // the cushion top (1.13, measured): the bottom sits on it (AvatarAnimator.SeatDrop)
+        private const float BarTableX = 10.36f, ArmchairSeat = 0.83f, BarTableTop = 0.74f;
 
         /// <summary>What the hotel bar sells (item, label, price).</summary>
         private static readonly (string item, string label, int price)[] HotelBarMenu =
