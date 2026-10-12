@@ -841,6 +841,7 @@ namespace PleaseDontDrown.Story
             bool Match(string s) => s != null && s.IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0;
             if (part.Equals("tourist", StringComparison.OrdinalIgnoreCase) && VictimBrain.All.Count > 0) return VictimBrain.All[VictimBrain.All.Count - 1].transform;
             foreach (VictimBrain v in VictimBrain.All) if (Match(v.Name)) return v.transform;
+            foreach (Vehicle v in Vehicle.All) if (v.name.Equals(part, StringComparison.OrdinalIgnoreCase)) return v.transform; // "goto TableSeat3"
             foreach (Vehicle v in Vehicle.All) if (Match(v.DisplayName)) return v.transform;
             foreach (StoryNpc n in StoryNpc.All) if (Match(n.Name)) return n.transform;
             foreach (Creature c in Creature.All) if (Match(c.DisplayName)) return c.transform;

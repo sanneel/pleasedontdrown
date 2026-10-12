@@ -111,18 +111,8 @@ namespace PleaseDontDrown.Editor
                 seats.Add(BuildBarStool(stools, root, i, HotelBarStools[i].at, HotelBarStools[i].yaw, barista.GetComponent<Barista>()));
             var bar = barista.GetComponent<Barista>();
             SetRefs(bar, "_seats", seats.ToArray());
-            SetField(bar, "_menu", p =>
-            {
-                (string item, string label, int price)[] menu = { ("Fries", "Fries", 3), ("Cola", "Cola", 2), ("Beer", "Beer", 4), ("Cocktail", "Cocktail", 8) };
-                p.arraySize = menu.Length;
-                for (int i = 0; i < menu.Length; i++)
-                {
-                    SerializedProperty e = p.GetArrayElementAtIndex(i);
-                    e.FindPropertyRelative("Item").stringValue = menu[i].item;
-                    e.FindPropertyRelative("Label").stringValue = menu[i].label;
-                    e.FindPropertyRelative("Price").intValue = menu[i].price;
-                }
-            });
+            AddBarTables(root, hotel, bar); // the armchairs at the four tables are seats too (GameSceneBuilder.BarDining.cs)
+            SetHotelBarMenu(bar);
 
             // Two guests on the west stools, chatting over their drinks.
             GameObject npcPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(NpcPrefabPath);
