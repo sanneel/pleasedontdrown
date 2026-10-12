@@ -27,8 +27,8 @@ namespace PleaseDontDrown.Editor
         // Armchairs measured from the bar model (side render of the LOD2 GLB, bar space): x = +/-10.36, two per table.
         // Each faces its table: (chair z, table z).
         private static readonly (float chair, float table)[] BarTableChairs = { (2.47f, 4.02f), (5.58f, 4.02f), (-4.55f, -3.12f), (-1.7f, -3.12f) };
-        /// <summary>A bar stool's seat point: on the cushion, a little back from the counter (on the middle the knees went into it).</summary>
-        private static readonly Vector3 StoolSeat = new(0f, StoolCushion + 0.13f, -0.16f);
+        /// <summary>A bar stool's seat point: on the cushion, a touch forward so the knees clear its edge and the shins hang in front of it (further back they went through the cushion; the counter is 0.42 ahead).</summary>
+        private static readonly Vector3 StoolSeat = new(0f, StoolCushion + 0.13f, 0.04f);
         private const float BarTableX = 10.36f, ArmchairSeat = 0.9f, BarTableTop = 0.74f;
 
         /// <summary>What the hotel bar sells (item, label, price).</summary>

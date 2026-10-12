@@ -1513,7 +1513,7 @@ namespace PleaseDontDrown.Avatars
                     bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
-                    bool kneeUp = !left;
+                    bool kneeUp = !left && _rig.Look.Feminine; // (the round dads' raised thigh went into their belly)
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, kneeUp ? Quaternion.Euler(-45f, 0f, 6f * side) : Quaternion.Euler(0f, 0f, 8f * side), w);
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kneeUp ? 85f : 4f, 0f, 0f), w);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(kneeUp ? -40f : -45f, 0f, 0f), w);
@@ -1572,11 +1572,8 @@ namespace PleaseDontDrown.Avatars
                 B(Bone.Chest).localRotation = Quaternion.Slerp(B(Bone.Chest).localRotation, Quaternion.Euler(-12f, 0f, 0f), w);
                 B(Bone.Neck).localRotation = Quaternion.Slerp(B(Bone.Neck).localRotation, Quaternion.Euler(-35f, 0f, 0f), w);
                 B(Bone.Head).localRotation = Quaternion.Slerp(B(Bone.Head).localRotation, Quaternion.Euler(-25f, 0f, 0f), w);
-                // Propped on the elbows, chin on the hands.
-                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(-150f, 0f, -18f), w);
-                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-95f, 0f, 0f), w);
-                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-150f, 0f, 18f), w);
-                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-95f, 0f, 0f), w);
+                // Arms folded on the towel in front of the head, elbows out to the sides (by IK, on every body: the
+                // fixed elbow bends put the round dads' arms up in the air through their shoulders).
                 for (int leg = 0; leg < 2; leg++)
                 {
                     bool left = leg == 0;
@@ -1586,6 +1583,21 @@ namespace PleaseDontDrown.Avatars
                     thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(0f, 0f, 6f * side), w);
                     shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(kick, 0f, 0f), w);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(40f, 0f, 0f), w);
+                }
+                {
+                    float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+                    Transform head = B(Bone.Head);
+                    Vector3 toHead = Vector3.ProjectOnPlane(head.position - hips.position, Vector3.up);
+                    toHead = toHead.sqrMagnitude > 1e-4f ? toHead.normalized : -transform.forward;
+                    Vector3 across = Vector3.Cross(Vector3.up, toHead);
+                    float half = 0.5f * Vector3.Distance(upperL.position, upperR.position);
+                    float ground = transform.position.y + 0.06f * s;
+                    // Under the chin, a little apart; the chest is propped on the elbows.
+                    Vector3 chin = head.position + toHead * (0.12f * s);
+                    Vector3 handL = chin + across * (half * 0.45f), handR = chin - across * (half * 0.45f);
+                    handL.y = handR.y = ground;
+                    IK.Solve(upperL, foreL, la, lb, handL, across * 1.2f - Vector3.up * 0.4f, w, false);
+                    IK.Solve(upperR, foreR, la, lb, handR, -across * 1.2f - Vector3.up * 0.4f, w, false);
                 }
             }
 
@@ -1617,17 +1629,29 @@ namespace PleaseDontDrown.Avatars
                 hips.localPosition = Vector3.Lerp(hips.localPosition, new Vector3(0f, 0.14f * s, -SitBack), w);
                 hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(-14f, 0f, 0f), w);
                 B(Bone.Spine).localRotation = Quaternion.Slerp(B(Bone.Spine).localRotation, Quaternion.Euler(4f, 0f, 0f), w);
-                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(38f, 0f, -16f), w);
-                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
-                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(38f, 0f, 16f), w);
-                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-4f, 0f, 0f), w);
+                // Sitting up on the towel, leaning back on the hands; one leg out, the other knee up. All by IK to points
+                // on the sand (fixed joint angles crossed the Tripo girls' legs into each other).
+                Vector3 fwd = Vector3.ProjectOnPlane(transform.forward, Vector3.up).normalized;
+                Vector3 across = Vector3.Cross(Vector3.up, fwd);
+                float ground = transform.position.y + 0.04f * s;
+                float half = 0.5f * Vector3.Distance(upperL.position, upperR.position);
+                float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+                Vector3 handL = hips.position - fwd * (0.22f * s) - across * (half + 0.12f * s);
+                Vector3 handR = hips.position - fwd * (0.22f * s) + across * (half + 0.12f * s);
+                handL.y = handR.y = ground;
+                IK.Solve(upperL, foreL, la, lb, handL, -across - fwd * 0.6f, w, false);
+                IK.Solve(upperR, foreR, la, lb, handR, across - fwd * 0.6f, w, false);
+                float legLength = _rig.ThighLength + _rig.ShinLength;
                 for (int leg = 0; leg < 2; leg++)
                 {
                     bool left = leg == 0;
                     float side = left ? -1f : 1f;
                     Transform thigh = B(left ? Bone.ThighL : Bone.ThighR), shin = B(left ? Bone.ShinL : Bone.ShinR), foot = B(left ? Bone.FootL : Bone.FootR);
-                    thigh.localRotation = Quaternion.Slerp(thigh.localRotation, Quaternion.Euler(-80f, 0f, 9f * side), w);
-                    shin.localRotation = Quaternion.Slerp(shin.localRotation, Quaternion.Euler(left ? 20f : 55f, 0f, 0f), w);
+                    // Left leg out along the towel, right knee up with the foot flat on it, the feet a hip apart.
+                    float reach = left ? 0.92f : 0.6f;
+                    Vector3 heel = thigh.position + fwd * (legLength * reach) + across * (side * 0.06f * s);
+                    heel.y = ground + 0.04f * s;
+                    IK.Solve(thigh, shin, _rig.ThighLength, _rig.ShinLength, heel, Vector3.up + fwd * 0.5f + across * (side * 0.2f), w, true);
                     foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(-20f, 0f, 0f), w);
                 }
                 _rig.LeftHand?.Pose(HandPose.Flat);
