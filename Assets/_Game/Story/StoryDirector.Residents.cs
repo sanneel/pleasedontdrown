@@ -121,9 +121,23 @@ namespace PleaseDontDrown.Story
                 });
 
             // The tavern's champion, waiting for someone to ask about the treasure.
-            if (GameObject.Find("Environment/Island3/PirateTavern/RoomFloor") is { } floor)
+            GameObject floor = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor");
+            if (floor != null)
+            {
                 AddResident("I3Tavern", () =>
                     SpawnNpc("Iron Jaw Jack", NpcRole.Pirate, PirateLookOf(AvatarLook.Bodies.PirateFat), floor.transform.position + Vector3.forward * 2f, 180f, 160).gameObject);
+                // The regulars round the ring, mugs up, waiting for a fight to bet on (they cheer the cage fight, 3.4).
+                Vector3 ring = floor.transform.position + Vector3.forward * 2f;
+                for (int i = 0; i < TavernRegulars.Length; i++)
+                {
+                    int k = i;
+                    AddResident("I3Tavern", () => TavernRegular(k, ring).gameObject);
+                }
+            }
+
+            // A drunk staggering between the tavern and the campfire, singing (too drunk to notice anyone sneaking by).
+            if (NightPoint("Campfire") is { } fire && floor != null)
+                AddResident("I3Locals", () => Drunk(fire.position, floor.transform.position).gameObject);
 
             // The jungle between the west road and the river: three guards on their beats, three monkeys.
             string[] names = { "Mangy Mo", "Long Tom", "Grog" };

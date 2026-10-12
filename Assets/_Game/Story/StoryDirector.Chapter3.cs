@@ -232,6 +232,45 @@ namespace PleaseDontDrown.Story
         /// <summary>Where the team lands: the little dock on the mountain side (the old pirate dock if it isn't built).</summary>
         private static Vector3 NightDock => NightPoint("Dock") is { } dock ? dock.position : Island3Arrival;
 
+        private static readonly string[] TavernRegulars = { "One-Tooth Tess", "Bilge Bob", "Rum Rita", "Patch", "Salty Sven" };
+        private static readonly string[] TavernCheers = { "HIT 'IM!", "Jack! Jack! Jack!", "Two doubloons on the big one!", "Ooooh!", "Get up, ya landlubber!", "FIGHT! FIGHT!" };
+        private static readonly string[] DrunkSongs = { "Yo ho ho... hic!", "Fifteen men on a dead man's... where was I?", "Who moved the island?", "Hic! Lovely night for it.", "The moon's got two of it..." };
+
+        /// <summary>A tavern regular round the ring (I3Tavern): standing about with a mug, facing the fight.</summary>
+        private StoryNpc TavernRegular(int i, Vector3 ring)
+        {
+            float a = (i * 72f + 20f) * Mathf.Deg2Rad;
+            Vector3 at = ring + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 3.4f;
+            StoryNpc npc = SpawnNpc(TavernRegulars[i], NpcRole.Pirate, PirateLook(i + 5), at, 0f, 100);
+            npc.ServerFace(ring);
+            npc.ServerSetMood(AvatarMood.Happy);
+            return npc;
+        }
+
+        /// <summary>The village drunk (I3Locals): staggers from the campfire to the tavern and back, singing.</summary>
+        private StoryNpc Drunk(Vector3 fire, Vector3 tavern)
+        {
+            StoryNpc npc = SpawnNpc("Wobbly Will", NpcRole.Pirate, PirateLook(9), fire + Vector3.right * 3f, 0f, 100);
+            StartCoroutine(Stagger(npc, fire + Vector3.right * 3f, tavern + Vector3.back * 4f));
+            return npc;
+        }
+
+        private System.Collections.IEnumerator Stagger(StoryNpc npc, Vector3 a, Vector3 b)
+        {
+            bool toB = true;
+            while (npc != null && !npc.IsDefeated)
+            {
+                if (!npc.IsFighting)
+                {
+                    Vector3 target = (toB ? b : a) + new Vector3(Random.Range(-1.5f, 1.5f), 0f, Random.Range(-1.5f, 1.5f));
+                    npc.ServerMoveTo(target, 1.1f);
+                    if (Random.value < 0.6f) npc.ServerShout(DrunkSongs[Random.Range(0, DrunkSongs.Length)]);
+                    toB = !toB;
+                }
+                yield return new WaitForSeconds(Random.Range(9f, 14f));
+            }
+        }
+
         private static readonly string[] SleeperNames = { "Snorin' Sam", "Drowsy Dan", "Old Wheeze", "Barnacle Bess", "Nodding Ned", "Grumbles", "Lazy Lars", "Mumbling Mick" };
 
         // Sneaking in is run like a boss fight (How to Fish): introduced, a bar at the bottom that empties as you close
@@ -405,14 +444,27 @@ namespace PleaseDontDrown.Story
         private IEnumerator CageFightBody()
         {
             // The tavern's champion has been in there all along (Skull Cove's residents): he steps up.
-            List<StoryNpc> jack = ResidentsOf<StoryNpc>("I3Tavern");
-            if (jack.Count == 0) yield break;
-            StoryNpc champ = jack[0];
+            StoryNpc champ = ResidentsOf<StoryNpc>("I3Tavern").Find(n => n.Name == "Iron Jaw Jack");
+            if (champ == null) yield break;
             yield return Say(champ, "Fresh meat! Nobody asks about the treasure without going a round with Iron Jaw Jack.");
             BossIntroObservers("IRON JAW JACK", "Fists only. LMB jab, RMB hook, crouch + LMB uppercut. Jab, jab, hook: combo.");
             champ.ServerFight(FighterProfile.Brawler(0.75f), champ.transform.position);
+            float nextCheer = 0f;
             while (!champ.IsDefeated)
             {
+                if (Time.time > nextCheer)
+                {
+                    // The regulars cheer the fight on.
+                    nextCheer = Time.time + Random.Range(2f, 3.5f);
+                    List<StoryNpc> crowd = ResidentsOf<StoryNpc>("I3Tavern");
+                    crowd.Remove(champ);
+                    if (crowd.Count > 0)
+                    {
+                        StoryNpc fan = crowd[Random.Range(0, crowd.Count)];
+                        fan.ServerShout(TavernCheers[Random.Range(0, TavernCheers.Length)]);
+                        fan.ServerFace(champ.transform.position);
+                    }
+                }
                 MissionObjective("Beat Iron Jaw Jack: dodge his swings, then jab, jab, hook (RMB) or uppercut (crouch + LMB).");
                 yield return new WaitForSeconds(0.25f);
             }
