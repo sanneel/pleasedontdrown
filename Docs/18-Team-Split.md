@@ -41,12 +41,12 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 ### B: islands 1 and 2, scene work
 | # | Task | Status |
 |---|---|---|
-| B1 | Island 1: remove Milo's building | open |
-| B2 | Remove the travellers | open |
-| B3 | Remove the birds | open |
-| B4 | Remove the palms with coconuts | open |
-| B5 | Sandy's house: lower, stairs removed | open |
-| B6 | Towels and shells overlapping the dock (islands 1 and 2) | open |
+| B1 | Island 1: remove Milo's building | **done** (Shako) — the "MILO'S JET SKIS" stall; Milo and his pier stay |
+| B2 | Remove the travellers | **done** (Shako) — read as the purple TRAVEL pads on islands 1-3; Esc > Travel, `home`/`hotel`/`island3` and the dev island pad remain |
+| B3 | Remove the birds | **done** (Shako) — island 1's parrot flock; island 3's parrot sentries untouched |
+| B4 | Remove the palms with coconuts | **done** (Shako) — island 1's 9 shakeable coconut palms (islands 1-2 had no others) |
+| B5 | Sandy's house: lower, stairs removed | **done** (Shako) — read as the red-roof house on stilts: down 2.4 m, porch one step up, stairs gone |
+| B6 | Towels and shells overlapping the dock (islands 1 and 2) | **done** (Shako) — one towel under Milo's pier moved onto the sand; no shell objects exist on islands 1-2 |
 | B7 | Sand texture prettier (islands 1 and 2) | open |
 | B8 | Island 2 smaller (more fun) | open |
 | B9 | Island 2: pool | open |

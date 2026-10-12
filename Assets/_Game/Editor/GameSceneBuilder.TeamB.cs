@@ -1,0 +1,144 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using Object = UnityEngine.Object;
+
+namespace PleaseDontDrown.Editor
+{
+    /// <summary>
+    /// Part B of the team split (Docs/18): islands 1 and 2, done as small edits to the saved Game scene (never a
+    /// rebuild: the hotel and the islands carry hand fixes). Each step logs what it did to Logs/teamb-*.txt.
+    /// </summary>
+    public static partial class GameSceneBuilder
+    {
+        /// <summary>Batch: B1-B6, the quick removals and the overlaps on islands 1 and 2.</summary>
+        public static void TeamBRemovalsBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var log = new List<string>();
+
+            // B1: Milo's jet ski stall on island 1 (Milo himself stays by his pier: the story needs him).
+            Remove("Environment/RentalKiosk", log);
+
+            // B2: the purple "TRAVEL" pads on the islands (travel stays in Esc > Travel and the dev commands; the
+            // dev island keeps its own pad).
+            Remove("Environment/DevIsland/TravelPad_Island1", log);
+            Remove("Environment/DevIsland/TravelPad_Island2", log);
+            Remove("Environment/Island3/TravelPad_Island3", log);
+
+            // B3: island 1's parrots (the parrots belong to island 3 now: its sentries are creatures, not these).
+            Remove("Environment/Island1Fun/Parrots", log);
+
+            // B4: the coconut palms (island 1's shakeable palms, the only ones on islands 1 and 2).
+            Transform env = GameObject.Find("Environment").transform;
+            foreach (Transform palm in env.Cast<Transform>().Where(t => t.name == "palm_tall_Pivot").ToArray())
+            {
+                log.Add($"removed coconut palm at {palm.position}");
+                Object.DestroyImmediate(palm.gameObject);
+            }
+
+            // B5: the lifeguard house on stilts comes down to the sand: its deck one step up, no stairs.
+            LowerStiltHouse(env.Find("Tower"), log);
+
+            // B6: towels (and their umbrellas) lying on or under a pier move off it onto the sand.
+            MoveTowelsOffDocks(env, log);
+
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island1");
+            BakeNavMeshes(only: "Island2");
+            Directory.CreateDirectory("Logs");
+            File.WriteAllLines("Logs/teamb-removals.txt", log);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[TeamB] PASS: removals done ({log.Count} changes, Logs/teamb-removals.txt)\n" + string.Join("\n", log));
+        }
+
+        private static void Remove(string path, List<string> log)
+        {
+            Transform t = FindByPath(path);
+            if (t == null) { log.Add("already gone: " + path); return; }
+            log.Add($"removed {path} at {t.position}");
+            Object.DestroyImmediate(t.gameObject);
+        }
+
+        private static float GroundUnder(Vector3 p)
+        {
+            var terrain = GameObject.Find("Environment/BeachTerrain").GetComponent<MeshCollider>();
+            return terrain.Raycast(new Ray(new Vector3(p.x, 200f, p.z), Vector3.down), out RaycastHit hit, 400f) ? hit.point.y : 0f;
+        }
+
+        private static void LowerStiltHouse(Transform tower, List<string> log)
+        {
+            if (tower == null) { log.Add("no Tower"); return; }
+            Transform deck = tower.Find("DeckCollision");
+            float deckTop = deck.GetComponent<BoxCollider>().bounds.max.y;
+            float ground = GroundUnder(deck.position);
+            float drop = deckTop - (ground + 0.3f); // the porch one step (30 cm) above the sand
+            if (drop < 0.5f) { log.Add($"Tower already low (deck top {deckTop:0.00})"); return; }
+            tower.position += Vector3.down * drop;
+            // The stairs and the stilts are under the sand now: their colliders go (the model's are hidden in the sand).
+            foreach (Transform c in tower.Cast<Transform>().ToArray())
+                if (c.name is "StairCollision" or "StairRail" or "StiltCollision") Object.DestroyImmediate(c.gameObject);
+            log.Add($"Tower lowered {drop:0.00} m (deck top {deckTop:0.00} -> {deckTop - drop:0.00}), stairs removed");
+        }
+
+        private static void MoveTowelsOffDocks(Transform env, List<string> log)
+        {
+            Physics.SyncTransforms();
+            // Every collider of the piers (the station dock, Milo's T pier, the hotel dock), as flat XZ boxes.
+            var piers = new List<Bounds>();
+            foreach (string dock in new[] { "Dock", "MilosRentalDock", "HotelDock" })
+                if (env.Find(dock) is { } d)
+                    piers.AddRange(d.GetComponentsInChildren<Collider>().Select(c => c.bounds));
+            // A first try pushed this towel along Milo's cross dock into the sea: back to its beach spot.
+            if (FindByPath("Environment/BeachTowels_Island1/Towel_6") is { } lost && lost.position.z < -10f)
+                lost.position = new Vector3(33.6f, GroundUnder(new Vector3(33.6f, 0f, 5.1f)), 5.1f);
+            foreach (string group in new[] { "BeachTowels_Island1", "BeachTowels_Island2" })
+            {
+                Transform towels = env.Find(group);
+                if (towels == null) continue;
+                foreach (Transform towel in towels)
+                {
+                    Vector3 home = towel.position;
+                    Bounds b = RendererBounds(towel);
+                    Vector3 offset = b.center - home;
+                    b.Expand(new Vector3(0.6f, 0f, 0.6f));
+                    if (!piers.Any(p => FlatOverlap(p, b))) continue;
+                    // The nearest dry spot around it that's clear of every pier.
+                    bool placed = false;
+                    for (float r = 0.5f; r <= 8f && !placed; r += 0.5f)
+                        for (int a = 0; a < 24 && !placed; a++)
+                        {
+                            float ang = a * Mathf.PI * 2f / 24f;
+                            Vector3 p = home + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * r;
+                            p.y = GroundUnder(p);
+                            if (p.y < WaterLevel + 0.2f) continue;
+                            var test = new Bounds(p + offset, b.size);
+                            if (piers.Any(q => FlatOverlap(q, test))) continue;
+                            towel.position = p;
+                            placed = true;
+                            log.Add($"moved {group}/{towel.name} off the pier: {home} -> {p}");
+                        }
+                    if (!placed) log.Add($"could not clear {group}/{towel.name} at {home}");
+                }
+            }
+        }
+
+        private static Bounds RendererBounds(Transform t)
+        {
+            var rs = t.GetComponentsInChildren<Renderer>();
+            if (rs.Length == 0) return new Bounds(t.position, Vector3.one);
+            Bounds b = rs[0].bounds;
+            foreach (Renderer r in rs) b.Encapsulate(r.bounds);
+            return b;
+        }
+
+        private static bool FlatOverlap(Bounds a, Bounds b) =>
+            a.min.x < b.max.x && a.max.x > b.min.x && a.min.z < b.max.z && a.max.z > b.min.z;
+    }
+}
