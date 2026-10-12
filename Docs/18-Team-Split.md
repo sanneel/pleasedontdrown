@@ -54,7 +54,7 @@ Order rule (the user's): gameplay logic first, then visuals, then money. Quick r
 | B11 | Island 2: bar restyle (look only; orders are A6) | **done** (Shako) — dressed in the hotel's teal/cream/gold: a "CORAL BAR" sign, warm string lights under the front and back beams (+3 soft lights), palm planters at the corners; the Tripo bar model, colliders, barista and serving spots untouched (`TeamBBarLookBatch`) |
 | B12 | Island 2: casino interior (Tripo tables/chandelier already in `Art/Tripo/Island2/`) | **done** (Shako) — the 6 box slots → Tripo slot machines on the same stands; Tripo roulette table (with a collider) in the back half; the 2 drawn chandeliers → Tripo crystal ones (+ warm lights); velvet ropes funnelling the door; champagne tower on a gold table. The existing blackjack table is left for A7 (`TeamBCasinoBatch`) |
 | B13 | Island 2: gun shop | **done** (Shako) — "Coral Arms", a walk-up boutique between the bar and the hotel facing the beach (teal awning, gold sign, guns on a walnut wall). Its counter is a copy of the reception's shop (same guns and prices) and opens/closes with the reception (`Story/ShopFollowsAnother.cs`, a tiny host script): the "buy the pistol" step (2.2) passes when bought here, tested in the build. A6/A: the objective still says "at reception" (`TeamBGunShopBatch`) |
-| B14 | List what an expensive island still lacks (show the team before building) | open |
+| B14 | List what an expensive island still lacks (show the team before building) | **list written** (Shako) — `Docs/19-Island-2-What-It-Lacks.md` (14 items, suggested order); waiting for the team to pick before building |
 | B15 | Island 1 restyle (get a reference picture first) | open |
 
 ### C: island 3 and the Tripo models
