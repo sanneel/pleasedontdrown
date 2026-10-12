@@ -65,6 +65,16 @@ namespace PleaseDontDrown.Creatures
         {
             if (!_tripo) return transform.TransformPoint(_armRoots[a]);
             Vector3 flat = new Vector3(_armRoots[a].x, 0f, _armRoots[a].z).normalized;
+            // It leaves the body on the side facing its tip (leaning toward its own side, so the two arms don't share a
+            // root): an arm reaching behind used to come out of the front and run back through the body and the
+            // model's own tentacles (Docs/18 C3).
+            Vector3 toTip = _model.InverseTransformPoint(_armTips[a]);
+            toTip.y = 0f;
+            if (toTip.sqrMagnitude > 0.04f)
+            {
+                Vector3 lean = toTip.normalized + flat * 0.45f;
+                if (lean.sqrMagnitude > 1e-4f) flat = lean.normalized;
+            }
             return _model.TransformPoint(Vector3.up * TripoArmHeight + flat * TripoArmOut);
         }
 

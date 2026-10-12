@@ -107,6 +107,40 @@ namespace PleaseDontDrown.Editor
             File.WriteAllText(System.Environment.GetEnvironmentVariable("PDD_DUMP"), sb.ToString());
         }
 
+        /// <summary>Pairs of "buildings" (the children of the PDD_GROUPS paths, ';'-separated) whose renderers' boxes
+        /// overlap in plan by more than 0.3 m each way, to PDD_DUMP.</summary>
+        public static void OverlapReport()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var items = new System.Collections.Generic.List<(string name, Bounds b)>();
+            foreach (string path in System.Environment.GetEnvironmentVariable("PDD_GROUPS").Split(';'))
+            {
+                GameObject g = GameObject.Find(path);
+                if (g == null) continue;
+                foreach (Transform c in g.transform)
+                {
+                    var rs = c.GetComponentsInChildren<Renderer>();
+                    if (rs.Length == 0) continue;
+                    Bounds b = rs[0].bounds;
+                    foreach (Renderer r in rs) b.Encapsulate(r.bounds);
+                    items.Add((path + "/" + c.name, b));
+                }
+            }
+            var sb = new StringBuilder();
+            for (int i = 0; i < items.Count; i++)
+                for (int j = i + 1; j < items.Count; j++)
+                {
+                    Bounds a = items[i].b, b = items[j].b;
+                    float ox = Mathf.Min(a.max.x, b.max.x) - Mathf.Max(a.min.x, b.min.x);
+                    float oz = Mathf.Min(a.max.z, b.max.z) - Mathf.Max(a.min.z, b.min.z);
+                    float oy = Mathf.Min(a.max.y, b.max.y) - Mathf.Max(a.min.y, b.min.y);
+                    if (ox > 0.3f && oz > 0.3f && oy > 0.3f)
+                        sb.Append($"{items[i].name} x {items[j].name}: overlap {ox:0.0} x {oz:0.0} m; A x {a.min.x:0.0}..{a.max.x:0.0} z {a.min.z:0.0}..{a.max.z:0.0}; B x {b.min.x:0.0}..{b.max.x:0.0} z {b.min.z:0.0}..{b.max.z:0.0}\n");
+                }
+            sb.Append($"{items.Count} items checked\n");
+            File.WriteAllText(System.Environment.GetEnvironmentVariable("PDD_DUMP"), sb.ToString());
+        }
+
         private static void Dump(Transform t, string parent, StringBuilder sb)
         {
             string path = parent.Length == 0 ? t.name : parent + "/" + t.name;
