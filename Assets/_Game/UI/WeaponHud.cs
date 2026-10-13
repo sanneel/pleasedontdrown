@@ -135,7 +135,6 @@ namespace PleaseDontDrown.UI
         {
             const float width = 380f, height = 250f;
             var area = new Rect(Hud.Width - width - 25f, Hud.Height * 0.5f - height * 0.5f, width, height);
-            Hud.Fill(area, new Color(0.02f, 0.06f, 0.09f, 0.7f), 16f);
             Hud.Label(new Rect(area.x + 20f, area.y + 12f, width - 40f, 40f), gun.DisplayName, 30f, Color.white, TextAnchor.MiddleLeft, heavy: true);
             string pellets = gun.Pellets > 1 ? $" x{gun.Pellets}" : "";
             string text = $"Damage <b>{gun.Damage}{pellets}</b>   ({gun.Tier.Name})\n" +

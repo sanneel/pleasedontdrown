@@ -80,15 +80,21 @@ namespace PleaseDontDrown.UI
             if (Event.current.type != EventType.Repaint || string.IsNullOrEmpty(text) || color.a <= 0.005f) return;
             GUIStyle style = Style(size, anchor, heavy, wrap);
             Rect r = Px(sheet);
-            if (shadow)
-            {
-                float d = Mathf.Max(1f, size * 0.07f * Scale);
-                style.normal.textColor = new Color(0f, 0f, 0f, 0.6f * color.a);
-                GUI.Label(new Rect(r.x + d, r.y + d, r.width, r.height), WithoutColorTags(text), style);
-            }
+            // Text sits straight on the game (no dark boxes behind it): a dark outline keeps it readable on bright sand
+            // and sky. (`shadow` only makes it a little heavier.)
+            float d = Mathf.Max(1f, size * (shadow ? 0.07f : 0.055f) * Scale);
+            string plain = WithoutColorTags(text);
+            style.normal.textColor = new Color(0.02f, 0.04f, 0.06f, 0.85f * color.a);
+            foreach (Vector2 o in Outline)
+                GUI.Label(new Rect(r.x + o.x * d, r.y + o.y * d, r.width, r.height), plain, style);
             style.normal.textColor = color;
             GUI.Label(r, text, style);
         }
+
+        private static readonly Vector2[] Outline =
+        {
+            new(-1f, -1f), new(1f, -1f), new(-1f, 1f), new(1f, 1f), new(0f, 1.3f), new(0f, -1f), new(1.2f, 0f), new(-1.2f, 0f)
+        };
 
         /// <summary>The text with its colour tags taken out (a shadow is one colour). Remembers the last few.</summary>
         private static string WithoutColorTags(string text)

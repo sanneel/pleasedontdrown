@@ -122,8 +122,8 @@ namespace PleaseDontDrown.UI
             DrawHurt(local, cx, cy);
 
             _toasts.RemoveAll(t => t.Until < Time.unscaledTime);
-            // Each message on its own dark pill under the top of the screen (the team, 2026-10-12: words floating in the
-            // sky read as a log), sliding in and fading out.
+            // Each message under the top of the screen, outlined straight on the game (no dark pill: the user, 2026-10-13),
+            // sliding in and fading out.
             for (int i = 0; i < _toasts.Count; i++)
             {
                 Toast toast = _toasts[i];
@@ -132,7 +132,6 @@ namespace PleaseDontDrown.UI
                 const float size = 22f, height = 44f;
                 float width = Mathf.Min(1300f, Hud.TextWidth(StripTags(toast.Text), size, heavy: true) + 56f);
                 var pill = new Rect(cx - width * 0.5f, Hud.Height * 0.11f + i * (height + 8f) - slide, width, height);
-                Hud.Fill(pill, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.78f * alpha), height * 0.5f);
                 Hud.Label(pill, toast.Text, size, new Color(1f, 1f, 1f, alpha), TextAnchor.MiddleCenter, heavy: true, shadow: false);
             }
         }

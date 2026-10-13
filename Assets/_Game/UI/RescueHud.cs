@@ -85,7 +85,7 @@ namespace PleaseDontDrown.UI
                 bool current = (i == 0) == (now == CprStep.Compress);
                 var box = new Rect(left, top + i * (height + gap), chip, height);
                 float pulse = current ? 0.82f + 0.18f * Mathf.Sin(Time.unscaledTime * 7f) : 0f;
-                Hud.Fill(box, current ? new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, pulse) : new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.55f), 14f);
+                if (current) Hud.Fill(box, new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, pulse), 14f); // (the other steps: just outlined text)
                 if (current) Hud.Frame(box, Color.white, 3f, 14f);
                 Color words = current ? Color.white : new Color(1f, 1f, 1f, 0.55f);
                 var key = new Rect(box.x + 12f, box.y + 11f, 84f, 58f);

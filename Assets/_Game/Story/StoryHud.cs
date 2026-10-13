@@ -175,7 +175,6 @@ namespace PleaseDontDrown.Story
             float w = Mathf.Min(1100f, Hud.Width - 80f);
             // Clear of the hotbar and the name of what you hold.
             var box = new Rect((Hud.Width - w) * 0.5f, Hud.HotbarTop - 96f - 124f, w, 124f);
-            Hud.Fill(box, new Color(0f, 0f, 0f, 0.6f), 16f);
             string speaker = l.Speaker == DialogueService.PlayerSpeaker ? "You" : l.Speaker;
             Hud.Label(new Rect(box.x + 24f, box.y + 10f, w - 48f, 32f), speaker, 24f, l.Color, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             // Typewriter.
@@ -201,7 +200,6 @@ namespace PleaseDontDrown.Story
             const float width = 640f, row = 46f;
             float height = 120f + ReportLabels.Length * row + 26f;
             var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f - 40f, width, height);
-            Hud.Fill(panel, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.88f * a), 20f);
             Hud.Label(new Rect(panel.x, panel.y + 22f, width, 64f), _reportTitle, 46f, new Color(1f, 0.92f, 0.6f, a), heavy: true, shadow: false);
             float y = panel.y + 110f;
             for (int i = 0; i < ReportLabels.Length; i++)
@@ -222,7 +220,6 @@ namespace PleaseDontDrown.Story
             if (_title == null || t > 4.5f) return;
             float a = Mathf.Clamp01(t / 0.4f) * Mathf.Clamp01((4.5f - t) / 0.8f);
             float y = Hud.Height * 0.28f;
-            Hud.Fill(new Rect(0f, y, Hud.Width, 176f), new Color(0f, 0f, 0f, 0.45f * a));
             Hud.Label(new Rect(0f, y + 14f, Hud.Width, 96f), _title, 78f, new Color(1f, 0.92f, 0.6f, a), heavy: true);
             Hud.Label(new Rect(0f, y + 112f, Hud.Width, 46f), _subtitle, 30f, new Color(1f, 1f, 1f, a));
         }
