@@ -1037,6 +1037,7 @@ namespace PleaseDontDrown.Editor
 
             Physics.SyncTransforms();
             BakeNavMeshes(only: "Island3");
+            AssignSceneIds(scene); // the gate's leaves are networked doors
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Debug.Log($"[TeamB] PASS: C5 gate shut at {gate.position}, sewer exit at {exit.position}");

@@ -436,7 +436,7 @@ namespace PleaseDontDrown.Editor
 
         // ================================================================== C5: the castle gate in its arch
 
-        /// <summary>Batch: the shut castle gate rebuilt inside the gatehouse's passage, cut to its arch (the user: the
+        /// <summary>Batch: the castle gate rebuilt inside the gatehouse's passage, cut to its arch, opening into the castle (the user: the
         /// door was a big flat board standing in front of the arch).</summary>
         public static void TeamCGateDoorBatch() => RunBatch(() =>
         {
@@ -446,33 +446,276 @@ namespace PleaseDontDrown.Editor
             ShutCastleGate(castle, log);
             Physics.SyncTransforms();
             BakeNavMeshes(only: "Island3");
+            AssignSceneIds(scene); // the leaves are networked doors
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
-            SaveLog("teamc-gate.txt", log, "C5 gate fitted to the arch");
+            SaveLog("teamc-gate.txt", log, "C5 gate fitted to the arch, opening into the castle");
         });
 
         /// <summary>
-        /// The shut gate: two plank leaves in the gatehouse passage just inside its outer arch ring, and a second pair in
-        /// the yard-side arch (in front of the model's flat beige panel there). Their tops follow the arches measured on
-        /// the model; iron straps with studs, an iron rim along the arch, ring handles. One collider over the passage up to
-        /// the greybox arch above (nobody walks or climbs in).
+        /// The castle gate: two arched plank-and-iron leaves in the gatehouse passage just inside its outer arch ring,
+        /// their tops following the arch measured on the model. They open together, into the castle only, as far as the
+        /// passage's vault and walls let them. The model's flat beige panel across the yard end of the passage is cut
+        /// away, and a stone plate fills round the passage's arch there (the panel had filled that gap).
         /// </summary>
         private static void ShutCastleGate(Transform castle, List<string> log)
         {
-            foreach (string old in new[] { "GateShut", "GateShutInner" })
+            foreach (string old in new[] { "GateShut", "GateShutInner", "GateYardPlate", "GatePocketLiners" })
                 if (castle.Find(old) is { } t) Object.DestroyImmediate(t.gameObject);
-            const float Z = 20f; // the castle's north wall line
+            AssetDatabase.DeleteAsset(MeshDir + "/Island3/CastleGateShutInner.asset");
+            const float Z = 20f, G = 0.3f, DoorZ = Z + 1f; // the castle's north wall line; the gate's depth in the passage
             Transform gatehouse = castle.Find("Tripo_castle_gatehouse");
             RestoreTripoMeshes(gatehouse, "castle_gatehouse");
-            (Transform outer, float w) = GateLeaves(castle, gatehouse, "GateShut", Z + 1.0f, 0.07f, false, log);
-            var blocker = outer.gameObject.AddComponent<BoxCollider>();
-            blocker.center = new Vector3(0f, 7.1f * 0.5f, 0f);
-            blocker.size = new Vector3(2f * w + 0.3f, 7.1f, 0.5f);
-            if (gatehouse != null) GateLeaves(castle, gatehouse, "GateShutInner", Z - 1.8f, 0.05f, true, log);
+            GateArch arch = MeasureGateArch(castle, gatehouse, DoorZ, log);
+            float leafTop = arch.TopAt(arch.W) - 0.06f; // the leaves stop where the arch starts curving; above them the arch is fixed
+            const float angle = 85f; // the model's own leaves are cut away below: the passage's sides are free
+            GateDoors(castle, arch, DoorZ, angle, leafTop, log);
+            if (gatehouse == null) return;
+            OpenGatePassage(castle, gatehouse, arch, Z, log);
+            GateYardPlate(castle, arch, Z - 1.74f, Z - 1.66f, log);
+            GatePocketLiners(castle, arch, Z, DoorZ, log);
         }
 
-        /// <summary>Puts a Tripo model's own meshes back (an earlier fix had cut a copy).</summary>
+        /// <summary>A gate's opening: its middle, the leaves' half width, the vault's top (castle-local) and the arch.</summary>
+        private sealed class GateArch
+        {
+            public const float Floor = 0.3f; // the castle yard's level (BuildPirateCastle's G)
+            public float Cx, W, Top;
+            public readonly List<(float y, float half)> Points = new();
+
+            /// <summary>The top of the leaves at x from the middle (height over the floor), 3 cm under the stone.</summary>
+            public float TopAt(float x)
+            {
+                x = Mathf.Abs(x);
+                for (int i = 1; i < Points.Count; i++)
+                    if (Points[i].half < x)
+                    {
+                        (float y0, float h0) = Points[i - 1];
+                        (float y1, float h1) = Points[i];
+                        float k = h0 - h1 > 1e-4f ? (h0 - x) / (h0 - h1) : 0f;
+                        return Mathf.Lerp(y0, y1, Mathf.Clamp01(k)) - Floor - 0.03f;
+                    }
+                return Top - Floor - 0.03f;
+            }
+        }
+
+        private static GateArch MeasureGateArch(Transform castle, Transform gatehouse, float z, List<string> log)
+        {
+            const float G = GateArch.Floor;
+            float jambL = 1.95f, jambR = 1.95f;
+            var arch = new GateArch { Top = G + 5.4f };
+            var points = new List<(float y, float half)>();
+            if (gatehouse != null)
+            {
+                var samples = new List<(float y, float l, float r)>();
+                using (var probe = new MeshProbe(gatehouse))
+                {
+                    Vector3 At(float x, float y) => castle.TransformPoint(new Vector3(x, y, z));
+                    arch.Top = G + 0.3f + (probe.Cast(At(0f, G + 0.3f), castle.up, 20f) ?? throw new InvalidOperationException("The gate's arch has no top"));
+                    for (float y = G + 0.2f; y < arch.Top - 0.01f; y += 0.05f)
+                        if (probe.Cast(At(0f, y), -castle.right, 8f) is { } l && probe.Cast(At(0f, y), castle.right, 8f) is { } r)
+                            samples.Add((y, l, r));
+                }
+                float Median(IEnumerable<float> v) { float[] s = v.OrderBy(x => x).ToArray(); return s[s.Length / 2]; }
+                var jamb = samples.Where(s => s.y > G + 0.5f && s.y < G + 4f).ToArray();
+                jambL = Median(jamb.Select(s => s.l));
+                jambR = Median(jamb.Select(s => s.r));
+                float last = (jambL + jambR) * 0.5f;
+                foreach ((float y, float l, float r) in samples.Where(s => s.y >= G + 4f))
+                    points.Add((y, last = Mathf.Min(last, (l + r) * 0.5f)));
+            }
+            arch.W = (jambL + jambR) * 0.5f - 0.03f;
+            arch.Cx = (jambR - jambL) * 0.5f;
+            arch.Points.Add((G + 4f, arch.W + 0.03f));
+            arch.Points.AddRange(points);
+            arch.Points.Add((arch.Top, 0f));
+            log.Add($"gate at z {z:0.00}: {jambL:0.00} m left, {jambR:0.00} m right of the middle, vault top {arch.Top - G:0.00} m; {2f * arch.W:0.00} m wide");
+            log.Add("  arch: " + string.Join(" ", arch.Points.Where((_, i) => i % 4 == 0).Select(a => $"{a.y - G:0.0}:{a.half:0.00}")));
+            return arch;
+        }
+
+        /// <summary>The two leaves, each a networked door hinged at its jamb, opening together into the castle.</summary>
+        private static void GateDoors(Transform castle, GateArch arch, float doorZ, float openAngle, float leafTop, List<string> log)
+        {
+            var root = new GameObject("GateShut").transform;
+            root.SetParent(castle, false);
+            root.localPosition = new Vector3(arch.Cx, GateArch.Floor, doorZ);
+            Material woodA = WoodMaterial("GateDoorPlankA", new Color(0.5f, 0.33f, 0.2f));
+            Material woodB = WoodMaterial("GateDoorPlankB", new Color(0.42f, 0.27f, 0.16f));
+            Material core = GetMaterial("GateDoorCore", new Color(0.07f, 0.05f, 0.04f));
+            Material iron = GetMaterial("GateIron", new Color(0.12f, 0.12f, 0.13f), 0.6f, 0.35f);
+            float W = arch.W;
+            const float half = 0.07f, bottom = -0.03f;
+            const int WoodA = 0, WoodB = 1, Core = 2, Iron = 3;
+            var doors = new Door[2];
+            foreach (int side in new[] { -1, 1 })
+            {
+                // The leaf's mesh in the gate's frame (x from the middle), from x = 0 to side * W.
+                var m = new MeshBuild(4);
+                float Lo(float a, float b) => Mathf.Min(side * a, side * b);
+                float Hi(float a, float b) => Mathf.Max(side * a, side * b);
+                int planks = Mathf.Max(4, Mathf.RoundToInt(W / 0.27f));
+                float pw = W / planks;
+                for (int i = 0; i < planks; i++)
+                {
+                    float xl = Lo(i * pw, (i + 1) * pw), xr = Hi(i * pw, (i + 1) * pw);
+                    // A plank (a hair narrower: dark seams between) on the dark core.
+                    m.Prism((i + (side > 0 ? 1 : 0)) % 2 == 0 ? WoodA : WoodB, xl + 0.007f, xr - 0.007f, bottom, bottom, leafTop, leafTop, -half, half);
+                    m.Prism(Core, xl, xr, bottom, bottom, leafTop - 0.02f, leafTop - 0.02f, -half + 0.02f, half - 0.02f);
+                }
+                foreach (int face in new[] { -1, 1 })
+                {
+                    float zIn = face * half, zOut = face * (half + 0.025f), z0 = Mathf.Min(zIn, zOut), z1 = Mathf.Max(zIn, zOut);
+                    // Iron straps across the leaf, studded.
+                    foreach (float y in new[] { 0.85f, 2.35f, 3.85f })
+                    {
+                        if (leafTop < y + 0.25f) continue;
+                        m.Box(Iron, new Vector3(Lo(0.06f, W - 0.05f), y - 0.07f, z0), new Vector3(Hi(0.06f, W - 0.05f), y + 0.07f, z1));
+                        for (float s = 0.2f; s < W - 0.1f; s += 0.33f)
+                        {
+                            float zs = face * (half + 0.05f);
+                            m.Box(Iron, new Vector3(side * s - 0.03f, y - 0.03f, Mathf.Min(zOut, zs)), new Vector3(side * s + 0.03f, y + 0.03f, Mathf.Max(zOut, zs)));
+                        }
+                    }
+                    // Its half of the meeting stile, its hinge-side edge and its top edge.
+                    m.Prism(Iron, Lo(0f, 0.045f), Hi(0f, 0.045f), bottom, bottom, leafTop - 0.04f, leafTop - 0.04f, z0, z1);
+                    m.Prism(Iron, Lo(W - 0.08f, W), Hi(W - 0.08f, W), bottom, bottom, leafTop, leafTop, z0, z1);
+                    m.Box(Iron, new Vector3(Lo(0f, W), leafTop - 0.13f, z0), new Vector3(Hi(0f, W), leafTop, z1));
+                }
+
+                // The networked door: root at the hinge, the leaf turning on it.
+                string name = side < 0 ? "GateLeafL" : "GateLeafR";
+                var leafRoot = new GameObject(name);
+                leafRoot.transform.SetParent(root, false);
+                leafRoot.transform.localPosition = new Vector3(side * W, 0f, 0f);
+                var hinge = new GameObject("Hinge").transform;
+                hinge.SetParent(leafRoot.transform, false);
+                GameObject leaf = MeshObject("Leaf", hinge, m.Save("Castle" + name), new[] { woodA, woodB, core, iron });
+                leaf.transform.localPosition = new Vector3(-side * W, 0f, 0f);
+                TagSurface(leaf, SurfaceKind.Wood);
+                var box = leaf.AddComponent<BoxCollider>();
+                box.center = new Vector3(side * W * 0.5f, leafTop * 0.5f, 0f);
+                box.size = new Vector3(W, leafTop, 0.2f);
+                var outline = new List<Renderer> { leaf.GetComponent<Renderer>() };
+                foreach (int face in new[] { -1, 1 })
+                {
+                    GameObject ring = Primitive(PrimitiveType.Cylinder, "RingHandle", leaf.transform, new Vector3(side * 0.3f, 1.45f, face * (half + 0.06f)), new Vector3(0.3f, 0.012f, 0.3f), iron, keepCollider: false);
+                    ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameObject boss = Primitive(PrimitiveType.Sphere, "RingBoss", leaf.transform, new Vector3(side * 0.3f, 1.58f, face * (half + 0.04f)), Vector3.one * 0.09f, iron, keepCollider: false);
+                    outline.Add(ring.GetComponent<Renderer>());
+                    outline.Add(boss.GetComponent<Renderer>());
+                }
+                leafRoot.AddComponent<FishNet.Object.NetworkObject>();
+                Door door = doors[side < 0 ? 0 : 1] = leafRoot.AddComponent<Door>();
+                SetRef(door, "_hinge", hinge);
+                SetRef(door, "_audio", SpatialAudio(leafRoot, 3f, 35f));
+                ConfigureInteractable(leafRoot.AddComponent<PleaseDontDrown.Interaction.Interactable>(), new Collider[] { box }, outline.ToArray(), 3.2f);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                var so = new SerializedObject(doors[i]);
+                Require(so, "_openAngle").floatValue = openAngle;
+                Require(so, "_swingSpeed").floatValue = 2.2f; // heavy
+                // The left leaf's free edge goes to -z (into the castle) on a positive turn, the right one's on a negative.
+                Require(so, "_onlySide").intValue = i == 0 ? 1 : -1;
+                Require(so, "_pair").objectReferenceValue = doors[1 - i];
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+            // The arch over the leaves is fixed (a swinging arched leaf would cut into the passage's vault): planks
+            // following the arch on a beam across the springing line, an iron rim along the arch.
+            var t = new MeshBuild(4);
+            int boards = Mathf.Max(8, Mathf.RoundToInt(2f * W / 0.27f));
+            float bw = 2f * W / boards, beam = leafTop + 0.03f;
+            for (int i = 0; i < boards; i++)
+            {
+                float xl = -W + i * bw, xr = xl + bw;
+                if (arch.TopAt(xl) < beam + 0.05f && arch.TopAt(xr) < beam + 0.05f) continue;
+                t.Prism(i % 2 == 0 ? WoodA : WoodB, xl + 0.007f, xr - 0.007f, beam, beam, Mathf.Max(beam, arch.TopAt(xl + 0.007f)), Mathf.Max(beam, arch.TopAt(xr - 0.007f)), -half, half);
+                t.Prism(Core, xl, xr, beam, beam, Mathf.Max(beam, arch.TopAt(xl) - 0.02f), Mathf.Max(beam, arch.TopAt(xr) - 0.02f), -half + 0.02f, half - 0.02f);
+            }
+            foreach (int face in new[] { -1, 1 })
+            {
+                float zIn = face * half, zOut = face * (half + 0.025f), z0 = Mathf.Min(zIn, zOut), z1 = Mathf.Max(zIn, zOut);
+                t.Box(Iron, new Vector3(-W, beam, z0 - (face < 0 ? 0.02f : 0f)), new Vector3(W, beam + 0.16f, z1 + (face > 0 ? 0.02f : 0f)));
+                for (float x = -W; x < W - 0.001f; x += 0.1f)
+                {
+                    float xa = x, xb = Mathf.Min(W, x + 0.1f);
+                    if (arch.TopAt(xa) - 0.13f < beam && arch.TopAt(xb) - 0.13f < beam) continue;
+                    t.Prism(Iron, xa, xb, Mathf.Max(beam, arch.TopAt(xa) - 0.13f), Mathf.Max(beam, arch.TopAt(xb) - 0.13f), arch.TopAt(xa), arch.TopAt(xb), z0, z1);
+                }
+                foreach (float x in new[] { -W * 0.5f, 0f, W * 0.5f }) // three iron spokes up from the beam
+                    if (arch.TopAt(x) > beam + 0.3f)
+                        t.Box(Iron, new Vector3(x - 0.04f, beam + 0.16f, z0), new Vector3(x + 0.04f, arch.TopAt(x) - 0.1f, z1));
+            }
+            GameObject tympanum = MeshObject("GateTympanum", root, t.Save("CastleGateTympanum"), new[] { woodA, woodB, core, iron });
+            TagSurface(tympanum, SurfaceKind.Wood);
+            log.Add($"  two leaves {W:0.00} m wide, {leafTop:0.00} m tall, opening together into the castle; the arch above them fixed (to {arch.TopAt(0f):0.00} m)");
+        }
+
+        // The passage behind the gate, in the castle's frame (GateArch.Floor up; z from the north wall line): from the
+        // gate to the yard-side arch ring, which is a half ellipse 2.5 m to each side, 4 m straight then up to 6.06 m
+        // (measured on the model with TeamCGateProbeBatch).
+        private const float PassageFrom = -1.65f, PassageTo = 1.25f, PassageHalf = 2.3f, PassageHigh = 4.75f;
+        private const float YardArchHalf = 2.51f, YardArchSides = 4f, YardArchTop = 6.06f, YardArchFrom = -1.95f, YardArchTo = -1.55f;
+
+        private static float YardArchHalfAt(float y) // y over the floor
+        {
+            if (y <= YardArchSides) return YardArchHalf;
+            float k = Mathf.Clamp01((y - YardArchSides) / (YardArchTop - YardArchSides));
+            return YardArchHalf * Mathf.Sqrt(1f - k * k);
+        }
+
+        private static float YardArchTopAt(float x) // over the floor, at |x| from the middle
+        {
+            float k = Mathf.Clamp01(Mathf.Abs(x) / YardArchHalf);
+            return YardArchSides + (YardArchTop - YardArchSides) * Mathf.Sqrt(1f - k * k);
+        }
+
+        /// <summary>Stone facings on the passage's sides from the gate to the yard arch: the model's walls there (and
+        /// its own old door leaves against them) are cut away, these are the walls now, clear of the open leaves.</summary>
+        private static void GatePocketLiners(Transform castle, GateArch arch, float wallZ, float doorZ, List<string> log)
+        {
+            var m = new MeshBuild(1);
+            const float x0 = 2.17f, x1 = 2.32f; // just behind the open leaves (hinged at the jamb, 7 cm half thickness)
+            foreach (int side in new[] { -1, 1 })
+            {
+                m.Box(0, new Vector3(Mathf.Min(side * x0, side * x1), -0.05f, wallZ + YardArchTo - 0.12f),
+                    new Vector3(Mathf.Max(side * x0, side * x1), PassageHigh + 0.3f, doorZ - 0.02f));
+                // A stone jamb beside each leaf's hinge, closing the slit between the gate and the passage's side.
+                float j0 = arch.W + 0.005f, j1 = x1;
+                m.Box(0, new Vector3(Mathf.Min(side * j0, side * j1), -0.05f, doorZ - 0.02f),
+                    new Vector3(Mathf.Max(side * j0, side * j1), arch.TopAt(arch.W) + 0.3f, doorZ + 0.25f));
+            }
+            Material stone = Island3RockMaterial("CastleStone", new Color(0.62f, 0.6f, 0.57f), "CastleStone", 3.2f);
+            GameObject liners = MeshObject("GatePocketLiners", castle, m.Save("CastleGatePocketLiners"), new[] { stone });
+            liners.transform.localPosition = new Vector3(arch.Cx, GateArch.Floor, 0f);
+            TagSurface(liners, SurfaceKind.Rock);
+            log.Add("  stone facings on the passage's sides, gate to yard");
+        }
+
+        /// <summary>A stone plate in the yard-side arch ring, round the passage's arch: it fills where the model's panel
+        /// was (between the passage's vault and the wider, taller yard arch), its edge tucked behind the ring.</summary>
+        private static void GateYardPlate(Transform castle, GateArch arch, float z0, float z1, List<string> log)
+        {
+            var m = new MeshBuild(1);
+            float reach = YardArchHalf + 0.12f;
+            for (float x = -reach; x < reach - 0.001f; x += 0.05f)
+            {
+                float xa = x, xb = Mathf.Min(reach, x + 0.05f);
+                float Bottom(float v) => Mathf.Abs(v) < arch.W ? arch.TopAt(v) + 0.03f : -0.05f;
+                float Top(float v) => Mathf.Abs(v) < YardArchHalf ? YardArchTopAt(v) + 0.12f : YardArchSides + 0.12f;
+                if (Top(xa) <= Bottom(xa) && Top(xb) <= Bottom(xb)) continue;
+                m.Prism(0, xa, xb, Bottom(xa), Bottom(xb), Mathf.Max(Top(xa), Bottom(xa)), Mathf.Max(Top(xb), Bottom(xb)), z0, z1);
+            }
+            Material stone = Island3RockMaterial("CastleStone", new Color(0.62f, 0.6f, 0.57f), "CastleStone", 3.2f);
+            GameObject plate = MeshObject("GateYardPlate", castle, m.Save("CastleGateYardPlate"), new[] { stone });
+            plate.transform.localPosition = new Vector3(arch.Cx, GateArch.Floor, 0f);
+            TagSurface(plate, SurfaceKind.Rock);
+            log.Add("  stone plate in the yard arch, round the passage's arch");
+        }
+
+        /// <summary>Puts a Tripo model's own meshes back (before cutting a fresh copy).</summary>
         private static void RestoreTripoMeshes(Transform model, string name)
         {
             GameObject prefab = model == null ? null : TripoPrefab(name);
@@ -485,132 +728,55 @@ namespace PleaseDontDrown.Editor
             }
         }
 
-        /// <summary>One pair of arched leaves at castle-local depth <paramref name="z"/>, fitted to the opening measured
-        /// there (<paramref name="widestSide"/>: the arch by the wider side's ray, where the other side hits clutter).</summary>
-        private static (Transform root, float halfWidth) GateLeaves(Transform castle, Transform gatehouse, string name, float z, float half, bool widestSide, List<string> log)
+        /// <summary>
+        /// The Tripo gatehouse's passage, cut open on a copy of its mesh: everything inside it between the gate and the
+        /// yard arch (the model's own old door leaves standing open, a bar across, the side walls: GatePocketLiners
+        /// replace them) and the flat beige panel across the yard arch (GateYardPlate fills round the passage's arch).
+        /// The floor and the vault stay.
+        /// </summary>
+        private static void OpenGatePassage(Transform castle, Transform gatehouse, GateArch arch, float wallZ, List<string> log)
         {
-            const float G = 0.3f;
-            float jambL = 1.95f, jambR = 1.95f, top = G + 5.4f;
-            var arch = new List<(float y, float half)>();
-            if (gatehouse != null)
+            const float G = GateArch.Floor;
+            int removed = 0;
+            foreach (MeshFilter f in gatehouse.GetComponentsInChildren<MeshFilter>())
             {
-                var samples = new List<(float y, float l, float r)>();
-                using (var probe = new MeshProbe(gatehouse))
+                Mesh source = f.sharedMesh; // RestoreTripoMeshes put the model's own mesh back first
+                if (source == null || !source.isReadable) continue;
+                Vector3[] v = source.vertices;
+                Matrix4x4 toCastle = castle.worldToLocalMatrix * f.transform.localToWorldMatrix;
+                var kept = new List<int[]>();
+                int cutHere = 0;
+                for (int s = 0; s < source.subMeshCount; s++)
                 {
-                    Vector3 At(float x, float y) => castle.TransformPoint(new Vector3(x, y, z));
-                    top = G + 0.3f + (probe.Cast(At(0f, G + 0.3f), castle.up, 20f) ?? throw new InvalidOperationException($"{name}: the arch has no top"));
-                    for (float y = G + 0.2f; y < top - 0.01f; y += 0.05f)
-                        if (probe.Cast(At(0f, y), -castle.right, 8f) is { } l && probe.Cast(At(0f, y), castle.right, 8f) is { } r)
-                            samples.Add((y, l, r));
-                }
-                float Median(IEnumerable<float> v) { float[] s = v.OrderBy(x => x).ToArray(); return s[s.Length / 2]; }
-                var jamb = samples.Where(s => s.y > G + 0.5f && s.y < G + 4f).ToArray();
-                jambL = Median(jamb.Select(s => s.l));
-                jambR = Median(jamb.Select(s => s.r));
-                float last = (jambL + jambR) * 0.5f;
-                if (widestSide)
-                {
-                    // Clutter in the way of the rays here (the panel's frame): the arch is a half ellipse from the jambs'
-                    // top (4 m) to the measured crown, which matched the clean samples within ~10 cm.
-                    for (float y = G + 4.05f; y < top; y += 0.05f)
+                    int[] tris = source.GetTriangles(s);
+                    var keep = new List<int>(tris.Length);
+                    for (int i = 0; i < tris.Length; i += 3)
                     {
-                        float k = (y - G - 4f) / (top - G - 4f);
-                        arch.Add((y, last * Mathf.Sqrt(Mathf.Max(0f, 1f - k * k))));
+                        Vector3 a = toCastle.MultiplyPoint3x4(v[tris[i]]), b = toCastle.MultiplyPoint3x4(v[tris[i + 1]]), c = toCastle.MultiplyPoint3x4(v[tris[i + 2]]);
+                        Vector3 mid = (a + b + c) / 3f, n = Vector3.Cross(b - a, c - a).normalized;
+                        float x = Mathf.Abs(mid.x - arch.Cx), y = mid.y - G, dz = mid.z - wallZ;
+                        bool Inside(Vector3 p) => p.z - wallZ > PassageFrom && p.z - wallZ < PassageTo && Mathf.Abs(p.x - arch.Cx) < PassageHalf && p.y - G > 0.05f && p.y - G < PassageHigh;
+                        float longest = Mathf.Max((a - b).magnitude, Mathf.Max((b - c).magnitude, (c - a).magnitude));
+                        // Inside the passage, or a long sliver (a bar across it) with a corner inside.
+                        bool passage = Inside(mid) || (longest > 1.2f && (Inside(a) || Inside(b) || Inside(c)));
+                        bool panel = dz > YardArchFrom && dz < YardArchTo && x < YardArchHalfAt(y) && y > 0.35f && y < YardArchTop
+                                     && (Mathf.Abs(n.z) > 0.6f || (Mathf.Abs(n.y) > 0.6f && y < 1.3f));
+                        if (passage || panel) { cutHere++; continue; }
+                        keep.AddRange(new[] { tris[i], tris[i + 1], tris[i + 2] });
                     }
+                    kept.Add(keep.ToArray());
                 }
-                else
-                    foreach ((float y, float l, float r) in samples.Where(s => s.y >= G + 4f))
-                        arch.Add((y, last = Mathf.Min(last, (l + r) * 0.5f)));
+                if (cutHere == 0) continue;
+                Mesh copy = Object.Instantiate(source);
+                copy.name = source.name + "_open";
+                for (int s = 0; s < kept.Count; s++) copy.SetTriangles(kept[s], s);
+                string asset = $"{MeshDir}/Island3/castle_gatehouse_{f.name}_open.asset";
+                AssetDatabase.DeleteAsset(asset);
+                AssetDatabase.CreateAsset(copy, asset);
+                f.sharedMesh = copy;
+                removed += cutHere;
             }
-            float W = (jambL + jambR) * 0.5f - 0.03f, cx = (jambR - jambL) * 0.5f;
-            arch.Insert(0, (G + 4f, W + 0.03f));
-            arch.Add((top, 0f));
-            log.Add($"{name} at z {z:0.00}: {jambL:0.00} m left, {jambR:0.00} m right of the middle, arch top {top - G:0.00} m; {2f * W:0.00} m wide");
-            log.Add("  arch: " + string.Join(" ", arch.Where((_, i) => i % 4 == 0).Select(a => $"{a.y - G:0.0}:{a.half:0.00}")));
-
-            // The top of the door at |x| from its middle (y from the floor), 3 cm under the stone.
-            float TopAt(float x)
-            {
-                x = Mathf.Abs(x);
-                for (int i = 1; i < arch.Count; i++)
-                    if (arch[i].half < x)
-                    {
-                        (float y0, float h0) = arch[i - 1];
-                        (float y1, float h1) = arch[i];
-                        float k = h0 - h1 > 1e-4f ? (h0 - x) / (h0 - h1) : 0f;
-                        return Mathf.Lerp(y0, y1, Mathf.Clamp01(k)) - G - 0.03f;
-                    }
-                return top - G - 0.03f;
-            }
-
-            var root = new GameObject(name).transform;
-            root.SetParent(castle, false);
-            root.localPosition = new Vector3(cx, G, z);
-            const int WoodA = 0, WoodB = 1, Core = 2, Iron = 3;
-            var m = new MeshBuild(4);
-            const float bottom = -0.03f;
-            foreach (int side in new[] { -1, 1 })
-            {
-                int planks = Mathf.Max(4, Mathf.RoundToInt(W / 0.27f));
-                float pw = W / planks;
-                for (int i = 0; i < planks; i++)
-                {
-                    float a = side * i * pw, b = side * (i + 1) * pw, xl = Mathf.Min(a, b), xr = Mathf.Max(a, b);
-                    // A plank (a hair narrower: dark seams between) on the dark core.
-                    m.Prism((i + (side > 0 ? 1 : 0)) % 2 == 0 ? WoodA : WoodB, xl + 0.007f, xr - 0.007f, bottom, bottom,
-                        TopAt(xl + 0.007f), TopAt(xr - 0.007f), -half, half);
-                    m.Prism(Core, xl, xr, bottom, bottom, TopAt(xl) - 0.02f, TopAt(xr) - 0.02f, -half + 0.02f, half - 0.02f);
-                }
-                // The leaf runs on 30 cm into the jamb (hidden in the stone): it closes the model's door pockets beside it,
-                // where you looked past the gate to the outside.
-                float edgeTop = TopAt(W) - 0.3f;
-                m.Prism(Core, side > 0 ? W : -W - 0.3f, side > 0 ? W + 0.3f : -W, bottom, bottom, edgeTop, edgeTop, -half, half);
-                // Iron straps across each leaf, studded, on both faces.
-                foreach (float y in new[] { 0.85f, 2.35f, 3.85f })
-                {
-                    if (TopAt(W) < y + 0.25f) continue;
-                    float x0 = side * 0.06f, x1 = side * (W - 0.05f);
-                    foreach (int face in new[] { -1, 1 })
-                    {
-                        float zIn = face * half, zOut = face * (half + 0.025f);
-                        m.Box(Iron, new Vector3(Mathf.Min(x0, x1), y - 0.07f, Mathf.Min(zIn, zOut)), new Vector3(Mathf.Max(x0, x1), y + 0.07f, Mathf.Max(zIn, zOut)));
-                        for (float s = 0.2f; s < W - 0.1f; s += 0.33f)
-                        {
-                            float sx = side * s, zs = face * (half + 0.05f);
-                            m.Box(Iron, new Vector3(sx - 0.03f, y - 0.03f, Mathf.Min(zOut, zs)), new Vector3(sx + 0.03f, y + 0.03f, Mathf.Max(zOut, zs)));
-                        }
-                    }
-                }
-            }
-            foreach (int face in new[] { -1, 1 })
-            {
-                float zIn = face * half, zOut = face * (half + 0.022f);
-                float z0 = Mathf.Min(zIn, zOut), z1 = Mathf.Max(zIn, zOut);
-                // The meeting stile in the middle, the edges, and the rim along the arch.
-                m.Prism(Iron, -0.045f, 0.045f, bottom, bottom, TopAt(0.045f) - 0.04f, TopAt(0.045f) - 0.04f, z0, z1);
-                foreach (int side in new[] { -1, 1 })
-                    m.Prism(Iron, side > 0 ? W - 0.08f : -W, side > 0 ? W : -W + 0.08f, bottom, bottom, TopAt(W - 0.08f), TopAt(W - 0.08f), z0, z1);
-                for (float x = -W; x < W - 0.001f; x += 0.1f)
-                {
-                    float xa = x, xb = Mathf.Min(W, x + 0.1f);
-                    m.Prism(Iron, xa, xb, TopAt(xa) - 0.13f, TopAt(xb) - 0.13f, TopAt(xa), TopAt(xb), z0, z1);
-                }
-            }
-            Material woodA = WoodMaterial("GateDoorPlankA", new Color(0.5f, 0.33f, 0.2f));
-            Material woodB = WoodMaterial("GateDoorPlankB", new Color(0.42f, 0.27f, 0.16f));
-            Material core = GetMaterial("GateDoorCore", new Color(0.07f, 0.05f, 0.04f));
-            Material iron = GetMaterial("GateIron", new Color(0.12f, 0.12f, 0.13f), 0.6f, 0.35f);
-            GameObject leaves = MeshObject("Leaves", root, m.Save("Castle" + name), new[] { woodA, woodB, core, iron });
-            TagSurface(leaves, SurfaceKind.Wood);
-            foreach (int face in new[] { -1, 1 })
-                foreach (int side in new[] { -1, 1 })
-                {
-                    GameObject ring = Primitive(PrimitiveType.Cylinder, "RingHandle", root, new Vector3(side * 0.3f, 1.45f, face * (half + 0.06f)), new Vector3(0.3f, 0.012f, 0.3f), iron, keepCollider: false);
-                    ring.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    Primitive(PrimitiveType.Sphere, "RingBoss", root, new Vector3(side * 0.3f, 1.58f, face * (half + 0.04f)), Vector3.one * 0.09f, iron, keepCollider: false);
-                }
-            log.Add($"  {name}: {root.position}, {TopAt(0f):0.00} m tall in the middle, {TopAt(W):0.00} m at its edges");
-            return (root, W);
+            log.Add($"  gatehouse: {removed} faces cut from its passage (old leaves, bar, panel)");
         }
 
         // ================================================================== the castle's curtain walls
@@ -635,7 +801,7 @@ namespace PleaseDontDrown.Editor
             const float X = 31f, Z = 20f, G = 0.3f; // BuildPirateCastle's frame
             // The old pieces' size, to keep the castle's proportions.
             Transform[] tripoWalls = castle.Cast<Transform>().Where(t => t.name == "Tripo_castle_wall").ToArray();
-            float wallTop = G + 10f, thick = 2.6f;
+            float wallTop = G + 10.5f, thick = 2.2f; // the Tripo pieces' size (measured on the first run)
             if (tripoWalls.Length > 0)
             {
                 Bounds[] b = tripoWalls.Select(w => TripoBounds(w, castle)).ToArray();
@@ -713,15 +879,31 @@ namespace PleaseDontDrown.Editor
                         Box("SlitSill", o, o + outward * 0.12f, G + (walk - G) * 0.62f - 0.12f, G + (walk - G) * 0.62f, zs - 0.25f, zs + 0.25f, stoneDark, false);
                     }
                 }
-                log.Add($"{name}: {len:0.0} m, shows {zB - zA:0.0} m, {merlons} merlons, {bays - 1} buttresses");
+                log.Add($"{name}: {len:0.0} m, shows {zB - zA:0.0} m (ends {trimA:0.0} / {trimB:0.0} m in), {merlons} merlons, {bays - 1} buttresses");
             }
-            float trim = towerR * 0.85f;
-            Line("WallSouth", new Vector3(-X, 0f, -Z), new Vector3(X, 0f, -Z), trim, trim);
-            Line("WallWest", new Vector3(-X, 0f, Z), new Vector3(-X, 0f, -Z), trim, trim);
-            Line("WallEast", new Vector3(X, 0f, -Z), new Vector3(X, 0f, Z), trim, trim);
+            // How far the stone of what stands at a wall's end (a tower, the gatehouse) reaches along it: the least over
+            // the wall's heights and across its width (the towers taper), so ledges, parapets and merlons run into it.
+            using var probe = new MeshProbe(castle);
+            float Reach(Vector3 a, Vector3 b)
+            {
+                Vector3 dir = (b - a).normalized, side = Vector3.Cross(Vector3.up, dir);
+                float start = Mathf.Min((b - a).magnitude * 0.5f, 16f), least = float.MaxValue;
+                foreach (float h in new[] { G + 1.5f, G + (walk - G) * 0.55f, walk - 0.3f, walk + 0.3f, wallTop - 0.2f })
+                    foreach (float across in new[] { -thick * 0.5f - 0.3f, 0f, thick * 0.5f + 0.3f })
+                    {
+                        Vector3 from = a + dir * start + side * across + Vector3.up * h;
+                        if (probe.Cast(castle.TransformPoint(from), castle.TransformDirection(-dir), start + 2f) is { } d)
+                            least = Mathf.Min(least, start - d);
+                    }
+                return least == float.MaxValue ? 1f : Mathf.Max(0.5f, least - 0.35f); // 35 cm into the stone
+            }
+            void Joined(string name, Vector3 a, Vector3 b) => Line(name, a, b, Reach(a, b), Reach(b, a));
+            Joined("WallSouth", new Vector3(-X, 0f, -Z), new Vector3(X, 0f, -Z));
+            Joined("WallWest", new Vector3(-X, 0f, Z), new Vector3(-X, 0f, -Z));
+            Joined("WallEast", new Vector3(X, 0f, -Z), new Vector3(X, 0f, Z));
             float g = gateHalf - 1f;
-            Line("WallNorthWest", new Vector3(-g, 0f, Z), new Vector3(-X, 0f, Z), 1f, trim);
-            Line("WallNorthEast", new Vector3(X, 0f, Z), new Vector3(g, 0f, Z), trim, 1f);
+            Joined("WallNorthWest", new Vector3(-g, 0f, Z), new Vector3(-X, 0f, Z));
+            Joined("WallNorthEast", new Vector3(X, 0f, Z), new Vector3(g, 0f, Z));
         }
 
         // ================================================================== C4: the river out to the sea
@@ -905,8 +1087,9 @@ namespace PleaseDontDrown.Editor
 
         // ================================================================== B4: coconut palms back on island 1
 
-        /// <summary>Batch: eleven shakeable coconut palms back on island 1, in small groups round its edges (the busy
-        /// front beach, the docks and everything standing on the sand kept clear).</summary>
+        /// <summary>Batch: about twenty shakeable coconut palms back on island 1, spread all round it: a ring 7 m in from
+        /// the dry sand's edge (some with a second palm close by, as palms grow) and a few further in, clear of the docks
+        /// and everything standing on the sand.</summary>
         public static void TeamBIsland1PalmsBatch() => RunBatch(() =>
         {
             var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -916,59 +1099,93 @@ namespace PleaseDontDrown.Editor
             var group = new GameObject("Island1Palms").transform;
             group.SetParent(env, false);
 
-            // Everything drawn on the island (towels, umbrellas, kiosks...), to keep the palms off it.
+            // Everything drawn on the island (towels, umbrellas, kiosks, docks...), to keep the palms off it.
             Bounds islandBox = new(new Vector3(IslandCenter.x, 0f, IslandCenter.y), new Vector3(IslandHalfSize.x * 2f + 20f, 60f, IslandHalfSize.y * 2f + 20f));
             Bounds[] things = Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None)
-                .Where(r => r.enabled && islandBox.Intersects(r.bounds) && r.bounds.size.x < 40f && r.bounds.size.z < 40f && !r.transform.IsChildOf(group))
+                .Where(r => r.enabled && islandBox.Intersects(r.bounds) && r.bounds.size.x < 120f && r.bounds.size.z < 120f
+                            && r.name != "BeachTerrain" && !r.transform.IsChildOf(group))
                 .Select(r => r.bounds).ToArray();
             bool Free(Vector2 p, float clear) => !things.Any(b =>
                 p.x > b.min.x - clear && p.x < b.max.x + clear && p.y > b.min.z - clear && p.y < b.max.z + clear && b.min.y < 4f);
-
-            // Groups (island-relative: x -1 west .. 1 east, z -1 front .. 1 back) and the palms' offsets in each.
-            (Vector2 anchor, Vector2[] offsets)[] groves =
+            bool Dry(Vector2 p)
             {
-                (new(-0.78f, 0.62f), new Vector2[] { new(0f, 0f), new(2.6f, 1.4f), new(-0.6f, -2.8f) }),
-                (new(0.8f, 0.66f), new Vector2[] { new(0f, 0f), new(-2.8f, 0.9f), new(0.8f, -2.7f) }),
-                (new(-0.86f, -0.05f), new Vector2[] { new(0f, 0f), new(0.9f, 2.9f) }),
-                (new(0.88f, 0.02f), new Vector2[] { new(0f, 0f), new(-1f, -2.8f) }),
-                (new(0.08f, 0.86f), new Vector2[] { new(0f, 0f) }),
-            };
+                // Dry sand (it lies at 0, the sea at WaterLevel) all round, 4 m from the wet edge.
+                if (BeachHeight(p.x, p.y) < WaterLevel + 0.3f) return false;
+                for (int d = 0; d < 8; d++)
+                    if (BeachHeight(p.x + Mathf.Cos(d * Mathf.PI / 4f) * 4f, p.y + Mathf.Sin(d * Mathf.PI / 4f) * 4f) <= WaterLevel + 0.15f) return false;
+                return true;
+            }
+            // How far the dry sand reaches from the middle, at an angle.
+            float Edge(float a)
+            {
+                var dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                float r = 0f;
+                while (r < 80f && BeachHeight(IslandCenter.x + dir.x * r, IslandCenter.y + dir.y * r) > WaterLevel + 0.3f) r += 0.25f;
+                return r;
+            }
+
+            // The ring 7 m in from the edge, as a closed line, and twelve palms evenly along it.
+            var ring = new List<Vector2>();
+            for (int i = 0; i < 180; i++)
+            {
+                float a = i * Mathf.PI * 2f / 180f;
+                ring.Add(IslandCenter + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Mathf.Max(0f, Edge(a) - 7f));
+            }
+            float perimeter = 0f;
+            for (int i = 0; i < ring.Count; i++) perimeter += Vector2.Distance(ring[i], ring[(i + 1) % ring.Count]);
+            Vector2 Along(float d)
+            {
+                for (int i = 0; ; i = (i + 1) % ring.Count)
+                {
+                    float step = Vector2.Distance(ring[i], ring[(i + 1) % ring.Count]);
+                    if (d <= step) return Vector2.Lerp(ring[i], ring[(i + 1) % ring.Count], step > 0f ? d / step : 0f);
+                    d -= step;
+                }
+            }
+            var wanted = new List<(Vector2 p, float near)>(); // where, and how close to another palm it may stand
+            const int OnRing = 12;
+            for (int i = 0; i < OnRing; i++)
+            {
+                Vector2 p = Along(perimeter * (i + 0.37f) / OnRing);
+                wanted.Add((p, 6f));
+                if (i % 3 == 0) // a second palm beside it, a little further in
+                    wanted.Add((p + (IslandCenter - p).normalized * 2.4f + new Vector2((IslandCenter - p).y, -(IslandCenter - p).x).normalized * 1.6f, 2.2f));
+            }
+            foreach (float deg in new[] { 35f, 145f, 215f, 325f }) // a few further in
+            {
+                float a = deg * Mathf.Deg2Rad;
+                wanted.Add((IslandCenter + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * Edge(a) * 0.48f, 6f));
+            }
+
             var placed = new List<Vector2>();
             int index = 0;
-            foreach ((Vector2 anchor, Vector2[] offsets) in groves)
-                foreach (Vector2 offset in offsets)
+            foreach ((Vector2 want, float near) in wanted)
+            {
+                Vector2? spot = null;
+                // A small spiral round the wanted spot until on dry sand, clear of things and of the other palms.
+                for (int k = 0; k < 80 && spot == null; k++)
                 {
-                    Vector2 want = IslandCenter + Vector2.Scale(anchor, IslandHalfSize) + offset;
-                    Vector2? spot = null;
-                    // Inward until on dry sand and clear of things and the other palms (a little spiral search).
-                    for (int k = 0; k < 60 && spot == null; k++)
-                    {
-                        Vector2 p = Vector2.Lerp(want, IslandCenter, k / 60f * 0.35f) + (k == 0 ? Vector2.zero : new Vector2(Mathf.Cos(k * 2.4f), Mathf.Sin(k * 2.4f)) * (0.6f + k * 0.05f));
-                        // Dry sand (it lies at 0, the sea at WaterLevel) all round, 4 m from the wet edge.
-                        if (BeachHeight(p.x, p.y) < WaterLevel + 0.3f) continue;
-                        bool dry = true;
-                        for (int d = 0; d < 8 && dry; d++)
-                            dry = BeachHeight(p.x + Mathf.Cos(d * Mathf.PI / 4f) * 4f, p.y + Mathf.Sin(d * Mathf.PI / 4f) * 4f) > WaterLevel + 0.15f;
-                        if (!dry || !Free(p, 1.8f)) continue;
-                        if (placed.Any(q => Vector2.Distance(q, p) < 2.4f)) continue;
-                        spot = p;
-                    }
-                    if (spot is not { } s) { log.Add($"no room near {want}"); continue; }
-                    var feet = new Vector3(s.x, BeachHeight(s.x, s.y) - 0.15f, s.y);
-                    GameObject palm = MeshyArt.Place("palm_tall", group, 6.5f + index % 3 * 0.65f, feet, index * 67f + 20f);
-                    if (palm == null) throw new InvalidOperationException("palm_tall model missing");
-                    var col = palm.AddComponent<CapsuleCollider>();
-                    col.center = new Vector3(0f, 2.4f, 0f);
-                    col.height = 4.8f;
-                    col.radius = 0.3f;
-                    MakeShakeable(palm);
-                    placed.Add(s);
-                    index++;
-                    log.Add($"palm at ({s.x:0.0}, {s.y:0.0})");
+                    Vector2 p = want + (k == 0 ? Vector2.zero : new Vector2(Mathf.Cos(k * 2.4f), Mathf.Sin(k * 2.4f)) * (0.4f + k * 0.05f));
+                    if (!Dry(p) || !Free(p, 1.8f) || placed.Any(q => Vector2.Distance(q, p) < near)) continue;
+                    spot = p;
                 }
+                if (spot is not { } s) { log.Add($"no room near ({want.x:0.0}, {want.y:0.0})"); continue; }
+                var feet = new Vector3(s.x, BeachHeight(s.x, s.y) - 0.15f, s.y);
+                GameObject palm = MeshyArt.Place("palm_tall", group, 6.4f + index % 4 * 0.5f, feet, index * 67f + 20f);
+                if (palm == null) throw new InvalidOperationException("palm_tall model missing");
+                var col = palm.AddComponent<CapsuleCollider>();
+                col.center = new Vector3(0f, 2.4f, 0f);
+                col.height = 4.8f;
+                col.radius = 0.3f;
+                MakeShakeable(palm);
+                placed.Add(s);
+                index++;
+                log.Add($"palm at ({s.x:0.0}, {s.y:0.0})");
+            }
             log.Insert(0, $"{placed.Count} coconut palms on island 1");
             Physics.SyncTransforms();
             BakeNavMeshes(only: "Island1");
+            AssignSceneIds(scene); // shakeable palms are networked
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             SaveLog("teamb-palms.txt", log, "B4 palms back on island 1");
