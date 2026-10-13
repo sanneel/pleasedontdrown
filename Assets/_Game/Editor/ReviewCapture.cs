@@ -353,6 +353,16 @@ namespace PleaseDontDrown.Editor
                 }
                 pose = "ride";
             }
+            if (pose.StartsWith("cpr:"))
+            {
+                // cpr:<forward m>[:<up m>]: the chest that far in front of the feet (the game kneels at KneelReach).
+                string[] c = pose.Split(':');
+                float ahead = float.Parse(c[1], CultureInfo.InvariantCulture);
+                float upBy = c.Length > 2 ? float.Parse(c[2], CultureInfo.InvariantCulture) : 0.2f;
+                m.Cpr = true;
+                m.CprPoint = go.transform.position + forward * ahead + Vector3.up * upBy;
+                pose = "cprdone";
+            }
             switch (pose)
             {
                 case "walk": m.Velocity = forward * 2.2f; break;

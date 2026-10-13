@@ -91,7 +91,7 @@ namespace PleaseDontDrown.Story
             float alpha = !alive ? 0f : since < ShowFor ? 1f : 1f - (since - ShowFor) / FadeFor;
             _shown = Mathf.MoveTowards(_shown, Mathf.Clamp01(alpha), Time.deltaTime * 8f);
             Camera cam = Camera.main;
-            bool visible = _shown > 0.01f && cam != null;
+            bool visible = _shown > 0.01f && cam != null && !Dev.Showreel.Filming;
             SetShown(visible);
             if (!visible) return;
 

@@ -24,6 +24,7 @@ namespace PleaseDontDrown.UI
         public static void Spawn(Vector3 position, string text, Color color, float scale = 1f, float lifetime = 1.4f, bool speechCloud = false)
         {
             if (speechCloud) { SpawnBubble(position, null, text, scale, lifetime); return; }
+            if (Dev.Showreel.Filming) return; // (no popups in trailer shots)
             var go = new GameObject("FloatingText");
             go.transform.position = position;
             TextMesh mesh = AddText(go, text, color, 0.035f * scale);

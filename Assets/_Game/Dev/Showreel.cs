@@ -33,20 +33,24 @@ namespace PleaseDontDrown.Dev
     ///   cam follow &lt;target&gt; dx dy dz [fov]        locked onto it from a world offset (fast things: a lifeguard
     ///                                               shot out of the cannon)
     ///   cam orbit &lt;target&gt; radius height deg/s [fov] [start deg]
+    ///   cam eyes [fov]                              through the player's own eyes (first person, hands and all)
     ///   cam drift dx dy dz                          slide the camera along (m/s) in fixed/look shots
     ///   cam off                                     back to the player's eyes
     ///   record &lt;name&gt; [width height fps] / record stop
     ///   costar &lt;n&gt;                                 a different goofy face and colours for this player
-    /// Targets: p1..p9 (player by join order: the host is p0), victim / victimf / victimm, or part of the name of
+    /// Targets: p1..p9 (player by join order: the host is p0), victim / victimf / victimm, a character or creature by name (a pirate, the Kleptopus), or part of the name of
     /// a vehicle, item or scene object; add .head / .chest / .mouth / .feet for a part of a body. A tourist lying
     /// down faces the way her head points.
     /// </summary>
     [DefaultExecutionOrder(10000)] // after everything has moved this frame
     public class Showreel : MonoBehaviour
     {
-        private enum Mode { Off, Fixed, Look, Chase, Follow, Orbit }
+        private enum Mode { Off, Fixed, Look, Chase, Follow, Orbit, Eyes }
 
         private static Showreel _instance;
+
+        /// <summary>The movie camera is on: damage numbers, health bars and name tags stay out of the shot.</summary>
+        public static bool Filming => _instance != null && _instance._mode != Mode.Off;
         private Camera _camera;
         private RenderTexture _dummy;
         private Camera _hidden;
@@ -144,6 +148,14 @@ namespace PleaseDontDrown.Dev
                     _position = _target() + Quaternion.Euler(0f, facing, 0f) * new Vector3(F(3), F(4), F(5));
                     _camera.fieldOfView = Fov(6);
                     break;
+                case "eyes":
+                    Take();
+                    if (_hidden == null) throw new InvalidOperationException("no player camera");
+                    _mode = Mode.Eyes;
+                    _camera.cullingMask = _hidden.cullingMask; // (the player's own body stays out of view)
+                    _camera.fieldOfView = args.Length > 1 ? F(1) : _hidden.fieldOfView;
+                    _target = () => _hidden.transform.position;
+                    break;
                 case "orbit":
                     Resolve(args[1]);
                     Take();
@@ -183,6 +195,7 @@ namespace PleaseDontDrown.Dev
                 player.tag = "Untagged";
                 if (player.TryGetComponent(out _hiddenEars)) _hiddenEars.enabled = false;
             }
+            _camera.cullingMask = ~0; // (cam eyes narrows it)
             _camera.gameObject.tag = "MainCamera";
             _camera.enabled = true;
             _camera.GetComponent<AudioListener>().enabled = true;
@@ -214,6 +227,13 @@ namespace PleaseDontDrown.Dev
             if (_mode != Mode.Off && _camera != null && _target != null)
             {
                 float dt = Time.unscaledDeltaTime;
+                if (_mode == Mode.Eyes)
+                {
+                    if (_hidden != null) _camera.transform.SetPositionAndRotation(_hidden.transform.position, _hidden.transform.rotation);
+                    HideNameTags();
+                    if (_recording) Capture();
+                    return;
+                }
                 Vector3 target;
                 float yaw = 0f;
                 try
@@ -265,6 +285,13 @@ namespace PleaseDontDrown.Dev
             foreach (PlayerHub p in PlayerHub.All)
                 if (p != null)
                     foreach (TextMesh tag in p.GetComponentsInChildren<TextMesh>())
+                    {
+                        tag.gameObject.SetActive(false);
+                        _hiddenTags.Add(tag.gameObject);
+                    }
+            foreach (Story.StoryNpc n in Story.StoryNpc.All)
+                if (n != null)
+                    foreach (TextMesh tag in n.GetComponentsInChildren<TextMesh>())
                     {
                         tag.gameObject.SetActive(false);
                         _hiddenTags.Add(tag.gameObject);
@@ -348,6 +375,11 @@ namespace PleaseDontDrown.Dev
 
         private static Transform FindNamed(string name)
         {
+            // Characters and creatures by their shown names first (a pirate "One-Eye", the Kleptopus).
+            foreach (Story.StoryNpc n in Story.StoryNpc.All)
+                if (n != null && n.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0) return n.transform;
+            foreach (Creatures.Creature c in Creatures.Creature.All)
+                if (c != null && c.DisplayName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0) return c.transform;
             foreach (Vehicle v in Vehicle.All)
                 if (v != null && v.DisplayName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0) return v.transform;
             foreach (Item i in Item.All)
