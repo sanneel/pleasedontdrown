@@ -24,7 +24,11 @@ namespace PleaseDontDrown.Audio
         {
             _burps ??= new AudioClip[Variants];
             variant = Mathf.Clamp(variant, 0, Variants - 1);
-            return _burps[variant] != null ? _burps[variant] : _burps[variant] = BuildBurp(variant);
+            if (_burps[variant] != null) return _burps[variant];
+            // The recorded belch (Resources/Audio/Fun/Burp0) for every variant (the burper's pitch varies it); the
+            // synthesized one if it's missing.
+            AudioClip recorded = Resources.Load<AudioClip>("Audio/Fun/Burp0");
+            return _burps[variant] = recorded != null ? recorded : BuildBurp(variant);
         }
 
         /// <summary>One swallow: the throat's soft thump and the glug of a bubble going down.</summary>

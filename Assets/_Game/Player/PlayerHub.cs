@@ -312,7 +312,7 @@ namespace PleaseDontDrown.Player
                 _burpAudio.playOnAwake = false;
                 _burpAudio.spatialBlend = 1f;
                 _burpAudio.rolloffMode = AudioRolloffMode.Linear;
-                _burpAudio.minDistance = 3f;
+                _burpAudio.minDistance = 5f; // (loud: the whole group hears it)
                 _burpAudio.maxDistance = 45f;
             }
             _burpAudio.pitch = UnityEngine.Random.Range(0.9f, 1.08f);

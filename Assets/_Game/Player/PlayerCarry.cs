@@ -55,6 +55,20 @@ namespace PleaseDontDrown.Player
         /// <summary>Where the one carried lies, from the carrier's feet (turned with the carrier's look).</summary>
         public static readonly Vector3 HoldOffset = new(0.17f, 1.04f, 0.04f);
 
+        private Vector3 _liftFrom;
+        private float _liftStart = -10f;
+        private const float LiftTime = 0.35f;
+
+        /// <summary>The hold point, eased in from where they stood for the first moment (swept up, not snapped).</summary>
+        private Vector3 LiftedPoint(PlayerHub carrier)
+        {
+            Vector3 hold = HoldPoint(carrier, out _);
+            float k = (Time.time - _liftStart) / LiftTime;
+            if (k >= 1f) return hold;
+            k = Mathf.Clamp01(k);
+            return Vector3.Lerp(_liftFrom, hold, Mathf.SmoothStep(0f, 1f, k)) + Vector3.up * (Mathf.Sin(k * Mathf.PI) * 0.25f);
+        }
+
         public static Vector3 HoldPoint(PlayerHub carrier, out float yaw)
         {
             yaw = carrier.Head != null ? carrier.Head.eulerAngles.y : carrier.transform.eulerAngles.y;
@@ -65,7 +79,11 @@ namespace PleaseDontDrown.Player
         private void Awake()
         {
             if (_hub == null) _hub = GetComponent<PlayerHub>();
-            _carrier.OnChange += (previous, next, _) => IgnoreCarrier(next);
+            _carrier.OnChange += (previous, next, _) =>
+            {
+                IgnoreCarrier(next);
+                if (next != null && previous == null) { _liftFrom = transform.position; _liftStart = Time.time; }
+            };
         }
 
         private void OnEnable() => All.Add(this);
@@ -183,7 +201,7 @@ namespace PleaseDontDrown.Player
             PlayerHub carrier = Carrier;
             if (carrier == null || Time.time < _letGoUntil) return;
             _hub.Motor.Stun(0.25f);
-            _hub.Motor.Teleport(HoldPoint(carrier, out _));
+            _hub.Motor.Teleport(LiftedPoint(carrier));
         }
 
         private void LateUpdate()
@@ -191,7 +209,7 @@ namespace PleaseDontDrown.Player
             // Everyone else: in the arms exactly, not a network-delay behind them.
             if (IsOwner) return;
             PlayerHub carrier = Carrier;
-            if (carrier != null) transform.position = HoldPoint(carrier, out _);
+            if (carrier != null) transform.position = LiftedPoint(carrier);
         }
 
         /// <summary>Carrier: tap Drop to put them down, hold it and let go to throw them (as a tourist is thrown).</summary>

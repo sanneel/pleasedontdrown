@@ -238,10 +238,11 @@ namespace PleaseDontDrown.Story
             if (_kind == NpcWeaponKind.Cutlass) Swing(shoulderR, m.FacingYaw, ref position, ref rotation);
             else if (_kick > 0f)
             {
-                // The kick: up and back about the grip.
+                // The kick: up and back about the grip (a musket shoves the whole shoulder), big enough to read across a beach.
+                bool musket = _kind == NpcWeaponKind.Musket;
                 Vector3 grip = position + rotation * GripLocal;
-                rotation *= Quaternion.Euler(-14f * _kick, 0f, 0f);
-                position = grip - rotation * GripLocal + rotation * new Vector3(0f, 0.01f, -0.05f) * _kick;
+                rotation *= Quaternion.Euler((musket ? -24f : -30f) * _kick, 0f, 0f);
+                position = grip - rotation * GripLocal + rotation * new Vector3(0f, 0.03f, musket ? -0.14f : -0.1f) * _kick;
             }
             _model.SetPositionAndRotation(position, rotation);
             _held = true;

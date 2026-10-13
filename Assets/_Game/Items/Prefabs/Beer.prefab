@@ -545,7 +545,7 @@ MonoBehaviour:
   _seconds: 2.6
   _audio: {fileID: 1683035312918438742}
   _drink: 1
-  _burpAfter: 10
+  _burpAfter: 2.5
   _lip: {x: 0, y: 0.156, z: 0}
 --- !u!114 &1874345803200135049
 MonoBehaviour:

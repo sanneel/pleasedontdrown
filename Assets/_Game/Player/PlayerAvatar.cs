@@ -37,6 +37,10 @@ namespace PleaseDontDrown.Player
         private float _kneelReach = 0.55f;      // how far out from the middle of their body (clear of a big belly)
         private bool _inCannon;                 // drawn up a cannon's barrel, at _cannonBody
         private Vector3 _cannonBody;
+        private Vector3 _cannonFrom;            // where the body was when it went in (the loader's arms)
+        private Quaternion _cannonFromRot;
+        private float _cannonEnterAt;
+        private const float CannonStuffTime = 0.5f;
         private float _groundCheckAt;
         private bool _grounded = true;
         private Vector3 _kneelShift;      // the body moved over to the tourist it is doing CPR on (the player stays put)
@@ -118,10 +122,15 @@ namespace PleaseDontDrown.Player
         public void OnPump(Vector3 chest, Vector3 head = default, float reach = 0.55f)
         {
             _lastPumpTime = Time.time;
-            _cprPoint = chest;
+            // The hands on the lower half of the breastbone, not up at the collarbones by the face, and the body
+            // kneeling tall at their side with the arms reaching out and down to it, never folded over (Avatar:
+            // MaxCprLean): the goofy lifeguard's big head must stay well clear of the hands.
+            Vector3 down = head != Vector3.zero ? chest - head : Vector3.zero;
+            down.y = 0f;
+            _cprPoint = down.sqrMagnitude > 1e-4f ? chest + down.normalized * 0.07f : chest;
             _kneelHead = head;
-            _kneelPoint = Rescue.VictimBody.KneelSpot(chest, head);
-            _kneelReach = reach;
+            _kneelPoint = Rescue.VictimBody.KneelSpot(_cprPoint, head);
+            _kneelReach = reach + 0.07f; // (knees at their side, not on them; checked with ReviewCapture cpr:0.62)
             _animator.Play(AvatarGesture.Pump);
         }
 
@@ -288,14 +297,34 @@ namespace PleaseDontDrown.Player
                 m.Flying = m.StarJump = m.Swimming = m.Underwater = m.Climbing = m.Sprinting = false;
                 m.Holding = m.TwoHanded = m.CarryingPerson = false;
                 m.LookPitch = 0f;
-                _animator.RootOverride = rotation;
                 // The whole head out of the muzzle (chin at the rim) and the hands up above it: the feet that far
                 // down the barrel. (The body's own eye height: the goofy lifeguard's eyes are well under the camera's.)
                 float eyes = _rig != null && _rig.EyeHeight > 0.3f ? _rig.EyeHeight : _standEyeHeight;
                 float s = _rig != null ? _rig.Scale : 1f;
-                _cannonBody = muzzle - rotation * Vector3.up * Mathf.Max(0.4f, eyes - 0.2f * s);
+                Vector3 inside = muzzle - rotation * Vector3.up * Mathf.Max(0.4f, eyes - 0.2f * s);
+                if (!_inCannon)
+                {
+                    _cannonEnterAt = Time.time;
+                    _cannonFrom = transform.TransformPoint(_bodyRest);
+                    _cannonFromRot = Quaternion.Euler(0f, m.FacingYaw, 0f);
+                }
+                // Stuffed in, not teleported: up out of the arms to stand over the muzzle, turning to the barrel, then
+                // down it feet first.
+                float k = Mathf.Clamp01((Time.time - _cannonEnterAt) / CannonStuffTime);
+                Vector3 over = muzzle + rotation * Vector3.up * 0.1f;
+                if (k < 0.6f)
+                {
+                    float e = Mathf.SmoothStep(0f, 1f, k / 0.6f);
+                    _cannonBody = Vector3.Lerp(_cannonFrom, over, e) + Vector3.up * (Mathf.Sin(e * Mathf.PI) * 0.4f);
+                    _animator.RootOverride = Quaternion.Slerp(_cannonFromRot, rotation, e);
+                }
+                else
+                {
+                    _cannonBody = Vector3.Lerp(over, inside, Mathf.SmoothStep(0f, 1f, (k - 0.6f) / 0.4f));
+                    _animator.RootOverride = rotation;
+                }
                 _inCannon = true;
-                HideInCannon(true);
+                HideInCannon(k >= 0.8f);
                 return;
             }
             _animator.RootOverride = _kneelFacing ?? _seatFacing;

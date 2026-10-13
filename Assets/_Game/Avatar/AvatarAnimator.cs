@@ -676,7 +676,7 @@ namespace PleaseDontDrown.Avatars
             // (Crouching goes down as far as the legs allow: the goofy lifeguard's short legs folded right up at the
             // full 32 cm and he collapsed into a heap.)
             float legs = Mathf.Clamp((_rig.ThighLength + _rig.ShinLength) / (0.82f * s), 0.4f, 1f);
-            float drop = _crouch * 0.32f * s * legs * legs * land + _cpr * 0.42f * s * land;
+            float drop = _crouch * 0.32f * s * legs * legs * land + _cpr * 0.3f * s * land; // (CPR: knees on the sand, not in it)
             float pumpDip = Mathf.Max(0f, 1f - (Now - _lastPump) / 0.25f) * 0.05f * s * _cpr;
             float breath = Mathf.Sin(Now * _variety.BreatheRate + _variety.Phase);
             float breathe = breath * 0.004f;
@@ -700,7 +700,7 @@ namespace PleaseDontDrown.Avatars
             float grounded = (_hipDrop * _groundWeight + _landing.Value) * land;
             hips.localPosition = _rig.RestPosition(Bone.Hips) +
                                  new Vector3(sway * 0.03f * s, stepBob - drop - pumpDip + lift + breathe + swimBob + StandTall() * land + grounded, 0f);
-            float lean = (4f + 9f * _run) * _move * land + _crouch * 18f * land + _cpr * 24f + _air * -6f + _leanForward.Value * standing;
+            float lean = (4f + 9f * _run) * _move * land + _crouch * 18f * land + _cpr * 2f + _air * -6f + _leanForward.Value * standing;
             float tip = (_leanSide.Value + _turnLag.Value * 0.25f - sway * 2.2f) * standing;
             // The crawl rolls the whole body round its long axis: the shoulder of the arm coming over is the high one.
             Quaternion roll = Quaternion.AngleAxis(CrawlRoll * crawl, Vector3.up);
@@ -1114,6 +1114,8 @@ namespace PleaseDontDrown.Avatars
         /// Wrists and fingers: loose fists when running, flat when swimming or pressing a chest, the grip's hand pose
         /// on held things (palm on the item, fingers wrapped round), an open hand to wave, a pointing finger to press.
         /// </summary>
+        // CPR: kneel tall over the chest, never folded over it (a big head bowed that far comes down over the hands).
+        private const float MaxCprLean = 30f;
         private static readonly HandPose CprLowerHand = new(0.22f, 0.15f, 0f), CprUpperHand = new(0.62f, 0.35f, 0f);
 
         private void PoseHands()
@@ -1337,13 +1339,13 @@ namespace PleaseDontDrown.Avatars
                 // the hands hovering in the air in front of an upright rescuer.
                 Transform spine = B(Bone.Spine);
                 float armReach = (la + lb) * 0.97f, leaned = 0f;
-                for (int k = 0; k < 4 && leaned < 40f; k++)
+                for (int k = 0; k < 4 && leaned < MaxCprLean; k++)
                 {
                     Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
                     float gap = Vector3.Distance(shoulders, point + up * 0.05f) - armReach;
                     if (gap <= 0.005f) break;
                     float torso = Mathf.Max(Vector3.Distance(spine.position, shoulders), 0.1f);
-                    float step = Mathf.Min(gap / torso * Mathf.Rad2Deg, 40f - leaned);
+                    float step = Mathf.Min(gap / torso * Mathf.Rad2Deg, MaxCprLean - leaned);
                     Turn(spine, right, step * _cpr);
                     leaned += step;
                 }
@@ -2103,7 +2105,8 @@ namespace PleaseDontDrown.Avatars
             pitch = pitch * (1f - 0.4f * aiming) + 3f * aiming; // (bowed all the way, the big head lands on the gun)
             tilt -= 12f * aiming;
             B(Bone.Neck).localRotation = Quaternion.Euler(pitch * 0.3f + swimTilt * 0.4f, yaw * 0.25f + turn * 0.4f, tilt * 0.4f);
-            B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 30f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
+            // (CPR: chin well up, so the big head stays clear above the hands on the chest.)
+            B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 32f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
         }
 
         private void PoseFace()

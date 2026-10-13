@@ -1010,7 +1010,15 @@ namespace PleaseDontDrown.Rescue
                 float ph = limb.Phase;
                 if (!state.IsConscious())
                 {
-                    if (_brain.IsAshore && !held)
+                    if (held)
+                    {
+                        // Out cold in somebody's arms: a soft carried shape (legs draped over the arm, arms hanging
+                        // a little), not a rag folding over the carrier's head.
+                        SetDrive(limb, 60f, 6f);
+                        SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 12f, 10f) : LegPose(limb, 55f, 4f));
+                        continue;
+                    }
+                    if (_brain.IsAshore)
                     {
                         // Out cold on the sand: a soft pull to lying flat (legs straight, arms a little out), so the
                         // limbs don't fold up under the body and wedge it onto its side.

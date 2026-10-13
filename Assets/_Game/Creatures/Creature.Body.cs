@@ -18,7 +18,8 @@ namespace PleaseDontDrown.Creatures
     {
         private CreatureKind _built;
         private Transform _wingL, _wingR, _jaw, _neck, _tail, _armL, _armR, _hat, _droppedHat;
-        private float _open, _extend, _flapPhase, _bob;
+        private float _open, _extend, _flapPhase, _bob, _kleptoLookYaw;
+        private bool[] _slapped;
 
         private void BuildBody(CreatureKind kind)
         {
@@ -236,10 +237,17 @@ namespace PleaseDontDrown.Creatures
             Vector3 outward = root - transform.position;
             outward.y = 0f;
             outward = outward.sqrMagnitude > 0.01f ? outward.normalized : transform.forward;
-            float t = Time.time * 1.3f + a * 1.7f;
-            Vector3 idle = root + outward * (2.6f + Mathf.Sin(t) * 0.6f) + Vector3.up * (1.6f + Mathf.Sin(t * 1.4f) * 0.8f) +
-                           Vector3.Cross(Vector3.up, outward) * Mathf.Cos(t * 0.8f) * 0.8f;
-            if (a >= 2) return idle;
+            float t = Time.time * 1.9f + a * 1.7f;
+            Vector3 idle = root + outward * (2.6f + Mathf.Sin(t) * 0.7f) + Vector3.up * (1.6f + Mathf.Sin(t * 1.4f) * 1.0f) +
+                           Vector3.Cross(Vector3.up, outward) * (Mathf.Cos(t * 0.8f) * 1.0f + Mathf.Sin(t * 3.1f) * 0.25f);
+            if (a >= 2)
+            {
+                // Now and then a back arm rears up high and slaps the water.
+                float ph = SlapPhase(a);
+                if (ph < 0.75f) return root + outward * 1.8f + Vector3.up * 5f;
+                if (ph < 1.05f) return root + outward * 3.8f + Vector3.down * 1f;
+                return idle;
+            }
             switch (Arm(a))
             {
                 case ArmState.Reach:
@@ -256,14 +264,31 @@ namespace PleaseDontDrown.Creatures
             }
         }
 
+        private float SlapPhase(int a) => (Time.time + a * 2.9f) % (6.5f + a * 1.3f);
+
         private void AnimateArms(float dt)
         {
             if (_arms == null) return;
+            if (_slapped == null) _slapped = new bool[_arms.Length];
             for (int a = 0; a < _arms.Length; a++)
             {
                 Vector3 want = ArmWant(a);
                 ArmState state = a < 2 ? Arm(a) : ArmState.Idle;
-                float speed = state == ArmState.Reach ? 16f : state == ArmState.Drag ? 30f : 8f;
+                float speed = state == ArmState.Reach ? 16f : state == ArmState.Drag ? 30f : 9f;
+                if (a >= 2)
+                {
+                    float ph = SlapPhase(a);
+                    if (ph < 0.75f) { speed = 14f; _slapped[a] = false; }
+                    else if (ph < 1.05f)
+                    {
+                        speed = 34f;
+                        if (!_slapped[a] && (_armTips[a] - want).sqrMagnitude < 1.5f)
+                        {
+                            _slapped[a] = true;
+                            World.Water.SplashFx.Spawn(new Vector3(_armTips[a].x, World.Water.WaterSurface.Exists ? World.Water.WaterSurface.HeightAt(_armTips[a]) : _armTips[a].y, _armTips[a].z), 1.6f);
+                        }
+                    }
+                }
                 _armTips[a] = Vector3.MoveTowards(_armTips[a], want, speed * dt);
                 Vector3 root = ArmRoot(a);
                 Vector3 tip = _armTips[a];
@@ -318,8 +343,23 @@ namespace PleaseDontDrown.Creatures
                     // Bobbing in the swell, puffing up when it shrieks or inks, slumping when beaten.
                     float puff = act is CreatureAct.Gasp or CreatureAct.Slam ? 1.12f : act == CreatureAct.Rear ? 1.06f : 1f;
                     _bob = Mathf.Lerp(_bob <= 0f ? 1f : _bob, puff, k);
-                    _model.localScale = new Vector3(_bob, _bob, _bob);
-                    _model.localPosition = new Vector3(0f, Mathf.Sin(Time.time * 1.1f) * 0.15f - (act == CreatureAct.Dead ? 1.5f : 0f), 0f);
+                    float t = Time.time;
+                    bool dead = act == CreatureAct.Dead;
+                    float breathe = dead ? 0f : Mathf.Sin(t * 2.3f) * 0.05f; // squash and stretch as it breathes
+                    _model.localScale = new Vector3(_bob * (1f - breathe), _bob * (1f + breathe * 1.5f), _bob * (1f - breathe));
+                    _model.localPosition = new Vector3(Mathf.Sin(t * 0.7f) * 0.25f, Mathf.Sin(t * 1.1f) * 0.35f - (dead ? 1.5f : 0f), 0f);
+                    // It keeps an eye on the nearest lifeguard, swaying and nodding as it bobs.
+                    float want = 0f;
+                    float best = 60f * 60f;
+                    foreach (Player.PlayerHub p in Player.PlayerHub.All)
+                    {
+                        if (p == null) continue;
+                        Vector3 local = transform.InverseTransformPoint(p.transform.position);
+                        float d = local.sqrMagnitude;
+                        if (d < best) { best = d; want = Mathf.Clamp(Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg, -45f, 45f); }
+                    }
+                    _kleptoLookYaw = Mathf.MoveTowardsAngle(_kleptoLookYaw, dead ? 0f : want, 40f * dt);
+                    _model.localRotation = Quaternion.Euler(dead ? 0f : Mathf.Sin(t * 1.3f + 1f) * 4f, _kleptoLookYaw, dead ? 0f : Mathf.Sin(t * 0.9f) * 6f);
                     AnimateArms(dt);
                     break;
                 }

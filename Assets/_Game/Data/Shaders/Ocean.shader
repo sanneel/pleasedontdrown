@@ -164,8 +164,11 @@ Shader "PleaseDontDrown/Ocean"
                 float3 n = normalize(input.normalWS);
                 float3 v = GetWorldSpaceNormalizeViewDir(input.positionWS);
 
-                // Camera below the surface: we're looking up at its underside.
-                if (_WorldSpaceCameraPos.y < input.positionWS.y)
+                // Camera below the surface (at the camera, not at this pixel: a tsunami towering over you is still
+                // its face, not its underside): we're looking up at the underside.
+                float2 camSlope;
+                float camSurface = _PDD_WaterLevel + Waves(_WorldSpaceCameraPos.xz, camSlope) + SurgeHeight(_WorldSpaceCameraPos.xz);
+                if (_WorldSpaceCameraPos.y < camSurface && _WorldSpaceCameraPos.y < input.positionWS.y)
                     return half4(MixFog(_UnderColor.rgb, input.fogFactor), 1.0);
 
                 float2 uv = input.screenPos.xy / input.screenPos.w;
@@ -198,11 +201,31 @@ Shader "PleaseDontDrown/Ocean"
                 float shoreNoise = PixelNoise(input.positionWS.xz, 2.2, float2(0.2, 0.1));
                 float shoreFoam = step(0.42, shore * (0.55 + 0.45 * lap) * (0.6 + 0.6 * shoreNoise));
                 float crestNoise = PixelNoise(input.positionWS.xz, 3.0, float2(0.15, -0.1));
-                float crestFoam = step(0.5, saturate((input.waveHeight - 0.16) * 5.0) * crestNoise * 1.6);
+                float surge = SurgeHeight(input.positionWS.xz);
+                float crestFoam = step(0.5, saturate((input.waveHeight - surge - 0.16) * 5.0) * crestNoise * 1.6); // the ordinary waves' crests
+                float tsunamiBody = 0.0;
+                if (_PDD_SurgeField.y > 0.05)
+                {
+                    // The tsunami: a lighter, see-through wall of water, foam streaks running down the face toward the
+                    // shore, a white breaking lip along the top and churned water behind it.
+                    float tall = saturate(surge / max(_PDD_SurgeField.y, 0.001));
+                    float face = saturate(n.z * 1.6) * tall;
+                    // Dark and deep at the foot of the face, lit through and turquoise toward the crest.
+                    float faceSide = saturate(n.z * 1.6) * step(0.05, tall);
+                    half3 foot = _DeepColor.rgb * 0.8, lit = _ShallowColor.rgb * 1.35 + 0.05;
+                    color = lerp(color, lerp(foot, lit, pow(tall, 1.4)), faceSide * 0.8);
+                    float streak = PixelNoise(float2(input.positionWS.x * 3.0, input.positionWS.y * 1.2), 3.2, float2(0.0, 1.1));
+                    streak = max(streak, PixelNoise(float2(input.positionWS.x * 1.3 + 17.0, input.positionWS.y * 0.6), 2.0, float2(0.0, 0.7)) * 0.9);
+                    float lip = smoothstep(0.8, 0.96, tall) * step(0.3, crestNoise);
+                    float behind = saturate(_PDD_SurgeField.z) * (1.0 - smoothstep(_PDD_SurgeField.x - 8.0, _PDD_SurgeField.x + 4.0, input.positionWS.z));
+                    float churn = step(0.6, crestNoise) * max(behind, tall * 0.6);
+                    crestFoam = max(crestFoam, saturate(step(0.62, streak) * face * 0.85 + lip + churn * 0.8));
+                    tsunamiBody = tall;
+                }
                 float foam = saturate(shoreFoam + crestFoam * 0.8);
                 color = lerp(color, _FoamColor.rgb, foam);
 
-                float alpha = lerp(_MinAlpha, 0.95, depthT);
+                float alpha = max(lerp(_MinAlpha, 0.95, depthT), tsunamiBody * 0.92);
                 alpha = saturate(max(alpha, foam) + fresnel * 0.3);
                 return half4(MixFog(color, input.fogFactor), alpha);
             }

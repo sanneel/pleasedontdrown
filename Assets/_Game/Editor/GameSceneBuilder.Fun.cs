@@ -91,7 +91,7 @@ namespace PleaseDontDrown.Editor
                 SetField(drink, "_food", p => p.floatValue = 0.12f);
                 SetField(drink, "_seconds", p => p.floatValue = 2.6f);
                 SetBool(drink, "_drink", true);
-                SetField(drink, "_burpAfter", p => p.floatValue = 10f);
+                SetField(drink, "_burpAfter", p => p.floatValue = 2.5f); // (soon after the last swig: the joke lands)
                 SetField(drink, "_lip", p => p.vector3Value = new Vector3(0f, 0.156f, 0f));
                 go.AddComponent<BottleHold>();
                 // The right hand round the bottle's belly: palm on its right side, a little toward you, fingers wrapped

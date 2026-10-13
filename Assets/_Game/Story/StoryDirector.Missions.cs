@@ -132,7 +132,7 @@ namespace PleaseDontDrown.Story
 
         private void RegisterMissionCommands()
         {
-            DevCommands.Register("brawltest", "[count] [fists|cutlass|pistol|musket|mix|drunk|brawler]",
+            DevCommands.Register("brawltest", "[count] [fists|cutlass|pistol|musket|guns|mix|drunk|brawler]",
                 "Mission test: fighters around you; everyone down restarts it.", args =>
                     CheatServer("brawltest:" + (args.Length > 1 ? args[1].ToLowerInvariant() : "fists"),
                         args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 3), cheat: true, owner: this);
@@ -178,6 +178,7 @@ namespace PleaseDontDrown.Story
             "cutlass" => FighterProfile.Pirate(NpcWeaponKind.Cutlass),
             "pistol" => FighterProfile.Pirate(NpcWeaponKind.Pistol),
             "musket" => FighterProfile.Pirate(NpcWeaponKind.Musket),
+            "guns" => FighterProfile.Pirate(i % 2 == 0 ? NpcWeaponKind.Pistol : NpcWeaponKind.Musket),
             "drunk" => FighterProfile.Drunk(),
             "brawler" => FighterProfile.Brawler(),
             // A raiding party: two with blades or fists up close, the rest shooting.

@@ -37,6 +37,11 @@ namespace PleaseDontDrown.Fun
 
         private readonly Dictionary<Item, Track> _tracks = new();
         private readonly Dictionary<string, int> _scores = new();
+        // A game of one-on-one (or more): baskets since the last pause, first to WinAt wins and it starts over.
+        private readonly Dictionary<string, int> _game = new();
+        private float _lastBasketAt = -999f;
+        private const int WinAt = 11;
+        private const float GameGap = 120f;
         private float _netPulse;
 
         private static readonly List<BasketballHoop> _hoops = new();
@@ -272,6 +277,7 @@ namespace PleaseDontDrown.Fun
             _scores[who] = total += points;
             Debug.Log($"[Hoop] {who} scores {points}{(swish ? " (swish)" : "")} from {distance:F1} m, total {total}");
             ScoredObservers(who, points, swish, total, distance);
+            ServerGame(who, points, c);
             // The beach loves it: a few people nearby cheer.
             int cheering = 0;
             foreach (StoryNpc npc in StoryNpc.All)
@@ -285,6 +291,38 @@ namespace PleaseDontDrown.Fun
         }
 
         private static readonly string[] Cheers = { "WOOO!", "NICE SHOT!", "BUCKETS!", "DO IT AGAIN!", "MVP! MVP!" };
+
+        /// <summary>Host: the running game's score after a basket; once two are playing, everyone near hears it.</summary>
+        private void ServerGame(string who, int points, Vector3 court)
+        {
+            if (Time.time - _lastBasketAt > GameGap) _game.Clear();
+            _lastBasketAt = Time.time;
+            _game.TryGetValue(who, out int mine);
+            _game[who] = mine += points;
+            if (_game.Count < 2) return; // shooting around alone: no game yet
+            var order = new List<KeyValuePair<string, int>>(_game);
+            order.Sort((a, b) => b.Value.CompareTo(a.Value));
+            string line = $"{order[0].Key} {order[0].Value} - {order[1].Value} {order[1].Key}";
+            bool won = mine >= WinAt;
+            if (won)
+            {
+                line = $"{who} WINS {mine} - {(order[0].Key == who ? order[1].Value : order[0].Value)}!";
+                _game.Clear();
+                foreach (StoryNpc npc in StoryNpc.All)
+                    if (npc != null && npc.Role is (NpcRole.Guest or NpcRole.Bystander) && (npc.transform.position - court).sqrMagnitude < 30f * 30f)
+                        npc.ServerGesture(Avatars.AvatarGesture.Wave, court);
+            }
+            GameObservers(line, won);
+        }
+
+        [ObserversRpc]
+        private void GameObservers(string line, bool won)
+        {
+            PlayerHub me = PlayerHub.Local;
+            if (me == null || (me.transform.position - _rim.position).sqrMagnitude > 30f * 30f) return;
+            PlayerHud.ShowToast(won ? $"<b>{line}</b>" : line, won ? 4f : 2.2f);
+            if (won && _audio != null) { _audio.PlayOneShot(FunSounds.Cheer, 1f); _audio.PlayOneShot(FunSounds.Whoop, 0.9f); }
+        }
 
         [ObserversRpc]
         private void ScoredObservers(string who, int points, bool swish, int total, float distance)

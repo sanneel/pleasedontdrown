@@ -32,6 +32,10 @@ namespace PleaseDontDrown.Fun
         [SerializeField] private Transform _barrel;    // tips up and down (pitch)
         [SerializeField] private Transform _mouth;     // forward = where it fires
         [SerializeField] private Transform[] _wheels;  // spin round their local x as the cannon turns
+        private float _recoil;                          // 1 at the bang, back to 0 as the barrel runs out again
+        private Vector3 _barrelRest;
+        private bool _barrelRestKnown;
+        private const float StuffTime = 0.5f;           // up into the muzzle and down the barrel, after the loader lets go
         [SerializeField] private float[] _wheelRadii;
         [SerializeField] private float _power = 23f;
         [SerializeField] private AudioSource _audio;
@@ -422,6 +426,20 @@ namespace PleaseDontDrown.Fun
                 : Pushed ? "In you go! Whoever's pushing decides when you fly..."
                 : $"Look where you want to fly, {Key(GameInput.Primary)} fire! (it goes off by itself soon)   {Key(GameInput.Jump)} climb out", FuseTime);
             if (onOurOwn) FuseServer();
+            // Into the barrel: up over the muzzle and in, not a jump cut from the arms (or the sand) to inside.
+            Vector3 from = player.transform.position;
+            for (float s = 0f; s < StuffTime && player != null; s += Time.deltaTime)
+            {
+                float k = s / StuffTime;
+                Vector3 over = _mouth.position + Vector3.up * 0.9f - Vector3.up * 1.4f; // feet a little above the muzzle
+                Vector3 tucked = _mouth.position - _mouth.forward * 1.2f - Vector3.up * 1.4f;
+                Vector3 at = k < 0.55f
+                    ? Vector3.Lerp(from, over, Mathf.SmoothStep(0f, 1f, k / 0.55f)) + Vector3.up * (Mathf.Sin(k / 0.55f * Mathf.PI) * 0.5f)
+                    : Vector3.Lerp(over, tucked, Mathf.SmoothStep(0f, 1f, (k - 0.55f) / 0.45f));
+                player.Motor.Teleport(at);
+                player.Motor.Stun(0.2f);
+                yield return null;
+            }
             float start = Time.time, fuseFrom = Time.time;
             bool climbOut = false;
             while (player != null)
@@ -551,6 +569,32 @@ namespace PleaseDontDrown.Fun
                 _audio.PlayOneShot(Core.ProceduralAudio.Shot(Combat.GunSound.Shotgun), 1f);
                 _audio.PlayOneShot(FunSounds.Whoop, 0.8f);
             }
+            // The bang you can see: a big flash, a cloud of powder smoke out of the muzzle, the barrel kicking back,
+            // a jolt for whoever's standing near.
+            Combat.ProjectileSystem fx = Combat.ProjectileSystem.Instance;
+            if (fx != null && _mouth != null)
+            {
+                Vector3 m = _mouth.position, f = _mouth.forward;
+                fx.MuzzleFlash(m, f, 7f, false);
+                for (int i = 0; i < 4; i++) fx.GunSmoke(m + f * (0.4f * i), f, 3.2f + i * 0.6f);
+                fx.Puff(m, f, new Color(0.35f, 0.32f, 0.3f), 18, 6f); // soot
+            }
+            _recoil = 1f;
+            PlayerHub me = PlayerHub.Local;
+            if (me != null && me.Look != null)
+            {
+                float d = Vector3.Distance(me.transform.position, transform.position);
+                if (d < 30f) me.Look.Shake(Mathf.Lerp(1.6f, 0.3f, d / 30f));
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (_barrel == null) return;
+            if (!_barrelRestKnown) { _barrelRest = _barrel.localPosition; _barrelRestKnown = true; }
+            _recoil = Mathf.MoveTowards(_recoil, 0f, Time.deltaTime * 1.6f);
+            // Snaps back at once, runs out again slowly (an ease on the way back).
+            _barrel.localPosition = _barrelRest - _barrel.localRotation * Vector3.forward * (0.5f * _recoil * _recoil);
         }
 
         private static PlayerHub HubOf(NetworkConnection conn)

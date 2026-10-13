@@ -675,8 +675,8 @@ namespace PleaseDontDrown.Story
             if (length < 0.05f) return;
             Vector3 dir = path / length;
             ProjectileSystem fx = ProjectileSystem.Instance;
-            fx.MuzzleFlash(from, dir, 1.5f, false);
-            fx.GunSmoke(from, dir, (GunSound)sound == GunSound.Rifle ? 1.3f : 1f);
+            fx.MuzzleFlash(from, dir, 2.6f, false);
+            fx.GunSmoke(from, dir, (GunSound)sound == GunSound.Rifle ? 2.1f : 1.6f);
             fx.Fire(null, null, false, from, from, new[] { dir }, 140f, 0f, ProjectileKind.Bullet, 0, 0f, length + 0.4f);
         }
 
