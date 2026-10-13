@@ -17,6 +17,10 @@ namespace PleaseDontDrown.World
         [SerializeField] private float _openAngle = 100f;
         [SerializeField] private float _swingSpeed = 6f;
         [SerializeField] private AudioSource _audio;
+        [Tooltip("±1: always swings this way (a gate that opens into the yard); 0: away from whoever opens it.")]
+        [SerializeField] private sbyte _onlySide;
+        [Tooltip("The other leaf of a double door: it opens and shuts with this one.")]
+        [SerializeField] private Door _pair;
 
         // 0 closed, +1 / -1 open to either side.
         private readonly SyncVar<sbyte> _state = new SyncVar<sbyte>();
@@ -49,11 +53,21 @@ namespace PleaseDontDrown.World
 
         public void OnInteract(PlayerHub player)
         {
-            sbyte next = IsOpen ? (sbyte)0 : SideAwayFrom(player != null ? player.transform.position : transform.position);
+            Vector3 from = player != null ? player.transform.position : transform.position;
+            bool open = !IsOpen;
+            Request(open, from);
+            if (_pair != null) _pair.Request(open, from);
+        }
+
+        private void Request(bool open, Vector3 from)
+        {
+            sbyte next = open ? SideFor(from) : (sbyte)0;
             _predicted = next;
             _predictedUntil = Time.time + 0.6f;
             SetServer(next);
         }
+
+        private sbyte SideFor(Vector3 opener) => _onlySide != 0 ? (_onlySide > 0 ? (sbyte)1 : (sbyte)-1) : SideAwayFrom(opener);
 
         /// <summary>+1 or -1: the swing that moves the door away from someone standing at <paramref name="position"/>.</summary>
         private sbyte SideAwayFrom(Vector3 position)
@@ -69,7 +83,11 @@ namespace PleaseDontDrown.World
 
         /// <summary>Host: open (swinging away from <paramref name="awayFrom"/>) or shut, by the story rather than a player.</summary>
         [Server]
-        public void ServerSet(bool open, Vector3 awayFrom) => _state.Value = open ? SideAwayFrom(awayFrom) : (sbyte)0;
+        public void ServerSet(bool open, Vector3 awayFrom)
+        {
+            _state.Value = open ? SideFor(awayFrom) : (sbyte)0;
+            if (_pair != null) _pair._state.Value = open ? _pair.SideFor(awayFrom) : (sbyte)0;
+        }
 
         private void OnStateChanged(sbyte prev, sbyte next, bool asServer)
         {

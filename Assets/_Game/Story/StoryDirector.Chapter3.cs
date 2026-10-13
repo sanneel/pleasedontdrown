@@ -148,8 +148,7 @@ namespace PleaseDontDrown.Story
             yield return WaitBeat("3.4", 10f);
             Check("3.3 a suppressed pistol and shotgun moves on", _beat.Value == "3.4", $"guns {TeamGuns()}");
 
-            Transform floor = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor")?.transform;
-            if (floor != null) Stand(floor.position);
+            if (CageRingCentre() is { } ringAt) Stand(ringAt + Vector3.back * 1.5f);
             t = Time.time;
             StoryNpc champ = null;
             while (champ == null && Time.time - t < 20f)
@@ -426,17 +425,26 @@ namespace PleaseDontDrown.Story
 
         // ------------------------------------------------------------------ 3.4 the cage fight
 
+        /// <summary>The middle of the cage-fight ring (C7's Octagon, on the grass beside the tavern), or in the tavern
+        /// before it existed.</summary>
+        public static Vector3? CageRingCentre()
+        {
+            Transform ring = GameObject.Find("Environment/Island3/Octagon")?.transform;
+            if (ring != null) return ring.position;
+            Transform floor = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor")?.transform;
+            return floor != null ? floor.position + Vector3.forward * 2f : null;
+        }
+
         private IEnumerator CageFight()
         {
             EnsureOnIsland3();
-            Transform floor = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor")?.transform;
-            if (floor == null) yield break;
-            SetObjective("The tavern. Somebody there knows the way to the money.");
-            Marker("Tavern", floor.position + Vector3.up * 2f);
-            yield return Reach(floor.position, 7f);
+            if (CageRingCentre() is not { } ring) yield break;
+            SetObjective("The fighting ring by the tavern. Somebody there knows the way to the money.");
+            Marker("Ring", ring + Vector3.up * 2f);
+            yield return Reach(ring, 7f);
             NoMarker();
-            PlayerHub first = StoryNpc.NearestPlayer(floor.position, 8f);
-            Vector3 start = first != null ? first.transform.position : floor.position;
+            PlayerHub first = StoryNpc.NearestPlayer(ring, 8f);
+            Vector3 start = first != null ? first.transform.position : ring;
             yield return RunMission("Cage fight", start, CageFightBody, () => ResetResidents("I3Tavern"));
         }
 

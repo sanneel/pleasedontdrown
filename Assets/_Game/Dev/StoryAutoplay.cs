@@ -703,8 +703,7 @@ namespace PleaseDontDrown.Dev
                     }
                     break;
                 case "3.4":
-                    Transform floor = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor")?.transform;
-                    if (floor != null && (me.transform.position - floor.position).sqrMagnitude > 4f * 4f) Stand(me, floor.position);
+                    if (StoryDirector.CageRingCentre() is { } ring && (me.transform.position - ring).sqrMagnitude > 4f * 4f) Stand(me, ring + Vector3.back * 1.5f);
                     foreach (StoryNpc n in StoryNpc.All)
                         if (n != null && n.Name == "Iron Jaw Jack" && n.IsFighting && !n.IsDefeated)
                             for (int k = 0; k < 6; k++)

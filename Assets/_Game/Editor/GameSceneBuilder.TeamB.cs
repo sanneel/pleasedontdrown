@@ -1007,32 +1007,15 @@ namespace PleaseDontDrown.Editor
             Transform castle = FindByPath("Environment/Island3/PirateCastle") ?? throw new InvalidOperationException("No castle");
             foreach (string old in new[] { "GateShut", "SewerExitDrain" })
                 if (castle.Find(old) is { } t) Object.DestroyImmediate(t.gameObject);
-            const float Z = 20f, G = 0.3f; // the castle's frame (GameSceneBuilder.Island3: gate on the north wall line)
-            Material wood = GetMaterial("PirateWoodDark", new Color(0.32f, 0.21f, 0.13f));
+            const float G = 0.3f; // the castle yard level (GameSceneBuilder.Island3)
             Material iron = GetMaterial("GateIron", new Color(0.12f, 0.12f, 0.13f), 0.6f, 0.35f);
             Material stoneDark = GetMaterial("SewerStone", new Color(0.36f, 0.35f, 0.33f), smoothness: 0.15f);
             Material black = GetMaterial("SewerDark", new Color(0.02f, 0.02f, 0.02f));
 
-            // The gate: shut, in the arch's outer half.
-            var gate = new GameObject("GateShut").transform;
-            gate.SetParent(castle, false);
-            gate.localPosition = new Vector3(0f, G, Z + 2.8f);
-            const float width = 3.9f, height = 6.6f;
-            foreach (float side in new[] { -1f, 1f })
-            {
-                float cx = side * width * 0.25f;
-                for (int p = 0; p < 4; p++) // vertical planks
-                    Primitive(PrimitiveType.Cube, "Plank", gate, new Vector3(cx - width * 0.25f + (p + 0.5f) * width / 8f, height * 0.5f, 0f),
-                        new Vector3(width / 8f - 0.03f, height, 0.22f), wood, keepCollider: false);
-                foreach (float y in new[] { 1.1f, 3.3f, 5.5f }) // iron bands and studs
-                    Primitive(PrimitiveType.Cube, "Band", gate, new Vector3(cx, y, 0.13f), new Vector3(width * 0.5f - 0.08f, 0.16f, 0.04f), iron, keepCollider: false);
-                Primitive(PrimitiveType.Cylinder, "RingHandle", gate, new Vector3(side * 0.35f, 2.6f, 0.2f), new Vector3(0.36f, 0.02f, 0.36f), iron, keepCollider: false)
-                    .transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            }
-            Primitive(PrimitiveType.Cube, "Bar", gate, new Vector3(0f, 2.9f, -0.2f), new Vector3(width - 0.2f, 0.25f, 0.2f), wood, keepCollider: false); // barred from inside
-            var blocker = gate.gameObject.AddComponent<BoxCollider>();
-            blocker.center = new Vector3(0f, height * 0.5f + 1f, 0f);
-            blocker.size = new Vector3(width + 0.6f, height + 2f, 0.8f);
+            // The gate: shut, fitted into the gatehouse's arch (GameSceneBuilder.TeamCPolish).
+            var gateLog = new List<string>();
+            ShutCastleGate(castle, gateLog);
+            Transform gate = castle.Find("GateShut");
 
             // The sewer's way out: a round stone drain in the yard's west half, an iron grate over it.
             var drain = new GameObject("SewerExitDrain").transform;
@@ -1054,6 +1037,7 @@ namespace PleaseDontDrown.Editor
 
             Physics.SyncTransforms();
             BakeNavMeshes(only: "Island3");
+            AssignSceneIds(scene); // the gate's leaves are networked doors
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             Debug.Log($"[TeamB] PASS: C5 gate shut at {gate.position}, sewer exit at {exit.position}");
@@ -1149,8 +1133,8 @@ namespace PleaseDontDrown.Editor
             Debug.Log($"[TeamB] PASS: C6 jungle {before} -> {jungle.childCount} plants (+{addedTrees} trees, +{addedBushes} bushes, +{addedFerns} ferns)");
         }
 
-        /// <summary>Batch: C7, the tavern: an octagon cage in the middle of the room for the cage fight (3.4: Iron Jaw Jack
-        /// already stands in its middle), its gate toward the front door; the tables and stools in its way go. The bar
+        /// <summary>Batch: C7, the tavern: an octagon cage on the grass beside it for the cage fight (3.4: Iron Jaw Jack
+        /// already stands in its middle), its gate toward the tavern door (GameSceneBuilder.TeamCPolish). The bar
         /// gets a sign, a Jolly Roger on the back wall and hanging lanterns.</summary>
         public static void TeamCTavernBatch()
         {
@@ -1158,59 +1142,10 @@ namespace PleaseDontDrown.Editor
             Transform tavern = FindByPath("Environment/Island3/PirateTavern") ?? throw new InvalidOperationException("No tavern");
             foreach (string old in new[] { "Octagon", "TavernDress" })
                 if (tavern.Find(old) is { } t) Object.DestroyImmediate(t.gameObject);
-            Bounds floorBox = tavern.Find("RoomFloor").GetComponent<Renderer>().bounds;
-            float floor = floorBox.max.y;
-            var centre = new Vector3(86f, floor, -966.8f);
-            const float R = 3.1f, PostH = 1.95f; // corner radius, cage height
-            var removed = 0;
-            foreach (Transform t in tavern.Cast<Transform>().ToArray())
-                if (t.name is "RoundTable" or "TableFoot" or "Stool" or "Candle" or "Mug" &&
-                    new Vector2(t.position.x - centre.x, t.position.z - centre.z).magnitude < R + 1.1f)
-                { Object.DestroyImmediate(t.gameObject); removed++; }
-
-            Material canvas = GetMaterial("OctagonCanvas", new Color(0.86f, 0.82f, 0.72f), smoothness: 0.1f);
-            Material pad = GetMaterial("OctagonPad", new Color(0.08f, 0.08f, 0.09f), smoothness: 0.35f);
-            Material red = GetMaterial("OctagonRed", new Color(0.62f, 0.07f, 0.06f), smoothness: 0.3f);
-            Material wire = GetMaterial("OctagonWire", new Color(0.2f, 0.2f, 0.21f), 0.7f, 0.4f);
-            var cage = new GameObject("Octagon").transform;
-            cage.SetParent(tavern, false);
-            cage.position = centre;
-            TagSurface(cage.gameObject, SurfaceKind.Wood);
-            GameObject Part(PrimitiveType type, string n, Vector3 local, Vector3 scale, Material m, bool solid = false) =>
-                Primitive(type, n, cage, local, scale, m, solid);
-            // The canvas: an octagon of 8 wedges (a flat cylinder reads round), a red ring painted near the edge.
-            Part(PrimitiveType.Cylinder, "Canvas", new Vector3(0f, 0.03f, 0f), new Vector3(R * 2f * 0.97f, 0.03f, R * 2f * 0.97f), canvas);
-            Part(PrimitiveType.Cylinder, "CanvasRing", new Vector3(0f, 0.062f, 0f), new Vector3(R * 1.5f, 0.002f, R * 1.5f), red);
-            Part(PrimitiveType.Cylinder, "CanvasInner", new Vector3(0f, 0.064f, 0f), new Vector3(R * 1.42f, 0.002f, R * 1.42f), canvas);
-            var corners = new Vector3[8];
-            for (int i = 0; i < 8; i++)
-            {
-                float a = (i + 0.5f) * Mathf.PI / 4f; // flat sides face the four walls
-                corners[i] = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * R;
-                Part(PrimitiveType.Cylinder, "Post", corners[i] + Vector3.up * PostH * 0.5f, new Vector3(0.16f, PostH * 0.5f, 0.16f), pad, solid: true);
-                Part(PrimitiveType.Cylinder, "PostPad", corners[i] + Vector3.up * 1.2f, new Vector3(0.24f, 0.45f, 0.24f), red);
-            }
-            for (int i = 0; i < 8; i++)
-            {
-                Vector3 a = corners[i], b = corners[(i + 1) % 8], mid = (a + b) * 0.5f;
-                float len = Vector3.Distance(a, b) - 0.16f;
-                Quaternion yaw = Quaternion.LookRotation(b - a) * Quaternion.Euler(0f, 90f, 0f); // x along the side
-                bool gate = mid.z > R * 0.8f; // the side toward the front door stays open
-                if (gate) continue; // the way in, open
-                var side = new GameObject("Side").transform;
-                side.SetParent(cage, false);
-                side.localPosition = mid;
-                side.localRotation = yaw;
-                Primitive(PrimitiveType.Cube, "Pad", side, new Vector3(0f, 0.45f, 0f), new Vector3(len, 0.9f, 0.14f), pad, keepCollider: false);
-                Primitive(PrimitiveType.Cube, "PadStripe", side, new Vector3(0f, 0.86f, 0f), new Vector3(len, 0.06f, 0.16f), red, keepCollider: false);
-                for (int k = 1; k < 7; k++) // the fence over the pad: thin uprights and two rails
-                    Primitive(PrimitiveType.Cube, "Wire", side, new Vector3(-len * 0.5f + k * len / 7f, 1.42f, 0f), new Vector3(0.025f, 1.06f, 0.025f), wire, keepCollider: false);
-                foreach (float y in new[] { 1.4f, PostH - 0.03f })
-                    Primitive(PrimitiveType.Cube, "Rail", side, new Vector3(0f, y, 0f), new Vector3(len, 0.04f, 0.04f), wire, keepCollider: false);
-                var block = side.gameObject.AddComponent<BoxCollider>();
-                block.center = new Vector3(0f, PostH * 0.5f, 0f);
-                block.size = new Vector3(len, PostH, 0.2f);
-            }
+            // The octagon stands outside, on the grass beside the tavern (the user, 2026-10-13); the room keeps its tables.
+            var ringLog = new List<string>();
+            RestoreTavernTables(tavern);
+            Transform cage = OctagonByTavern(tavern.parent, tavern, ringLog);
 
             // The bar's look: a sign over it, the Jolly Roger on the back wall, lanterns hanging over the counter.
             var dress = new GameObject("TavernDress").transform;
@@ -1245,7 +1180,7 @@ namespace PleaseDontDrown.Editor
             BakeNavMeshes(only: "Island3");
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            Debug.Log($"[TeamB] PASS: C7 octagon at {centre} (removed {removed} tables/stools), bar dressed");
+            Debug.Log($"[TeamB] PASS: C7 octagon at {cage.position} (beside the tavern), bar dressed");
         }
 
         /// <summary>Batch: C8, island 3's gun shop as a real building: the Tripo gun_shop (open shop front, awning,

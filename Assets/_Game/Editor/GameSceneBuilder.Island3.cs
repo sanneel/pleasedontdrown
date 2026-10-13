@@ -46,6 +46,8 @@ namespace PleaseDontDrown.Editor
         private static readonly Vector2 Island3Spring = I3(26f, -822f);
         private static readonly Vector2[] Island3River =
             I3Path(new(26f, -822f), new(18f, -848f), new(-4f, -893f), new(-38f, -930f), new(-85f, -955f), new(-140f, -968f), new(-215f, -978f));
+        // Its last stretch, out of the jungle to the sea: it crosses the foot of the plateau's slope, cut through there too.
+        private static readonly Vector2[] Island3RiverMouth = Island3River.Skip(4).ToArray();
         private static readonly (Vector2 centre, float radius)[] Island3Pools = { (I3(86f, -1050f), 7f), (I3(100f, -1058f), 5.5f) };
         private static readonly Vector2[] Island3Stream = I3Path(new(100f, -1058f), new(114f, -1072f), new(125f, -1088f));
         // The village (the user's island map, 2026-10-11): the main road from the dock crosses a village lane; the lane
@@ -155,7 +157,10 @@ namespace PleaseDontDrown.Editor
             // The river (lowland only, the sea fills it) and the spring pond it starts from.
             var p = new Vector2(x, z);
             float river = Mathf.Min(DistanceToLine(p, Island3River) - 3.5f, Vector2.Distance(p, Island3Spring) - 8f);
-            h = Mathf.Lerp(h, Mathf.Min(h, -1.7f), Smooth(4f, 0f, river) * (1f - Smooth(1f, 3f, high)));
+            // The mouth is cut through the slope's foot as well (wider banks, the slope is higher), or the river stops
+            // short of the coast behind a dry strip (the user, 2026-10-13).
+            float mouth = Smooth(7f, 0f, DistanceToLine(p, Island3RiverMouth) - 3.5f);
+            h = Mathf.Lerp(h, Mathf.Min(h, -1.7f), Mathf.Max(Smooth(4f, 0f, river) * (1f - Smooth(1f, 3f, high)), mouth));
             // On the plateau: two pools and the stream that runs to the waterfall.
             float onTop = Smooth(Island3CliffTop - 6f, Island3CliffTop - 1f, high);
             if (onTop > 0f)
@@ -1053,7 +1058,21 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cylinder, "Mug", house, new Vector3(x, floor + 1.18f, counterZ + 0.1f), new Vector3(0.12f, 0.08f, 0.12f), barrel, keepCollider: false);
             ResortBox(house, "BarLantern", new Vector3(counterR - 0.5f, floor + 1.25f, counterZ), new Vector3(0.18f, 0.28f, 0.18f), lamp, false);
 
-            // Round tables with stools, two each side of the way in from the door.
+            TavernTables(house, x0, x1, z1, floor, doorX, counterZ, wood, counterTop, lamp, seat);
+            // Barrels standing in the front corners, a ship's wheel and crossed oars on the side walls.
+            foreach (float x in new[] { x0 + 0.5f, x1 - 0.5f })
+            {
+                Primitive(PrimitiveType.Cylinder, "Barrel", house, new Vector3(x, floor + 0.5f, z1 - 0.5f), new Vector3(0.75f, 0.5f, 0.75f), barrel);
+                foreach (float y in new[] { 0.25f, 0.75f })
+                    Primitive(PrimitiveType.Cylinder, "BarrelHoop", house, new Vector3(x, floor + y, z1 - 0.5f), new Vector3(0.78f, 0.03f, 0.78f), hoop, keepCollider: false);
+            }
+            TavernWallDress(house, x0, x1, floor, cz, wood, trim);
+        }
+
+        /// <summary>Round tables with stools in the tavern, two each side of the way in from the door.</summary>
+        private static void TavernTables(Transform house, float x0, float x1, float z1, float floor, float doorX, float counterZ,
+            Material wood, Material counterTop, Material lamp, Material seat)
+        {
             foreach (float side in new[] { -1f, 1f })
                 foreach (float along in new[] { 0.3f, 0.75f })
                 {
@@ -1070,13 +1089,11 @@ namespace PleaseDontDrown.Editor
                             new Vector3(0.38f, 0.25f, 0.38f), seat);
                     }
                 }
-            // Barrels standing in the front corners, a ship's wheel and crossed oars on the side walls.
-            foreach (float x in new[] { x0 + 0.5f, x1 - 0.5f })
-            {
-                Primitive(PrimitiveType.Cylinder, "Barrel", house, new Vector3(x, floor + 0.5f, z1 - 0.5f), new Vector3(0.75f, 0.5f, 0.75f), barrel);
-                foreach (float y in new[] { 0.25f, 0.75f })
-                    Primitive(PrimitiveType.Cylinder, "BarrelHoop", house, new Vector3(x, floor + y, z1 - 0.5f), new Vector3(0.78f, 0.03f, 0.78f), hoop, keepCollider: false);
-            }
+        }
+
+        /// <summary>A ship's wheel and crossed oars on the tavern's side walls.</summary>
+        private static void TavernWallDress(Transform house, float x0, float x1, float floor, float cz, Material wood, Material trim)
+        {
             GameObject wheel = Primitive(PrimitiveType.Cylinder, "ShipWheel", house, new Vector3(x0 + 0.05f, floor + 2.2f, cz + 1f), new Vector3(1.2f, 0.03f, 1.2f), wood, keepCollider: false);
             wheel.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
             for (int k = 0; k < 4; k++)

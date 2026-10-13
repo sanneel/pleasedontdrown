@@ -24,12 +24,12 @@ will find the spot.
 | A5 | Works but weird | **Redone** (12a08a88): put it down by the casualty, stand beside them, E on it; the other button picks it up again |
 | A6 | Works, bad visuals | **Redone**: the order is put down in front of you (khinkali on a plate), never into your hand; sitting, E on it takes a bite: your hand cups the nearest khinkali off the plate and brings it up to eat (a drink is lifted by its side, tipped at the lips and put back), 3 each. Others see you lean in, reach and eat. The hotel bar's stools are 5 cm nearer the counter and the plates just in from its edge, within a seated arm's reach (no body touches the counter, measured) |
 | A7 | Needs better visuals | **Redone** (a2683701): cards dealt on the felt (E deal/hit, other button stand or bet, R double), no pop-up |
-| A8 / C7 | Octagon is inside the tavern | The octagon stands **next to** the tavern, outside (C7 builds it, A8's fight works wherever it is) |
-| A11 / C5 | No sewer anywhere; C5 done very badly | C5's drain/grate in the castle yard **removed**; a real sewer (entrance behind the back waterfall, tunnel, exit in the castle) still to be built, then A11 hooks the Pirate King beat to it |
+| A8 / C7 | Octagon is inside the tavern | The octagon stands **next to** the tavern, outside (C7 builds it, A8's fight works wherever it is). **Done (Shako, 2026-10-13)**: on a plank stage on the grass west of the tavern, open side toward its door, torches round it; the tavern has its tables back; Jack and the regulars wait there (`StoryDirector.CageRingCentre`); `chapter3check` ALL PASS (`TeamCRingOutsideBatch`) |
+| A11 / C5 | No sewer anywhere; C5 done very badly | C5's drain/grate in the castle yard **removed**; the gate **redone (Shako, 2026-10-13)**: arched plank-and-iron double doors cut to the gatehouse arch; they **open** (E), both leaves together, only into the castle (`Door._onlySide`, `_pair`), the arch above them fixed; the model's old leaves, bar and yard-side panel cut from its passage, stone facings instead (`TeamCGateDoorBatch`). Note for A11: the gate is no longer locked, you can walk into the castle. The walls rebuilt as clean masonry run into the towers (`TeamCCastleWallsBatch`); a real sewer (entrance behind the back waterfall, tunnel, exit in the castle) still to be built, then A11 hooks the Pirate King beat to it |
 | A12 | Worse: hands very weird, lying on the stomach worst | **Redone** (5bd265dc): propped on the elbows on the stomach, arms along the body on the back, every body |
 | A13 | Changed, not clearer | A cleaner on-screen text design |
 | B1 | Removed | — |
-| B4 | Wrong island | Coconut palms **back on island 1**; remove them from **island 3** |
+| B4 | Wrong island | Coconut palms **back on island 1**; remove them from **island 3**. **Done (Shako, 2026-10-13)**: island 3's 84 palms gone (the jungle's 23 became jungle trees), jungle where the user marked (meadow tavern-castle, strip village-jungle); 19 shakeable palms on island 1, spread round it (a ring 7 m in from the dry edge, some in pairs, a few further in) (`TeamCJunglePalmsBatch`, `TeamBIsland1PalmsBatch`) |
 | B5 | Fixed, but the white house still has stairs | Remove the white house's stairs (not needed) |
 | B6 | Only island 1 | Same on island 2 |
 | B8 | Smaller, but bare | Restyle island 2 and place more things |
@@ -39,7 +39,7 @@ will find the spot.
 | B12 | Casino added | Needs changes |
 | B13 | Gun shop added | Restyle; **no pop-up** for buying |
 | C3 | Kleptopus | Faster; it **grabs** people and pulls them into the sea, picks up and throws (not makes them walk) |
-| C4 | **Not done** | The waterfall's water isn't open and doesn't reach the ocean |
+| C4 | **Not done** | The waterfall's water isn't open and doesn't reach the ocean. **Done (Shako, 2026-10-13)**: the river from the crag falls ran into the foot of the plateau's slope and stopped behind a dry strip; its mouth is cut through to the sea now (`Island3RiverMouth`, `TeamCRiverMouthBatch`) |
 | C8 | Gun shop | Restyle; guns (and silencers, upgrades) on display: **click one to buy it**, simply |
 
 ## The full list, in order (pick from the top of your part)
