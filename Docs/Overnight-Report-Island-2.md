@@ -19,8 +19,8 @@
 | 9 | Make it look expensive | **Done** | `hotel`, then look around; `galatest` for night |
 | 10 | People using the place | **Done** (staff, slot players, guests on the pool loungers) | `story goto 2.5c` |
 
-The whole of chapter 2 plays through automatically now: `-pdd-autoplay` went 2.1 → 2.6 with no errors, and from 2.7
-on the yacht to Skull Cove (beat 3.2): **RESULT PASS**. The old "stuck at 2.1" did not happen any more.
+The whole of chapter 2 plays through automatically now, with everything in: `-pdd-autoplay` from 2.1 to Skull Cove
+(beat 3.2) in one run: **RESULT PASS, 0 errors, 0 warnings** (last run at the very end). The old "stuck at 2.1" is gone.
 
 ## The new story of chapter 2 (end part)
 
@@ -126,7 +126,7 @@ Performance at the hotel spawn (`hotel`, 1280x720):
 | Low | - | 4.67 ms | 4.88 ms |
 
 Automated checks at the end: `GunHoldCheck` ALL PASS, `KissCheck` ALL PASS, `WalkCheck` ALL PASS, `HandCurlCheck`
-ALL PASS. Story autoplay 2.1-2.6: no errors; 2.7 → 3.2: PASS.
+ALL PASS (run again at the very end, after the last change). Story autoplay 2.1 → 3.2 in one run: PASS.
 
 ## Files
 
