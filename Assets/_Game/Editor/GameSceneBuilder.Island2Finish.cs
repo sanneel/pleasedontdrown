@@ -203,7 +203,7 @@ namespace PleaseDontDrown.Editor
             var hull = new GameObject("Hull").AddComponent<BoxCollider>();
             hull.transform.SetParent(root.transform, false);
             hull.center = new Vector3(0f, deck * 0.5f, b.center.z);
-            hull.size = new Vector3(beam * 0.86f, deck, length * 0.94f);
+            hull.size = new Vector3(beam * 0.97f, deck, length * 0.94f); // the deck's full width: you step on at the rail
             TagSurface(hull.gameObject, SurfaceKind.Wood);
             if (cabin.Count > 0)
             {
@@ -217,7 +217,10 @@ namespace PleaseDontDrown.Editor
             float helmZ = cabin.Count > 0 ? cabinZ0 - 0.9f : b.min.z + 2f;
             Material teak = GetMaterial("YachtTeak", new Color(0.55f, 0.36f, 0.2f), smoothness: 0.45f);
             Material chrome = GetMaterial("Chrome", new Color(0.85f, 0.87f, 0.9f), 0.9f, 0.85f);
-            Primitive(PrimitiveType.Cube, "HelmConsole", root.transform, new Vector3(0f, deck + 0.45f, helmZ + 0.35f), new Vector3(0.7f, 0.9f, 0.35f), teak, keepCollider: false);
+            // A slim chrome pedestal with a teak top (a box console read as a crate on the deck).
+            Primitive(PrimitiveType.Cylinder, "HelmPedestal", root.transform, new Vector3(0f, deck + 0.45f, helmZ + 0.35f), new Vector3(0.14f, 0.45f, 0.14f), chrome, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "HelmTop", root.transform, new Vector3(0f, deck + 0.92f, helmZ + 0.33f), new Vector3(0.42f, 0.06f, 0.3f), teak, keepCollider: false)
+                .transform.localRotation = Quaternion.Euler(-20f, 0f, 0f);
             GameObject wheel = Primitive(PrimitiveType.Cylinder, "HelmWheel", root.transform, new Vector3(0f, deck + 1.05f, helmZ + 0.15f), new Vector3(0.5f, 0.02f, 0.5f), chrome, keepCollider: false);
             wheel.transform.localRotation = Quaternion.Euler(70f, 0f, 0f);
             Transform P(string n, Vector3 p, Quaternion r)
@@ -235,7 +238,14 @@ namespace PleaseDontDrown.Editor
             // Floats with about 0.9 m under water (the teal stripe at the waterline), of the model's whole height.
             float density = Mathf.Clamp(0.9f / Mathf.Max(1f, b.size.y), 0.08f, 0.4f);
             Vehicle yacht = FinishVehicle(root, "Yacht", "", seat, gripL, gripR, thrust, hull, density, thrustForce: 7f, maxSpeed: 13f, turnRate: 0.7f);
-            root.transform.SetPositionAndRotation(new Vector3(pierEdge.x + beam * 0.5f + 0.1f, WaterLevel - 0.9f, pierEdge.z), Quaternion.identity);
+            root.transform.SetPositionAndRotation(new Vector3(pierEdge.x + beam * 0.5f + 0.35f, WaterLevel - 0.9f, pierEdge.z), Quaternion.identity);
+            // Tied up at the pier (it doesn't drift off on the waves while nobody sails it).
+            var berth = new GameObject("YachtBerth").transform;
+            berth.SetParent(parent, false);
+            berth.SetPositionAndRotation(root.transform.position, root.transform.rotation);
+            var mooring = root.AddComponent<Mooring>();
+            SetRef(mooring, "_vehicle", yacht);
+            SetRef(mooring, "_berth", berth);
             Debug.Log($"[Island2Finish] yacht: {length:F1} x {beam:F1} x {b.size.y:F1} m, deck {deck:F2}, cabin z {cabinZ0:F1}..{cabinZ1:F1} roof {roof:F2}, density {density:F2}, at {root.transform.position}");
             _ = yacht;
             return (root.transform.position.y + deck, root.transform.TransformPoint(new Vector3(0f, 0f, helmZ - 0.4f)).z);
@@ -272,7 +282,13 @@ namespace PleaseDontDrown.Editor
             // The cushion on the west side near the end, nose out to sea; the jet ski that tows it just ahead.
             float end = start + length;
             Vector3 cushionAt = OnWater(new Vector3(CushionJettyX - width * 0.5f - 1.9f, 0f, end - 3f));
-            BuildJetSki(root, OnWater(new Vector3(cushionAt.x, 0f, end + 5f)), 0f, key: "", displayName: "Lifeguard Jet Ski");
+            Vehicle ski = BuildJetSki(root, OnWater(new Vector3(cushionAt.x, 0f, end + 5f)), 0f, key: "", displayName: "Lifeguard Jet Ski");
+            var skiBerth = new GameObject("JetSkiBerth").transform;
+            skiBerth.SetParent(root, false);
+            skiBerth.SetPositionAndRotation(ski.transform.position, ski.transform.rotation);
+            var skiMooring = ski.gameObject.AddComponent<Mooring>();
+            SetRef(skiMooring, "_vehicle", ski);
+            SetRef(skiMooring, "_berth", skiBerth);
             var home = new GameObject("CushionHome").transform;
             home.SetParent(root, false);
             home.position = cushionAt;
@@ -346,12 +362,15 @@ namespace PleaseDontDrown.Editor
             SetRefs(ride, "_riderSpots", r0, r1);
             SetRefs(ride, "_buoys", buoys.Cast<Object>().ToArray());
             SetRef(ride, "_home", home);
+            var mooring = root.AddComponent<Mooring>();
+            SetRef(mooring, "_vehicle", vehicle);
+            SetRef(mooring, "_berth", home);
             GameObject npc = AssetDatabase.LoadAssetAtPath<GameObject>(NpcPrefabPath);
             if (npc != null) SetRef(ride, "_npcPrefab", npc.GetComponent<StoryNpc>());
         }
 
         /// <summary>The cushion model turned so its backrest is at the back (-z) and its tow ring at the front.</summary>
-        private const float CushionModelYaw = 180f;
+        private const float CushionModelYaw = 90f;
         /// <summary>Where a seated guest's root goes, over the cushion's bottom.</summary>
         private const float CushionSitHeight = 0.25f;
 
@@ -388,7 +407,7 @@ namespace PleaseDontDrown.Editor
                     at.y = SurfaceUnder(at);
                     GameObject set = Object.Instantiate(ropes, show, false);
                     set.name = "VelvetRopes";
-                    set.transform.SetPositionAndRotation(at, Quaternion.Euler(0f, 90f, 0f));
+                    set.transform.SetPositionAndRotation(at, Quaternion.Euler(0f, RopeLineYaw(set) , 0f));
                     set.transform.localScale = Vector3.one * 1.1f;
                     Bounds sb = RendererBounds(set.transform);
                     set.transform.position += new Vector3(at.x - sb.center.x, at.y - sb.min.y, at.z - sb.center.z);
@@ -423,34 +442,42 @@ namespace PleaseDontDrown.Editor
                 l.shadows = LightShadows.None;
             }
 
-            // In the casino: the champagne tower on a gold-clothed round table by the door, two chandeliers over the floor.
-            float floor = SurfaceUnder(CasinoCentre, 3.4f);
-            var table = new Vector3(5.6f, floor, -258.6f);
-            Primitive(PrimitiveType.Cylinder, "ChampagneTable", show, table + Vector3.up * 0.4f, new Vector3(1.1f, 0.4f, 1.1f), GetMaterial("GalaCloth", new Color(0.95f, 0.92f, 0.85f)));
-            if (TripoIsland2("champagne_tower") is { } tower)
-            {
-                GameObject t = Object.Instantiate(tower, show, false);
-                t.name = "ChampagneTower";
-                t.transform.position = table;
-                Bounds tb = RendererBounds(t.transform);
-                t.transform.position += new Vector3(table.x - tb.center.x, table.y + 0.8f - tb.min.y, table.z - tb.center.z);
-            }
-            float ceiling = 1.5f + 3.45f;
-            foreach (Vector3 c in new[] { new Vector3(-0.2f, 0f, -250.5f), new Vector3(4.2f, 0f, -256.5f) })
-                if (TripoIsland2("crystal_chandelier") is { } chandelier)
-                {
-                    GameObject ch = Object.Instantiate(chandelier, show, false);
-                    ch.name = "Chandelier";
-                    ch.transform.localScale = Vector3.one * 0.85f;
-                    ch.transform.position = c;
-                    Bounds cb = RendererBounds(ch.transform);
-                    ch.transform.position += new Vector3(c.x - cb.center.x, ceiling - cb.max.y, c.z - cb.center.z);
-                }
+            // (The casino has its own chandeliers, champagne tower and roulette table: GameSceneBuilder.TeamB, B12.)
 
             var glow = root.gameObject.AddComponent<NightGlow>();
             SetRefs(glow, "_night", night.Cast<Object>().ToArray());
             SetBool(glow, "_galaOnly", true);
             show.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// The stanchion set's posts stand on one line, diagonal as modelled: the turn that lays that line along the carpet
+        /// (+z), from the line through the mesh's points (turning it a quarter showed zigzag double rows).
+        /// </summary>
+        private static float RopeLineYaw(GameObject set)
+        {
+            set.transform.rotation = Quaternion.identity;
+            float cxx = 0f, czz = 0f, cxz = 0f, mx = 0f, mz = 0f;
+            int n = 0;
+            foreach (MeshFilter mf in set.GetComponentsInChildren<MeshFilter>())
+                foreach (Vector3 v in mf.sharedMesh.vertices)
+                {
+                    Vector3 p = mf.transform.TransformPoint(v);
+                    mx += p.x; mz += p.z; n++;
+                }
+            if (n == 0) return 0f;
+            mx /= n; mz /= n;
+            foreach (MeshFilter mf in set.GetComponentsInChildren<MeshFilter>())
+                foreach (Vector3 v in mf.sharedMesh.vertices)
+                {
+                    Vector3 p = mf.transform.TransformPoint(v);
+                    float dx = p.x - mx, dz = p.z - mz;
+                    cxx += dx * dx; czz += dz * dz; cxz += dx * dz;
+                }
+            float lineAngle = 0.5f * Mathf.Atan2(2f * cxz, cxx - czz) * Mathf.Rad2Deg; // the line's angle from +x toward +z
+            float yaw = lineAngle - 90f; // turning by yaw takes angle a (from +x toward +z) to a - yaw: onto +z
+            Debug.Log($"[Island2Finish] velvet ropes: line at {lineAngle:F0} deg from x, turned {yaw:F0}");
+            return yaw;
         }
 
         /// <summary>A sagging string of bulbs between two points: one mesh for the bulbs, a thin wire.</summary>
@@ -496,7 +523,17 @@ namespace PleaseDontDrown.Editor
                 feet.y = GroundUnder(feet);
                 // On dry sand only, never on the road, a path or against a building.
                 if (feet.y < 0.6f || NearCartRoad(new Vector2(feet.x, feet.z), 3.2f) || Blocked(feet, 1.2f)) { skipped++; return; }
-                if (MeshyArt.Place("palm_tall", root, R(7f, 9.5f), feet, R(0f, 360f)) != null) placed++;
+                GameObject palm = MeshyArt.Place("palm_tall", root, R(7f, 9.5f), feet, R(0f, 360f));
+                if (palm == null) return;
+                // The trunk leans: its crown must not hang over the road (turn it round, or leave the palm out).
+                for (int turn = 0; turn < 4; turn++)
+                {
+                    Vector3 crown = RendererBounds(palm.transform).center;
+                    if (!NearCartRoad(new Vector2(crown.x, crown.z), 3.5f)) break;
+                    palm.transform.RotateAround(feet, Vector3.up, 90f);
+                    if (turn == 3) { Object.DestroyImmediate(palm); skipped++; return; }
+                }
+                placed++;
             }
             // The beach edge, away from the guests' towels and the docks.
             for (float x = -92f; x <= -52f; x += 10f) Palm(x, WaterlineZ(x) - 12f);
@@ -526,8 +563,8 @@ namespace PleaseDontDrown.Editor
             }
             Hedge(new Vector3(79f, 0f, -240f), new Vector3(79f, 0f, -248f));
             Hedge(new Vector3(79f, 0f, -253f), new Vector3(79f, 0f, -264f));
-            Hedge(new Vector3(52f, 0f, -266f), new Vector3(60f, 0f, -266f));
-            Hedge(new Vector3(66f, 0f, -266f), new Vector3(78f, 0f, -266f));
+            Hedge(new Vector3(52f, 0f, -263.9f), new Vector3(60f, 0f, -263.9f));
+            Hedge(new Vector3(66f, 0f, -263.9f), new Vector3(78f, 0f, -263.9f));
             Debug.Log($"[Island2Finish] greenery: {placed} palms ({skipped} spots skipped)");
         }
 
@@ -610,7 +647,9 @@ namespace PleaseDontDrown.Editor
             root.SetParent(parent, false);
             feet.y = SurfaceUnder(feet);
             root.SetPositionAndRotation(feet, Quaternion.Euler(0f, yaw, 0f));
-            Primitive(PrimitiveType.Cylinder, "Post", root, new Vector3(0f, 1.05f, 0f), new Vector3(0.1f, 1.05f, 0.1f), post);
+            // Two posts at the board's ends (one in the middle ran up through the letters).
+            foreach (float x in new[] { -0.8f, 0.8f })
+                Primitive(PrimitiveType.Cylinder, "Post", root, new Vector3(x, 1.06f, 0f), new Vector3(0.08f, 1.06f, 0.08f), post);
             Primitive(PrimitiveType.Cube, "Board", root, new Vector3(0f, 1.85f, 0f), new Vector3(1.5f, 0.55f, 0.06f), teal, keepCollider: false);
             foreach (float side in new[] { 1f, -1f })
             {
@@ -668,15 +707,15 @@ namespace PleaseDontDrown.Editor
             Material stone = GetMaterial("FountainStone", new Color(0.93f, 0.88f, 0.78f), smoothness: 0.3f);
             Material gold = GetMaterial("GalaGold", new Color(1f, 0.78f, 0.35f), 0.9f, 0.7f);
             Primitive(PrimitiveType.Cylinder, "Basin", root, new Vector3(0f, 0.28f, 0f), new Vector3(3.6f, 0.28f, 3.6f), stone);
-            Primitive(PrimitiveType.Cylinder, "BasinRim", root, new Vector3(0f, 0.58f, 0f), new Vector3(3.8f, 0.04f, 3.8f), stone, keepCollider: false);
-            GameObject water = Primitive(PrimitiveType.Cylinder, "Water", root, new Vector3(0f, 0.57f, 0f), new Vector3(3.3f, 0.02f, 3.3f), PoolWaterMaterial(), keepCollider: false);
+            Material fountainWater = GetMaterial("FountainWater", new Color(0.22f, 0.58f, 0.72f), 0.1f, 0.92f);
+            GameObject water = Primitive(PrimitiveType.Cylinder, "Water", root, new Vector3(0f, 0.565f, 0f), new Vector3(3.25f, 0.02f, 3.25f), fountainWater, keepCollider: false);
             water.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             Primitive(PrimitiveType.Cylinder, "Column", root, new Vector3(0f, 1.1f, 0f), new Vector3(0.35f, 0.55f, 0.35f), stone, keepCollider: false);
             Primitive(PrimitiveType.Cylinder, "BowlLow", root, new Vector3(0f, 1.62f, 0f), new Vector3(1.5f, 0.07f, 1.5f), stone, keepCollider: false);
             Primitive(PrimitiveType.Cylinder, "Column2", root, new Vector3(0f, 1.95f, 0f), new Vector3(0.18f, 0.3f, 0.18f), stone, keepCollider: false);
             Primitive(PrimitiveType.Cylinder, "BowlHigh", root, new Vector3(0f, 2.28f, 0f), new Vector3(0.75f, 0.05f, 0.75f), stone, keepCollider: false);
             Primitive(PrimitiveType.Sphere, "Finial", root, new Vector3(0f, 2.48f, 0f), Vector3.one * 0.22f, gold, keepCollider: false);
-            GameObject lowWater = Primitive(PrimitiveType.Cylinder, "BowlWater", root, new Vector3(0f, 1.695f, 0f), new Vector3(1.35f, 0.01f, 1.35f), PoolWaterMaterial(), keepCollider: false);
+            GameObject lowWater = Primitive(PrimitiveType.Cylinder, "BowlWater", root, new Vector3(0f, 1.695f, 0f), new Vector3(1.35f, 0.01f, 1.35f), fountainWater, keepCollider: false);
             lowWater.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 

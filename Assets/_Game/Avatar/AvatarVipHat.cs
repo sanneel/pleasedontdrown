@@ -41,6 +41,14 @@ namespace PleaseDontDrown.Avatars
             if (_rig != null) _rig.Rebuilt -= Wear;
         }
 
+        // Lying down (out cold, carried, on a bed) the brim would cut into the sand: the hat is off until they're up.
+        private void LateUpdate()
+        {
+            if (_hat == null || _rig == null || !_rig.IsBuilt) return;
+            bool upright = Vector3.Dot(_rig[Bone.Head].up, Vector3.up) > 0.55f;
+            if (_hat.activeSelf != upright) _hat.SetActive(upright);
+        }
+
         private void OnDestroy()
         {
             if (_hat != null) Destroy(_hat);
@@ -59,8 +67,6 @@ namespace PleaseDontDrown.Avatars
             _hat.transform.localScale = Vector3.one * r;
             _hat.AddComponent<MeshFilter>().sharedMesh = SharedMesh();
             _hat.AddComponent<MeshRenderer>().sharedMaterial = AvatarRig.SharedMaterial;
-            Debug.Log($"[VipHat] {name}: body {(_rig.GeneratedBody != null ? _rig.GeneratedBody.Id : 0)} head top {_rig.HeadTop:F3} half width {_rig.HeadHalfWidth:F3} " +
-                      $"front {_rig.HeadFront:F3} back {_rig.HeadBack:F3} bone scale {_rig[Bone.Head].lossyScale.x:F3} rig scale {_rig.Scale:F2}");
         }
 
         /// <summary>The hat around a skull of radius 1 centred on the origin (y up, the face toward +z).</summary>

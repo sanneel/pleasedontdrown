@@ -17,7 +17,7 @@
 | 7 | Gala night | **Done** | `story goto 2.6`, `galatest` / `galatest day` |
 | 8 | Marina and the real yacht | **Done** | `story goto 2.7` |
 | 9 | Make it look expensive | **Done** | `hotel`, then look around; `galatest` for night |
-| 10 | People using the place | **Done** (staff, slot players, guests on the pool loungers) | `story goto 2.5c` |
+| 10 | People using the place | **Partly** (slot players and lounger guests yes; staff no: no uniform body) | `story goto 2.5c` |
 
 The whole of chapter 2 plays through automatically now, with everything in: `-pdd-autoplay` from 2.1 to Skull Cove
 (beat 3.2) in one run: **RESULT PASS, 0 errors, 0 warnings** (last run at the very end). The old "stuck at 2.1" is gone.
@@ -98,8 +98,10 @@ the yacht is at the new marina; sail to Skull Cove.
 - A round stone fountain (two bowls, a gold top) on the forecourt in front of the casino wing.
 
 ### 10. People: partly
-- Done: a bellhop at the door, a waitress walking from the Coral Bar to the pool and back, a pool attendant. They use
-  the hotel bar's uniform body (a woman in the teal waistcoat: the only staff body there is), so they have women's names.
+- **Staff: taken out.** I first used the hotel bar's "uniform" body, but in the strict review it turned out to be
+  a woman in a bikini (so is the barista's body): a bellhop and a waitress in bikinis looked wrong. Every staff body
+  in the game is a bikini model; the only one in clothes is the director's suit. Staff need a uniformed model (a Tripo
+  character: your call, it costs credits).
 - Two guests sit playing the casino's slot machines (on the stools, facing the machines; 0 hand overlaps).
 - Two guests sit up on the pool loungers (backs to the backrest, legs out). The loungers had no collision, so the
   scene batch adds an invisible seat box on each (the first try, lying down, sank them to the sand: taken out).
@@ -113,8 +115,27 @@ the yacht is at the new marina; sail to Skull Cove.
 - **VIP hat is new** (made in code); the wear library's hats only fit the lifeguard's head.
 - **Broken chair = a stool knocked over** (the stools are fixed seats, they can't fly about).
 - **Yacht:** the only Tripo yacht there is (from `ArtSource/Tripo/island3/`), copied into the game.
-- **Staff body:** the bar's uniformed woman for all three.
 - **Story test:** after a minute of shift it tops the wallet up with `galamoney` (else the test takes an hour).
+
+## Strict review pass (after the first report)
+ played everything again, took pictures from several sides (and from above), and fixed what was wrong:
+
+| Found | Fixed |
+|---|---|
+| The cushion drifted away from its jetty on the waves (and the jetty's jet ski turned crooked) | A mooring holds the yacht, the cushion and that jet ski at their berths while nobody drives or tows them (checked after 1 minute) |
+| The man in the cushion sat partly inside its backrest (the model was turned 90 degrees wrong) | Turned the model: backrest behind them, both on the seat facing the jet ski, 0 hand overlaps |
+| The yacht sat flush against the pier; the boarding platform poked into its railing | Yacht moved out a little, platform ends at the pier's edge, the yacht's deck box widened to the rail: walked aboard again (checked) |
+| The helm was a box that looked like a crate | A slim chrome pedestal with a teak top |
+| Signposts: the post ran up through the middle of the board and the letters | Two posts at the board's ends |
+| Fountain: the stone rim covered the water, it looked like a solid drum | Rim removed, blue water visible in both bowls |
+| The pool's south hedge lay on the edge of the cart road | Moved onto the deck's edge |
+| Some palms leaned their crowns over the cart road | Each palm is turned so its crown is 3.5 m clear of the road (checked from above) |
+| Velvet ropes stood in zigzag double rows (the Tripo set's posts are on a diagonal) | Measured the line of posts and laid it along the carpet: one straight row each side |
+| My champagne table and 2 chandeliers duplicated the casino's own (the casino already has them) | Removed mine |
+| VIP hat: lying on the sand the brim cut into the ground | The hat is off while the head isn't upright (lying, carried) |
+| Staff were in bikinis | Taken out (see task 10) |
+| bjtest stood the player on / right behind a stool | Stands between two stools |
+ changed (not mine): the island 1 beach crowd's hands touch each other a few cm while walking past (overlaps log).
 
 ## Numbers
 

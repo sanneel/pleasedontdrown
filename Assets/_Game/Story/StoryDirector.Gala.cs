@@ -77,16 +77,8 @@ namespace PleaseDontDrown.Story
                 _director.ServerSetTalkable(false);
                 return _director.gameObject;
             });
-            // The staff, in the hotel's teal waistcoat: a bellboy at the door, a waiter going between the bar and the
-            // pool, a pool attendant on the deck.
-            AddResident("I2Hotel", () => Staff("Bellhop Bella", BellboySpot, 0f).gameObject);
-            AddResident("I2Hotel", () => Staff("Pool attendant Ines", PoolAttendantSpot, 0f).gameObject);
-            AddResident("I2Hotel", () =>
-            {
-                StoryNpc waiter = Staff("Waitress Paola", WaiterRoute[0], 90f);
-                StartCoroutine(WaiterRounds(waiter));
-                return waiter.gameObject;
-            });
+            // (No staff yet: the only staff-like bodies, the bartender and the barista, are bikini models. A bellhop in a
+            // bikini looked wrong; they wait for a uniformed model.)
             SlotResidents();
             LoungerResidents();
         }
@@ -135,41 +127,12 @@ namespace PleaseDontDrown.Story
             }
         }
 
-        private static readonly Vector3 BellboySpot = new(22.4f, 1.85f, -241.2f), PoolAttendantSpot = new(50.5f, 1.7f, -241.5f);
-        // Along the front of the hotel, from the Coral Bar's deck to the pool deck and back (clear of the carpet's ropes).
-        private static readonly Vector3[] WaiterRoute = { new(-40f, 1.8f, -243f), new(-12f, 1.8f, -238.5f), new(8f, 1.8f, -235.5f), new(32f, 1.8f, -235.5f), new(50f, 1.8f, -240.5f) };
-
         /// <summary>A character inside the hotel, exactly where asked (the navmesh snap put the lobby's people on its roof).</summary>
         private StoryNpc SpawnIndoors(string displayName, NpcRole role, AvatarLook look, Vector3 at, float yaw)
         {
             StoryNpc npc = SpawnNpc(displayName, role, look, at, yaw);
             npc.ServerTeleport(at, yaw, keepExact: true);
             return npc;
-        }
-
-        private StoryNpc Staff(string displayName, Vector3 at, float yaw)
-        {
-            AvatarLook look = GuestLook(4242, 1);
-            look.Body = AvatarLook.Bodies.Bartender; // the hotel bar's uniform: teal waistcoat
-            StoryNpc npc = SpawnNpc(displayName, NpcRole.Bystander, look, at, yaw);
-            npc.ServerSetTalkable(false);
-            return npc;
-        }
-
-        /// <summary>Host: the waiter walks the hotel front from the bar to the pool and back, stopping at each end.</summary>
-        private IEnumerator WaiterRounds(StoryNpc waiter)
-        {
-            int i = 0, step = 1;
-            while (waiter != null && waiter.IsSpawned)
-            {
-                yield return new WaitForSeconds(i == 0 || i == WaiterRoute.Length - 1 ? Random.Range(6f, 12f) : 0.2f);
-                if (waiter == null || !waiter.IsSpawned) yield break;
-                if (i + step < 0 || i + step >= WaiterRoute.Length) step = -step;
-                i += step;
-                waiter.ServerMoveTo(WaiterRoute[i]);
-                float started = Time.time;
-                while (waiter != null && waiter.IsMoving && Time.time - started < 30f) yield return new WaitForSeconds(0.3f);
-            }
         }
 
         /// <summary>Host: the night and the casino follow the beat the story is at (also after a jump or a reload).</summary>
@@ -462,6 +425,14 @@ namespace PleaseDontDrown.Story
             }
         }
 
+        /// <summary>Test ('bartest stool'): the second stool from the left goes over now.</summary>
+        private IEnumerator TestStool()
+        {
+            yield return new WaitForSeconds(1f);
+            _brokenStools.Add("BarStool1");
+            StoolObservers("BarStool1", new Vector3(0.3f, 0f, 1f).normalized, true);
+        }
+
         private void StandStoolsUp()
         {
             foreach (string name in _brokenStools) StoolObservers(name, Vector3.zero, false);
@@ -500,7 +471,7 @@ namespace PleaseDontDrown.Story
                 CheatServer("vip", args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0) * 10f) : 100), cheat: true, owner: this);
             DevCommands.Register("galamoney", "<amount>", "Show the gala bar (if the story hasn't) and add money to the team's wallet.", args =>
                 CheatServer("galamoney", args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 250), cheat: true, owner: this);
-            DevCommands.Register("bartest", "", "Start a bar fight at the Coral Bar now (bouncer job: $50, -$20 per broken chair).", _ => CheatServer("bartest", 0), cheat: true, owner: this);
+            DevCommands.Register("bartest", "[stool]", "Start a bar fight at the Coral Bar now (bouncer job: $50, -$20 per broken chair); 'stool' knocks a stool over at once (to look at it).", args => CheatServer("bartest", args.Length > 0 && args[0] == "stool" ? 1 : 0), cheat: true, owner: this);
             DevCommands.Register("galatest", "[day]", "Gala night on island 2 now (night, decorations); 'galatest day' turns it off.", args =>
                 CheatServer("galatest", args.Length > 0 && args[0] == "day" ? 0 : 1), cheat: true, owner: this);
         }
@@ -522,10 +493,14 @@ namespace PleaseDontDrown.Story
                     TouristProfile profile = Profile(_island2, Random.value < 0.5f ? 0 : 1);
                     profile.Vip = true;
                     profile.Name = VictimBrain.VipName(profile.Figure == 1);
-                    at.y = World.Water.WaterSurface.Exists ? World.Water.WaterSurface.HeightAt(at) - 0.4f : at.y;
+                    // On land: out cold on the sand in front of you (CPR, carrying); in the water: in trouble.
+                    bool onLand = Shore.WaterDepthAt(new Vector3(at.x, 20f, at.z)) < Shore.StandDepth;
+                    float ground = Shore.GroundHeightAt(at + Vector3.up * 10f);
+                    at.y = onLand && !float.IsNaN(ground) ? ground + 0.5f : World.Water.WaterSurface.Exists ? World.Water.WaterSurface.HeightAt(at) - 0.4f : at.y;
                     if (RescueService.Instance != null)
                     {
-                        VictimBrain v = RescueService.Instance.SpawnVictim(at, 0f, VictimState.Distressed, 30f, 1f, profile);
+                        VictimBrain v = onLand ? RescueService.Instance.SpawnVictim(at, 0f, VictimState.Unconscious, 0f, 0f, profile)
+                            : RescueService.Instance.SpawnVictim(at, 0f, VictimState.Distressed, 30f, 1f, profile);
                         Debug.Log($"[Gala] viptest: {v?.Name} at {at:F1}, money ${Economy.Money}");
                     }
                     return true;
@@ -543,6 +518,7 @@ namespace PleaseDontDrown.Story
                     if (_barFight != null) StopCoroutine(_barFight);
                     foreach (StoryNpc n in _barFighters) if (n != null) Remove(n);
                     _barFight = StartCoroutine(BarFight());
+                    if (value == 1) StartCoroutine(TestStool());
                     return true;
                 case "galatest":
                     _galaNight.Value = value != 0;
