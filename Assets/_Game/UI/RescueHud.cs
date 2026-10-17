@@ -87,11 +87,12 @@ namespace PleaseDontDrown.UI
             {
                 bool current = (i == 0) == (now == CprStep.Compress);
                 var box = new Rect(left, top + i * (height + gap), chip, height);
-                Hud.Fill(box, current ? new Color(0.07f, 0.27f, 0.28f) : new Color(1f, 1f, 1f, 0.04f), 10f);
-                Hud.Frame(box, current ? Hud.Teal : new Color(1f, 1f, 1f, 0.12f), current ? 2f : 1f, 10f);
+                // (No dark boxes: only the current step is framed; the words are outlined straight on the game.)
+                if (current) Hud.Frame(box, Hud.Teal, 2f, 10f);
                 Color words = current ? Hud.Paper : Hud.Muted;
                 var key = new Rect(box.x + 12f, box.y + 11f, 84f, 58f);
-                Hud.Fill(key, current ? Hud.Teal : new Color(0f, 0f, 0f, 0.25f), 8f);
+                if (current) Hud.Fill(key, Hud.Teal, 8f);
+                else Hud.Frame(key, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.5f), 1.5f, 8f);
                 Hud.FitLabel(key, _cprKeys[i], 26f, current ? Hud.Ink : words, TextAnchor.MiddleCenter, heavy: true);
                 Hud.FitLabel(new Rect(box.x + 108f, box.y + 8f, chip - 120f, 36f), _cprWhat[i], 21f, words, TextAnchor.MiddleLeft, heavy: true);
                 Hud.Label(new Rect(box.x + 108f, box.y + 40f, chip - 116f, 30f), _cprCount[i], 21f, words, TextAnchor.MiddleLeft, shadow: false);

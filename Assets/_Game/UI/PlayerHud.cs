@@ -174,7 +174,7 @@ namespace PleaseDontDrown.UI
                 float lift = active ? Hud.EaseOutBack(_lift[i]) : _lift[i] * _lift[i];
 
                 var r = new Rect(x0 + i * (size + gap), y0 - lift * Hud.SlotLift, size, size);
-                Hud.Fill(r, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, active ? 0.9f : 0.7f), 14f);
+                Hud.Fill(r, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, active ? 0.55f : 0.35f), 14f); // (see-through, not black blocks)
                 Hud.Frame(r, active ? Hud.Teal : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.34f), active ? 3f : 1.5f, 14f);
                 if (active) Hud.Fill(new Rect(r.x + 18f, r.yMax - 5f, r.width - 36f, 3f), Hud.Teal, 1.5f);
 

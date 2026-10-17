@@ -233,7 +233,7 @@ namespace PleaseDontDrown.Story
             if (_title == null || t > 4.5f) return;
             float a = Mathf.Clamp01(t / 0.4f) * Mathf.Clamp01((4.5f - t) / 0.8f);
             float y = Hud.Height * 0.28f;
-            Hud.Fill(new Rect(0f, y, Hud.Width, 176f), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.8f * a));
+            // (No dark band behind it: text sits straight on the game, outlined. The user, 2026-10-13 and again 2026-10-17.)
             Hud.Fill(new Rect(Hud.Width * 0.5f - 110f, y + 5f, 220f, 4f), new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, a), 2f);
             Hud.FitLabel(new Rect(80f, y + 14f, Hud.Width - 160f, 96f), _title, 68f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, a), TextAnchor.MiddleCenter, heavy: true);
             Hud.Label(new Rect(80f, y + 110f, Hud.Width - 160f, 60f), _subtitle, 25f, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, a), wrap: true, shadow: false);
