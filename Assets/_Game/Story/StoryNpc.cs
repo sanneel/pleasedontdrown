@@ -45,6 +45,7 @@ namespace PleaseDontDrown.Story
 
         private readonly SyncVar<string> _name = new SyncVar<string>();
         private readonly SyncVar<ulong> _look = new SyncVar<ulong>();
+        private readonly SyncVar<bool> _vip = new SyncVar<bool>();
         private readonly SyncVar<NpcRole> _role = new SyncVar<NpcRole>();
         private readonly SyncVar<AvatarPose> _pose = new SyncVar<AvatarPose>();
         private readonly SyncVar<AvatarMood> _mood = new SyncVar<AvatarMood>();
@@ -102,6 +103,8 @@ namespace PleaseDontDrown.Story
         public NpcRole Role => _role.Value;
         public AvatarLook Look => AvatarLook.Unpack(_look.Value);
         public ulong LookPacked => _look.Value;
+        /// <summary>A VIP hotel guest (gold hat): if they get into trouble in the water they're a VIP to rescue (tips).</summary>
+        public bool IsVip => _vip.Value;
         public AvatarPose Pose => _pose.Value;
         public int Health => _health.Value;
         public int MaxHealth => _maxHealth.Value;
@@ -179,6 +182,7 @@ namespace PleaseDontDrown.Story
         private void Awake()
         {
             _look.OnChange += (_, next, _) => ApplyLook(next);
+            _vip.OnChange += (_, next, _) => AvatarVipHat.Set(_rig, next);
             _name.OnChange += (_, next, _) =>
             {
                 if (_nameTag != null) _nameTag.text = next;
@@ -292,6 +296,7 @@ namespace PleaseDontDrown.Story
 
         [Server] public void ServerSetPose(AvatarPose pose) => _pose.Value = pose;
         [Server] public void ServerSetMood(AvatarMood mood) => _mood.Value = mood;
+        [Server] public void ServerSetVip(bool vip) => _vip.Value = vip;
         [Server] public void ServerSetHealth(int health, int max) { _maxHealth.Value = max; _health.Value = health; }
         [Server] public void ServerSetBag(bool hasBag) => _hasBag.Value = hasBag;
 

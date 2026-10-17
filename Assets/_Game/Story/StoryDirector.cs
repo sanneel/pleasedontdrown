@@ -620,8 +620,11 @@ namespace PleaseDontDrown.Story
                 Despawn(swimmer.gameObject);
             }
             else if (!rescue.TryFindSeaSpot(island.SeaX, island.SeaZ, minDepth, maxDepth, out spot)) return null;
-            // A VIP guest: "VIP Mrs. Astor" (the gold hat comes with the flag).
-            if (profile.Vip) profile.Name = VictimBrain.VipName(profile.Look != 0 ? AvatarLook.Unpack(profile.Look).Feminine : profile.Figure == 1);
+            // A VIP guest: "VIP Mrs. Astor" (the gold hat comes with the flag). A VIP swimmer from the beach stays one.
+            if (swimmer != null) profile.Vip = swimmer.IsVip; // (the beach crowd has its one in five already)
+            if (profile.Vip && (profile.Name == null || !profile.Name.StartsWith("VIP ")))
+                profile.Name = !string.IsNullOrEmpty(profile.Name) && swimmer == null ? "VIP " + profile.Name
+                    : VictimBrain.VipName(profile.Look != 0 ? AvatarLook.Unpack(profile.Look).Feminine : profile.Figure == 1);
             VictimBrain v = rescue.SpawnVictim(spot, yaw, VictimState.Distressed, 30f, 1f, profile);
             if (v == null) return null;
             _waveTourists.Add(v);

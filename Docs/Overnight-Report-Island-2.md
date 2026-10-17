@@ -35,7 +35,8 @@ the yacht is at the new marina; sail to Skull Cove.
 ## Each task
 
 ### 1. VIP guests and tips: done
-- About 1 in 5 guests in trouble on the hotel beach is a VIP: a **gold panama hat with a black band** and "VIP" before
+- About 1 in 5 guests on the hotel beach (sunbathing, walking, swimming) is a VIP, and stays one when they get
+  into trouble: a **gold panama hat with a black band** and "VIP" before
   the name ("VIP Mrs. Astor"), in the prompt and every message. Picture `01_vip_guest.jpg`.
 - Rescued: normal pay x1.5 (island 2) **plus a $100-300 tip** with the money popup and "VIP ... tips the team $160!".
   VIPs never take money away (no airlift bill).
