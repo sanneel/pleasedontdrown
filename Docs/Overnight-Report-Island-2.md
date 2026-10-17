@@ -16,7 +16,7 @@
 | 6 | Hotel director in the story | **Done** | `story goto 2.5c` |
 | 7 | Gala night | **Done** | `story goto 2.6`, `galatest` / `galatest day` |
 | 8 | Marina and the real yacht | **Done** | `story goto 2.7` |
-| 9 | Make it look expensive | **Mostly done** (no fountain) | `hotel`, then look around; `galatest` for night |
+| 9 | Make it look expensive | **Done** | `hotel`, then look around; `galatest` for night |
 | 10 | People using the place | **Partly** (staff yes; guests on loungers and slots no) | `story goto 2.5c` |
 
 The whole of chapter 2 plays through automatically now: `-pdd-autoplay` went 2.1 → 2.6 with no errors, and from 2.7
@@ -94,7 +94,7 @@ the yacht is at the new marina; sail to Skull Cove.
   low hedges round the pool's east and south sides, **17 lamp posts** along the road + 4 pool bollards (glow at night
   only, no real lights), signposts (Casino, Coral Bar, Coral Arms, Pool, Marina, Cushion Ride), and a "GRAND CORAL" arch
   over the dock. Picture `09_road_lamps_night.jpg`.
-- **Not done:** the fountain.
+- A round stone fountain (two bowls, a gold top) on the forecourt in front of the casino wing.
 
 ### 10. People: partly
 - Done: a bellhop at the door, a waitress walking from the Coral Bar to the pool and back, a pool attendant. They use
@@ -138,7 +138,7 @@ Changed: `Story/StoryDirector.cs`, `StoryDirector.Beats.cs`, `StoryDirector.Free
 
 ## Still wrong or not checked
 
-- Guests on loungers and at the slots, the fountain: not built.
+- Guests on loungers and at the slots: not built.
 - The waitress walks a fixed line in front of the hotel; she doesn't carry a tray.
 - The arch's "GRAND CORAL" letters are small from the beach.
 - Not checked by eye from every side: the palms from the sea side, the hedges up close.

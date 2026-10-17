@@ -54,6 +54,7 @@ namespace PleaseDontDrown.Editor
             BuildIsland2Lamps(root);
             BuildIsland2Signs(root);
             BuildDockArch(root);
+            BuildForecourtFountain(root);
 
             Physics.SyncTransforms();
             BakeNavMeshes(only: "Island2");
@@ -618,6 +619,32 @@ namespace PleaseDontDrown.Editor
                 TextMesh s = WorldText(root, "Subtitle", new Vector3(0f, 1.71f, 0.035f * side), subtitle, 60, 0.018f, gold);
                 s.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 180f : 0f, 0f);
             }
+        }
+
+        // ------------------------------------------------------------------ the fountain on the forecourt (task 9)
+
+        /// <summary>A round stone fountain in front of the casino wing: a basin with water, a column, two bowls.</summary>
+        private static void BuildForecourtFountain(Transform parent)
+        {
+            var root = new GameObject("Fountain").transform;
+            root.SetParent(parent, false);
+            var at = new Vector3(2.5f, 0f, -238.5f);
+            at.y = SurfaceUnder(at);
+            if (Blocked(at + Vector3.up * 0.2f, 1.6f)) { Debug.LogWarning("[Island2Finish] no room for the fountain"); return; }
+            root.position = at;
+            Material stone = GetMaterial("FountainStone", new Color(0.93f, 0.88f, 0.78f), smoothness: 0.3f);
+            Material gold = GetMaterial("GalaGold", new Color(1f, 0.78f, 0.35f), 0.9f, 0.7f);
+            Primitive(PrimitiveType.Cylinder, "Basin", root, new Vector3(0f, 0.28f, 0f), new Vector3(3.6f, 0.28f, 3.6f), stone);
+            Primitive(PrimitiveType.Cylinder, "BasinRim", root, new Vector3(0f, 0.58f, 0f), new Vector3(3.8f, 0.04f, 3.8f), stone, keepCollider: false);
+            GameObject water = Primitive(PrimitiveType.Cylinder, "Water", root, new Vector3(0f, 0.57f, 0f), new Vector3(3.3f, 0.02f, 3.3f), PoolWaterMaterial(), keepCollider: false);
+            water.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            Primitive(PrimitiveType.Cylinder, "Column", root, new Vector3(0f, 1.1f, 0f), new Vector3(0.35f, 0.55f, 0.35f), stone, keepCollider: false);
+            Primitive(PrimitiveType.Cylinder, "BowlLow", root, new Vector3(0f, 1.62f, 0f), new Vector3(1.5f, 0.07f, 1.5f), stone, keepCollider: false);
+            Primitive(PrimitiveType.Cylinder, "Column2", root, new Vector3(0f, 1.95f, 0f), new Vector3(0.18f, 0.3f, 0.18f), stone, keepCollider: false);
+            Primitive(PrimitiveType.Cylinder, "BowlHigh", root, new Vector3(0f, 2.28f, 0f), new Vector3(0.75f, 0.05f, 0.75f), stone, keepCollider: false);
+            Primitive(PrimitiveType.Sphere, "Finial", root, new Vector3(0f, 2.48f, 0f), Vector3.one * 0.22f, gold, keepCollider: false);
+            GameObject lowWater = Primitive(PrimitiveType.Cylinder, "BowlWater", root, new Vector3(0f, 1.695f, 0f), new Vector3(1.35f, 0.01f, 1.35f), PoolWaterMaterial(), keepCollider: false);
+            lowWater.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         // ------------------------------------------------------------------ the arch over the dock (task 9)
