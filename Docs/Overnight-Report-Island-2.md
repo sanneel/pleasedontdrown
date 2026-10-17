@@ -17,7 +17,7 @@
 | 7 | Gala night | **Done** | `story goto 2.6`, `galatest` / `galatest day` |
 | 8 | Marina and the real yacht | **Done** | `story goto 2.7` |
 | 9 | Make it look expensive | **Done** | `hotel`, then look around; `galatest` for night |
-| 10 | People using the place | **Partly** (staff yes; guests on loungers and slots no) | `story goto 2.5c` |
+| 10 | People using the place | **Mostly** (staff, slot players; no guests on the loungers) | `story goto 2.5c` |
 
 The whole of chapter 2 plays through automatically now: `-pdd-autoplay` went 2.1 → 2.6 with no errors, and from 2.7
 on the yacht to Skull Cove (beat 3.2): **RESULT PASS**. The old "stuck at 2.1" did not happen any more.
@@ -100,7 +100,8 @@ the yacht is at the new marina; sail to Skull Cove.
 ### 10. People: partly
 - Done: a bellhop at the door, a waitress walking from the Coral Bar to the pool and back, a pool attendant. They use
   the hotel bar's uniform body (a woman in the teal waistcoat: the only staff body there is), so they have women's names.
-- **Not done:** guests lying on the pool loungers and playing the slots. I tried the loungers: the guests fell through
+- Two guests sit playing the casino's slot machines (on the stools, facing the machines; 0 hand overlaps).
+- **Not done:** guests lying on the pool loungers. I tried: the guests fell through
   the lounger to the sand (the loungers have no seat surface to lie on), so I took them out rather than leave it broken.
 
 ## Decisions I made without you (overrule any of them)
@@ -139,7 +140,7 @@ Changed: `Story/StoryDirector.cs`, `StoryDirector.Beats.cs`, `StoryDirector.Free
 
 ## Still wrong or not checked
 
-- Guests on loungers and at the slots: not built.
+- Guests on the pool loungers: not built.
 - The waitress walks a fixed line in front of the hotel; she doesn't carry a tray.
 - The arch's "GRAND CORAL" letters are small from the beach.
 - Not checked by eye from every side: the palms from the sea side, the hedges up close.

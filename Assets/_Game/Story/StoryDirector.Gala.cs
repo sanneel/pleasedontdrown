@@ -87,6 +87,27 @@ namespace PleaseDontDrown.Story
                 StartCoroutine(WaiterRounds(waiter));
                 return waiter.gameObject;
             });
+            SlotResidents();
+        }
+
+        // Guests at the casino's slot machines (GameSceneBuilder.HotelInterior: six along the outer wall, a low stool in
+        // front of each): which machine (0-5), sitting facing it.
+        private static readonly int[] SlotGuests = { 1, 4 };
+        private const float SlotStoolX = -2.15f, SlotStoolTop = 2.16f, SlotFirstZ = -246.4f, SlotStep = 1.15f, SlotSitDrop = 0.5f;
+
+        private void SlotResidents()
+        {
+            for (int i = 0; i < SlotGuests.Length; i++)
+            {
+                int k = i;
+                AddResident("I2Hotel", () =>
+                {
+                    var at = new Vector3(SlotStoolX, SlotStoolTop - SlotSitDrop, SlotFirstZ - SlotGuests[k] * SlotStep);
+                    StoryNpc guest = SpawnIndoors(VictimBrain.RandomName(k == 0), NpcRole.Guest, GuestLook(8300 + k * 13, k == 0 ? 1 : 0), at, 270f);
+                    guest.ServerSetPose(AvatarPose.SitStool);
+                    return guest.gameObject;
+                });
+            }
         }
 
         private static readonly Vector3 BellboySpot = new(22.4f, 1.85f, -241.2f), PoolAttendantSpot = new(50.5f, 1.7f, -241.5f);
