@@ -55,6 +55,7 @@ namespace PleaseDontDrown.Editor
             BuildIsland2Signs(root);
             BuildDockArch(root);
             BuildForecourtFountain(root);
+            BuildLoungerSeats(root);
 
             Physics.SyncTransforms();
             BakeNavMeshes(only: "Island2");
@@ -620,6 +621,38 @@ namespace PleaseDontDrown.Editor
                 s.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 180f : 0f, 0f);
             }
         }
+
+        // ------------------------------------------------------------------ lounger seats (task 10)
+
+        /// <summary>
+        /// The pool's lounge sets (two loungers and a table each, GameSceneBuilder.TeamB) have no collision: an invisible
+        /// box on each lounger's flat part, so guests sitting on them rest on the cushion (StoryDirector.Gala).
+        /// Their backrests are at the set's -z (the model's +y as made in Blender).
+        /// </summary>
+        private static void BuildLoungerSeats(Transform parent)
+        {
+            var root = new GameObject("LoungerSeats").transform;
+            root.SetParent(parent, false);
+            Transform pool = GameObject.Find("Environment/Island2Pool")?.transform;
+            if (pool == null) return;
+            int n = 0;
+            foreach (Transform set in pool)
+            {
+                if (!set.name.StartsWith("Lounge")) continue;
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    var seat = new GameObject("LoungerSeat").transform;
+                    seat.SetParent(root, false);
+                    seat.SetPositionAndRotation(set.TransformPoint(new Vector3(side * 1.2f, LoungerCushionTop - 0.05f, 0.25f)), set.rotation);
+                    seat.gameObject.AddComponent<BoxCollider>().size = new Vector3(0.7f, 0.1f, 1.7f);
+                    n++;
+                }
+            }
+            Debug.Log($"[Island2Finish] {n} lounger seats");
+        }
+
+        /// <summary>The loungers' cushion top over the set's root (the model stands 0.1 m up, its cushion top at 0.67).</summary>
+        private const float LoungerCushionTop = 0.66f;
 
         // ------------------------------------------------------------------ the fountain on the forecourt (task 9)
 

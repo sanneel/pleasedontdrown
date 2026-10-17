@@ -88,6 +88,7 @@ namespace PleaseDontDrown.Story
                 return waiter.gameObject;
             });
             SlotResidents();
+            LoungerResidents();
         }
 
         // Guests at the casino's slot machines (GameSceneBuilder.HotelInterior: six along the outer wall, a low stool in
@@ -105,6 +106,30 @@ namespace PleaseDontDrown.Story
                     var at = new Vector3(SlotStoolX, SlotStoolTop - SlotSitDrop, SlotFirstZ - SlotGuests[k] * SlotStep);
                     StoryNpc guest = SpawnIndoors(VictimBrain.RandomName(k == 0), NpcRole.Guest, GuestLook(8300 + k * 13, k == 0 ? 1 : 0), at, 270f);
                     guest.ServerSetPose(AvatarPose.SitStool);
+                    return guest.gameObject;
+                });
+            }
+        }
+
+        // Guests sitting up on the pool's loungers, backs to the backrest (the set's -z), feet toward the pool. The sitting
+        // pose's root is at the feet, the hips SitBack behind them: the hips just in front of the backrest.
+        private static readonly (string set, float side)[] LoungerGuests = { ("LoungeS0", -1f), ("LoungeN2", 1f) };
+        private const float LoungerSide = 1.2f, LoungerTop = 0.66f, LoungerHipsZ = -0.38f;
+
+        private void LoungerResidents()
+        {
+            for (int i = 0; i < LoungerGuests.Length; i++)
+            {
+                int k = i;
+                GameObject set = GameObject.Find("Environment/Island2Pool/" + LoungerGuests[k].set);
+                if (set == null) continue;
+                AddResident("I2Hotel", () =>
+                {
+                    Transform t = set.transform;
+                    Vector3 feet = t.TransformPoint(new Vector3(LoungerGuests[k].side * LoungerSide, LoungerTop, LoungerHipsZ + StoryNpc.SitBack));
+                    StoryNpc guest = SpawnIndoors(VictimBrain.RandomName(k == 0), NpcRole.Guest, GuestLook(9100 + k * 17, k == 0 ? 1 : 0), feet, t.eulerAngles.y);
+                    guest.ServerSetPose(AvatarPose.Sit);
+                    guest.ServerSetMood(AvatarMood.Happy);
                     return guest.gameObject;
                 });
             }
