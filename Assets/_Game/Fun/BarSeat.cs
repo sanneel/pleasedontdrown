@@ -40,7 +40,6 @@ namespace PleaseDontDrown.Fun
         private void Awake()
         {
             _vehicle = GetComponent<Vehicle>();
-            useGUILayout = false;
         }
 
         private void OnEnable() =>
@@ -106,6 +105,8 @@ namespace PleaseDontDrown.Fun
         {
             if (_cardOpen == open) return;
             _cardOpen = open;
+            if (open) UI.WorldMenus.Show(this, DrawCard); // (drawn by the one shared OnGUI while open)
+            else UI.WorldMenus.Close(this);
             if (open && !_pushedUI) { GameInput.PushUI(); _pushedUI = true; }
             if (!open && _pushedUI) { GameInput.PopUI(); _pushedUI = false; }
         }
@@ -121,7 +122,7 @@ namespace PleaseDontDrown.Fun
 
         private const float CardWidth = 760f, Row = 92f;
 
-        private void OnGUI()
+        private void DrawCard()
         {
             if (!_cardOpen || !_seated) return;
             Barista.MenuItem[] menu = _barista.Menu;
@@ -133,7 +134,7 @@ namespace PleaseDontDrown.Fun
             if (_moneyShown != Economy.Money || _moneyText == null)
             {
                 _moneyShown = Economy.Money;
-                _moneyText = "Wallet $" + _moneyShown;
+                _moneyText = "Team funds  $" + _moneyShown.ToString("N0");
             }
 
             Hud.Dim(0.35f);
@@ -144,7 +145,7 @@ namespace PleaseDontDrown.Fun
             var panel = new Rect((Hud.Width - CardWidth) * 0.5f, (Hud.Height - height) * 0.5f, CardWidth, height);
             Hud.Panel(panel, 0.94f);
             Hud.Label(new Rect(panel.x + 36f, panel.y + 22f, CardWidth - 72f, 60f), "MENU", 44f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            Hud.Label(new Rect(panel.x + 36f, panel.y + 22f, CardWidth - 72f, 60f), _moneyText, 26f, new Color(0.56f, 1f, 0.56f), TextAnchor.MiddleRight, heavy: true, shadow: false);
+            Hud.Label(new Rect(panel.x + 36f, panel.y + 22f, CardWidth - 72f, 60f), _moneyText, 26f, Hud.Sand, TextAnchor.MiddleRight, heavy: true, shadow: false);
             Hud.Fill(new Rect(panel.x + 36f, panel.y + 92f, CardWidth - 72f, 2f), new Color(1f, 1f, 1f, 0.15f));
 
             float y = panel.y + 108f;
@@ -162,7 +163,7 @@ namespace PleaseDontDrown.Fun
                     Color text = afford ? Color.white : new Color(1f, 1f, 1f, 0.4f);
                     Hud.Fill(new Rect(row.x + 18f, row.y + 18f, 46f, 46f), new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, afford ? 0.9f : 0.3f), 10f);
                     Hud.Label(new Rect(row.x + 18f, row.y + 18f, 46f, 46f), (i + 1).ToString(), 26f, Hud.Ink, TextAnchor.MiddleCenter, heavy: true, shadow: false);
-                    Hud.Label(new Rect(row.x + 84f, row.y + 6f, row.width - 230f, 40f), dish.Label, 30f, text, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                    Hud.FitLabel(new Rect(row.x + 84f, row.y + 6f, row.width - 230f, 40f), dish.Label, 26f, text, heavy: true);
                     Hud.Label(new Rect(row.x + 84f, row.y + 44f, row.width - 230f, 30f), Blurb(dish.Item), 18f, new Color(text.r, text.g, text.b, text.a * 0.7f),
                         TextAnchor.MiddleLeft, shadow: false);
                     Hud.Label(new Rect(row.xMax - 140f, row.y, 116f, row.height), _prices[i], 32f, afford ? Hud.Teal : text, TextAnchor.MiddleRight, heavy: true, shadow: false);

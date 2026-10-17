@@ -15,20 +15,45 @@ namespace PleaseDontDrown.UI
     {
         public const float Sheet = 1080f;
 
-        public static readonly Color Coral = new(0.98f, 0.47f, 0.34f);
-        public static readonly Color Teal = new(0.27f, 0.79f, 0.77f);
-        public static readonly Color Sand = new(1f, 0.93f, 0.72f);
-        public static readonly Color Ink = new(0.03f, 0.1f, 0.15f);
+        // A single coastal rescue palette for menus, combat, story and the HUD.
+        public static readonly Color Coral = new(1f, 0.38f, 0.28f);
+        public static readonly Color Teal = new(0.32f, 0.88f, 0.81f);
+        public static readonly Color Sand = new(1f, 0.91f, 0.70f);
+        public static readonly Color Ink = new(0.025f, 0.075f, 0.11f);
+        public static readonly Color Paper = new(0.96f, 0.97f, 0.94f);
+        public static readonly Color Muted = new(0.69f, 0.79f, 0.79f);
+        public static readonly Color Danger = new(1f, 0.43f, 0.36f);
+        public const float Margin = 28f;
+        public static float BossTop => Width >= 1800f ? Margin : 220f;
 
         // Where the bottom-centre block sits, for everything that stacks above it.
         public const float SlotSize = 100f, SlotGap = 8f, SlotBottom = 24f, SlotLift = 20f;
         /// <summary>The top of the hotbar (a lifted slot included), in sheet units.</summary>
         public static float HotbarTop => Height - SlotBottom - SlotSize - SlotLift;
 
-        public static float Scale => Mathf.Max(0.45f, Screen.height / Sheet);
+        // Keep the full layout visible on 4:3 and narrow windows as well as 16:9.
+        public static float Scale => Mathf.Max(0.1f, Mathf.Min(Screen.height / Sheet, Screen.width / 1440f));
         public static float Width => Screen.width / Scale;
         public static float Height => Screen.height / Scale;
-        public static Vector2 Mouse => Event.current.mousePosition / Scale;
+        public static Vector2 Mouse
+        {
+            get
+            {
+                if (!Retained && Event.current != null) return Event.current.mousePosition / Scale;
+                var mouse = UnityEngine.InputSystem.Mouse.current;
+                Vector2 p = mouse != null ? mouse.position.ReadValue() : Vector2.zero;
+                return new Vector2(p.x, Screen.height - p.y) / Scale;
+            }
+        }
+
+        /// <summary>
+        /// True while <see cref="HudCanvas"/> runs the in-game HUD: everything below then draws on its canvas instead
+        /// of through IMGUI (menus, drawn in OnGUI, still use IMGUI).
+        /// </summary>
+        internal static bool Retained;
+
+        /// <summary>Drawing now: the HUD canvas pass, or IMGUI's repaint event.</summary>
+        private static bool Painting => Retained || Event.current != null && Event.current.type == EventType.Repaint;
 
         private static Font _heavy, _bold;
         private static readonly Dictionary<long, GUIStyle> _styles = new();
@@ -51,22 +76,29 @@ namespace PleaseDontDrown.UI
             _hoverFrame = -10;
         }
 
+        private static Font HudFont(bool heavy)
+        {
+            if (_heavy == null) _heavy = Resources.Load<Font>("Fonts/Roboto-Black");
+            if (_bold == null) _bold = Resources.Load<Font>("Fonts/Roboto-Bold");
+            return heavy ? _heavy : _bold;
+        }
+
+        private static int PixelSize(float size) => Mathf.Max(8, Mathf.RoundToInt(size * Scale));
+
         public static Rect Px(Rect sheet) => new(sheet.x * Scale, sheet.y * Scale, sheet.width * Scale, sheet.height * Scale);
 
         public static bool Hovered(Rect sheet) => sheet.Contains(Mouse);
 
         /// <summary>A text style at <paramref name="size"/> sheet units (cached per pixel size).</summary>
-        public static GUIStyle Style(float size, TextAnchor anchor = TextAnchor.MiddleCenter, bool heavy = false, bool wrap = false)
+        public static GUIStyle Style(float size, TextAnchor anchor = TextAnchor.MiddleCenter, bool heavy = false, bool wrap = false, bool richText = true)
         {
-            int px = Mathf.Max(8, Mathf.RoundToInt(size * Scale));
-            long key = (uint)px | ((long)anchor << 12) | (heavy ? 1L << 20 : 0L) | (wrap ? 1L << 21 : 0L);
+            int px = PixelSize(size);
+            long key = (uint)px | ((long)anchor << 12) | (heavy ? 1L << 20 : 0L) | (wrap ? 1L << 21 : 0L) | (richText ? 1L << 22 : 0L);
             if (_styles.TryGetValue(key, out GUIStyle style)) return style;
-            if (_heavy == null) _heavy = Resources.Load<Font>("Fonts/Roboto-Black");
-            if (_bold == null) _bold = Resources.Load<Font>("Fonts/Roboto-Bold");
             style = new GUIStyle
             {
-                font = heavy ? _heavy : _bold, fontSize = px, alignment = anchor, richText = true, wordWrap = wrap,
-                clipping = TextClipping.Overflow
+                font = HudFont(heavy), fontSize = px, alignment = anchor, richText = richText, wordWrap = wrap,
+                clipping = TextClipping.Clip
             };
             style.normal.textColor = Color.white;
             _styles[key] = style;
@@ -75,16 +107,22 @@ namespace PleaseDontDrown.UI
 
         /// <summary>Text with a soft drop shadow (the shadow is what keeps it readable over sand and sky).</summary>
         public static void Label(Rect sheet, string text, float size, Color color, TextAnchor anchor = TextAnchor.MiddleCenter,
-            bool heavy = false, bool wrap = false, bool shadow = true)
+            bool heavy = false, bool wrap = false, bool shadow = true, bool richText = true)
         {
-            if (Event.current.type != EventType.Repaint || string.IsNullOrEmpty(text) || color.a <= 0.005f) return;
-            GUIStyle style = Style(size, anchor, heavy, wrap);
+            if (!Painting || string.IsNullOrEmpty(text) || color.a <= 0.005f) return;
             Rect r = Px(sheet);
             // Text sits straight on the game (no dark boxes behind it): a dark outline keeps it readable on bright sand
-            // and sky. (`shadow` only makes it a little heavier.)
+            // and sky. (`shadow` only makes it a little heavier now.)
             float d = Mathf.Max(1f, size * (shadow ? 0.07f : 0.055f) * Scale);
+            var outline = new Color(0.02f, 0.04f, 0.06f, 0.85f * color.a);
+            if (Retained)
+            {
+                HudCanvas.Text(r, text, HudFont(heavy), PixelSize(size), anchor, wrap, richText, color, d, outline);
+                return;
+            }
+            GUIStyle style = Style(size, anchor, heavy, wrap, richText);
             string plain = WithoutColorTags(text);
-            style.normal.textColor = new Color(0.02f, 0.04f, 0.06f, 0.85f * color.a);
+            style.normal.textColor = outline;
             foreach (Vector2 o in Outline)
                 GUI.Label(new Rect(r.x + o.x * d, r.y + o.y * d, r.width, r.height), plain, style);
             style.normal.textColor = color;
@@ -107,38 +145,84 @@ namespace PleaseDontDrown.UI
             return plain;
         }
 
-        public static float TextWidth(string text, float size, bool heavy = false) =>
-            Style(size, TextAnchor.MiddleLeft, heavy).CalcSize(new GUIContent(text)).x / Scale;
+        private static readonly GUIContent Measured = new();
+        private static readonly TextGenerator Measure = new();
+
+        public static float TextWidth(string text, float size, bool heavy = false)
+        {
+            if (Retained) return Measure.GetPreferredWidth(text, Generation(size, heavy, true, 0f)) / Scale;
+            Measured.text = text;
+            return Style(size, TextAnchor.MiddleLeft, heavy).CalcSize(Measured).x / Scale;
+        }
+
+        public static float TextHeight(string text, float width, float size, bool heavy = false, bool richText = true)
+        {
+            if (Retained) return Measure.GetPreferredHeight(text, Generation(size, heavy, richText, Mathf.Max(1f, width * Scale))) / Scale;
+            Measured.text = text;
+            return Style(size, TextAnchor.UpperLeft, heavy, true, richText).CalcHeight(Measured, Mathf.Max(1f, width * Scale)) / Scale;
+        }
+
+        /// <summary>How the HUD canvas lays text out (the same font and pixel size as the IMGUI styles).</summary>
+        private static TextGenerationSettings Generation(float size, bool heavy, bool richText, float wrapWidth) => new()
+        {
+            font = HudFont(heavy), fontSize = PixelSize(size), richText = richText, scaleFactor = 1f, lineSpacing = 1f,
+            textAnchor = TextAnchor.UpperLeft, color = Color.white, pivot = new Vector2(0.5f, 0.5f), updateBounds = true,
+            horizontalOverflow = wrapWidth > 0f ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow,
+            verticalOverflow = VerticalWrapMode.Overflow, generationExtents = new Vector2(wrapWidth, 0f), generateOutOfBounds = true,
+        };
+
+        /// <summary>Single-line labels keep their padding when a name or binding is unusually long.</summary>
+        public static void FitLabel(Rect rect, string text, float size, Color color,
+            TextAnchor anchor = TextAnchor.MiddleLeft, bool heavy = false, float minimum = 16f)
+        {
+            if (!Painting || string.IsNullOrEmpty(text)) return;
+            float width = TextWidth(text, size, heavy);
+            if (width > rect.width) size = Mathf.Max(minimum, size * rect.width / width);
+            Label(rect, text, size, color, anchor, heavy, shadow: false);
+        }
+
+        /// <summary>
+        /// Where in-game information sits. Draws nothing now: no dark boxes over the game, the text carries itself
+        /// with its outline (see <see cref="Label"/>). Menus that need a backdrop use <see cref="Panel"/>.
+        /// </summary>
+        public static void Surface(Rect rect, float alpha = 0.9f, Color? accent = null)
+        {
+        }
 
         /// <summary>A filled box, corners rounded by <paramref name="radius"/>.</summary>
         public static void Fill(Rect sheet, Color color, float radius = 0f)
         {
-            if (Event.current.type != EventType.Repaint || color.a <= 0.005f) return;
-            GUI.DrawTexture(Px(sheet), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, color, 0f, radius * Scale);
+            if (!Painting || color.a <= 0.005f) return;
+            if (Retained) HudCanvas.Box(Px(sheet), color, radius * Scale, 0f);
+            else GUI.DrawTexture(Px(sheet), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, color, 0f, radius * Scale);
         }
 
         /// <summary>Only the outline of a box.</summary>
         public static void Frame(Rect sheet, Color color, float thickness, float radius = 0f)
         {
-            if (Event.current.type != EventType.Repaint || color.a <= 0.005f) return;
-            GUI.DrawTexture(Px(sheet), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, color, Mathf.Max(1f, thickness * Scale), radius * Scale);
+            if (!Painting || color.a <= 0.005f) return;
+            if (Retained) HudCanvas.Box(Px(sheet), color, radius * Scale, Mathf.Max(1f, thickness * Scale));
+            else GUI.DrawTexture(Px(sheet), Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, color, Mathf.Max(1f, thickness * Scale), radius * Scale);
         }
 
         public static void Picture(Rect sheet, Texture picture, Color tint)
         {
-            if (Event.current.type != EventType.Repaint || picture == null) return;
-            GUI.DrawTexture(Px(sheet), picture, ScaleMode.ScaleToFit, true, 0f, tint, 0f, 0f);
+            if (!Painting || picture == null) return;
+            if (Retained) HudCanvas.Picture(Fit(Px(sheet), picture), picture, tint);
+            else GUI.DrawTexture(Px(sheet), picture, ScaleMode.ScaleToFit, true, 0f, tint, 0f, 0f);
         }
 
         /// <summary>A rounded bar filled from the left.</summary>
         public static void Bar(Rect sheet, float value, Color fill)
         {
-            Fill(sheet, new Color(0f, 0f, 0f, 0.5f), sheet.height * 0.5f);
+            Fill(sheet, new Color(Ink.r, Ink.g, Ink.b, 0.9f), sheet.height * 0.5f);
             value = Mathf.Clamp01(value);
-            if (value <= 0f) return;
-            GUI.BeginGroup(Px(new Rect(sheet.x, sheet.y, sheet.width * value, sheet.height)));
-            Fill(new Rect(0f, 0f, sheet.width, sheet.height), fill, sheet.height * 0.5f);
-            GUI.EndGroup();
+            if (value > 0f)
+            {
+                var filled = new Rect(sheet.x + 2f, sheet.y + 2f, Mathf.Max(0f, sheet.width - 4f) * value, Mathf.Max(0f, sheet.height - 4f));
+                Fill(filled, fill, Mathf.Min(filled.width, filled.height) * 0.5f);
+            }
+            Frame(sheet, new Color(Paper.r, Paper.g, Paper.b, 0.28f), 1f, sheet.height * 0.5f);
         }
 
         /// <summary>
@@ -149,12 +233,15 @@ namespace PleaseDontDrown.UI
         {
             if (alpha <= 0.01f) return;
             float radius = sheet.width * 0.2f;
-            Fill(sheet, new Color(0f, 0f, 0f, 0.5f * alpha), radius);
+            Fill(sheet, new Color(Ink.r, Ink.g, Ink.b, 0.82f * alpha), radius);
+            Frame(sheet, new Color(Paper.r, Paper.g, Paper.b, 0.26f * alpha), 1.5f, radius);
             value = Mathf.Clamp01(value);
             if (warn) fill = Color.Lerp(fill, Color.white, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 10f));
             fill.a *= alpha;
             float h = sheet.height * value;
-            if (h > 0.5f)
+            if (h > 0.5f && Retained)
+                Fill(new Rect(sheet.x, sheet.yMax - h, sheet.width, h), fill, Mathf.Min(radius, h * 0.5f)); // (no clipping on the canvas)
+            else if (h > 0.5f)
             {
                 GUI.BeginGroup(Px(new Rect(sheet.x, sheet.yMax - h, sheet.width, h)));
                 Fill(new Rect(0f, h - sheet.height, sheet.width, sheet.height), fill, radius);
@@ -172,16 +259,17 @@ namespace PleaseDontDrown.UI
         /// </summary>
         public static void Vital(Rect sheet, float value, float trail, HudIcon icon, Color warnColor, bool low, float alpha = 1f)
         {
-            if (alpha <= 0.01f || Event.current.type != EventType.Repaint) return;
+            if (alpha <= 0.01f || !Painting) return;
             value = Mathf.Clamp01(value);
             trail = Mathf.Clamp01(Mathf.Max(trail, value));
             const float thick = 0.075f; // of the diameter
             var shadow = new Rect(sheet.x + 1.5f, sheet.y + 2f, sheet.width, sheet.height);
+            Fill(sheet, new Color(Ink.r, Ink.g, Ink.b, 0.48f * alpha), sheet.width * 0.5f);
             Arc(shadow, 0f, 1f, thick * 1.25f, new Color(0f, 0f, 0f, 0.35f * alpha));
-            Arc(sheet, 0f, 1f, thick, new Color(1f, 1f, 1f, 0.22f * alpha));               // the empty track
+            Arc(sheet, 0f, 1f, thick, new Color(Paper.r, Paper.g, Paper.b, 0.26f * alpha));
             // (Full, the ring closes at the top; it empties from there round to the right.)
             if (trail > value + 0.002f) Arc(sheet, 1f - trail, 1f - value, thick, new Color(Coral.r, Coral.g, Coral.b, alpha)); // just lost
-            if (value > 0.002f) Arc(sheet, 1f - value, 1f, thick, new Color(1f, 1f, 1f, alpha));
+            if (value > 0.002f) Arc(sheet, 1f - value, 1f, thick, new Color(Teal.r, Teal.g, Teal.b, alpha));
             float pulse = low ? 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 9f) : 0f;
             Color tint = low ? Color.Lerp(warnColor, Color.white, pulse * 0.35f) : Color.white;
             tint.a = alpha;
@@ -197,12 +285,17 @@ namespace PleaseDontDrown.UI
         /// </summary>
         public static void Arc(Rect sheet, float from, float to, float thickness, Color color)
         {
-            if (Event.current.type != EventType.Repaint || color.a <= 0.005f) return;
+            if (!Painting || color.a <= 0.005f) return;
             from = Mathf.Clamp01(from);
             to = Mathf.Clamp01(to);
             if (to - from <= 0.001f) return;
             Texture2D arc = ArcTexture(to - from, thickness);
             Rect px = Px(sheet);
+            if (Retained)
+            {
+                HudCanvas.Picture(px, arc, color, from * 360f);
+                return;
+            }
             Matrix4x4 before = GUI.matrix;
             if (from > 0.0005f) GUIUtility.RotateAroundPivot(from * 360f, px.center);
             GUI.DrawTexture(px, arc, ScaleMode.StretchToFill, true, 0f, color, 0f, 0f);
@@ -237,12 +330,66 @@ namespace PleaseDontDrown.UI
             return texture;
         }
 
+        /// <summary>The part of <paramref name="px"/> a picture fills keeping its shape (IMGUI's ScaleToFit).</summary>
+        private static Rect Fit(Rect px, Texture picture)
+        {
+            float aspect = picture.width / (float)Mathf.Max(1, picture.height);
+            if (px.width / Mathf.Max(0.001f, px.height) > aspect)
+            {
+                float w = px.height * aspect;
+                return new Rect(px.x + (px.width - w) * 0.5f, px.y, w, px.height);
+            }
+            float h = px.width / aspect;
+            return new Rect(px.x, px.y + (px.height - h) * 0.5f, px.width, h);
+        }
+
+        /// <summary>
+        /// A plain box in screen pixels (the crosshair, the scope's black sides), turned <paramref name="angle"/>
+        /// degrees clockwise about <paramref name="pivot"/> (screen pixels; default its own middle).
+        /// </summary>
+        public static void PixelBox(Rect px, Color color, float angle = 0f, Vector2? pivot = null)
+        {
+            if (!Painting || color.a <= 0.005f) return;
+            if (Retained)
+            {
+                HudCanvas.Box(Turned(px, angle, pivot), color, 0f, 0f, angle);
+                return;
+            }
+            Matrix4x4 before = GUI.matrix;
+            if (angle != 0f) GUIUtility.RotateAroundPivot(angle, pivot ?? px.center);
+            GUI.DrawTexture(px, Texture2D.whiteTexture, ScaleMode.StretchToFill, true, 0f, color, 0f, 0f);
+            GUI.matrix = before;
+        }
+
+        /// <summary>A picture stretched over a rect in screen pixels.</summary>
+        public static void PixelPicture(Rect px, Texture picture, Color tint)
+        {
+            if (!Painting || picture == null) return;
+            if (Retained) HudCanvas.Picture(px, picture, tint);
+            else GUI.DrawTexture(px, picture, ScaleMode.StretchToFill, true, 0f, tint, 0f, 0f);
+        }
+
+        /// <summary>Where <paramref name="px"/> ends up turned about <paramref name="pivot"/> (it is then also turned about its own middle).</summary>
+        private static Rect Turned(Rect px, float angle, Vector2? pivot)
+        {
+            if (angle == 0f || pivot == null) return px;
+            float a = angle * Mathf.Deg2Rad, cos = Mathf.Cos(a), sin = Mathf.Sin(a);
+            Vector2 d = px.center - pivot.Value; // screen y runs down, so this turns clockwise on screen
+            Vector2 c = pivot.Value + new Vector2(d.x * cos - d.y * sin, d.x * sin + d.y * cos);
+            return new Rect(c.x - px.width * 0.5f, c.y - px.height * 0.5f, px.width, px.height);
+        }
+
         // ------------------------------------------------------------------ controls (menus and panels)
 
         private static int _hoverId, _hoverFrame = -10;
 
         /// <summary>A dark rounded panel for a menu page or a window.</summary>
-        public static void Panel(Rect sheet, float alpha = 0.85f) => Fill(sheet, new Color(Ink.r, Ink.g, Ink.b, alpha), 16f);
+        public static void Panel(Rect sheet, float alpha = 0.85f)
+        {
+            Surface(sheet, alpha);
+            Fill(new Rect(sheet.x + 28f, sheet.y + 1f, Mathf.Max(0f, Mathf.Min(64f, sheet.width - 56f)), 3f),
+                new Color(Teal.r, Teal.g, Teal.b, alpha), 1.5f);
+        }
 
         /// <summary>The whole screen darkened behind a window.</summary>
         public static void Dim(float alpha = 0.66f) => Fill(new Rect(0f, 0f, Width, Height), new Color(Ink.r, Ink.g, Ink.b, alpha));
@@ -258,17 +405,20 @@ namespace PleaseDontDrown.UI
             bool hover = enabled && Hovered(r);
             if (Event.current.type == EventType.Repaint)
             {
-                Rect box = hover && !centred && !small ? new Rect(r.x + 8f, r.y, r.width, r.height) : r;
-                float radius = Mathf.Min(14f, r.height * 0.25f);
-                Color fill = primary ? new Color(Coral.r, Coral.g, Coral.b, hover ? 1f : 0.9f)
-                    : small ? new Color(Teal.r * 0.6f, Teal.g * 0.6f, Teal.b * 0.6f, hover ? 1f : 0.85f)
-                    : new Color(Ink.r, Ink.g, Ink.b, hover || selected ? 0.9f : 0.6f);
-                if (!enabled) fill.a *= 0.4f;
+                Rect box = r;
+                float radius = Mathf.Min(12f, r.height * 0.22f);
+                Color fill = primary ? new Color(Coral.r, Coral.g, Coral.b, hover ? 1f : 0.94f)
+                    : small ? new Color(0.055f, 0.29f, 0.31f, hover ? 1f : 0.96f)
+                    : new Color(0.06f, 0.18f, 0.22f, hover || selected ? 0.98f : 0.88f);
+                if (selected && !primary) fill = new Color(0.10f, 0.37f, 0.38f, 0.98f);
+                if (!enabled) fill = new Color(0.08f, 0.15f, 0.18f, 0.7f);
                 Fill(box, fill, radius);
-                if (hover || selected) Frame(box, Color.white, 3f, radius);
-                Color text = !enabled ? new Color(1f, 1f, 1f, 0.45f) : hover && !primary && !small ? Sand : Color.white;
-                Rect words = centred || small ? box : new Rect(box.x + 24f, box.y, box.width - 36f, box.height);
-                Label(words, label, small ? 22f : 30f, text, centred || small ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                Frame(box, hover || selected ? new Color(Teal.r, Teal.g, Teal.b, enabled ? 0.95f : 0.35f)
+                    : new Color(Paper.r, Paper.g, Paper.b, enabled ? 0.26f : 0.12f), hover || selected ? 2f : 1f, radius);
+                if (primary && enabled) Fill(new Rect(box.x + 18f, box.yMax - 5f, box.width - 36f, 2f), new Color(Sand.r, Sand.g, Sand.b, 0.55f), 1f);
+                Color text = !enabled ? new Color(1f, 1f, 1f, 0.45f) : primary ? Ink : hover ? Sand : Paper;
+                Rect words = new Rect(box.x + (centred || small ? 14f : 24f), box.y, box.width - (centred || small ? 28f : 48f), box.height);
+                FitLabel(words, label, small ? 21f : 27f, text, centred || small ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, heavy: true);
                 if (hover) HoverSound(System.HashCode.Combine(label, Mathf.RoundToInt(r.x), Mathf.RoundToInt(r.y)));
             }
             bool pressed = GUI.Button(Px(r), GUIContent.none, GUIStyle.none);
@@ -339,10 +489,11 @@ namespace PleaseDontDrown.UI
                     float t = Mathf.InverseLerp(min, max, value);
                     float cx = Mathf.Lerp(r.x + knob * 0.5f, r.xMax - knob * 0.5f, t), cy = r.y + r.height * 0.5f;
                     bool active = GUIUtility.hotControl == id || Hovered(r);
-                    Fill(new Rect(r.x, cy - track * 0.5f, r.width, track), new Color(1f, 1f, 1f, 0.18f), track * 0.5f);
+                    Fill(new Rect(r.x, cy - track * 0.5f, r.width, track), new Color(Paper.r, Paper.g, Paper.b, 0.22f), track * 0.5f);
                     Fill(new Rect(r.x, cy - track * 0.5f, cx - r.x, track), Coral, track * 0.5f);
                     float size = active ? knob + 4f : knob;
-                    Fill(new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size), Color.white, size * 0.5f);
+                    Fill(new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size), Paper, size * 0.5f);
+                    Frame(new Rect(cx - size * 0.5f, cy - size * 0.5f, size, size), Ink, 2f, size * 0.5f);
                     break;
                 }
             }

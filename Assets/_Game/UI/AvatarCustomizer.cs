@@ -362,7 +362,7 @@ namespace PleaseDontDrown.UI
             Hud.Label(new Rect(x, y, LabelWidth, RowHeight), label, 20f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             float bx = x + LabelWidth;
             if (Hud.Button(new Rect(bx, y + 3f, arrow, RowHeight - 6f), "<", centred: true, small: true)) dir = -1;
-            Hud.Label(new Rect(bx + arrow, y, wide, RowHeight), value, 24f, Color.white, heavy: true, shadow: false);
+            Hud.FitLabel(new Rect(bx + arrow + 8f, y, wide - 16f, RowHeight), value, 22f, Hud.Paper, TextAnchor.MiddleCenter, heavy: true);
             if (Hud.Button(new Rect(bx + arrow + wide, y + 3f, arrow, RowHeight - 6f), ">", centred: true, small: true)) dir = 1;
             y += RowHeight;
             return dir;

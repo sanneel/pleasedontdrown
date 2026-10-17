@@ -32,7 +32,7 @@ namespace PleaseDontDrown.Rescue
                 if (material == null) return null; // no ocean in this scene (or a headless run with nothing to draw)
                 var go = new GameObject("BloodFx");
                 _instance = go.AddComponent<BloodFx>();
-                _instance.useGUILayout = false;
+                UI.HudCanvas.Add(_instance, UI.HudCanvas.OrderScreenTint, _instance.DrawHud); // (destroyed with it)
                 _instance.Build(material);
                 return _instance;
             }
@@ -99,10 +99,10 @@ namespace PleaseDontDrown.Rescue
             }
         }
 
-        private void OnGUI()
+        private void DrawHud()
         {
             float t = Time.unscaledTime - _splatAt;
-            if (t > SplatSeconds || Event.current.type != EventType.Repaint) return;
+            if (t > SplatSeconds) return;
             float alpha = Mathf.Clamp01((SplatSeconds - t) / 1.6f) * 0.8f;
             var red = new Color(Fresh.r, Fresh.g, Fresh.b, alpha);
             foreach (Vector4 s in _splats)

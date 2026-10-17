@@ -23,6 +23,8 @@ namespace PleaseDontDrown.UI
         private bool _focusInput;
         private Vector2 _scroll;
         private GUIStyle _lineStyle;
+        private GUIStyle _inputStyle;
+        private int _styleSize;
 
         public static bool IsOpen { get; private set; }
 
@@ -81,7 +83,19 @@ namespace PleaseDontDrown.UI
         {
             if (!_open) return;
 
-            _lineStyle ??= new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 13 };
+            int fontSize = Mathf.RoundToInt(19f * Hud.Scale);
+            if (_lineStyle == null || _styleSize != fontSize)
+            {
+                _styleSize = fontSize;
+                _lineStyle = new GUIStyle(Hud.Style(19f, TextAnchor.UpperLeft, wrap: true))
+                {
+                    normal = { textColor = Hud.Muted }, padding = new RectOffset(0, 0, 3, 3)
+                };
+                _inputStyle = new GUIStyle(Hud.Style(21f, TextAnchor.MiddleLeft, richText: false))
+                {
+                    normal = { textColor = Hud.Paper }, focused = { textColor = Hud.Paper }
+                };
+            }
             Event e = Event.current;
 
             // Keys handled before the text field. Toggling itself is done by the input action (` / F2);
@@ -112,25 +126,32 @@ namespace PleaseDontDrown.UI
                 }
             }
 
-            float h = Screen.height * 0.45f;
-            GUI.Box(new Rect(0, 0, Screen.width, h), GUIContent.none);
-            GUILayout.BeginArea(new Rect(8, 6, Screen.width - 16, h - 12));
+            int depth = GUI.depth;
+            GUI.depth = -100;
+            var panel = new Rect(Hud.Margin, Hud.Margin, Hud.Width - Hud.Margin * 2f, Mathf.Min(560f, Hud.Height * 0.55f));
+            Hud.Panel(panel, 0.98f);
+            Hud.Label(new Rect(panel.x + 22f, panel.y + 14f, 300f, 28f), "SESSION LOG", 19f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Label(new Rect(panel.xMax - 550f, panel.y + 14f, 528f, 28f), "Esc  Close     Tab  Complete     ↑ / ↓  History", 16f, Hud.Muted, TextAnchor.MiddleRight, shadow: false);
+            Hud.Fill(new Rect(panel.x + 22f, panel.y + 53f, panel.width - 44f, 1f), new Color(1f, 1f, 1f, 0.12f));
+            GUILayout.BeginArea(Hud.Px(new Rect(panel.x + 22f, panel.y + 66f, panel.width - 44f, panel.height - 148f)));
             _scroll = GUILayout.BeginScrollView(_scroll);
             foreach (string line in _lines)
                 GUILayout.Label(line, _lineStyle);
             GUILayout.EndScrollView();
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(">", GUILayout.Width(12));
-            GUI.SetNextControlName(InputControl);
-            _input = GUILayout.TextField(_input);
-            GUILayout.EndHorizontal();
             GUILayout.EndArea();
+            var input = new Rect(panel.x + 22f, panel.yMax - 62f, panel.width - 44f, 42f);
+            Hud.Fill(input, new Color(1f, 1f, 1f, 0.06f), 8f);
+            Hud.Frame(input, new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, 0.4f), 1f, 8f);
+            Hud.Label(new Rect(input.x + 12f, input.y, 24f, input.height), ">", 22f, Hud.Teal, shadow: false);
+            GUI.SetNextControlName(InputControl);
+            _input = GUI.TextField(Hud.Px(new Rect(input.x + 42f, input.y, input.width - 56f, input.height)), _input, _inputStyle);
 
             if (_focusInput)
             {
                 GUI.FocusControl(InputControl);
                 _focusInput = false;
             }
+            GUI.depth = depth;
         }
 
         // Georgian keyboard (QWERTY-based) letters and the Latin letter on the same key.

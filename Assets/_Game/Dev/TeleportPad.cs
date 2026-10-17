@@ -18,8 +18,6 @@ namespace PleaseDontDrown.Dev
         private bool _open;
         private string[] _names;
 
-        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
-
         public bool CanInteract(PlayerHub player) => DevIsland.Instance != null;
         public string GetPrompt(PlayerHub player) => "Travel to another island";
 
@@ -32,6 +30,8 @@ namespace PleaseDontDrown.Dev
         {
             if (open == _open) return;
             _open = open;
+            if (open) UI.WorldMenus.Show(this, DrawMenu); // (drawn by the one shared OnGUI while open)
+            else UI.WorldMenus.Close(this);
             if (open) GameInput.PushUI();
             else GameInput.PopUI();
         }
@@ -46,7 +46,7 @@ namespace PleaseDontDrown.Dev
                 SetOpen(false);
         }
 
-        private void OnGUI()
+        private void DrawMenu()
         {
             if (!_open) return;
             const float width = 440f, row = 60f, gap = 10f;

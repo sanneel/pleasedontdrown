@@ -51,6 +51,7 @@ namespace PleaseDontDrown.Story
         private void Awake()
         {
             Instance = this;
+            HudCanvas.Add(this, HudCanvas.OrderFade, DrawFade);
             if (_wobble != null)
             {
                 _wobbleRest = _wobble.localRotation;
@@ -60,6 +61,7 @@ namespace PleaseDontDrown.Story
 
         private void OnDestroy()
         {
+            HudCanvas.Remove(this);
             if (Instance == this) Instance = null;
         }
 
@@ -204,13 +206,13 @@ namespace PleaseDontDrown.Story
             }
         }
 
-        private void OnGUI()
+        private void DrawFade()
         {
             if (_dark <= 0.001f) return;
             Hud.Fill(new Rect(0f, 0f, Hud.Width, Hud.Height), new Color(0f, 0f, 0f, _dark));
             if (_dark > 0.9f)
-                Hud.Label(new Rect(0f, Hud.Height * 0.45f, Hud.Width, 80f), "*the toilet door is locked. what happens in the toilets stays in the toilets.*", 30f,
-                    new Color(1f, 0.85f, 0.9f, (_dark - 0.9f) * 10f));
+                Hud.Label(new Rect(Hud.Width * 0.5f - 420f, Hud.Height * 0.45f, 840f, 100f), "The toilet door is locked.\nWhat happens in the toilets stays in the toilets.", 25f,
+                    new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, (_dark - 0.9f) * 10f), wrap: true);
         }
     }
 }

@@ -42,8 +42,6 @@ namespace PleaseDontDrown.Story
         private System.Collections.Generic.List<Combat.Weapon.PartOffer> _parts;
         private Combat.Weapon _partsGun;
 
-        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
-
         /// <summary>Host: someone bought something.</summary>
         public static event Action<ShopCounter, PlayerHub, string> ServerPurchased;
 
@@ -79,6 +77,8 @@ namespace PleaseDontDrown.Story
         {
             if (_open == open) return;
             _open = open;
+            if (open) UI.WorldMenus.Show(this, DrawShop); // (drawn by the one shared OnGUI while open)
+            else UI.WorldMenus.Close(this);
             if (open && !_pushedUI) { GameInput.PushUI(); _pushedUI = true; }
             if (!open && _pushedUI) { GameInput.PopUI(); _pushedUI = false; }
             if (!open) _openedFromAfar = false;
@@ -97,7 +97,7 @@ namespace PleaseDontDrown.Story
 
         private const float ProductsWidth = 700f, PartsWidth = 560f, ProductRow = 78f, PartRow = 54f;
 
-        private void OnGUI()
+        private void DrawShop()
         {
             if (!_open) return;
             Combat.Weapon gun = HeldGun(PlayerHub.Local);
@@ -119,23 +119,24 @@ namespace PleaseDontDrown.Story
             if (fit < 1f) GUIUtility.ScaleAroundPivot(new Vector2(fit, fit), new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
             var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f, width, height);
             Hud.Panel(panel, 0.92f);
-            Hud.Label(new Rect(panel.x + 32f, panel.y + 18f, width - 260f, 56f), _titleUpper ??= _title.ToUpperInvariant(), 40f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.FitLabel(new Rect(panel.x + 32f, panel.y + 18f, width - 300f, 56f), _titleUpper ??= _title.ToUpperInvariant(), 36f, Hud.Paper, heavy: true);
             if (!_free)
             {
                 if (_moneyShown != Economy.Money || _moneyText == null)
                 {
                     _moneyShown = Economy.Money;
-                    _moneyText = "$" + _moneyShown;
+                    _moneyText = "$" + _moneyShown.ToString("N0");
                 }
-                Hud.Label(new Rect(panel.xMax - 232f, panel.y + 18f, 200f, 56f), _moneyText, 40f, new Color(0.56f, 1f, 0.56f), TextAnchor.MiddleRight, heavy: true, shadow: false);
+                Hud.Label(new Rect(panel.xMax - 232f, panel.y + 18f, 200f, 56f), _moneyText, 40f, Hud.Sand, TextAnchor.MiddleRight, heavy: true, shadow: false);
             }
 
             float x = panel.x + 32f, y = panel.y + 96f;
             for (int i = 0; i < _products.Length; i++)
             {
                 Product p = _products[i];
-                Hud.Label(new Rect(x, y + 4f, ProductsWidth - 290f, 34f), _productNames[i], 26f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-                Hud.Label(new Rect(x, y + 38f, ProductsWidth - 290f, 28f), p.Blurb, 18f, new Color(1f, 1f, 1f, 0.7f), TextAnchor.MiddleLeft, shadow: false);
+                Hud.Fill(new Rect(x - 10f, y, ProductsWidth - 44f, ProductRow - 6f), new Color(1f, 1f, 1f, i % 2 == 0 ? 0.045f : 0.02f), 8f);
+                Hud.FitLabel(new Rect(x, y + 4f, ProductsWidth - 290f, 34f), _productNames[i], 24f, Hud.Paper, heavy: true);
+                Hud.FitLabel(new Rect(x, y + 38f, ProductsWidth - 290f, 28f), p.Blurb, 17f, Hud.Muted, minimum: 14f);
                 bool afford = _free || Economy.Money >= p.Price;
                 GUI.enabled = afford;
                 if (Hud.Button(new Rect(x + ProductsWidth - 264f, y + 10f, 200f, 52f), _free ? "TAKE" : _productPrices[i], centred: true, small: true))
@@ -154,12 +155,12 @@ namespace PleaseDontDrown.Story
                     _partsGun = gun;
                     _partsTitle = "FOR YOUR " + gun.DisplayName.ToUpperInvariant();
                 }
-                Hud.Label(new Rect(px, py, PartsWidth - 32f, 40f), _partsTitle, 22f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                Hud.FitLabel(new Rect(px, py, PartsWidth - 32f, 40f), _partsTitle, 21f, Hud.Teal, heavy: true);
                 py += 50f;
                 for (int i = 0; i < parts; i++)
                 {
                     Combat.Weapon.PartOffer part = _parts[i];
-                    Hud.Label(new Rect(px, py, PartsWidth - 230f, PartRow - 8f), part.Name, 22f, Color.white, TextAnchor.MiddleLeft, shadow: false);
+                    Hud.FitLabel(new Rect(px, py, PartsWidth - 230f, PartRow - 8f), part.Name, 20f, Hud.Paper);
                     bool afford = _free || Economy.Money >= part.Price;
                     GUI.enabled = afford && !part.Fitted;
                     string label = part.Fitted ? "FITTED" : _free ? "FIT" : "$" + part.Price;

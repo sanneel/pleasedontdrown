@@ -63,11 +63,13 @@ namespace PleaseDontDrown.Story
             _titleAt = Time.unscaledTime;
         }
 
-        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+        // Drawn on the HUD canvas (no IMGUI): see HudCanvas.
+        private void OnEnable() => HudCanvas.Add(this, HudCanvas.OrderStory, DrawHud);
 
-        private void OnGUI()
+        private void OnDisable() => HudCanvas.Remove(this);
+
+        private void DrawHud()
         {
-            if (Event.current.type != EventType.Repaint) return; // nothing here takes input
             PlayerHub local = PlayerHub.Local;
             if (local == null || !GameInput.GameplayActive) return;
             Camera cam = local.Look != null ? local.Look.Camera : null;
@@ -88,30 +90,39 @@ namespace PleaseDontDrown.Story
             StoryDirector story = StoryDirector.Instance;
             if (story != null && !string.IsNullOrEmpty(story.Objective))
             {
-                Hud.Label(new Rect(30f, 22f, 900f, 28f), story.Chapter, 20f, new Color(1f, 0.85f, 0.5f), TextAnchor.MiddleLeft, heavy: true);
                 if (story.Objective != _objective || story.Progress != _objectiveProgress || story.Goal != _objectiveGoal)
                 {
                     _objective = story.Objective;
                     _objectiveProgress = story.Progress;
                     _objectiveGoal = story.Goal;
-                    _objectiveLine = story.Goal > 0 ? $"{_objective}  <color=#ffd24a>{story.Progress}/{story.Goal}</color>" : _objective;
+                    _objectiveLine = _objective;
                 }
-                Hud.Label(new Rect(30f, 52f, 820f, 80f), _objectiveLine, 27f, Color.white, TextAnchor.UpperLeft, wrap: true);
+                const float width = 440f;
+                float body = Hud.TextHeight(_objectiveLine, width - 44f, 22f);
+                var card = new Rect(Hud.Margin, Hud.Margin, width, 56f + body + (story.Goal > 0 ? 30f : 0f));
+                Hud.Surface(card, 0.86f, Hud.Teal);
+                Hud.FitLabel(new Rect(card.x + 22f, card.y + 12f, width - 44f, 24f), story.Chapter, 17f, Hud.Teal, heavy: true);
+                Hud.Label(new Rect(card.x + 22f, card.y + 42f, width - 44f, body), _objectiveLine, 22f, Hud.Paper, TextAnchor.UpperLeft, wrap: true, shadow: false);
+                if (story.Goal > 0)
+                {
+                    Hud.Bar(new Rect(card.x + 22f, card.yMax - 20f, width - 116f, 7f), (float)story.Progress / story.Goal, Hud.Teal);
+                    Hud.Label(new Rect(card.xMax - 86f, card.yMax - 32f, 64f, 27f), $"{story.Progress} / {story.Goal}", 17f, Hud.Sand, TextAnchor.MiddleRight, shadow: false);
+                }
             }
             if (Economy.Instance != null)
             {
-                // Above the vitals rings, in their style: white lettering in a thin white rounded frame, no box.
+                // Wallet sits above the vitals as a compact, readable status chip.
                 if (Economy.Money != _money || !Mathf.Approximately(Hud.Scale, _moneyScale))
                 {
                     _money = Economy.Money;
                     _moneyScale = Hud.Scale;
-                    _moneyText = "$" + _money;
-                    _moneyWidth = Hud.TextWidth(_moneyText, 28f, true) + 30f;
+                    _moneyText = "$" + _money.ToString("N0");
+                    _moneyWidth = Mathf.Max(156f, Hud.TextWidth(_moneyText, 28f, true) + 40f);
                 }
-                var pill = new Rect(50f, Hud.Height - 25f - 60f - 16f - 42f, _moneyWidth, 42f);
-                Hud.Frame(new Rect(pill.x + 1.5f, pill.y + 2f, pill.width, pill.height), new Color(0f, 0f, 0f, 0.35f), 3f, 10f);
-                Hud.Frame(pill, Color.white, 2.5f, 10f);
-                Hud.Label(pill, _moneyText, 28f, Color.white, heavy: true);
+                var pill = new Rect(Hud.Margin, Hud.Height - 25f - 60f - 16f - 70f, _moneyWidth, 70f);
+                Hud.Surface(pill, 0.9f);
+                Hud.Label(new Rect(pill.x + 18f, pill.y + 10f, pill.width - 36f, 18f), "TEAM FUNDS", 14f, Hud.Muted, TextAnchor.MiddleLeft, shadow: false);
+                Hud.Label(new Rect(pill.x + 18f, pill.y + 29f, pill.width - 36f, 33f), _moneyText, 28f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             }
         }
 
@@ -140,10 +151,10 @@ namespace PleaseDontDrown.Story
             if (distance < 4f && !offscreen) return; // right there: the prompt and name tag say enough
             float size = 22f * (1f + 0.15f * Mathf.Sin(Time.time * 5f));
             Hud.Fill(new Rect(sx - size * 0.5f - 3f, sy - size * 0.5f - 3f, size + 6f, size + 6f), new Color(0f, 0f, 0f, 0.6f), size * 0.5f + 3f);
-            Hud.Fill(new Rect(sx - size * 0.5f, sy - size * 0.5f, size, size), new Color(1f, 0.8f, 0.2f), size * 0.5f);
+            Hud.Fill(new Rect(sx - size * 0.5f, sy - size * 0.5f, size, size), Hud.Sand, size * 0.5f);
             bool below = sy < 110f;
             Hud.Label(new Rect(sx - 250f, below ? sy + 18f : sy - 74f, 500f, 56f), $"<b>{story.MarkerLabel}</b>\n{distance:F0} m", 21f,
-                new Color(1f, 0.85f, 0.35f), TextAnchor.UpperCenter);
+                Hud.Sand, TextAnchor.UpperCenter);
         }
 
         private void DrawLostSparkles(Camera cam, PlayerHub local)
@@ -172,11 +183,13 @@ namespace PleaseDontDrown.Story
             DialogueLine? line = DialogueService.Current;
             if (!line.HasValue) return;
             DialogueLine l = line.Value;
-            float w = Mathf.Min(1100f, Hud.Width - 80f);
+            float w = Mathf.Min(880f, Hud.Width - 160f);
             // Clear of the hotbar and the name of what you hold.
-            var box = new Rect((Hud.Width - w) * 0.5f, Hud.HotbarTop - 96f - 124f, w, 124f);
+            float body = Mathf.Max(26f, Hud.TextHeight(l.Text, w, 21f, richText: false));
+            float height = body + 26f;
+            var box = new Rect((Hud.Width - w) * 0.5f, Hud.HotbarTop - 104f - height, w, height);
             string speaker = l.Speaker == DialogueService.PlayerSpeaker ? "You" : l.Speaker;
-            Hud.Label(new Rect(box.x + 24f, box.y + 10f, w - 48f, 32f), speaker, 24f, l.Color, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Label(new Rect(box.x, box.y, w, 22f), speaker, 16f, Color.Lerp(l.Color, Hud.Paper, 0.4f), heavy: true);
             // Typewriter.
             int shown = Mathf.Clamp(Mathf.CeilToInt((Time.time - l.Start) * 55f), 0, l.Text.Length);
             if (!ReferenceEquals(l.Text, _spoken) || shown != _spokenLength)
@@ -185,10 +198,7 @@ namespace PleaseDontDrown.Story
                 _spokenLength = shown;
                 _spokenShown = shown >= l.Text.Length ? l.Text : l.Text.Substring(0, shown);
             }
-            GUIStyle style = Hud.Style(25f, TextAnchor.UpperLeft, wrap: true);
-            style.richText = false; // spoken lines are shown as written
-            Hud.Label(new Rect(box.x + 24f, box.y + 44f, w - 48f, 76f), _spokenShown, 25f, Color.white, TextAnchor.UpperLeft, wrap: true, shadow: false);
-            style.richText = true;
+            Hud.Label(new Rect(box.x, box.y + 26f, w, body + 2f), _spokenShown, 21f, Hud.Paper, TextAnchor.UpperCenter, wrap: true, richText: false);
         }
 
         /// <summary>The chapter's report card: a dark panel, the title, one line per number (the lost count in red if any).</summary>
@@ -200,15 +210,18 @@ namespace PleaseDontDrown.Story
             const float width = 640f, row = 46f;
             float height = 120f + ReportLabels.Length * row + 26f;
             var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f - 40f, width, height);
-            Hud.Label(new Rect(panel.x, panel.y + 22f, width, 64f), _reportTitle, 46f, new Color(1f, 0.92f, 0.6f, a), heavy: true, shadow: false);
+            Hud.Panel(panel, 0.94f * a);
+            Hud.FitLabel(new Rect(panel.x + 36f, panel.y + 22f, width - 72f, 64f), _reportTitle, 38f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, a), TextAnchor.MiddleCenter, heavy: true);
             float y = panel.y + 110f;
             for (int i = 0; i < ReportLabels.Length; i++)
             {
                 // Each line comes in a moment after the one above.
                 float shown = Mathf.Clamp01((t - 0.5f - i * 0.35f) / 0.3f) * a;
                 bool bad = i == 1 && _reportValues[1] != "0";
-                Color value = bad ? new Color(1f, 0.5f, 0.4f, shown) : i >= 3 ? new Color(0.56f, 1f, 0.56f, shown) : new Color(1f, 1f, 1f, shown);
-                Hud.Label(new Rect(panel.x + 48f, y, width - 96f, row), ReportLabels[i], 26f, new Color(1f, 1f, 1f, 0.85f * shown), TextAnchor.MiddleLeft, shadow: false);
+                Color value = bad ? Hud.Danger : i >= 3 ? Hud.Teal : Hud.Paper;
+                value.a = shown;
+                Hud.Fill(new Rect(panel.x + 36f, y + row - 1f, width - 72f, 1f), new Color(1f, 1f, 1f, 0.08f * shown));
+                Hud.Label(new Rect(panel.x + 36f, y, width - 190f, row), ReportLabels[i], 22f, new Color(Hud.Muted.r, Hud.Muted.g, Hud.Muted.b, shown), TextAnchor.MiddleLeft, shadow: false);
                 Hud.Label(new Rect(panel.x + 48f, y, width - 96f, row), _reportValues[i], 30f, value, TextAnchor.MiddleRight, heavy: true, shadow: false);
                 y += row;
             }
@@ -220,8 +233,10 @@ namespace PleaseDontDrown.Story
             if (_title == null || t > 4.5f) return;
             float a = Mathf.Clamp01(t / 0.4f) * Mathf.Clamp01((4.5f - t) / 0.8f);
             float y = Hud.Height * 0.28f;
-            Hud.Label(new Rect(0f, y + 14f, Hud.Width, 96f), _title, 78f, new Color(1f, 0.92f, 0.6f, a), heavy: true);
-            Hud.Label(new Rect(0f, y + 112f, Hud.Width, 46f), _subtitle, 30f, new Color(1f, 1f, 1f, a));
+            Hud.Fill(new Rect(0f, y, Hud.Width, 176f), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.8f * a));
+            Hud.Fill(new Rect(Hud.Width * 0.5f - 110f, y + 5f, 220f, 4f), new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, a), 2f);
+            Hud.FitLabel(new Rect(80f, y + 14f, Hud.Width - 160f, 96f), _title, 68f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, a), TextAnchor.MiddleCenter, heavy: true);
+            Hud.Label(new Rect(80f, y + 110f, Hud.Width - 160f, 60f), _subtitle, 25f, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, a), wrap: true, shadow: false);
         }
     }
 }

@@ -37,16 +37,18 @@ namespace PleaseDontDrown.UI
             _hitLength = kill ? 0.45f : head ? 0.3f : 0.18f;
         }
 
-        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+        // Drawn on the HUD canvas (no IMGUI): see HudCanvas.
+        private void OnEnable() => HudCanvas.Add(this, HudCanvas.OrderWeapon, DrawHud);
+
+        private void OnDisable() => HudCanvas.Remove(this);
 
         private void OnDestroy()
         {
             if (_scope != null) Destroy(_scope);
         }
 
-        private void OnGUI()
+        private void DrawHud()
         {
-            if (Event.current.type != EventType.Repaint) return; // nothing here takes input
             Weapon gun = Weapon.Local;
             if (gun == null || !GameInput.GameplayActive) return;
             float cx = Screen.width * 0.5f, cy = Screen.height * 0.5f;
@@ -59,16 +61,10 @@ namespace PleaseDontDrown.UI
             if (since < _hitLength)
             {
                 float t = since / _hitLength;
-                GUI.color = new Color(_hitColour.r, _hitColour.g, _hitColour.b, 1f - t * t);
+                var colour = new Color(_hitColour.r, _hitColour.g, _hitColour.b, 1f - t * t);
                 float s = Hud.Scale * _hitSize * (1f + 0.25f * (1f - t));
                 for (int i = 0; i < 4; i++)
-                {
-                    Matrix4x4 keep = GUI.matrix;
-                    GUIUtility.RotateAroundPivot(45f + 90f * i, new Vector2(cx, cy));
-                    GUI.DrawTexture(new Rect(cx + 9f * s, cy - 1.5f * s, 12f * s, 3f * s), Texture2D.whiteTexture);
-                    GUI.matrix = keep;
-                }
-                GUI.color = Color.white;
+                    Hud.PixelBox(new Rect(cx + 9f * s, cy - 1.5f * s, 12f * s, 3f * s), colour, 45f + 90f * i, new Vector2(cx, cy));
             }
 
             if (gun.IsInspecting) DrawCard(gun);
@@ -82,13 +78,12 @@ namespace PleaseDontDrown.UI
             float gap = Mathf.Tan(gun.CurrentSpread * Mathf.Deg2Rad) / Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) * cy;
             gap = Mathf.Clamp(gap, 4f * Hud.Scale, Screen.height * 0.25f) + 3f * Hud.Scale;
             float fade = 1f - gun.Aim * 2f;
-            GUI.color = new Color(1f, 1f, 1f, 0.85f * fade);
+            var colour = new Color(1f, 1f, 1f, 0.85f * fade);
             float len = 11f * Hud.Scale, w = Mathf.Max(2f, 3f * Hud.Scale);
-            GUI.DrawTexture(new Rect(cx - w * 0.5f, cy - gap - len, w, len), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(cx - w * 0.5f, cy + gap, w, len), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(cx - gap - len, cy - w * 0.5f, len, w), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(cx + gap, cy - w * 0.5f, len, w), Texture2D.whiteTexture);
-            GUI.color = Color.white;
+            Hud.PixelBox(new Rect(cx - w * 0.5f, cy - gap - len, w, len), colour);
+            Hud.PixelBox(new Rect(cx - w * 0.5f, cy + gap, w, len), colour);
+            Hud.PixelBox(new Rect(cx - gap - len, cy - w * 0.5f, len, w), colour);
+            Hud.PixelBox(new Rect(cx + gap, cy - w * 0.5f, len, w), colour);
         }
 
         private void DrawScope(float cx, float cy)
@@ -96,11 +91,9 @@ namespace PleaseDontDrown.UI
             int size = Screen.height;
             if (_scope == null || _scopeSize != size) BuildScope(size);
             float left = cx - size * 0.5f;
-            GUI.color = Color.black;
-            GUI.DrawTexture(new Rect(0f, 0f, left + 1f, Screen.height), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(left + size - 1f, 0f, Screen.width - left - size + 1f, Screen.height), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUI.DrawTexture(new Rect(left, 0f, size, size), _scope);
+            Hud.PixelBox(new Rect(0f, 0f, left + 1f, Screen.height), Color.black);
+            Hud.PixelBox(new Rect(left + size - 1f, 0f, Screen.width - left - size + 1f, Screen.height), Color.black);
+            Hud.PixelPicture(new Rect(left, 0f, size, size), _scope, Color.white);
         }
 
         /// <summary>Black all round a round lens, fine crosshairs with thicker outer posts.</summary>
@@ -133,15 +126,18 @@ namespace PleaseDontDrown.UI
         /// <summary>The gun's card, on the right at eye height.</summary>
         private void DrawCard(Weapon gun)
         {
-            const float width = 380f, height = 250f;
-            var area = new Rect(Hud.Width - width - 25f, Hud.Height * 0.5f - height * 0.5f, width, height);
-            Hud.Label(new Rect(area.x + 20f, area.y + 12f, width - 40f, 40f), gun.DisplayName, 30f, Color.white, TextAnchor.MiddleLeft, heavy: true);
+            const float width = 396f, height = 310f;
+            var area = new Rect(Hud.Width - width - Hud.Margin, Hud.Height * 0.5f - height * 0.5f, width, height);
+            Hud.Surface(area, 0.94f, Hud.Teal);
+            Hud.Label(new Rect(area.x + 22f, area.y + 14f, width - 44f, 22f), "EQUIPMENT", 15f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.FitLabel(new Rect(area.x + 22f, area.y + 38f, width - 44f, 40f), gun.DisplayName, 28f, Hud.Paper, heavy: true);
+            Hud.Fill(new Rect(area.x + 22f, area.y + 88f, width - 44f, 1f), new Color(1f, 1f, 1f, 0.14f));
             string pellets = gun.Pellets > 1 ? $" x{gun.Pellets}" : "";
             string text = $"Damage <b>{gun.Damage}{pellets}</b>   ({gun.Tier.Name})\n" +
                           $"{(gun.FullAuto ? "Full auto" : "Single shots")},  {Mathf.RoundToInt(60f / Mathf.Max(0.01f, gun.Interval))} rounds a minute\n\n" +
                           $"Sight: {gun.Sight.Name}\nBarrel: {gun.Barrel.Name}" +
                           (gun.HasLaser ? "\nLaser sight" : "") + (gun.HasExtendedMagazine ? "\nExtended magazine" : "");
-            Hud.Label(new Rect(area.x + 20f, area.y + 58f, width - 40f, height - 70f), text, 20f, new Color(1f, 1f, 1f, 0.92f), TextAnchor.UpperLeft, wrap: true, shadow: false);
+            Hud.Label(new Rect(area.x + 22f, area.y + 104f, width - 44f, height - 124f), text, 20f, Hud.Muted, TextAnchor.UpperLeft, wrap: true, shadow: false);
         }
     }
 }

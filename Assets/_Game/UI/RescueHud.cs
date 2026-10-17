@@ -12,11 +12,13 @@ namespace PleaseDontDrown.UI
     /// </summary>
     public class RescueHud : MonoBehaviour
     {
-        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+        // Drawn on the HUD canvas (no IMGUI): see HudCanvas.
+        private void OnEnable() => HudCanvas.Add(this, HudCanvas.OrderWorldMarkers, DrawHud);
 
-        private void OnGUI()
+        private void OnDisable() => HudCanvas.Remove(this);
+
+        private void DrawHud()
         {
-            if (Event.current.type != EventType.Repaint) return; // nothing here takes input
             PlayerHub local = PlayerHub.Local;
             Camera cam = local != null && local.Look != null ? local.Look.Camera : null;
             if (cam == null || !GameInput.GameplayActive)
@@ -79,24 +81,24 @@ namespace PleaseDontDrown.UI
             // left) and the patient in the middle of the view.
             const float chip = 330f, gap = 12f, height = 80f;
             float left = Hud.Width - chip - 48f, top = Hud.Height * 0.5f - height - gap * 0.5f;
-            Hud.Label(new Rect(left, top - 40f, chip, 32f), "CPR", 24f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true);
+            Hud.Surface(new Rect(left - 18f, top - 54f, chip + 36f, 300f), 0.94f);
+            Hud.Label(new Rect(left, top - 42f, chip, 28f), "RESCUE  /  CPR", 18f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             for (int i = 0; i < 2; i++)
             {
                 bool current = (i == 0) == (now == CprStep.Compress);
                 var box = new Rect(left, top + i * (height + gap), chip, height);
-                float pulse = current ? 0.82f + 0.18f * Mathf.Sin(Time.unscaledTime * 7f) : 0f;
-                if (current) Hud.Fill(box, new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, pulse), 14f); // (the other steps: just outlined text)
-                if (current) Hud.Frame(box, Color.white, 3f, 14f);
-                Color words = current ? Color.white : new Color(1f, 1f, 1f, 0.55f);
+                Hud.Fill(box, current ? new Color(0.07f, 0.27f, 0.28f) : new Color(1f, 1f, 1f, 0.04f), 10f);
+                Hud.Frame(box, current ? Hud.Teal : new Color(1f, 1f, 1f, 0.12f), current ? 2f : 1f, 10f);
+                Color words = current ? Hud.Paper : Hud.Muted;
                 var key = new Rect(box.x + 12f, box.y + 11f, 84f, 58f);
-                Hud.Fill(key, new Color(0f, 0f, 0f, current ? 0.35f : 0.3f), 10f);
-                Hud.Label(key, _cprKeys[i], 28f, current ? Hud.Sand : words, heavy: true, shadow: false);
-                Hud.Label(new Rect(box.x + 108f, box.y + 8f, chip - 116f, 36f), _cprWhat[i], 23f, words, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                Hud.Fill(key, current ? Hud.Teal : new Color(0f, 0f, 0f, 0.25f), 8f);
+                Hud.FitLabel(key, _cprKeys[i], 26f, current ? Hud.Ink : words, TextAnchor.MiddleCenter, heavy: true);
+                Hud.FitLabel(new Rect(box.x + 108f, box.y + 8f, chip - 120f, 36f), _cprWhat[i], 21f, words, TextAnchor.MiddleLeft, heavy: true);
                 Hud.Label(new Rect(box.x + 108f, box.y + 40f, chip - 116f, 30f), _cprCount[i], 21f, words, TextAnchor.MiddleLeft, shadow: false);
             }
             var bar = new Rect(left, top + 2f * height + gap + 14f, chip, 14f);
-            Hud.Bar(bar, v.Cpr01, new Color(0.5f, 1f, 0.5f));
-            Hud.Label(new Rect(bar.x, bar.yMax + 4f, bar.width, 30f), _cprPercent, 21f, new Color(0.7f, 1f, 0.7f), heavy: true);
+            Hud.Bar(bar, v.Cpr01, Hud.Teal);
+            Hud.Label(new Rect(bar.x, bar.yMax + 4f, bar.width, 30f), _cprPercent, 17f, Hud.Teal, heavy: true, shadow: false);
         }
 
         private void DrawMarker(Camera cam, PlayerHub local, VictimBrain v, VictimState state)
@@ -141,16 +143,20 @@ namespace PleaseDontDrown.UI
             };
             if (v.HasLostLeg && state != VictimState.Saved && state != VictimState.Lost) info += $"  BLEEDING {v.BleedSecondsLeft:F0}s";
             if (v.Item.IsHeld) info += $"  (with {v.Item.Holder.DisplayName})";
-            string text = $"<b>{v.Name}</b>  {info}\n{distance:F0} m";
+            string text = $"{v.Name}  ·  {distance:F0} m";
             // Label and bar above the dot (clear of the tourist), or below it when pinned to the top edge.
             bool below = y < 100f;
-            var rect = new Rect(x - 300f, below ? y + 16f : y - 84f, 600f, 56f);
-            Hud.Label(rect, text, 21f, color, TextAnchor.UpperCenter);
+            float infoHeight = Hud.TextHeight(info, 280f, 16f);
+            float labelHeight = 38f + infoHeight;
+            var rect = new Rect(Mathf.Clamp(x - 156f, 12f, Hud.Width - 324f), below ? y + 18f : y - labelHeight - 30f, 312f, labelHeight);
+            Hud.Surface(rect, 0.8f, color);
+            Hud.FitLabel(new Rect(rect.x + 16f, rect.y + 8f, 280f, 23f), text, 19f, Hud.Paper, TextAnchor.MiddleCenter, heavy: true);
+            Hud.Label(new Rect(rect.x + 16f, rect.y + 32f, 280f, infoHeight), info, 16f, color, TextAnchor.UpperCenter, wrap: true, shadow: false);
 
             // Air (awake) or CPR progress (unconscious on land).
             float bar = state == VictimState.Unconscious ? v.Cpr01 : v.Air01;
             if (state.NeedsHelp() && (state != VictimState.Unconscious || bar > 0f))
-                Hud.Bar(new Rect(x - 45f, below ? rect.y + 60f : y - 24f, 90f, 8f), bar,
+                Hud.Bar(new Rect(rect.center.x - 45f, below ? rect.yMax + 6f : y - 24f, 90f, 8f), bar,
                     state == VictimState.Unconscious ? new Color(0.5f, 1f, 0.5f) : bar < 0.35f ? new Color(1f, 0.35f, 0.3f) : new Color(0.45f, 0.8f, 1f));
         }
 
@@ -168,7 +174,11 @@ namespace PleaseDontDrown.UI
                     ? $"Bring <b>{v.Name}</b> back to the shallows!"
                     : $"Carrying <b>{v.Name}</b>";
             // Where the held item's name and keys would be.
-            Hud.Label(new Rect(Hud.Width * 0.5f - 800f, Hud.HotbarTop - 56f, 1600f, 40f), text, 26f, Hud.Sand);
+            float width = Mathf.Min(960f, Hud.Width - 160f);
+            float height = Hud.TextHeight(text, width - 40f, 22f) + 24f;
+            var card = new Rect((Hud.Width - width) * 0.5f, Hud.HotbarTop - height - 18f, width, height);
+            Hud.Surface(card, 0.9f, Hud.Sand);
+            Hud.Label(new Rect(card.x + 20f, card.y + 12f, width - 40f, height - 24f), text, 22f, Hud.Sand, wrap: true, shadow: false);
         }
 
         private static Color ColorOf(VictimState s) => s switch

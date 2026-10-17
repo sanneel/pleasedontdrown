@@ -25,8 +25,10 @@ namespace PleaseDontDrown.UI
         private GUIStyle _field;
         private int _fieldPx;
         private Texture2D _fade;
+        private static DevConnectMenu _instance;
+        public static bool GuideOpen => _instance != null && _instance._guideOpen;
 
-        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+        private void Awake() { useGUILayout = false; _instance = this; }
 
         private void OnEnable()
         {
@@ -162,7 +164,7 @@ namespace PleaseDontDrown.UI
                 }
             float panelHeight = 200f + (playing > 0 ? 44f + playing * row : SteamBootstrap.IsReady ? 44f : 0f);
             var panel = new Rect(x, bottom - panelHeight, width, panelHeight);
-            Hud.Fill(panel, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.8f), 16f);
+            Hud.Panel(panel, 0.94f);
             float y = panel.y + 18f;
 
             if (SteamBootstrap.IsReady)
@@ -176,7 +178,7 @@ namespace PleaseDontDrown.UI
                     SteamLobbyService.Friend friend = friends[i];
                     bool joinable = friend.SameVersion && friend.Lobby != Steamworks.CSteamID.Nil;
                     string state = !friend.SameVersion ? "  (other build)" : !joinable ? "  (in the menu)" : string.Empty;
-                    Hud.Label(new Rect(x + 24f, y, width - 190f, row - 8f), friend.Name + state, 24f, Color.white, TextAnchor.MiddleLeft, shadow: false);
+                    Hud.FitLabel(new Rect(x + 24f, y, width - 190f, row - 8f), friend.Name + state, 23f, Hud.Paper);
                     GUI.enabled = joinable;
                     if (Hud.Button(new Rect(x + width - 144f, y, 120f, row - 8f), "JOIN", small: true)) _connection.JoinFriend(friend.Lobby);
                     GUI.enabled = true;
@@ -355,12 +357,12 @@ namespace PleaseDontDrown.UI
             for (int i = 0; i < keys.Length; i++)
             {
                 float x = panel.x + 28f + (i / perColumn) * (column + 24f), y = panel.y + 78f + (i % perColumn) * row;
-                Hud.Label(new Rect(x, y, column - 190f, row - 8f), keys[i].Label, 21f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                Hud.Label(new Rect(x, y, column - 190f, row - 8f), keys[i].Label, 18f, Hud.Muted, TextAnchor.MiddleLeft, wrap: true, shadow: false);
                 var box = new Rect(x + column - 180f, y, 180f, row - 8f);
                 if (i == _rebindRow)
                 {
                     Hud.Fill(box, Hud.Coral, 11f);
-                    Hud.Label(box, "PRESS A KEY", 20f, Color.white, heavy: true, shadow: false);
+                    Hud.Label(box, "PRESS A KEY", 20f, Hud.Ink, heavy: true, shadow: false);
                 }
                 else
                 {
@@ -375,7 +377,7 @@ namespace PleaseDontDrown.UI
             }
             Hud.Label(new Rect(panel.x + 270f, panel.yMax - 66f, panel.width - 298f, 46f),
                 waiting ? "Press the new key or mouse button. Esc keeps the old one." : "Click a key to change it. Slots 1-6 and the gamepad stay as they are.",
-                18f, new Color(1f, 1f, 1f, 0.7f), TextAnchor.MiddleRight, shadow: false);
+                18f, Hud.Muted, TextAnchor.MiddleRight, wrap: true, shadow: false);
             GUI.enabled = !waiting;
             if (Hud.Button(new Rect(panel.x + 28f, panel.yMax - 66f, 220f, 46f), "RESET KEYS", small: true)) GameInput.ResetBindings();
             GUI.enabled = true;
@@ -401,7 +403,7 @@ namespace PleaseDontDrown.UI
                 if (!SteamLobbyService.IsMember(friend.Id) && shown < 10) shown++;
             float panelHeight = 96f + Mathf.Max(1, shown) * row + 150f;
             var panel = new Rect((width - panelWidth) * 0.5f, (height - panelHeight) * 0.5f, panelWidth, panelHeight);
-            Hud.Fill(panel, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.85f), 16f);
+            Hud.Panel(panel, 0.94f);
             Hud.Label(new Rect(panel.x, panel.y + 16f, panelWidth, 50f), "INVITE A FRIEND", 40f, Color.white, heavy: true, shadow: false);
             float y = panel.y + 84f;
             if (shown == 0)
@@ -414,7 +416,7 @@ namespace PleaseDontDrown.UI
             {
                 if (SteamLobbyService.IsMember(friend.Id)) continue;
                 if (++drawn > shown) break;
-                Hud.Label(new Rect(panel.x + 24f, y, panelWidth - 200f, row - 8f), friend.InGame ? friend.Name + "  (playing)" : friend.Name, 24f, Color.white, TextAnchor.MiddleLeft, shadow: false);
+                Hud.FitLabel(new Rect(panel.x + 24f, y, panelWidth - 212f, row - 8f), friend.InGame ? friend.Name + "  (playing)" : friend.Name, 23f, Hud.Paper);
                 bool invited = SteamLobbyService.RecentlyInvited(friend.Id);
                 GUI.enabled = !invited;
                 if (Hud.Button(new Rect(panel.xMax - 164f, y, 140f, row - 8f), invited ? "SENT" : "INVITE", small: true)) SteamLobbyService.Invite(friend.Id);
@@ -482,8 +484,8 @@ namespace PleaseDontDrown.UI
             for (int i = 0; i < _guide.Length; i += 2)
             {
                 if (i == 10) y += 10f;
-                Hud.Label(new Rect(panel.x + 24f, y, half, 32f), _guide[i], 20f, white, TextAnchor.MiddleLeft, shadow: false);
-                Hud.Label(new Rect(panel.x + 24f + half + 10f, y, half, 32f), _guide[i + 1], 20f, white, TextAnchor.MiddleLeft, shadow: false);
+                Hud.FitLabel(new Rect(panel.x + 24f, y, half - 8f, 32f), _guide[i], 19f, white, minimum: 15f);
+                Hud.FitLabel(new Rect(panel.x + 24f + half + 10f, y, half - 8f, 32f), _guide[i + 1], 19f, white, minimum: 15f);
                 y += 34f;
             }
             Hud.Label(new Rect(panel.x + 24f, panel.yMax - 40f, width - 48f, 28f), "Keys, mouse and sound: Esc, then OPTIONS", 18f, new Color(1f, 1f, 1f, 0.65f), TextAnchor.MiddleLeft, shadow: false);

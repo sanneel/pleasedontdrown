@@ -48,18 +48,20 @@ namespace PleaseDontDrown.UI
             return numbers;
         }
 
-        private void Awake() => useGUILayout = false; // drawn with fixed boxes: no layout pass needed
+        // Drawn on the HUD canvas (no IMGUI): see HudCanvas.
+        private void OnEnable() => HudCanvas.Add(this, HudCanvas.OrderPlayer, DrawHud);
+
+        private void OnDisable() => HudCanvas.Remove(this);
 
         /// <summary>Shows a short message to the local player only.</summary>
         public static void ShowToast(string text, float seconds = 4f)
         {
             _toasts.Add(new Toast { Text = text, From = Time.unscaledTime, Until = Time.unscaledTime + seconds });
-            if (_toasts.Count > 4) _toasts.RemoveAt(0);
+            if (_toasts.Count > 2) _toasts.RemoveAt(0);
         }
 
-        private void OnGUI()
+        private void DrawHud()
         {
-            if (Event.current.type != EventType.Repaint) return; // nothing here takes input
             PlayerHub local = PlayerHub.Local;
             if (local == null || !GameInput.GameplayActive)
                 return;
@@ -97,8 +99,7 @@ namespace PleaseDontDrown.UI
                         _primary = primary;
                         _primaryLine = $"{Key(GameInput.Interact)} {primary}";
                     }
-                    Hud.Label(new Rect(cx - 500f, y, 1000f, 36f), _primaryLine, 26f, Color.white);
-                    y += 36f;
+                    y += DrawPrompt(cx, y, _primaryLine);
                 }
                 if (!string.IsNullOrEmpty(secondary))
                 {
@@ -107,7 +108,7 @@ namespace PleaseDontDrown.UI
                         _secondary = secondary;
                         _secondaryLine = $"{Key(local.Interactor.CurrentSecondaryAction)} {secondary}";
                     }
-                    Hud.Label(new Rect(cx - 500f, y, 1000f, 36f), _secondaryLine, 26f, Color.white);
+                    DrawPrompt(cx, y, _secondaryLine);
                 }
             }
 
@@ -122,22 +123,32 @@ namespace PleaseDontDrown.UI
             DrawHurt(local, cx, cy);
 
             _toasts.RemoveAll(t => t.Until < Time.unscaledTime);
-            // Each message under the top of the screen, outlined straight on the game (no dark pill: the user, 2026-10-13),
-            // sliding in and fading out.
-            for (int i = 0; i < _toasts.Count; i++)
+            // Each message on its own dark pill under the top of the screen (the team, 2026-10-12: words floating in the
+            // sky read as a log), sliding in and fading out.
+            float toastY = DevConnectMenu.GuideOpen ? 414f : Hud.Margin;
+            for (int i = _toasts.Count - 1; i >= 0; i--)
             {
                 Toast toast = _toasts[i];
                 float alpha = Mathf.Clamp01((Time.unscaledTime - toast.From) / 0.15f) * Mathf.Clamp01((toast.Until - Time.unscaledTime) / 0.4f);
                 float slide = (1f - Mathf.Clamp01((Time.unscaledTime - toast.From) / 0.2f)) * 12f;
-                const float size = 22f, height = 44f;
-                float width = Mathf.Min(1300f, Hud.TextWidth(StripTags(toast.Text), size, heavy: true) + 56f);
-                var pill = new Rect(cx - width * 0.5f, Hud.Height * 0.11f + i * (height + 8f) - slide, width, height);
-                Hud.Label(pill, toast.Text, size, new Color(1f, 1f, 1f, alpha), TextAnchor.MiddleCenter, heavy: true, shadow: false);
+                const float size = 18f, width = 340f;
+                float height = Hud.TextHeight(toast.Text, width, size) + 8f;
+                var pill = new Rect(Hud.Width - Hud.Margin - width + slide, toastY, width, height);
+                Hud.Label(new Rect(pill.x, pill.y, width, height), toast.Text, size,
+                    new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, alpha), TextAnchor.UpperRight, wrap: true);
+                toastY += height + 10f;
             }
         }
 
-        /// <summary>The words without their colour/bold tags (to measure them).</summary>
-        private static string StripTags(string text) => System.Text.RegularExpressions.Regex.Replace(text, "<[^>]+>", "");
+        private static float DrawPrompt(float center, float y, string text)
+        {
+            float width = Mathf.Min(720f, Hud.TextWidth(text, 22f) + 36f);
+            float height = Mathf.Max(40f, Hud.TextHeight(text, width - 36f, 22f) + 16f);
+            var rect = new Rect(center - width * 0.5f, y, width, height);
+            Hud.Surface(rect, 0.8f);
+            Hud.Label(new Rect(rect.x + 18f, y + 8f, width - 36f, height - 16f), text, 22f, Hud.Paper, wrap: true, shadow: false);
+            return height + 6f;
+        }
 
         private static string Key(UnityEngine.InputSystem.InputAction action) => $"<color=#ffd24a>[{GameInput.KeyLabel(action)}]</color>";
 
@@ -163,8 +174,9 @@ namespace PleaseDontDrown.UI
                 float lift = active ? Hud.EaseOutBack(_lift[i]) : _lift[i] * _lift[i];
 
                 var r = new Rect(x0 + i * (size + gap), y0 - lift * Hud.SlotLift, size, size);
-                Hud.Fill(r, new Color(0.02f, 0.06f, 0.09f, active ? 0.62f : 0.42f), 16f);
-                if (active) Hud.Frame(r, new Color(1f, 1f, 1f, 0.95f), 4f, 16f);
+                Hud.Fill(r, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, active ? 0.9f : 0.7f), 14f);
+                Hud.Frame(r, active ? Hud.Teal : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.34f), active ? 3f : 1.5f, 14f);
+                if (active) Hud.Fill(new Rect(r.x + 18f, r.yMax - 5f, r.width - 36f, 3f), Hud.Teal, 1.5f);
 
                 if (item != null)
                 {
@@ -175,7 +187,9 @@ namespace PleaseDontDrown.UI
                     if (picture != null) Hud.Picture(inner, picture, active ? Color.white : new Color(1f, 1f, 1f, 0.8f));
                     else Hud.Label(new Rect(r.x + 6f, r.y + 24f, size - 12f, size - 30f), item.DisplayName, 15f, Color.white, TextAnchor.MiddleCenter, wrap: true);
                 }
-                Hud.Label(new Rect(r.x + 10f, r.y + 5f, 30f, 26f), SlotNumbers[i], 20f, new Color(1f, 1f, 1f, active ? 1f : 0.7f), TextAnchor.UpperLeft, heavy: true);
+                var number = new Rect(r.x + 7f, r.y + 7f, 24f, 24f);
+                Hud.Fill(number, active ? Hud.Teal : new Color(0f, 0f, 0f, 0.5f), 5f);
+                Hud.Label(number, SlotNumbers[i], 15f, active ? Hud.Ink : Hud.Muted, heavy: true, shadow: false);
             }
         }
 
@@ -195,7 +209,7 @@ namespace PleaseDontDrown.UI
             float nameY = Hud.HotbarTop - 50f;
             if (!_heldIsPerson) // RescueHud says what to do with a person
             {
-                Hud.Label(new Rect(cx - 500f, nameY, 1000f, 40f), held.DisplayName, 30f, Color.white, heavy: true);
+                Hud.Label(new Rect(cx - 500f, nameY, 1000f, 40f), held.DisplayName, 25f, Hud.Paper, heavy: true);
                 float hintAlpha = Mathf.Clamp01(HintSeconds - (Time.unscaledTime - _heldSince));
                 if (hintAlpha > 0f)
                 {
@@ -206,7 +220,9 @@ namespace PleaseDontDrown.UI
                         _hints = Hints(held);
                         _hintsWithSkin = withSkin;
                     }
-                    Hud.Label(new Rect(cx - 800f, nameY - 32f, 1600f, 30f), _hints, 20f, new Color(1f, 1f, 1f, 0.9f * hintAlpha));
+                    float width = Mathf.Min(1120f, Hud.Width - 120f);
+                    Hud.FitLabel(new Rect(cx - width * 0.5f, nameY - 30f, width, 28f), _hints, 18f,
+                        new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, hintAlpha), TextAnchor.MiddleCenter);
                 }
             }
 
@@ -252,7 +268,7 @@ namespace PleaseDontDrown.UI
         private void DrawVitals(PlayerHub local, float dt)
         {
             const float size = 60f, gap = 14f;
-            float x = 50f, y = Hud.Height - 25f - size;
+            float x = Hud.Margin, y = Hud.Height - 25f - size;
             PlayerMotor motor = local.Motor;
             PlayerVitals vitals = local.Vitals;
             // Health: only while hurt (it fills back up on its own), first in the row.
@@ -338,8 +354,9 @@ namespace PleaseDontDrown.UI
                 if (p != null && p != local && p.TryGetComponent(out Combat.PlayerCombat c) && !c.IsDowned) someoneUp = true;
             string line = combat.Revive01 > 0f ? "Being revived..." : someoneUp ? "You're down. A friend can revive you (CPR)" : "You're down. Getting your breath back...";
             float y = Hud.HotbarTop - 70f;
-            Hud.Label(new Rect(cx - 500f + 1.5f, y + 2f, 1000f, 34f), line, 26f, new Color(0f, 0f, 0f, 0.5f), heavy: true);
-            Hud.Label(new Rect(cx - 500f, y, 1000f, 34f), line, 26f, new Color(1f, 0.82f, 0.75f), heavy: true);
+            var downed = new Rect(cx - 330f, y - 8f, 660f, combat.Revive01 > 0f ? 70f : 50f);
+            Hud.Surface(downed, 0.94f, Hud.Danger);
+            Hud.Label(new Rect(downed.x + 16f, y, downed.width - 32f, 34f), line, 22f, Hud.Paper, heavy: true, shadow: false);
             if (combat.Revive01 > 0f)
                 Hud.Bar(new Rect(cx - 140f, y + 40f, 280f, 10f), combat.Revive01, new Color(0.5f, 1f, 0.6f));
         }

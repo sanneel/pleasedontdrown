@@ -50,15 +50,15 @@ namespace PleaseDontDrown.UI
             if (string.IsNullOrWhiteSpace(text)) return;
             var go = new GameObject("SpeechBubble");
             go.transform.position = position;
-            string wrapped = Wrap(text, 23);
-            float size = 0.02f * scale;
-            TextMesh mesh = AddText(go, wrapped, new Color(0.12f, 0.16f, 0.19f), size);
+            string wrapped = Wrap(text, 30);
+            float size = 0.016f * scale;
+            TextMesh mesh = AddText(go, wrapped, Hud.Ink, size);
             mesh.lineSpacing = 1.08f;
             // TextMesh widths vary with the glyphs. Use its generated bounds so both
             // narrow and broad lines receive consistent padding.
             Bounds glyphs = go.GetComponent<MeshRenderer>().localBounds;
-            float width = Mathf.Max(1.1f * scale, glyphs.size.x + 0.38f * scale);
-            float height = Mathf.Max(0.5f * scale, glyphs.size.y + 0.32f * scale);
+            float width = Mathf.Max(0.8f * scale, glyphs.size.x + 0.28f * scale);
+            float height = Mathf.Max(0.38f * scale, glyphs.size.y + 0.24f * scale);
 
             var bg = new GameObject("RoundedBackground");
             bg.transform.SetParent(go.transform, false);
@@ -67,7 +67,7 @@ namespace PleaseDontDrown.UI
             bubble.sprite = BubbleSprite;
             bubble.drawMode = SpriteDrawMode.Sliced;
             bubble.size = new Vector2(width, height);
-            bubble.color = new Color(1f, 0.98f, 0.91f, 0.97f);
+            bubble.color = new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.97f);
             var tip = new GameObject("Tail");
             tip.transform.SetParent(go.transform, false);
             tip.transform.localPosition = new Vector3(glyphs.center.x - 0.13f * scale, glyphs.center.y - height * 0.5f - 0.09f * scale, 0.027f);
@@ -173,8 +173,8 @@ namespace PleaseDontDrown.UI
             transform.localScale = Vector3.one * pop;
             float fade = Mathf.Clamp01((1f - t) * 4f);
             _text.color = new Color(_color.r, _color.g, _color.b, _color.a * fade);
-            if (_bubble != null) _bubble.color = new Color(1f, 0.98f, 0.91f, 0.97f * fade);
-            if (_tail != null) _tail.color = new Color(1f, 0.98f, 0.91f, 0.97f * fade);
+            if (_bubble != null) _bubble.color = new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.97f * fade);
+            if (_tail != null) _tail.color = new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.97f * fade);
             Camera cam = Camera.main;
             if (cam != null) transform.rotation = cam.transform.rotation;
         }

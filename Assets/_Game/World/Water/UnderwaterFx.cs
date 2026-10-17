@@ -17,7 +17,6 @@ namespace PleaseDontDrown.World.Water
         [SerializeField] private Color _tint = new Color(0.05f, 0.35f, 0.45f, 0.1f);
 
         private Camera _camera;
-        private Texture2D _pixel;
 
         public static bool CameraUnderwater { get; private set; }
 
@@ -25,6 +24,11 @@ namespace PleaseDontDrown.World.Water
         private static void ResetStatics() => CameraUnderwater = false;
 
         private void Start() => Apply(false);
+
+        // The tint is drawn on the HUD canvas, underneath everything else there.
+        private void OnEnable() => UI.HudCanvas.Add(this, UI.HudCanvas.OrderScreenTint, DrawTint);
+
+        private void OnDisable() => UI.HudCanvas.Remove(this);
 
         private void LateUpdate()
         {
@@ -52,19 +56,9 @@ namespace PleaseDontDrown.World.Water
             _camera.backgroundColor = _belowFog;
         }
 
-        private void OnGUI()
+        private void DrawTint()
         {
-            if (!CameraUnderwater) return;
-            if (_pixel == null)
-            {
-                _pixel = new Texture2D(1, 1);
-                _pixel.SetPixel(0, 0, Color.white);
-                _pixel.Apply();
-            }
-            GUI.depth = 10; // behind the HUD
-            GUI.color = _tint;
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), _pixel);
-            GUI.color = Color.white;
+            if (CameraUnderwater) UI.Hud.PixelBox(new Rect(0, 0, Screen.width, Screen.height), _tint);
         }
     }
 }

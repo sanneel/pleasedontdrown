@@ -24,13 +24,16 @@ namespace PleaseDontDrown.UI
             go.AddComponent<ThreatHud>();
         }
 
-        private void Awake() => useGUILayout = false;
+        // Drawn on the HUD canvas (no IMGUI): see HudCanvas.
+        private void OnEnable() => HudCanvas.Add(this, HudCanvas.OrderWorldMarkers, DrawHud);
 
-        private void OnGUI()
+        private void OnDisable() => HudCanvas.Remove(this);
+
+        private void DrawHud()
         {
-            if (Event.current.type != EventType.Repaint) return;
             PlayerHub local = PlayerHub.Local;
             if (local == null || !GameInput.GameplayActive) return;
+            DrawInk();
             Camera cam = local.Look != null ? local.Look.Camera : null;
             if (cam != null)
             {
@@ -42,10 +45,13 @@ namespace PleaseDontDrown.UI
                         DrawAlert(cam, local, c.TopPosition + Vector3.up * 0.45f, c.Alert, c.IsAlarmed);
             }
             DrawBossBar();
-            DrawInk();
             if (local.TryGetComponent(out PlayerCombat combat) && combat.IsDisguised)
-                Hud.Label(new Rect(30f, 140f, 520f, 26f), "<b>DISGUISED</b>  <color=#c8c8c8>pirates take you for one of theirs</color>", 18f,
-                    new Color(0.85f, 0.95f, 0.7f), TextAnchor.MiddleLeft);
+            {
+                var tag = new Rect(Hud.Margin, 242f, 290f, 54f);
+                Hud.Surface(tag, 0.86f, Hud.Teal);
+                Hud.Label(new Rect(tag.x + 18f, tag.y + 7f, tag.width - 36f, 20f), "DISGUISED", 16f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+                Hud.Label(new Rect(tag.x + 18f, tag.y + 28f, tag.width - 36f, 18f), "Pirates see you as one of their own", 14f, Hud.Muted, TextAnchor.MiddleLeft, shadow: false);
+            }
         }
 
         private static void DrawAlert(Camera cam, PlayerHub local, Vector3 world, float alert, bool alarmed)
@@ -65,8 +71,8 @@ namespace PleaseDontDrown.UI
                 return;
             }
             // The ring fills as they grow sure; it turns from yellow to orange near the top.
-            Color ring = Color.Lerp(new Color(1f, 0.85f, 0.25f), new Color(1f, 0.45f, 0.15f), Mathf.InverseLerp(0.5f, 1f, alert));
-            Hud.Arc(r, 0f, alert, 5f, ring);
+            Color ring = Color.Lerp(Hud.Sand, Hud.Coral, Mathf.InverseLerp(0.5f, 1f, alert));
+            Hud.Arc(r, 0f, alert, 0.1f, ring);
             Hud.Label(r, "?", 24f, ring, heavy: true);
         }
 
@@ -100,22 +106,14 @@ namespace PleaseDontDrown.UI
                 DrawMissionBossBar();
                 return;
             }
-            // Bottom middle, above the hotbar: the top left is the mission's, the middle is for titles.
-            float width = 700f, x = (Hud.Width - width) * 0.5f, y = Hud.HotbarTop - 120f;
-            Hud.Label(new Rect(x, y, width, 30f), boss.IsDead ? $"{boss.DisplayName.ToUpperInvariant()}  BEATEN" : boss.DisplayName.ToUpperInvariant(), 24f,
-                new Color(1f, 0.88f, 0.55f), heavy: true);
-            var bar = new Rect(x, y + 34f, width, 18f);
-            Color fill = boss.BossOpen ? Color.Lerp(new Color(1f, 0.85f, 0.2f), Color.white, 0.5f + 0.5f * Mathf.Sin(Time.time * 14f)) : new Color(0.86f, 0.22f, 0.18f);
-            Hud.Bar(bar, boss.Health01, fill);
-            Hud.Frame(bar, new Color(1f, 1f, 1f, 0.7f), 2f, 9f);
-            // Phase pips under the bar.
-            for (int i = 0; i < boss.BossPhases; i++)
-            {
-                var pip = new Rect(x + width * 0.5f - boss.BossPhases * 14f + i * 28f, y + 58f, 20f, 8f);
-                Hud.Fill(pip, i < boss.BossPhase ? new Color(1f, 0.6f, 0.25f) : new Color(1f, 1f, 1f, 0.25f), 4f);
-            }
+            Color fill = boss.IsDead ? Hud.Teal : boss.BossOpen ? Hud.Sand : Hud.Coral;
+            Rect card = BossCard(boss.DisplayName, boss.IsDead ? "DEFEATED" : $"PHASE {boss.BossPhase} / {boss.BossPhases}", boss.Health01, fill);
             if (boss.BossOpen && !boss.IsDead)
-                Hud.Label(new Rect(x, y - 32f, width, 30f), "WEAK SPOT OPEN! HIT THE HEAD!", 21f, new Color(1f, 0.95f, 0.4f), heavy: true);
+            {
+                var hint = new Rect(card.x + 70f, card.yMax + 8f, card.width - 140f, 34f);
+                Hud.Surface(hint, 0.9f);
+                Hud.Label(hint, "WEAK SPOT OPEN  ·  AIM FOR THE HEAD", 17f, Hud.Sand, heavy: true, shadow: false);
+            }
         }
 
         private static float _missionBarShown = -1f;
@@ -133,21 +131,29 @@ namespace PleaseDontDrown.UI
             }
             float target = StoryDirector.BossBar01;
             _missionBarShown = _missionBarShown < 0f ? target : Mathf.MoveTowards(_missionBarShown, target, Time.unscaledDeltaTime * 0.6f);
-            float width = 700f, x = (Hud.Width - width) * 0.5f, y = Hud.HotbarTop - 120f;
-            Hud.Label(new Rect(x, y, width, 30f), StoryDirector.BossBarTitle.ToUpperInvariant(), 24f, new Color(1f, 0.88f, 0.55f), heavy: true);
-            var bar = new Rect(x, y + 34f, width, 18f);
-            Hud.Bar(bar, _missionBarShown, new Color(0.86f, 0.22f, 0.18f));
-            Hud.Frame(bar, new Color(1f, 1f, 1f, 0.7f), 2f, 9f);
             float total = StoryDirector.BossBarTimeTotal, left = StoryDirector.BossBarTimeLeft;
-            if (total <= 0f) return;
-            // The clock: a ring that runs down, right of the bar; red and counted in the last 10 seconds.
-            var ring = new Rect(x + width + 14f, y + 18f, 50f, 50f);
-            bool hurry = left <= 10f;
-            Hud.Fill(ring, new Color(0f, 0f, 0f, 0.55f), 25f);
-            Hud.Arc(ring, 0f, Mathf.Clamp01(left / total), 5f, hurry ? new Color(1f, 0.3f, 0.2f) : new Color(1f, 0.88f, 0.55f));
-            if (hurry)
-                Hud.Label(new Rect(x, y - 70f, width, 60f), Mathf.CeilToInt(left).ToString(), 52f,
-                    new Color(1f, 0.35f, 0.25f, 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 10f)), heavy: true);
+            int seconds = Mathf.Max(0, Mathf.CeilToInt(left));
+            bool hurry = total > 0f && left <= 10f;
+            string status = total > 0f ? $"{seconds / 60}:{seconds % 60:00} LEFT" : "IN PROGRESS";
+            Rect card = BossCard(StoryDirector.BossBarTitle, status, _missionBarShown, hurry ? Hud.Danger : Hud.Coral);
+            if (total > 0f)
+            {
+                var ring = new Rect(card.xMax - 166f, card.y + 12f, 20f, 20f);
+                Hud.Arc(ring, 0f, 1f, 0.12f, new Color(1f, 1f, 1f, 0.15f));
+                Hud.Arc(ring, 0f, Mathf.Clamp01(left / total), 0.12f, hurry ? Hud.Danger : Hud.Sand);
+            }
+        }
+
+        private static Rect BossCard(string title, string status, float fraction, Color accent)
+        {
+            const float width = 620f;
+            var card = new Rect((Hud.Width - width) * 0.5f, Hud.BossTop, width, 104f);
+            Hud.Surface(card, 0.92f, accent);
+            Hud.Label(new Rect(card.x + 22f, card.y + 12f, 230f, 22f), "BOSS ENCOUNTER", 15f, Hud.Muted, TextAnchor.MiddleLeft, shadow: false);
+            Hud.Label(new Rect(card.xMax - 142f, card.y + 12f, 120f, 22f), status, 16f, accent, TextAnchor.MiddleRight, heavy: true, shadow: false);
+            Hud.FitLabel(new Rect(card.x + 22f, card.y + 35f, width - 44f, 34f), title.ToUpperInvariant(), 27f, Hud.Paper, heavy: true);
+            Hud.Bar(new Rect(card.x + 22f, card.y + 79f, width - 44f, 12f), fraction, accent);
+            return card;
         }
     }
 }
