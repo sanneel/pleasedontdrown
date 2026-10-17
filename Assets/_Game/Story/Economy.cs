@@ -20,6 +20,8 @@ namespace PleaseDontDrown.Story
         [SerializeField] private int _payRevive = 80;
         [SerializeField] private int _payDefib = 150;
         [SerializeField] private int _payHospital = 200;
+        [Tooltip("A drunk knocked out in a bar fight, carried to the infirmary (the hotel thanks you).")]
+        [SerializeField] private int _payDrunkToBed = 20;
         [Tooltip("What the rival company bills the team for every tourist it has to airlift (never more than the team has).")]
         [SerializeField] private int _airliftBill = 30;
         [Tooltip("Rescues on the hotel island (island 2) pay this much more (the hotel pays better).")]
@@ -86,7 +88,7 @@ namespace PleaseDontDrown.Story
                 VictimEvent.SelfRescue => _payRescue / 2,
                 VictimEvent.Revived => _payRevive,
                 VictimEvent.Zapped => _payDefib,
-                VictimEvent.Hospitalized => _payHospital,
+                VictimEvent.Hospitalized => victim.IsKnockedOut ? _payDrunkToBed : _payHospital,
                 _ => 0
             };
             if (pay > 0 && OnHotelIsland(victim.transform.position)) pay = Mathf.RoundToInt(pay * _hotelPayScale);

@@ -328,6 +328,7 @@ namespace PleaseDontDrown.Story
                 bool bothDown = true;
                 foreach (StoryNpc n in _barFighters) if (n != null && !n.IsDefeated) bothDown = false;
                 if (bothDown) break;
+                ToPatients();
                 KnockStools();
                 // Nobody came: they keep at it (a grudge runs out when nobody lands a punch for a while).
                 if (_barFighters[0] != null && _barFighters[1] != null && !_barFighters[0].IsDefeated && !_barFighters[1].IsDefeated &&
@@ -335,6 +336,7 @@ namespace PleaseDontDrown.Story
                     _barFighters[0].ServerBrawlWith(_barFighters[1], 20f, null);
                 yield return new WaitForSeconds(0.3f);
             }
+            ToPatients(0f);
             if (_markerLabel.Value == "Bar fight") NoMarker();
             int broken = _brokenStools.Count;
             bool stopped = StoryNpc.NearestPlayer(BarFront, 12f) != null;
@@ -352,6 +354,35 @@ namespace PleaseDontDrown.Story
             StandStoolsUp(); // the staff tidy up
             _nextBarFight = Time.time + Random.Range(120f, 200f);
             _barFight = null;
+        }
+
+        private readonly Dictionary<StoryNpc, float> _downSince = new();
+
+        /// <summary>
+        /// Host: a fighter knocked out a moment ago becomes a guest lying there to carry to the infirmary's bed (the
+        /// same look and name; story characters can't be picked up, tourists can). Nobody comes: up and off in 2 min.
+        /// </summary>
+        private void ToPatients(float after = 1.5f)
+        {
+            for (int i = 0; i < _barFighters.Count; i++)
+            {
+                StoryNpc n = _barFighters[i];
+                if (n == null || !n.IsDefeated) continue;
+                if (!_downSince.TryGetValue(n, out float since)) _downSince[n] = since = Time.time;
+                if (Time.time - since < after || RescueService.Instance == null) continue;
+                _downSince.Remove(n);
+                var profile = new TouristProfile
+                {
+                    Figure = AvatarLook.Unpack(n.LookPacked).Feminine ? 1 : 0, Look = n.LookPacked, Name = n.Name, BleedSeconds = 60f
+                };
+                VictimBrain v = RescueService.Instance.SpawnVictim(n.transform.position + Vector3.up * 0.3f, n.transform.eulerAngles.y, VictimState.Fine, 0f, 1f, profile);
+                Remove(n);
+                _barFighters[i] = null;
+                if (v == null) continue;
+                v.ServerKnockedOut();
+                StartCoroutine(RemoveLater(v, 120f));
+                Debug.Log($"[Bar] {v.Name} is out cold: carry him to the infirmary");
+            }
         }
 
         private static IEnumerable<Transform> StoolsNearBar()

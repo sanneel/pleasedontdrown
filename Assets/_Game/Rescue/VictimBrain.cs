@@ -129,6 +129,7 @@ namespace PleaseDontDrown.Rescue
         private readonly SyncVar<float> _bleedLeft = new SyncVar<float>(0f, new SyncTypeSettings(0.25f));
         private readonly SyncVar<string> _shouts = new SyncVar<string>();
         private readonly SyncVar<bool> _vip = new SyncVar<bool>();
+        private readonly SyncVar<bool> _knockedOut = new SyncVar<bool>();
         private string[] _shoutLines = System.Array.Empty<string>();
 
         private Item _item;
@@ -178,6 +179,8 @@ namespace PleaseDontDrown.Rescue
         public bool IsVip => _vip.Value;
         /// <summary>Host: the VIP tip has been paid (once per guest).</summary>
         public bool VipTipped { get; set; }
+        /// <summary>Knocked out in a fight on land (a bar brawler): carry them to the infirmary's bed.</summary>
+        public bool IsKnockedOut => _knockedOut.Value;
         public float BleedSecondsLeft => _bleedLeft.Value;
         /// <summary>What they shout in trouble instead of "help!" (empty = the usual).</summary>
         public string[] Shouts => _shoutLines;
@@ -740,11 +743,21 @@ namespace PleaseDontDrown.Rescue
             Debug.Log($"[Victim] {Name} bitten by a shark");
         }
 
+        /// <summary>Host: knocked out in a fight on land (a bar brawler): lying there, to be carried to the infirmary.</summary>
+        [Server]
+        public void ServerKnockedOut()
+        {
+            _knockedOut.Value = true;
+            _ashore.Value = true;
+            _autoState = false;
+            SetState(VictimState.Injured, VictimEvent.InjuredAshore, $"{Name} is out cold after the bar fight. Carry {They} to the infirmary!");
+        }
+
         /// <summary>Host: carried onto a hospital bed. Bleeding stops, they're saved.</summary>
         [Server]
         public void ServerHospitalize(Vector3 position, Quaternion rotation, PlayerHub by)
         {
-            if (!_legLost.Value || _hospitalized) return;
+            if ((!_legLost.Value && !_knockedOut.Value) || _hospitalized) return;
             _hospitalized = true;
             PlayerHub holder = _item.Holder;
             _item.ServerForceDrop();
@@ -752,7 +765,21 @@ namespace PleaseDontDrown.Rescue
             _air.Value = 1f;
             _panic.Value = 0f;
             string who = by != null ? by.DisplayName : holder != null ? holder.DisplayName : "the lifeguards";
+            if (_knockedOut.Value)
+            {
+                // He stays lying on the bed, sleeping it off, and is gone a moment later (getting up on the bed looked broken).
+                _rescued.Value = true;
+                Announce(VictimEvent.Hospitalized, $"{Name} is sleeping it off in the infirmary. Brought in by {who}.", by ?? holder);
+                StartCoroutine(SleepItOff());
+                return;
+            }
             SetState(VictimState.Saved, VictimEvent.Hospitalized, $"{Name} is in the infirmary with {_bleedLeft.Value:F0}s to spare. Brought in by {who}!", by ?? holder);
+        }
+
+        private System.Collections.IEnumerator SleepItOff()
+        {
+            yield return new WaitForSeconds(3f);
+            if (IsSpawned) Despawn(gameObject);
         }
 
         // ------------------------------------------------------------------ announcements (every machine)

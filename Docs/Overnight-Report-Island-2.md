@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 1 | VIP guests and tips | **Done** | `viptest` (or `viptest 3`: 3 m in front) |
 | 2 | Gala money bar | **Done** (host and client checked) | `galamoney 500` |
-| 3 | Bar bouncer job | **Done**, except carrying hurt drunks to the infirmary | `bartest` |
+| 3 | Bar bouncer job | **Done** (also carrying the knocked-out drunks to the infirmary) | `bartest` |
 | 4 | Cushion ride | **Done** | `cushiontest`, `cushiontest lap`, `cushiontest fling` |
 | 5 | Blackjack side quest | **Done** (it already worked; now closes after the robbery) | `bjtest` |
 | 6 | Hotel director in the story | **Done** | `story goto 2.5c` |
@@ -52,8 +52,9 @@ the yacht is at the new marina; sail to Skull Cove.
   the stools (the existing drunk-fight AI). Knock both out: **+$50**, **-$20 for each stool knocked over** (a stool a
   fighter stumbles into tips onto its side on everyone's screen; the staff stand it back up after 20 s).
 - `overlaps` during fights: **0** hands inside bodies (two runs, 614 and 850 frames).
-- **Not done:** carrying the knocked-out drunks to the infirmary. Story characters can't be picked up yet (only
-  tourists can); they lie there, then disappear after 25 s.
+- Knocked-out drunks: 1.5 s after going down each one becomes a guest lying there, "KNOCKED OUT: TO THE INFIRMARY".
+  Carry him to the infirmary bed and press E: he sleeps it off (+$20 from the hotel, x1.5 = $30; checked). Nobody
+  comes: he gets up and goes after 2 minutes.
 
 ### 4. Cushion ride: done
 - The cushion jetty on the west beach (sign "CUSHION RIDE - $40 A GUEST"), the Tripo cushion with **two guests sitting
@@ -98,7 +99,8 @@ the yacht is at the new marina; sail to Skull Cove.
 ### 10. People: partly
 - Done: a bellhop at the door, a waitress walking from the Coral Bar to the pool and back, a pool attendant. They use
   the hotel bar's uniform body (a woman in the teal waistcoat: the only staff body there is), so they have women's names.
-- **Not done:** guests lying on the pool loungers and playing the slots (needs careful pose checks; left for later).
+- **Not done:** guests lying on the pool loungers and playing the slots. I tried the loungers: the guests fell through
+  the lounger to the sand (the loungers have no seat surface to lie on), so I took them out rather than leave it broken.
 
 ## Decisions I made without you (overrule any of them)
 
@@ -136,7 +138,6 @@ Changed: `Story/StoryDirector.cs`, `StoryDirector.Beats.cs`, `StoryDirector.Free
 
 ## Still wrong or not checked
 
-- Carrying knocked-out drunks to the infirmary: not possible yet.
 - Guests on loungers and at the slots, the fountain: not built.
 - The waitress walks a fixed line in front of the hotel; she doesn't carry a tray.
 - The arch's "GRAND CORAL" letters are small from the beach.
