@@ -27,7 +27,7 @@ namespace PleaseDontDrown.Look
             if (camera == null) return;
             UniversalAdditionalCameraData data = camera.GetUniversalAdditionalCameraData();
             data.renderPostProcessing = true;
-            data.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            data.antialiasing = Core.GraphicsQuality.Antialiasing;
             data.antialiasingQuality = AntialiasingQuality.Medium;
         }
 
@@ -39,7 +39,12 @@ namespace PleaseDontDrown.Look
                 _underwater.weight = 0f;
             }
             DynamicGI.UpdateEnvironment(); // sky-lit ambient and reflections from the sky material
+            Core.GraphicsQuality.Changed += Reprepare;
         }
+
+        private void OnDestroy() => Core.GraphicsQuality.Changed -= Reprepare;
+
+        private void Reprepare() => _prepared = null; // the edge smoothing follows the graphics level
 
         private void LateUpdate()
         {
