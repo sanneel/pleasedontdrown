@@ -136,10 +136,12 @@ namespace PleaseDontDrown.Fun
             // The players' side of the felt, looking at the dealer's edge.
             Vector3 side = _felt.right;
             side.y = 0f;
-            Vector3 stand = _felt.position + side.normalized * 1.45f;
-            // On the casino floor under that spot (the felt is about a metre up).
-            if (Physics.Raycast(stand + Vector3.up * 0.3f, Vector3.down, out RaycastHit floor, 3f, ~0, QueryTriggerInteraction.Ignore))
-                stand = floor.point + Vector3.up * 0.05f;
+            Vector3 stand = _felt.position + side.normalized * 2.1f; // behind the players' chairs
+            // On the casino floor under that spot (the felt is about a metre up): the lowest thing hit, not a chair.
+            float lowest = float.PositiveInfinity;
+            foreach (RaycastHit hit in Physics.RaycastAll(stand + Vector3.up * 0.3f, Vector3.down, 3f, ~0, QueryTriggerInteraction.Ignore))
+                lowest = Mathf.Min(lowest, hit.point.y);
+            if (!float.IsPositiveInfinity(lowest)) stand.y = lowest + 0.05f;
             me.Motor.Teleport(stand);
             me.Look.LookAt(_felt.position + side.normalized * 0.45f);
             yield return new WaitForSeconds(1f);

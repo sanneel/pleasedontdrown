@@ -115,7 +115,7 @@ namespace PleaseDontDrown.Editor
             // From the sand (deck top level with it) 32 m out to sea.
             float start = shore - 7f;
             while (GroundUnder(new Vector3(MarinaX, 0f, start)) > 0.45f && start < shore) start += 0.5f;
-            const float length = 32f, width = 2.6f, deckTop = 0.5f;
+            const float length = 40f, width = 2.6f, deckTop = 0.5f;
             Material planks = GetMaterial("MarinaDeck", new Color(0.62f, 0.47f, 0.32f), smoothness: 0.2f);
             Material posts = GetMaterial("MarinaPost", new Color(0.36f, 0.26f, 0.18f), smoothness: 0.15f);
             Material rope = GetMaterial("MarinaRope", new Color(0.9f, 0.85f, 0.7f));
@@ -132,13 +132,23 @@ namespace PleaseDontDrown.Editor
             // Mooring cleats along the yacht's side.
             for (int i = 0; i < 3; i++)
                 Primitive(PrimitiveType.Cube, "Cleat", root, new Vector3(MarinaX + width * 0.5f - 0.2f, deckTop + 0.06f, start + 10f + i * 8f), new Vector3(0.12f, 0.12f, 0.4f), rope, keepCollider: false);
-            (float yachtDeck, float aftZ) = BuildYacht(root, new Vector3(MarinaX + width * 0.5f, 0f, start + length - 13f));
-            // A gangway from the pier up onto the yacht's aft deck (it rides higher than the pier).
-            float rise = yachtDeck - deckTop, run = 1.9f;
-            GameObject gangway = Primitive(PrimitiveType.Cube, "Gangway", root, new Vector3(MarinaX + width * 0.5f + run * 0.5f - 0.3f, deckTop + rise * 0.5f - 0.04f, aftZ),
-                new Vector3(Mathf.Sqrt(run * run + rise * rise), 0.08f, 1.1f), planks);
-            gangway.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(rise, run) * Mathf.Rad2Deg);
-            Debug.Log($"[Island2Finish] marina: waterline z {shore:F1}, pier z {start:F1}..{start + length:F1} at x {MarinaX}");
+            (float yachtDeck, float aftZ) = BuildYacht(root, new Vector3(MarinaX + width * 0.5f, 0f, start + length - 7f));
+            // Boarding: a platform at the yacht's deck height reaching just over the pier's edge (the hull's box starts
+            // past it, so the yacht never rests on it), two steps up from the pier.
+            float rise = yachtDeck - deckTop;
+            var platformTop = yachtDeck - 0.04f;
+            GameObject platform = Primitive(PrimitiveType.Cube, "BoardingPlatform", root, new Vector3(MarinaX + width * 0.5f - 0.45f, platformTop - 0.15f, aftZ),
+                new Vector3(1.5f, 0.3f, 1.6f), planks);
+            TagSurface(platform, SurfaceKind.Wood);
+            for (int s = 1; s <= 2; s++)
+            {
+                float top = deckTop + rise * s / 3f;
+                Primitive(PrimitiveType.Cube, "BoardingStep", root, new Vector3(MarinaX + width * 0.5f - 0.45f, (top + deckTop - 0.3f) * 0.5f, aftZ - 0.8f - (3 - s) * 0.45f),
+                    new Vector3(1.5f, top - deckTop + 0.3f, 0.45f), planks);
+            }
+            Primitive(PrimitiveType.Cube, "PlatformBase", root, new Vector3(MarinaX + width * 0.5f - 0.6f, (platformTop - 0.3f + deckTop - 0.3f) * 0.5f, aftZ),
+                new Vector3(1.2f, platformTop - deckTop, 1.6f), posts, keepCollider: false);
+            Debug.Log($"[Island2Finish] marina: waterline z {shore:F1}, pier z {start:F1}..{start + length:F1} at x {MarinaX}, yacht deck {yachtDeck:F2}, boarding at z {aftZ:F1}, seabed under the yacht {GroundUnder(new Vector3(MarinaX + 4f, 0f, start + length - 7f)):F2}");
         }
 
         /// <summary>The hotel's yacht (the Tripo motor cruiser, 10 m long) against the pier's east side at <paramref name="pierEdge"/>.</summary>
@@ -223,14 +233,14 @@ namespace PleaseDontDrown.Editor
             // Floats with about 0.9 m under water (the teal stripe at the waterline), of the model's whole height.
             float density = Mathf.Clamp(0.9f / Mathf.Max(1f, b.size.y), 0.08f, 0.4f);
             Vehicle yacht = FinishVehicle(root, "Yacht", "", seat, gripL, gripR, thrust, hull, density, thrustForce: 7f, maxSpeed: 13f, turnRate: 0.7f);
-            root.transform.SetPositionAndRotation(new Vector3(pierEdge.x + beam * 0.5f + 0.6f, WaterLevel - 0.9f, pierEdge.z), Quaternion.identity);
+            root.transform.SetPositionAndRotation(new Vector3(pierEdge.x + beam * 0.5f + 0.1f, WaterLevel - 0.9f, pierEdge.z), Quaternion.identity);
             Debug.Log($"[Island2Finish] yacht: {length:F1} x {beam:F1} x {b.size.y:F1} m, deck {deck:F2}, cabin z {cabinZ0:F1}..{cabinZ1:F1} roof {roof:F2}, density {density:F2}, at {root.transform.position}");
             _ = yacht;
             return (root.transform.position.y + deck, root.transform.TransformPoint(new Vector3(0f, 0f, helmZ - 0.4f)).z);
         }
 
         /// <summary>How far the yacht model is turned to point its bow along +z (its length is along its x as imported).</summary>
-        private const float YachtModelYaw = -90f;
+        private const float YachtModelYaw = 90f;
 
         // ------------------------------------------------------------------ the cushion jetty and its course (task 4)
 

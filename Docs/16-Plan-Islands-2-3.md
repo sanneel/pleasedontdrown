@@ -159,9 +159,16 @@ Measured (headless tests, 2026-10-11): fists vs a still player ~90% land, vs a p
   crag falls, up a ramp, along a tunnel to a hall in the heart of the crags (a mound of gold, bars, chests, sacks and
   the casino's chips): chapter 3 complete. `GameSceneBuilder.Island3Vault`. The south sea cave is now just a cave.
   Places: `Island3/Story/...` (GameSceneBuilder.Island3Story).
-- Still open: the gala bar, VIP tips, bouncer, cushion ride, blackjack (island 2); suppressors cost 150 in the gun
-  prefabs (plan says 250); the yacht (the pirate boat stands in); pirates walking the village; the gala itself (its
-  Tripo props are ready, see below); the director as a story character; Shako's playtest verdicts.
+- **Island 2 finished (2026-10-17, see `Docs/Overnight-Report-Island-2.md`):** VIP guests (gold hat, $100-300 tip,
+  rescues x1.5 on island 2), beat **2.5c the gala fund** (the director Mr. Castellane in the lobby, the plain gala bar
+  top left, beach shift, bar fights $50 / -$20 a knocked-over stool, the cushion ride $40 a guest), **2.6 gala night**
+  (island 2 at night, red carpet, ropes, string lights, champagne tower, chandeliers, guests; the pirates rob the casino
+  and their boat escapes with the money; the casino closes), **2.7** the director gives the keys of the hotel's yacht
+  (Tripo, at the new marina pier east of the beach). Palms, flower beds, pool hedges, lamp posts, signposts, the GRAND
+  CORAL arch. Scene: `GameSceneBuilder.Island2FinishBatch` (re-runnable). Tests: `viptest`, `galamoney`, `bartest`,
+  `galatest`, `cushiontest [fling|lap]`, `bjtest`.
+- Still open: suppressors cost 150 in the gun prefabs (plan says 250); pirates walking the village; guests on the
+  pool loungers and at the slots; Shako's playtest verdicts.
 
 ## On another PC (after `git pull` of `shako-dev`)
 `git lfs pull` (the models and textures are in LFS), open the project in Unity 6000.3.25f1 and let it import. Nothing
@@ -213,6 +220,5 @@ Not in the game:
   Blender from the GLBs if needed). Prompts: `.claude/skills/pdd-tripo/prompts/pirates.md`, `island3.md`.
 
 ## Known issues
-- The story gets stuck at beat 2.1 ("Go to the hotel reception") in the autoplay test, on plain `main` too
-  (01c9421): not caused by `shako-dev`. Probably the hotel lobby move.
+- (Fixed by 2026-10-17: the autoplay test plays 2.1 to 2.7 through; it used to stick at 2.1.)
 - `Tools/test-story.ps1` failed in folders with spaces (log paths unquoted): fixed on `shako-dev`.

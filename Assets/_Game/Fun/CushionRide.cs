@@ -183,7 +183,7 @@ namespace PleaseDontDrown.Fun
                     }
                 return;
             }
-            if (tug.Driver == null) { if (_unmannedSince < 0f) _unmannedSince = Time.time; }
+            if (tug.Driver == null && !tug.OnAutopilot) { if (_unmannedSince < 0f) _unmannedSince = Time.time; }
             else _unmannedSince = -1f;
             if ((_unmannedSince > 0f && Time.time - _unmannedSince > 6f) || (TailOf(tug) - _nose.position).sqrMagnitude > 30f * 30f)
             {
@@ -309,8 +309,8 @@ namespace PleaseDontDrown.Fun
         public override void OnStartClient()
         {
             base.OnStartClient();
-            DevCommands.Register("cushiontest", "[fling]", "Put yourself on a jet ski hitched to the cushion with two guests aboard (fling: throw them off now).", args =>
-                TestServer(args.Length > 0 && args[0] == "fling"), cheat: true, owner: this);
+            DevCommands.Register("cushiontest", "[fling|lap]", "Put yourself on a jet ski hitched to the cushion with two guests aboard (fling: throw them off now; lap: the jet ski drives a lap round the buoys).", args =>
+                TestServer(args.Length > 0 && args[0] == "fling", args.Length > 0 && args[0] == "lap"), cheat: true, owner: this);
         }
 
         public override void OnStopClient()
@@ -320,12 +320,17 @@ namespace PleaseDontDrown.Fun
         }
 
         [ServerRpc(RequireOwnership = false)]
-        private void TestServer(bool fling, FishNet.Connection.NetworkConnection caller = null)
+        private void TestServer(bool fling, bool lap, FishNet.Connection.NetworkConnection caller = null)
         {
             if (!DevCommands.CheatsAllowed) return;
             if (fling)
             {
                 ServerFling("cushiontest fling");
+                return;
+            }
+            if (lap)
+            {
+                if (Tug != null) StartCoroutine(TestLap(Tug));
                 return;
             }
             if (RidersAboard < _riderSpots.Length) ServerFillUp();
@@ -341,6 +346,25 @@ namespace PleaseDontDrown.Fun
             foreach (PlayerHub h in PlayerHub.All) if (h.Owner == caller) by = h;
             if (by != null) MountTarget(caller, ski.NetworkObject);
             Debug.Log($"[Cushion] cushiontest: {ski.name} placed at {at:F1} for {by?.DisplayName}");
+        }
+
+        /// <summary>Host ('cushiontest lap'): the jet ski steers itself round the buoys and back past the first, gently.</summary>
+        private System.Collections.IEnumerator TestLap(Vehicle tug)
+        {
+            for (int i = 0; i <= _buoys.Length; i++)
+            {
+                Transform buoy = _buoys[i % _buoys.Length];
+                // Just outside each buoy, on the far side from the island's middle (a wide, smooth loop).
+                Vector3 centre = Vector3.zero;
+                foreach (Transform b in _buoys) centre += b.position / _buoys.Length;
+                Vector3 target = buoy.position + (buoy.position - centre).normalized * 6f;
+                tug.ServerAutopilot(target, 9f);
+                float started = Time.time;
+                while (Time.time - started < 40f && (new Vector2(tug.transform.position.x - target.x, tug.transform.position.z - target.z)).sqrMagnitude > 8f * 8f)
+                    yield return new WaitForSeconds(0.2f);
+                Debug.Log($"[Cushion] lap test: at buoy {i % _buoys.Length} after {Time.time - started:F0}s, guests aboard {RidersAboard}");
+            }
+            tug.ServerAutopilot(null);
         }
 
         [TargetRpc]
