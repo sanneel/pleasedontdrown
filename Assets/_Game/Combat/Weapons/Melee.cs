@@ -269,6 +269,6 @@ namespace PleaseDontDrown.Combat
         }
 
         private static Transform ViewOf(PlayerHub holder) =>
-            holder.Look != null && holder.Look.Camera != null ? holder.Look.Camera.transform : holder.Head;
+            holder.Look != null && holder.Look.Aim != null ? holder.Look.Aim : holder.Head;
     }
 }

@@ -627,7 +627,7 @@ namespace PleaseDontDrown.Vehicles
         {
             left = right = default;
             if (_gripLeft == null || _gripRight == null) return false;
-            HandPose pose = _restHands || _chair ? HandPose.Flat : HandPose.LooseFist; // (a chair's "grips": hands resting flat on the bar)
+            HandPose pose = _restHands || _chair ? HandPose.Flat : HandPose.Fist; // (loose, the fingers fanned out over the bars) // (a chair's "grips": hands resting flat on the bar)
             left = new HandGrip(_gripLeft.position, _gripLeft.forward, -_gripLeft.up, pose);
             right = new HandGrip(_gripRight.position, _gripRight.forward, -_gripRight.up, pose);
             return true;

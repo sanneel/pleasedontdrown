@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Globalization;
 using System.IO;
 using PleaseDontDrown.Avatars;
@@ -25,6 +26,8 @@ namespace PleaseDontDrown.Editor
                 string[] args = Environment.GetCommandLineArgs();
                 int i = Array.IndexOf(args, "-shots");
                 string file = i >= 0 && i + 1 < args.Length ? args[i + 1] : "Screenshots/shots.txt";
+                int tuck = Array.IndexOf(args, "-thumbtuck"); // (trying out how far a closing hand swings the thumb in)
+                if (tuck >= 0 && tuck + 1 < args.Length) AvatarRig.ThumbTuckDegrees = float.Parse(args[tuck + 1], CultureInfo.InvariantCulture);
                 Capture(File.ReadAllLines(file));
                 Debug.Log("[Review] captures complete");
             }
@@ -51,6 +54,36 @@ namespace PleaseDontDrown.Editor
                 if (p[0] == "avatar")
                 {
                     SpawnAvatar(p);
+                    continue;
+                }
+                if (p[0] == "fists") { AvatarAnimator.DebugFists = p.Length < 2 || p[1] != "0"; continue; }
+                if (p[0] == "handcam")
+                {
+                    // handcam <shot> <left|right> dx dy dz fov: the last posed avatar's hand, from a point in that hand's
+                    // own frame (x back of the hand, y up the arm, z the thumb's side), looking at the middle of the hand.
+                    GameObject last = Spawned.LastOrDefault(g => g != null && g.GetComponent<AvatarRig>() != null);
+                    if (last == null) { Debug.LogWarning("[Review] handcam: nobody posed"); continue; }
+                    var handRig = last.GetComponent<AvatarRig>();
+                    Transform hb = handRig[p[2] == "left" ? AvatarRig.Bone.HandL : AvatarRig.Bone.HandR];
+                    Vector3 middle = hb.TransformPoint(new Vector3(0f, -0.07f, 0f));
+                    camera.transform.position = hb.TransformPoint(new Vector3(F(3), F(4), F(5)));
+                    camera.transform.LookAt(middle, hb.up);
+                    camera.fieldOfView = F(6);
+                    Render(camera, p[1]);
+                    continue;
+                }
+                if (p[0] == "nearm")
+                {
+                    // nearm <object name> <shot> dx dy dz tx ty tz fov: as near, but in metres (its turn, not its scale:
+                    // a small stool's own frame shrank the offsets into the seat).
+                    GameObject anchor = GameObject.Find(p[1]);
+                    if (anchor == null) { Debug.LogWarning($"[Review] no object '{p[1]}'"); continue; }
+                    Transform a = anchor.transform;
+                    Quaternion yawOnly = Quaternion.Euler(0f, a.eulerAngles.y, 0f);
+                    camera.transform.position = a.position + yawOnly * new Vector3(F(3), F(4), F(5));
+                    camera.transform.LookAt(a.position + yawOnly * new Vector3(F(6), F(7), F(8)));
+                    camera.fieldOfView = F(9);
+                    Render(camera, p[2]);
                     continue;
                 }
                 if (p[0] == "near")
@@ -351,6 +384,20 @@ namespace PleaseDontDrown.Editor
                     m.GripLeft = new HandGrip(wl.position, wl.forward, -wl.up, HandPose.Fist);
                     m.GripRight = new HandGrip(wr.position, wr.forward, -wr.up, HandPose.Fist);
                 }
+                else if (seatVehicle != null)
+                {
+                    // A driver's seat, exactly as PlayerAvatar sets it: chair or astride, and the hands on the
+                    // handlebars (Vehicle.GetHandlebars).
+                    m.ChairSeat = seatVehicle.IsChair || seatVehicle.IsLand;
+                    m.Straddle = seatVehicle.Straddle;
+                    m.FloatSeat = seatVehicle.RestHands;
+                    if (seatVehicle.GetHandlebars(out HandGrip bl, out HandGrip br))
+                    {
+                        m.Holding = m.TwoHanded = true;
+                        m.GripLeft = bl;
+                        m.GripRight = br;
+                    }
+                }
                 pose = "ride";
             }
             if (pose.StartsWith("cpr:"))
@@ -377,6 +424,25 @@ namespace PleaseDontDrown.Editor
                     m.Holding = true; m.TwoHanded = true;
                     m.GripLeft = new HandGrip(chest + forward * 0.5f - go.transform.right * 0.3f, forward, go.transform.right, HandPose.BoxGrip);
                     m.GripRight = new HandGrip(chest + forward * 0.5f + go.transform.right * 0.3f, forward, -go.transform.right, HandPose.BoxGrip);
+                    break;
+                case "hand:flat": case "hand:relaxed": case "hand:cup": case "hand:box": case "hand:loose":
+                {
+                    // Both hands held out in front, palms facing in, in one finger pose (checking how the fingers bend).
+                    HandPose shape = pose switch
+                    {
+                        "hand:flat" => HandPose.Flat, "hand:relaxed" => HandPose.Relaxed, "hand:cup" => HandPose.Cup,
+                        "hand:box" => HandPose.BoxGrip, _ => HandPose.LooseFist
+                    };
+                    m.Holding = true; m.TwoHanded = true;
+                    m.GripLeft = new HandGrip(chest + forward * 0.35f - go.transform.right * 0.12f, forward, go.transform.right, shape);
+                    m.GripRight = new HandGrip(chest + forward * 0.35f + go.transform.right * 0.12f, forward, -go.transform.right, shape);
+                    break;
+                }
+                case "fist":
+                    // Fists up in front of the chest (a boxer's guard): the closed hand, for checking the finger curl.
+                    m.Holding = true; m.TwoHanded = true;
+                    m.GripLeft = new HandGrip(chest + forward * 0.35f - go.transform.right * 0.12f, forward, go.transform.right, HandPose.Fist);
+                    m.GripRight = new HandGrip(chest + forward * 0.35f + go.transform.right * 0.12f, forward, -go.transform.right, HandPose.Fist);
                     break;
                 case "carry":
                 case "carrypair":
@@ -424,6 +490,12 @@ namespace PleaseDontDrown.Editor
                 animator.Tick(1f / 30f);
             }
             if (m.ChairSeat) LogSeatGap(go, rig, m.SeatEdge);
+            if (m.Holding)
+            {
+                // How far each palm is from its grip (a hand that can't reach floats in the air short of it).
+                Vector3 pl = rig[AvatarRig.Bone.HandL].TransformPoint(rig.LeftHand.PalmContact), pr = rig[AvatarRig.Bone.HandR].TransformPoint(rig.RightHand.PalmContact);
+                Debug.Log($"[Review] avatar {p[1]} {pose}: palms {(m.GripLeft.Active ? Vector3.Distance(pl, m.GripLeft.Point) * 100f : -1f):0.0} / {(m.GripRight.Active ? Vector3.Distance(pr, m.GripRight.Point) * 100f : -1f):0.0} cm from their grips");
+            }
             // "bottle" / "drink": a beer in the right hand as someone else sees it (BottleHold's remote offset from the
             // eyes, shrunk like PlayerHands does), or tipped up at the lips (PlayerHands' drinking), the hand on its grip.
             if (pose.StartsWith("bottle") || pose.StartsWith("drink"))

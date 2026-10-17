@@ -221,6 +221,11 @@ namespace PleaseDontDrown.Combat
         [ObserversRpc]
         private void UpObservers()
         {
+            // Whoever was pressing on our chest stands up with us, instead of staying knelt where we lay.
+            foreach (PlayerHub p in PlayerHub.All)
+                if (p != null && p != _hub && p.Avatar != null && p.Avatar.CprNear(ChestPoint, 2.5f)) p.Avatar.EndCpr();
+            // Getting up takes a moment (sit up, feet in, up from a crouch): no running off out of the lying pose.
+            if (IsOwner && _hub.Motor != null) _hub.Motor.Stun(0.9f);
             Vector3 head = _hub.Head != null ? _hub.Head.position : transform.position + Vector3.up * 1.6f;
             FloatingText.Spawn(head + Vector3.up * 0.4f, "BACK UP!", new Color(0.55f, 1f, 0.6f), 1f, 1.4f);
         }

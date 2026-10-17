@@ -130,6 +130,8 @@ namespace PleaseDontDrown.Avatars
                 if (part != null) { part.SetActive(false); Kill(part); }
             _parts.Clear();
             _eyes.Clear();
+            _glasses.Clear();
+            _glassesHead = null;
             if (_rig != null && _rig.IsBuilt) _rig[AvatarRig.Bone.Head].localScale = Vector3.one;
             _headScale = 1f;
         }
@@ -151,6 +153,33 @@ namespace PleaseDontDrown.Avatars
         /// <summary>How far the puckered lips reach out of the mouth (head space).</summary>
         private const float PuckerReach = 0.07f;
         private Transform _pucker;
+        private readonly List<Transform> _glasses = new();
+        private Transform _glassesHead;
+
+        /// <summary>
+        /// Glasses tipped up onto the forehead for a kiss of life (left on, the lenses went into the face of the
+        /// tourist being given a breath), and back down after.
+        /// </summary>
+        private void PushUpGlasses(Transform head, float up)
+        {
+            if (head == null) return;
+            if (_glassesHead != head || _glasses.Exists(g => g == null))
+            {
+                _glassesHead = head;
+                _glasses.Clear();
+                foreach (Transform child in head)
+                    if (child.name.StartsWith("Blender glasses_")) _glasses.Add(child);
+            }
+            foreach (Transform g in _glasses)
+            {
+                // Turned about the temples (the arms' hinge, 12 cm behind the lenses at their height), lenses up.
+                Bounds b = g.TryGetComponent(out MeshFilter filter) && filter.sharedMesh != null ? filter.sharedMesh.bounds : default;
+                var pivot = new Vector3(0f, b.center.y, b.max.z - 0.12f);
+                Quaternion turn = Quaternion.Euler(-55f * up, 0f, 0f);
+                g.localRotation = turn;
+                g.localPosition = pivot - turn * pivot + new Vector3(0f, 0.015f * up, 0f);
+            }
+        }
         private AvatarAnimator _animator;
 
         /// <summary>
@@ -191,6 +220,7 @@ namespace PleaseDontDrown.Avatars
             float k = _animator != null ? _animator.Kissing : 0f;
             Transform head = _rig[AvatarRig.Bone.Head], mouth = _rig[AvatarRig.Bone.Mouth];
             _pucker.localScale = Vector3.one * Mathf.SmoothStep(0f, 1f, k);
+            PushUpGlasses(head, Mathf.SmoothStep(0f, 1f, k));
             if (k <= 0f || mouth == null) return;
             _pucker.localPosition = head.InverseTransformPoint(mouth.position);
             _pucker.localRotation = Quaternion.identity; // straight out of the face

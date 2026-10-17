@@ -328,8 +328,8 @@ namespace PleaseDontDrown.Avatars
             if (generated != null && generated.HasFingers)
             {
                 // The finger bones run down the model's own fingers (measured when it was baked, in metres).
-                LeftHand = new HandBones(_bones[(int)Bone.HandL], -1f, 1f, leftFingers, FingerShape(generated.FingerBasesL, generated.FingerLengthsL));
-                RightHand = new HandBones(_bones[(int)Bone.HandR], 1f, 1f, rightFingers, FingerShape(generated.FingerBasesR, generated.FingerLengthsR));
+                LeftHand = new HandBones(_bones[(int)Bone.HandL], -1f, 1f, leftFingers, FingerShape(generated.FingerBasesL, generated.FingerLengthsL, generated.FingerDirsL));
+                RightHand = new HandBones(_bones[(int)Bone.HandR], 1f, 1f, rightFingers, FingerShape(generated.FingerBasesR, generated.FingerLengthsR, generated.FingerDirsR));
             }
             else
             {
@@ -341,10 +341,17 @@ namespace PleaseDontDrown.Avatars
             ResetPose();
         }
 
-        private static HandBones.Shape FingerShape(Vector3[] bases, float[] lengths)
+        /// <summary>How far a closing hand swings a model's thumb in toward the fingers (degrees at a full curl).</summary>
+        public static float ThumbTuckDegrees = 50f;
+
+        private static HandBones.Shape FingerShape(Vector3[] bases, float[] lengths, Vector3[] directions)
         {
-            var shape = new HandBones.Shape { Bases = bases, Lengths = lengths, ThumbTuck = 0f };
-            for (int f = 0; f < HandBones.Fingers; f++) shape.Directions[f] = Vector3.down;
+            // (A measured, skinned thumb swings in across the fingers as the hand closes; an unmeasured one is not on its bones.)
+            bool measured = directions != null && directions.Length == HandBones.Fingers;
+            var shape = new HandBones.Shape { Bases = bases, Lengths = lengths, ThumbTuck = measured ? ThumbTuckDegrees : 0f };
+            // (Bodies baked before finger directions were measured: straight down, as they were bound.)
+            for (int f = 0; f < HandBones.Fingers; f++)
+                shape.Directions[f] = directions != null && directions.Length == HandBones.Fingers && directions[f].sqrMagnitude > 0.5f ? directions[f] : Vector3.down;
             shape.Palm = new Vector3(-0.02f, bases[2].y * 0.6f, 0f);
             return shape;
         }

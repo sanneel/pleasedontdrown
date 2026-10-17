@@ -198,13 +198,16 @@ namespace PleaseDontDrown.Editor
             public bool Fingers;
             public readonly Vector3[] Bases = new Vector3[HandBones.Fingers];   // hand space
             public readonly float[] Lengths = new float[HandBones.BoneCount];
+            public readonly Vector3[] Directions = Enumerable.Repeat(Vector3.down, HandBones.Fingers).ToArray(); // hand space, unit
             public float Knuckles;      // from the wrist down the hand to the knuckle line
             public float Reach;         // ... to the fingertips
             public float ThumbEdge;     // z of the index finger's outer edge (the thumb lies beyond it)
             public float Width;         // across the four fingers
+            public bool Thumb;          // the model's thumb is skinned to the thumb bones (measured: base, direction, lengths)
 
             /// <summary>As AvatarBody keeps them: laid out as a right hand (HandBones mirrors the left one back).</summary>
             public Vector3[] StoredBases(float side) => Bases.Select(b => new Vector3(b.x * side, b.y, b.z)).ToArray();
+            public Vector3[] StoredDirections(float side) => Directions.Select(d => new Vector3(d.x * side, d.y, d.z)).ToArray();
         }
 
         private static int Dominant(BoneWeight w)
@@ -303,6 +306,7 @@ namespace PleaseDontDrown.Editor
             // The four fingers, in the hand's own frame.
             Quaternion toHand = Quaternion.Inverse(fit.Rotation);
             List<Vector3> local = hand.Select(v => toHand * v).ToList();
+            if (Environment.GetCommandLineArgs().Contains("-pdd-dump-hands")) File.WriteAllLines($"Logs/hand_{file}_{which}.csv", local.Select(q => $"{q.x:0.0000},{q.y:0.0000},{q.z:0.0000}"));
             List<float> z = local.Where(q => -q.y > 0.7f * reach && -q.y < 0.95f * reach).Select(q => q.z).OrderBy(a => a).ToList();
             if (z.Count < 8) return fit;
             float zLo = Percentile(z, 0.03f), zHi = Percentile(z, 0.97f), width = zHi - zLo;
@@ -326,7 +330,38 @@ namespace PleaseDontDrown.Editor
                 for (int seg = 0; seg < HandBones.Segments; seg++)
                     fit.Lengths[HandBones.BoneIndex(f, seg)] = fingerLength * share[seg];
             }
+            // Cartoon hands fan their fingers out (the goofy lifeguard's are 17 cm across at the tips): a bone run
+            // straight down the hand curls such a finger sideways about its own length instead of into the palm, a
+            // claw instead of a fist. Each finger's bones run down that finger: from its knuckle to the middle of its
+            // tip (the tips split into four bands across the hand), the knuckles spread over the knuckle row.
+            List<Vector3> knuckleRow = local.Where(q => -q.y > 0.45f * reach && -q.y < 0.58f * reach && q.z < zHi + 0.12f * width).ToList();
+            List<Vector3> tips = local.Where(q => -q.y > 0.78f * reach && -q.y < 0.97f * reach && q.z >= zLo && q.z <= zHi).ToList();
+            if (knuckleRow.Count >= 8 && tips.Count >= 16)
+            {
+                List<float> kz = knuckleRow.Select(q => q.z).OrderBy(a => a).ToList();
+                float kLo = Percentile(kz, 0.05f), kHi = Mathf.Min(zHi, Percentile(kz, 0.95f)), kWidth = Mathf.Max(0.5f * width, kHi - kLo);
+                for (int f = 1; f < HandBones.Fingers; f++)
+                {
+                    float bandHi = zHi - (f - 1) * width / 4f, bandLo = bandHi - width / 4f;
+                    List<Vector3> band = tips.Where(q => q.z >= bandLo && q.z <= bandHi).ToList();
+                    if (band.Count < 4) continue;
+                    var basePoint = new Vector3(xMid, -fit.Knuckles, kHi - (f - 0.5f) * kWidth / 4f);
+                    var tip = new Vector3(xMid, band.Average(q => q.y), band.Average(q => q.z));
+                    Vector3 dir = tip - basePoint;
+                    if (dir.y > -0.01f) continue;
+                    fit.Bases[f] = basePoint;
+                    fit.Directions[f] = dir.normalized;
+                    float length = dir.magnitude * 1.08f; // on to the very end, past the tips' middle
+                    for (int seg = 0; seg < HandBones.Segments; seg++)
+                        fit.Lengths[HandBones.BoneIndex(f, seg)] = length * share[seg];
+                }
+            }
+            // The digits themselves, when they stand apart: the far half of the hand split where there are gaps across
+            // it. A cartoon hand with three fingers and a thumb (the goofy lifeguard's) had its thumb read as the index
+            // finger and fitted as one; a fist then left it sticking up (a thumbs-up) and bent the rest sideways.
+            FitDigits(fit, local, reach, file, which);
             fit.Fingers = true;
+            Debug.Log($"[Build] body {file}: {which} fingers fan {string.Join(" ", fit.Directions.Skip(1).Select(d => (Mathf.Atan2(d.z, -d.y) * Mathf.Rad2Deg).ToString("0")))} degrees off straight");
             Debug.Log($"[Build] body {file}: {which} hand {reach:0.000} m long, fingers {width:0.000} m across, " +
                       $"palm faces {fit.Rotation * new Vector3(-side, 0f, 0f):0.0}, thumb {thumb:0.0} (stuck out {Mathf.Max(over, under):0.000} m)");
             return fit;
@@ -338,45 +373,75 @@ namespace PleaseDontDrown.Editor
         /// </summary>
         private static void SkinFingers(HandFit fit, Vector3[] vertices, BoneWeight[] weights, Matrix4x4[] bind, int handBone, int firstFinger, float side)
         {
+            SkinFingersInner(fit, vertices, weights, bind, handBone, firstFinger, side);
+            if (!Environment.GetCommandLineArgs().Contains("-pdd-dump-hands")) return;
+            Matrix4x4 inv = bind[handBone].inverse;
+            var lines = new List<string>();
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                int bone = Dominant(weights[i]);
+                if (bone != handBone && (bone < firstFinger || bone >= firstFinger + HandBones.BoneCount)) continue;
+                Vector3 q = inv.MultiplyPoint3x4(vertices[i]);
+                lines.Add($"{q.x:0.0000},{q.y:0.0000},{q.z:0.0000},{(bone == handBone ? -1 : bone - firstFinger)}");
+            }
+            File.WriteAllLines($"Logs/skin_{(side < 0f ? "left" : "right")}.csv", lines);
+        }
+
+        private static void SkinFingersInner(HandFit fit, Vector3[] vertices, BoneWeight[] weights, Matrix4x4[] bind, int handBone, int firstFinger, float side)
+        {
             Matrix4x4 handBind = bind[handBone];
             for (int f = 0; f < HandBones.Fingers; f++)
             {
-                Vector3 at = fit.Bases[f];
+                // As HandBones builds them: the first bone at the knuckle turned down the finger, the next ones on
+                // down its -Y.
+                Matrix4x4 at = handBind * Matrix4x4.TRS(fit.Bases[f], Quaternion.FromToRotation(Vector3.down, fit.Directions[f]), Vector3.one);
                 for (int seg = 0; seg < HandBones.Segments; seg++)
                 {
                     int i = HandBones.BoneIndex(f, seg);
-                    bind[firstFinger + i] = handBind * Matrix4x4.Translate(at);
-                    at += new Vector3(0f, -fit.Lengths[i], 0f);
+                    bind[firstFinger + i] = at;
+                    at *= Matrix4x4.Translate(new Vector3(0f, -fit.Lengths[i], 0f));
                 }
             }
 
             Matrix4x4 toHand = handBind.inverse;
             float fingerLength = fit.Reach - fit.Knuckles, blend = 0.18f * fingerLength;
-            float len0 = fit.Lengths[HandBones.BoneIndex(1, 0)], len1 = fit.Lengths[HandBones.BoneIndex(1, 1)];
             var parts = new List<(int bone, float weight)>(8);
             for (int i = 0; i < vertices.Length; i++)
             {
                 if (Dominant(weights[i]) != handBone) continue;
                 Vector3 q = toHand.MultiplyPoint3x4(vertices[i]);
-                float t = -q.y - fit.Knuckles;
-                if (t < -blend) continue;
-                if (q.z > fit.ThumbEdge + 0.12f * fit.Width && -q.y < 0.8f * fit.Reach) continue; // the thumb
-                float a0 = Smooth((t + blend) / (2f * blend));
-                float a1 = Smooth((t - len0 + blend) / (2f * blend));
-                float a2 = Smooth((t - len0 - len1 + blend) / (2f * blend));
-                float u = Mathf.Clamp((fit.ThumbEdge - q.z) / fit.Width * 4f - 0.5f, 0f, 3f);
+                if (fit.Thumb ? OnThumb(fit, q) : q.z > fit.ThumbEdge + 0.12f * fit.Width && -q.y < 0.8f * fit.Reach)
+                {
+                    // The thumb: along its own bones from where it leaves the palm (or left on the hand, unmeasured).
+                    if (fit.Thumb) weights[i] = ThumbWeight(fit, q, handBone, firstFinger);
+                    continue;
+                }
+                // Across the hand: where between the four finger lines (index 0 .. pinky 3), each line from its
+                // knuckle down its own finger.
+                float u = FingerAcross(fit, q);
                 int near = Mathf.Min(2, Mathf.FloorToInt(u));
                 float next = Smooth(u - near);
+                // Along the finger (from its own knuckle): before the knuckles it stays on the hand.
+                float tNear = Vector3.Dot(q - fit.Bases[near + 1], fit.Directions[near + 1]);
+                float tNext = Vector3.Dot(q - fit.Bases[near + 2], fit.Directions[near + 2]);
+                if (Mathf.Lerp(tNear, tNext, next) < -blend) continue;
                 parts.Clear();
-                parts.Add((handBone, 1f - a0));
+                float handShare = 0f;
                 for (int k = 0; k < 2; k++)
                 {
                     int finger = near + 1 + k;
                     float fw = k == 0 ? 1f - next : next;
+                    float t = k == 0 ? tNear : tNext;
+                    float f0 = fit.Lengths[HandBones.BoneIndex(finger, 0)], f1 = fit.Lengths[HandBones.BoneIndex(finger, 1)];
+                    float a0 = Smooth((t + blend) / (2f * blend));
+                    float a1 = Smooth((t - f0 + blend) / (2f * blend));
+                    float a2 = Smooth((t - f0 - f1 + blend) / (2f * blend));
+                    handShare += (1f - a0) * fw;
                     parts.Add((firstFinger + HandBones.BoneIndex(finger, 0), a0 * (1f - a1) * fw));
                     parts.Add((firstFinger + HandBones.BoneIndex(finger, 1), a0 * a1 * (1f - a2) * fw));
                     parts.Add((firstFinger + HandBones.BoneIndex(finger, 2), a0 * a1 * a2 * fw));
                 }
+                parts.Add((handBone, handShare));
                 parts.Sort((x, y) => y.weight.CompareTo(x.weight));
                 float total = parts[0].weight + parts[1].weight + parts[2].weight + parts[3].weight;
                 weights[i] = new BoneWeight
@@ -387,6 +452,134 @@ namespace PleaseDontDrown.Editor
                     boneIndex3 = parts[3].bone, weight3 = parts[3].weight / total
                 };
             }
+        }
+
+        /// <summary>
+        /// Splits the far part of the hand into separate digits across it (gaps of a centimetre or more), and when
+        /// there are four (thumb and three fingers) or five, fits each its own line: from where it leaves the palm to
+        /// its tip. The thumb is the one furthest toward +z (the hand frame's thumb side). With three fingers, the
+        /// pinky's bones follow the ring finger's.
+        /// </summary>
+        private static void FitDigits(HandFit fit, List<Vector3> local, float reach, string file, string which)
+        {
+            List<Vector3> far = local.Where(q => -q.y > 0.6f * reach && -q.y < 0.99f * reach).OrderBy(q => q.z).ToList();
+            var digits = new List<List<Vector3>>();
+            var current = new List<Vector3>();
+            for (int i = 0; i < far.Count; i++)
+            {
+                if (i > 0 && far[i].z - far[i - 1].z > 0.006f)
+                {
+                    digits.Add(current);
+                    current = new List<Vector3>();
+                }
+                current.Add(far[i]);
+            }
+            digits.Add(current);
+            digits = digits.Where(d => d.Count >= 15).OrderByDescending(d => d.Average(q => q.z)).ToList(); // thumb side first
+            if (digits.Count != 4 && digits.Count != 5)
+            {
+                Debug.Log($"[Build] body {file}: {which} hand: {digits.Count} separate digits, keeping the four-band fit");
+                return;
+            }
+            var lines = new List<(Vector3 from, Vector3 dir, float length)>();
+            for (int digit = 0; digit < digits.Count; digit++)
+            {
+                List<Vector3> d = digits[digit];
+                // From its root (the hand above it, in its own strip across the hand) to the middle of its tip. The
+                // thumb leaves the hand much nearer the wrist than the fingers do.
+                float zMin = d.Min(q => q.z) - 0.008f, zMax = d.Max(q => q.z) + 0.008f;
+                float yTip = d.Min(q => q.y), yTop = d.Max(q => q.y);
+                List<Vector3> tipEnd = d.Where(q => q.y < yTip + 0.3f * (yTop - yTip)).ToList();
+                Vector3 tip = Mean(tipEnd.Count > 0 ? tipEnd : d);
+                float rootFrom = digit == 0 ? 0.12f : 0.33f, rootTo = digit == 0 ? 0.36f : 0.6f;
+                List<Vector3> rootStrip = local.Where(q => q.z >= zMin && q.z <= zMax && -q.y > rootFrom * reach && -q.y < rootTo * reach).ToList();
+                Vector3 root = rootStrip.Count >= 8 ? Mean(rootStrip) : Mean(d.Where(q => q.y > yTop - 0.3f * (yTop - yTip)).ToList());
+                Vector3 dir = tip - root;
+                dir.x = 0f; // in the palm's plane
+                float length = dir.magnitude;
+                if (length < 0.01f || dir.y > -0.2f * length) return; // not a digit hanging down the hand: leave the four-band fit
+                dir /= length;
+                // (On past the tip's middle to its end.)
+                lines.Add((root, dir, length * 1.18f));
+            }
+            int fingers = digits.Count - 1;
+            for (int f = 0; f < HandBones.Fingers; f++)
+            {
+                int line = f == 0 ? 0 : Mathf.Min(f, fingers);
+                var (from, dir, length) = lines[line];
+                fit.Bases[f] = from;
+                fit.Directions[f] = dir;
+                float[] share = f == 0 ? new[] { 0.4f, 0.32f, 0.28f } : new[] { 0.42f, 0.32f, 0.26f };
+                for (int seg = 0; seg < HandBones.Segments; seg++)
+                    fit.Lengths[HandBones.BoneIndex(f, seg)] = length * share[seg];
+            }
+            fit.Thumb = true;
+            Debug.Log($"[Build] body {file}: {which} hand: thumb and {fingers} fingers, pointing " +
+                      string.Join(" ", lines.Select(l => (Mathf.Atan2(l.dir.z, -l.dir.y) * Mathf.Rad2Deg).ToString("0"))) + " degrees off straight");
+        }
+
+        private static Vector3 Mean(List<Vector3> points) =>
+            new Vector3(points.Average(q => q.x), points.Average(q => q.y), points.Average(q => q.z));
+
+        /// <summary>Which digit a point of the hand is on when the thumb is fitted: the thumb if its line is nearer than the index finger's.</summary>
+        private static bool OnThumb(HandFit fit, Vector3 q)
+        {
+            float Off(int f)
+            {
+                Vector3 rel = q - fit.Bases[f], dir = fit.Directions[f];
+                Vector3 along = dir * Mathf.Max(0f, Vector3.Dot(rel, dir));
+                Vector3 off = rel - along;
+                return new Vector2(off.y, off.z).magnitude; // in the palm's plane
+            }
+            return Off(0) < Off(1);
+        }
+
+        /// <summary>The thumb's skin: blended from the hand onto its three bones along its length.</summary>
+        private static BoneWeight ThumbWeight(HandFit fit, Vector3 q, int handBone, int firstFinger)
+        {
+            float l0 = fit.Lengths[HandBones.BoneIndex(0, 0)], l1 = fit.Lengths[HandBones.BoneIndex(0, 1)];
+            float blend = 0.3f * l0;
+            float t = Vector3.Dot(q - fit.Bases[0], fit.Directions[0]);
+            float a0 = Smooth((t + blend * 0.5f) / blend);
+            float a1 = Smooth((t - l0 + blend * 0.5f) / blend);
+            float a2 = Smooth((t - l0 - l1 + blend * 0.5f) / blend);
+            var parts = new[]
+            {
+                (handBone, 1f - a0),
+                (firstFinger + HandBones.BoneIndex(0, 0), a0 * (1f - a1)),
+                (firstFinger + HandBones.BoneIndex(0, 1), a0 * a1 * (1f - a2)),
+                (firstFinger + HandBones.BoneIndex(0, 2), a0 * a1 * a2)
+            }.OrderByDescending(p => p.Item2).ToArray();
+            float total = parts.Sum(p => p.Item2);
+            return new BoneWeight
+            {
+                boneIndex0 = parts[0].Item1, weight0 = parts[0].Item2 / total,
+                boneIndex1 = parts[1].Item1, weight1 = parts[1].Item2 / total,
+                boneIndex2 = parts[2].Item1, weight2 = parts[2].Item2 / total,
+                boneIndex3 = parts[3].Item1, weight3 = parts[3].Item2 / total
+            };
+        }
+
+        /// <summary>
+        /// Where a point of the hand lies across the four fingers: 0 on the index finger's line, 1 the middle's,
+        /// 2 the ring's, 3 the pinky's, in between between two (each line runs from its knuckle down its finger).
+        /// </summary>
+        private static float FingerAcross(HandFit fit, Vector3 q)
+        {
+            // Signed distance toward the pinky side (-z) of each finger's line, in the palm's plane (y, z).
+            var d = new float[4];
+            for (int k = 0; k < 4; k++)
+            {
+                Vector3 dir = fit.Directions[k + 1];
+                var across = new Vector2(dir.z, -dir.y).normalized; // the line's normal in (y, z)
+                if (across.y > 0f) across = -across;                // pointing toward the pinky (-z)
+                Vector3 rel = q - fit.Bases[k + 1];
+                d[k] = rel.y * across.x + rel.z * across.y;
+            }
+            if (d[0] <= 0f) return 0f;
+            for (int k = 0; k < 3; k++)
+                if (d[k + 1] <= 0f) return k + d[k] / Mathf.Max(1e-5f, d[k] - d[k + 1]);
+            return 3f;
         }
 
         // ------------------------------------------------------------------ face
@@ -1049,6 +1242,8 @@ namespace PleaseDontDrown.Editor
                     body.FingerBasesR = handFitR.StoredBases(1f);
                     body.FingerLengthsL = handFitL.Lengths;
                     body.FingerLengthsR = handFitR.Lengths;
+                    body.FingerDirsL = handFitL.StoredDirections(-1f);
+                    body.FingerDirsR = handFitR.StoredDirections(1f);
                 }
 
                 body.RestPositions = rest;

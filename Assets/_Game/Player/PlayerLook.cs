@@ -26,6 +26,11 @@ namespace PleaseDontDrown.Player
         [SerializeField] private float _fallPitch = 0.25f;        // degrees per m/s of vertical speed
         [SerializeField] private float _fallPitchSmoothTime = 0.08f;
 
+        [Header("Third person (F5)")]
+        [SerializeField] private float _thirdDistance = 3.6f;     // metres behind the eyes
+        [SerializeField] private float _thirdShoulder = 0.65f;     // metres to the right (over the shoulder)
+        [SerializeField] private float _thirdHeight = 0.35f;      // metres above the eyes, the pivot
+
         [Header("Head bob")]
         [SerializeField] private float _bobCyclesPerSecond = 3f;  // at full speed; half that when slow
         [SerializeField] private float _bobMinSpeed = 0.1f;       // speed fraction below which it stops
@@ -75,6 +80,34 @@ namespace PleaseDontDrown.Player
         /// <summary>Raised on each footfall of the camera bob (for footstep sounds).</summary>
         public event System.Action Step;
 
+        /// <summary>
+        /// Over-the-shoulder view of our own player (F5, or <c>thirdperson</c>). The body and the arms show; the camera
+        /// is pulled in when a wall is in the way. Each player has their own view, so the second player (on another
+        /// machine) gets the same from their own key.
+        /// </summary>
+        public bool ThirdPerson { get; private set; }
+
+        private Transform _aimPoint;
+        private bool _thirdApplied;
+
+        /// <summary>
+        /// Where gameplay aims from (what E uses, what a punch, a bat or a shot hits, where a throw goes). In first
+        /// person that's the camera itself. In the third-person view the camera hangs back over the shoulder, so the
+        /// reach of a punch or of E measured from there touched nothing: it is the eyes, looking where the camera
+        /// looks. (Null until a camera is attached: callers fall back to the head.)
+        /// </summary>
+        public Transform Aim => _thirdApplied && _aimPoint != null ? _aimPoint : _camera != null ? _camera.transform : null;
+
+        public void SetThirdPerson(bool on)
+        {
+            if (ThirdPerson == on) return;
+            ThirdPerson = on;
+            var hub = GetComponentInParent<PlayerHub>();
+            if (hub != null && hub.Avatar != null) hub.Avatar.SetLocal(!on); // our own body: hidden in first person only
+            if (_camera != null)
+                foreach (FirstPersonArms arms in _camera.GetComponentsInChildren<FirstPersonArms>(true)) arms.SetShown(!on);
+        }
+
         public void Attach(Camera cam)
         {
             _camera = cam;
@@ -120,6 +153,12 @@ namespace PleaseDontDrown.Player
                 LookSettings.Sensitivity = DevCommands.ParseFloat(args, 0);
                 DevCommands.Print($"sensitivity = {Sensitivity}");
             }, owner: this);
+            DevCommands.Register("thirdperson", "[on|off]", "Over-the-shoulder view of your own player (F5 does the same).", args =>
+            {
+                bool on = args.Length == 0 ? !ThirdPerson : args[0] != "off";
+                SetThirdPerson(on);
+                DevCommands.Print($"third person {(ThirdPerson ? "on" : "off")}");
+            }, owner: this);
             DevCommands.Register("fov", "<degrees>", "Field of view (default 74).", args =>
             {
                 LookSettings.Fov = DevCommands.ParseFloat(args, 0);
@@ -134,6 +173,7 @@ namespace PleaseDontDrown.Player
         {
             DevCommands.Unregister("sens", this);
             DevCommands.Unregister("fov", this);
+            DevCommands.Unregister("thirdperson", this);
             DevCommands.Unregister("lookat", this);
         }
 
@@ -230,6 +270,9 @@ namespace PleaseDontDrown.Player
         private float _shake, _shakeSide = 1f, _shakeSeed;
 
         /// <summary>Jolt the view (about 1 = a punch, 2 = a big hit); <paramref name="side"/> +1 rolls right, -1 left.</summary>
+        /// <summary>Stand up out of a CPR kneel at once (the one we pressed on got up).</summary>
+        public void EndKneel() => _kneelUntil = -10f;
+
         public void Shake(float strength, float side = 1f)
         {
             _shake = Mathf.Max(_shake, strength);
@@ -261,6 +304,8 @@ namespace PleaseDontDrown.Player
         private void Update()
         {
             LookDelta = Vector2.zero;
+            // (Only our own player: GameplayActive is for the whole game, and every player has a look.)
+            if (GameInput.GameplayActive && GameInput.ThirdPerson.WasPressedThisFrame() && IsOwnView()) SetThirdPerson(!ThirdPerson);
             if (!GameInput.GameplayActive)
                 return;
 
@@ -362,8 +407,63 @@ namespace PleaseDontDrown.Player
                 _camera.transform.SetPositionAndRotation(Vector3.Lerp(eye, close, lean), Quaternion.Slerp(_camera.transform.rotation, face, lean));
             }
 
+            _thirdApplied = ThirdPerson && _kneel <= 0f && lean <= 0f;
+            if (_thirdApplied) ApplyThirdPerson();
+
             if (Time.frameCount - _viewFrame <= 1) _camera.transform.position = _viewFrom;
         }
+
+        private bool IsOwnView()
+        {
+            var hub = GetComponentInParent<PlayerHub>();
+            return hub != null && hub.IsOwner;
+        }
+
+        /// <summary>Behind and over the right shoulder, looking where the head looks. Pulled in by a wall (not our own body).</summary>
+        private void ApplyThirdPerson()
+        {
+            Vector3 pivot = _head.position + Vector3.up * _thirdHeight;
+            Vector3 aim = _head.forward;
+            Vector3 want = pivot - aim * _thirdDistance + _head.right * _thirdShoulder;
+            Vector3 dir = want - pivot;
+            float length = dir.magnitude;
+            if (length > 0.01f)
+            {
+                float clear = length;
+                foreach (RaycastHit hit in Physics.SphereCastAll(pivot, 0.2f, dir / length, length, ~0, QueryTriggerInteraction.Ignore))
+                    // (Not our own body, nor anything held: the gun in our hand pulled the camera in.)
+                    if (hit.distance < clear && !hit.collider.transform.IsChildOf(transform.root)
+                        && !(Items.Item.FromCollider(hit.collider) is { IsHeld: true })) clear = hit.distance;
+                want = pivot + dir / length * Mathf.Max(0.25f, clear - 0.15f);
+            }
+            // The camera looks the way the head does; shots and "use" go from the head to whatever is under the
+            // crosshair. (Aimed at a point 10 m ahead, the over-the-shoulder view and the head's line only met
+            // there: a gun shot a metre wide of the crosshair at 30 m, two at 50.)
+            _camera.transform.SetPositionAndRotation(want, Quaternion.LookRotation(aim, Vector3.up));
+            if (_aimPoint == null)
+            {
+                _aimPoint = new GameObject("Aim (third person)").transform;
+                _aimPoint.SetParent(transform, false);
+            }
+            Vector3 from = want + aim * Mathf.Max(0f, Vector3.Dot(_head.position - want, aim)); // level with the head
+            Vector3 target = from + aim * CrosshairReach;
+            int hits = Physics.RaycastNonAlloc(from, aim, CrosshairHits, CrosshairReach, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = CrosshairReach;
+            for (int i = 0; i < hits; i++)
+            {
+                RaycastHit hit = CrosshairHits[i];
+                if (hit.distance >= nearest || hit.collider.transform.IsChildOf(transform.root) || Items.Item.FromCollider(hit.collider) is { IsHeld: true }) continue;
+                nearest = hit.distance;
+                target = hit.point;
+            }
+            Vector3 toTarget = target - _head.position;
+            // (Something right against the head, or behind it: straight ahead instead.)
+            if (toTarget.sqrMagnitude < 0.5f * 0.5f || Vector3.Dot(toTarget, aim) <= 0f) toTarget = aim;
+            _aimPoint.SetPositionAndRotation(_head.position, Quaternion.LookRotation(toTarget, Vector3.up));
+        }
+
+        private const float CrosshairReach = 300f;
+        private static readonly RaycastHit[] CrosshairHits = new RaycastHit[16];
 
         /// <summary>
         /// The step cycle runs at 1.5..3 cycles a second (with speed), the bob follows the two curves, sized by the

@@ -111,6 +111,13 @@ namespace PleaseDontDrown.Player
 
         private bool IsLocal => _hub.IsOwner;
 
+        /// <summary>
+        /// Held things drawn as our own first-person view model (in front of the camera). In the third-person view
+        /// (F5) our own body holds them, exactly as everybody else sees it, or the gun floated beside the camera.
+        /// (Only where it is drawn: what we are doing with it, eating, a throw charging, stays ours.)
+        /// </summary>
+        private bool ViewModel => IsLocal && (_hub.Look == null || !_hub.Look.ThirdPerson);
+
         // ------------------------------------------------------------------ slots
 
         /// <summary>What's in a slot right now (items know their holder and slot; cached per frame).</summary>
@@ -326,7 +333,7 @@ namespace PleaseDontDrown.Player
             _dropForce = 0f;
         }
 
-        private Transform AimTransform => _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _head;
+        private Transform AimTransform => _hub.Look != null && _hub.Look.Aim != null ? _hub.Look.Aim : _head;
 
         // ------------------------------------------------------------------ eating
 
@@ -570,7 +577,7 @@ namespace PleaseDontDrown.Player
 
             Item item = HeldItem;
             if (item == null) return;
-            if (IsLocal)
+            if (ViewModel)
             {
                 // Guns sit rigidly in view (their own pose adds aim, sway and recoil).
                 if (item.RigidInHand && item.Sync.Body.isKinematic)
@@ -591,7 +598,7 @@ namespace PleaseDontDrown.Player
 
         private void GetHoldTarget(Item item, out Vector3 position, out Quaternion rotation)
         {
-            Transform aim = IsLocal ? AimTransform : _head;
+            Transform aim = ViewModel ? AimTransform : _head;
             if (item.TryGetComponent(out Fun.BasketballDribble basketball))
             {
                 basketball.GetHoldTarget(_hub, aim, out position, out rotation);
@@ -599,7 +606,7 @@ namespace PleaseDontDrown.Player
             }
             // Somebody else's gun or bat: held by their body (third person), not floated in front of their eyes the
             // way our own first-person view model is (that put guns up beside the head, pointing at the sky).
-            if (!IsLocal && item.RigidInHand && item.GripRight != null)
+            if (!ViewModel && item.RigidInHand && item.GripRight != null)
             {
                 if (_rig == null) _rig = GetComponentInChildren<Avatars.AvatarRig>();
                 Quaternion flat = Quaternion.Euler(0f, aim.eulerAngles.y, 0f);
@@ -611,7 +618,7 @@ namespace PleaseDontDrown.Player
                 return;
             }
             item.GetHoldPose(_hub, out Vector3 holdOffset, out Quaternion holdRotation, out float pitchFollow);
-            if (IsLocal && !item.HasCustomHoldPose && !item.RigidInHand && _eatBlend <= 0f)
+            if (ViewModel && !item.HasCustomHoldPose && !item.RigidInHand && _eatBlend <= 0f)
             {
                 // Plain things (How to Fish): straight ahead of the eyes at the hold distance, turning with the view,
                 // bobbing with the head (more while sprinting), pulled back a little while a throw charges.
@@ -622,7 +629,21 @@ namespace PleaseDontDrown.Player
                 rotation = view * holdRotation;
                 return;
             }
-            if (!IsLocal) holdOffset = Vector3.Scale(holdOffset, _remoteHoldScale);
+            // Seen from outside (somebody else, or our own third-person view): held by the body, in front of the chest,
+            // not where the first-person view puts it in front of the eyes (that held a crate over the face and a
+            // ring round the head). Eating still lifts it to the mouth (blended below).
+            Vector3 bodyPos = default;
+            Quaternion bodyRot = Quaternion.identity;
+            bool bodyHeld = !ViewModel && item.Grip != ItemGrip.Person && BodyHold(item, aim, holdRotation, out bodyPos, out bodyRot);
+            if (bodyHeld && _eatBlend <= 0f)
+            {
+                position = bodyPos;
+                rotation = bodyRot;
+                return;
+            }
+            // (Not a carried person: pulled a third closer, a tourist across the arms sat inside the lifeguard's big
+            // cartoon head. Their hold pose is already where the arms reach under them.)
+            if (!ViewModel && item.Grip != ItemGrip.Person) holdOffset = Vector3.Scale(holdOffset, _remoteHoldScale);
             // Eating: up to the mouth, with a little bob per bite.
             if (_eatBlend > 0f)
             {
@@ -638,7 +659,7 @@ namespace PleaseDontDrown.Player
                     // (Right at the lips, not out where food is held up: the neck goes into the mouth, just under the view.
                     // Seen from outside, at the avatar's own lips, wherever its head is.)
                     Vector3 lips = new(0.015f, -0.1f, 0.1f);
-                    if (!IsLocal)
+                    if (!ViewModel)
                     {
                         if (_animator == null) _animator = GetComponentInChildren<Avatars.AvatarAnimator>();
                         if (_animator != null) lips = aim.InverseTransformPoint(_animator.Lips);
@@ -655,15 +676,64 @@ namespace PleaseDontDrown.Player
             {
                 position = aim.TransformPoint(offset);
                 rotation = aim.rotation * holdRotation * windUp;
-                return;
             }
-            // Big things (a person) only partly follow looking up and down, so they don't end up under your feet.
-            Vector3 f = aim.forward;
-            float yaw = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
-            float pitch = -Mathf.Asin(Mathf.Clamp(f.y, -1f, 1f)) * Mathf.Rad2Deg;
-            Quaternion frame = Quaternion.Euler(pitch * pitchFollow, yaw, 0f);
-            position = aim.position + frame * offset;
-            rotation = frame * holdRotation * windUp;
+            else
+            {
+                // Big things (a person) only partly follow looking up and down, so they don't end up under your feet.
+                Vector3 f = aim.forward;
+                float yaw = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+                float pitch = -Mathf.Asin(Mathf.Clamp(f.y, -1f, 1f)) * Mathf.Rad2Deg;
+                Quaternion frame = Quaternion.Euler(pitch * pitchFollow, yaw, 0f);
+                position = aim.position + frame * offset;
+                rotation = frame * holdRotation * windUp;
+            }
+            if (bodyHeld)
+            {
+                // From the body hold up to the mouth and back.
+                float e = Mathf.SmoothStep(0f, 1f, _eatBlend);
+                position = Vector3.Lerp(bodyPos, position, e);
+                rotation = Quaternion.Slerp(bodyRot, rotation, e);
+            }
+        }
+
+        /// <summary>
+        /// Where somebody seen from outside holds a plain item: small things in the right hand in front of the chest,
+        /// a ring at the right of the chest, boxes and balls in both hands in front of the chest and belly, always far
+        /// enough out (by the item's own size) that it doesn't sink into the body or the big head, and upright.
+        /// A throw being charged draws it back and up over the shoulder.
+        /// </summary>
+        private bool BodyHold(Item item, Transform aim, Quaternion holdRotation, out Vector3 position, out Quaternion rotation)
+        {
+            position = default;
+            rotation = default;
+            if (_rig == null) _rig = GetComponentInChildren<Avatars.AvatarRig>();
+            if (_rig == null || !_rig.IsBuilt || _rig[Avatars.AvatarRig.Bone.Chest] == null) return false;
+            float s = _rig.Scale;
+            Vector3 look = aim.forward;
+            Quaternion flat = Quaternion.Euler(0f, Mathf.Atan2(look.x, look.z) * Mathf.Rad2Deg, 0f);
+            Vector3 fw = flat * Vector3.forward, rt = flat * Vector3.right, up = Vector3.up;
+            float pull = Mathf.SmoothStep(0f, 1f, IsLocal ? _dropForce : Charge01);
+            rotation = flat * holdRotation * Quaternion.Euler(-25f * pull, 0f, 0f);
+
+            // The item's size and middle, measured as it is turned now (it is turned this way every frame it's held).
+            Bounds b = item.VisualBounds;
+            Vector3 e = b.extents, middle = b.center - item.transform.position;
+            float depth = Mathf.Abs(fw.x) * e.x + Mathf.Abs(fw.z) * e.z;
+            float width = Mathf.Abs(rt.x) * e.x + Mathf.Abs(rt.z) * e.z;
+            bool small = b.size.x < 0.36f && b.size.y < 0.36f && b.size.z < 0.36f;
+            ItemGrip style = item.Grip != ItemGrip.Auto ? item.Grip : small ? ItemGrip.OneHand : ItemGrip.TwoHands;
+
+            Vector3 chest = _rig[Avatars.AvatarRig.Bone.Chest].position;
+            Vector3 centre;
+            if (style == ItemGrip.OneHand && width <= 0.2f)
+                centre = chest + rt * (0.15f * s) - up * (0.14f * s) + fw * (0.24f * s + depth); // in the right hand, out in front
+            else if (style == ItemGrip.OneHand)
+                centre = chest + rt * (0.12f * s) - up * (0.08f * s) + fw * (0.2f * s + depth);  // a ring, by its near rim
+            else
+                centre = chest - up * (0.08f * s) + fw * (0.19f * s + depth);                    // both hands, clear of the belly
+            centre += (rt * 0.05f + up * 0.18f - fw * 0.22f) * (pull * s);                       // wound up to throw
+            position = centre - middle;
+            return true;
         }
 
         /// <summary>
@@ -692,7 +762,7 @@ namespace PleaseDontDrown.Player
                 if (item.GripRight != null) right = new HandGrip(item.GripRight.position, item.GripRight.forward, -item.GripRight.up, item.GripPose);
                 if (item.GripLeft != null) left = new HandGrip(item.GripLeft.position, item.GripLeft.forward, -item.GripLeft.up, item.GripPoseLeft);
                 // Seen from outside: the left hand on the forend where the arm reaches (long guns' grips are far out).
-                if (!IsLocal && left.Active && item.RigidInHand)
+                if (!ViewModel && left.Active && item.RigidInHand)
                 {
                     if (_rig == null) _rig = GetComponentInChildren<Avatars.AvatarRig>();
                     if (_rig != null && _rig[Avatars.AvatarRig.Bone.UpperArmL] != null)
@@ -708,7 +778,7 @@ namespace PleaseDontDrown.Player
                 return right.Active && left.Active ? GripKind.TwoHands : GripKind.OneHand;
             }
 
-            Transform frame = IsLocal ? AimTransform : _head;
+            Transform frame = ViewModel ? AimTransform : _head;
             Vector3 up = Vector3.up;
             Vector3 side = Vector3.ProjectOnPlane(frame.right, up);
             side = side.sqrMagnitude > 1e-4f ? side.normalized : frame.right;
@@ -719,9 +789,32 @@ namespace PleaseDontDrown.Player
                 Transform body = item.transform;
                 Vector3 a = body.position + body.up * 0.24f - up * 0.15f; // under the shoulders
                 Vector3 b = body.position - body.up * 0.32f - up * 0.15f; // under the knees
+                Vector3 palm = up, curl = fwd;
+                // A tourist: on their own body, palms on the near side of the lower back and the thighs, wherever the
+                // limp body hangs.
+                if (item.TryGetComponent(out Rescue.VictimBody victim) && victim.CarryPoints(frame.position, out Vector3 back, out Vector3 knees, out Vector3 inward, out Vector3 down))
+                {
+                    a = back;
+                    b = knees;
+                    palm = inward;
+                    curl = down;
+                }
                 bool aRight = Vector3.Dot(a - b, side) > 0f;
-                right = new HandGrip(aRight ? a : b, fwd, up, HandPose.Carry);
-                left = new HandGrip(aRight ? b : a, fwd, up, HandPose.Carry);
+                // Short (cartoon) arms: a hand that can't reach its spot slides along under the body toward us, at the
+                // same height, until it can (rather than stopping short on the chest or at the face).
+                if (_rig == null) _rig = GetComponentInChildren<Avatars.AvatarRig>();
+                if (_rig != null && _rig.IsBuilt)
+                {
+                    float reach = (_rig.UpperArmLength + _rig.ForearmLength + _rig.HandLength * 0.5f) * 0.94f;
+                    Vector3 shoulderA = _rig[aRight ? Avatars.AvatarRig.Bone.UpperArmR : Avatars.AvatarRig.Bone.UpperArmL].position;
+                    Vector3 shoulderB = _rig[aRight ? Avatars.AvatarRig.Bone.UpperArmL : Avatars.AvatarRig.Bone.UpperArmR].position;
+                    // (A tourist's knees out of reach: further up under the thighs instead, still underneath.)
+                    if (victim != null && (b - shoulderB).sqrMagnitude > reach * reach && victim.ThighUnderWithin(shoulderB, reach) is { } under) b = under;
+                    a = WithinReach(a, shoulderA, reach);
+                    b = WithinReach(b, shoulderB, reach);
+                }
+                right = new HandGrip(aRight ? a : b, curl, palm, HandPose.Carry);
+                left = new HandGrip(aRight ? b : a, curl, palm, HandPose.Carry);
                 return GripKind.Person;
             }
 
@@ -790,6 +883,18 @@ namespace PleaseDontDrown.Player
                 grip -= along * over;
             }
             return grip;
+        }
+
+        /// <summary>A spot pulled in level toward the shoulder until it is within <paramref name="reach"/> of it.</summary>
+        private static Vector3 WithinReach(Vector3 spot, Vector3 shoulder, float reach)
+        {
+            Vector3 to = spot - shoulder;
+            if (to.sqrMagnitude <= reach * reach) return spot;
+            float drop = Mathf.Min(Mathf.Abs(to.y), reach * 0.97f);
+            var level = new Vector3(to.x, 0f, to.z);
+            float across = Mathf.Sqrt(reach * reach - drop * drop);
+            if (level.sqrMagnitude > across * across) level = level.normalized * across;
+            return shoulder + level + Vector3.up * (Mathf.Sign(to.y) * drop);
         }
 
         /// <summary>

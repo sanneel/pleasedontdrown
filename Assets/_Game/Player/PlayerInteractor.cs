@@ -35,12 +35,13 @@ namespace PleaseDontDrown.Player
         {
             Interactable found = null;
             Camera cam = _hub.Look.Camera;
+            Transform aim = _hub.Look.Aim; // (the eyes in the third-person view, else the camera)
             // Driving: E only gets you off. Sitting in a chair: only what's used from the seat (the dish in front of you
             // at the bar, Fun.TableMeal), and E on it doesn't get you up (Vehicle asks TargetsSeatedUse).
             if (cam != null && GameInput.GameplayActive && _hub.Motor.Seat == null)
-                found = FindTarget(cam.transform, false);
+                found = FindTarget(aim, false);
             else if (cam != null && GameInput.GameplayActive && _hub.Motor.Seat.IsChair)
-                found = FindTarget(cam.transform, true);
+                found = FindTarget(aim, true);
             TargetsSeatedUse = _hub.Motor.Seat != null && found != null;
 
             if (found != _current)
@@ -57,7 +58,7 @@ namespace PleaseDontDrown.Player
 
             if (_current != null && GameInput.Interact.WasPressedThisFrame())
             {
-                _hub.Gesture(Avatars.AvatarGesture.Interact, TargetPoint(cam));
+                _hub.Gesture(Avatars.AvatarGesture.Interact, TargetPoint(aim));
                 _current.Interact(_hub);
             }
             else if (CurrentSecondaryPrompt != null && CurrentSecondaryAction.WasPressedThisFrame())
@@ -65,10 +66,9 @@ namespace PleaseDontDrown.Player
         }
 
         /// <summary>Where on the target the hand reaches (closest point of its collider to the crosshair ray).</summary>
-        private Vector3 TargetPoint(Camera cam)
+        private Vector3 TargetPoint(Transform view)
         {
-            if (_current == null || cam == null) return Vector3.zero;
-            Transform view = cam.transform;
+            if (_current == null || view == null) return Vector3.zero;
             if (FirstHit(view.position, view.forward, _rayDistance, out RaycastHit hit) && Interactable.FromCollider(hit.collider) == _current)
                 return hit.point;
             Collider c = _current.GetComponentInChildren<Collider>();
@@ -181,10 +181,10 @@ namespace PleaseDontDrown.Player
 
         private void ExplainTargeting()
         {
-            Camera cam = _hub.Look != null ? _hub.Look.Camera : null;
-            DevCommands.Print($"camera {(cam != null ? cam.transform.position.ToString("F2") : "NONE")}, gameplay {GameInput.GameplayActive}, current {(_current != null ? _current.name : "none")}");
-            if (cam == null) return;
-            Vector3 origin = cam.transform.position, forward = cam.transform.forward;
+            Transform aim = _hub.Look != null ? _hub.Look.Aim : null;
+            DevCommands.Print($"aim {(aim != null ? aim.position.ToString("F2") : "NONE")}, gameplay {GameInput.GameplayActive}, current {(_current != null ? _current.name : "none")}");
+            if (aim == null) return;
+            Vector3 origin = aim.position, forward = aim.forward;
             int raw = Physics.RaycastNonAlloc(origin, forward, _hits, 10f, ~0, QueryTriggerInteraction.Collide);
             DevCommands.Print($"  forward {forward:F2}, head fwd {_hub.Head.forward:F2}, mask {_mask.value}, raw hits within 10 m: {raw}" +
                               (raw > 0 ? $" (first: {_hits[0].collider.name} {_hits[0].distance:F2})" : ""));

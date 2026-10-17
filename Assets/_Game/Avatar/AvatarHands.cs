@@ -31,7 +31,7 @@ namespace PleaseDontDrown.Avatars
         public static readonly HandPose BoxGrip = new(0.34f, 0.08f, 0.04f);
         public static readonly HandPose BallGrip = new(0.3f, 0.22f, 0.5f);
         public static readonly HandPose Cup = new(0.55f, 0.42f, 0.1f);
-        public static readonly HandPose Fist = new(0.95f, 0.72f, 0f);
+        public static readonly HandPose Fist = new(0.95f, 1f, 0f);
         public static readonly HandPose LooseFist = new(0.68f, 0.5f, 0f);
         public static readonly HandPose Carry = new(0.5f, 0.18f, 0.06f);
         public static readonly HandPose Swim = new(0.1f, 0.04f, 0f);
@@ -131,6 +131,14 @@ namespace PleaseDontDrown.Avatars
         public Vector3 PalmContact => (_shape != null ? Mirror(_shape.Palm) : new Vector3(-Side * 0.02f, -0.052f, 0f)) * _scale;
 
         public static int BoneIndex(int finger, int segment) => finger * Segments + segment;
+
+        /// <summary>Where a finger's tip is now (world): on past its last joint by that segment's length.</summary>
+        public Vector3 Tip(int finger)
+        {
+            Transform mid = Bones[BoneIndex(finger, Segments - 2)], last = Bones[BoneIndex(finger, Segments - 1)];
+            Vector3 along = last.position - mid.position;
+            return last.position + along * 0.85f;
+        }
 
         /// <summary>
         /// Finger layout taken from a modelled hand (right hand, scale 1): where each finger starts, which way it

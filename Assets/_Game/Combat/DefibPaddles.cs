@@ -154,7 +154,7 @@ namespace PleaseDontDrown.Combat
         {
             float side = rightHand ? 1f : -1f;
             Transform frame = holder == null ? transform
-                : holder.IsOwner && holder.Look != null && holder.Look.Camera != null ? holder.Look.Camera.transform : holder.Head;
+                : holder.IsOwner && holder.Look != null && holder.Look.Aim != null ? holder.Look.Aim : holder.Head;
             Vector3 fwd = frame.forward, up = frame.up, across = frame.right;
             // Ready: in front of the chest, plates ahead, handles toward us (palms push forward on them).
             Vector3 ready = frame.position + fwd * 0.46f - up * 0.22f + across * (side * 0.16f);

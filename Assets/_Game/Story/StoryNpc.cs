@@ -801,8 +801,11 @@ namespace PleaseDontDrown.Story
                 Vector3 d = p - other.transform.position;
                 d.y = 0f;
                 float distance = d.magnitude;
-                if (distance < 0.85f)
-                    push += (distance > 0.01f ? d / distance : Random.insideUnitSphere) * (0.85f - distance);
+                // (Swimmers lie flat with their arms reaching out ahead: at 0.85 m two of them had their arms in each
+                // other. Standing, a round belly and swinging arms want a little more than a slim body.)
+                float room = _swimPose || other._swimPose ? 1.7f : 0.95f;
+                if (distance < room)
+                    push += (distance > 0.01f ? d / distance : Random.insideUnitSphere) * (room - distance);
             }
             push.y = 0f;
             if (push.sqrMagnitude > 1e-6f) transform.position = Grounded(MoveChecked(p, Vector3.ClampMagnitude(push, 1f) * Mathf.Min(1f, dt * 6f)));

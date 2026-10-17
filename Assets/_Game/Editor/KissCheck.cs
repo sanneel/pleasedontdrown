@@ -73,6 +73,7 @@ namespace PleaseDontDrown.Editor
             body.transform.SetPositionAndRotation(feet, Quaternion.identity);
             AvatarLook look = AvatarLook.Lifeguard;
             look.HeadSize = head;
+            if (k % 2 == 1) look.Glasses = GlassesStyle.Round; // (glasses tip up out of the way for the breath: AvatarFunny.PushUpGlasses)
             var rig = body.AddComponent<AvatarRig>();
             rig.Build(look);
             var animator = body.AddComponent<AvatarAnimator>();
@@ -102,6 +103,9 @@ namespace PleaseDontDrown.Editor
             // The lips down on theirs: the middle of the breath.
             for (int i = 0; i <= 18; i++) { AvatarAnimator.TimeOverride = 102f + i / 30f; animator.Tick(1f / 30f); }
             if (body.TryGetComponent(out AvatarFunny funny)) funny.PosePucker();
+            foreach (Transform t in rig[AvatarRig.Bone.Head])
+                if (t.name.StartsWith("Blender glasses_") && t.TryGetComponent(out MeshFilter gf))
+                    Debug.Log($"[KissCheck] glasses: mesh bounds {gf.sharedMesh.bounds.center:F3} size {gf.sharedMesh.bounds.size:F3}, local {t.localPosition:F3} rot {t.localEulerAngles:F0}, head scale {rig[AvatarRig.Bone.Head].lossyScale:F2}, world {t.position:F2} vs eyes {rig[AvatarRig.Bone.EyeL].position:F2}, lips {animator.Lips:F2}");
             float gap = Vector3.Distance(animator.Lips, mouth);
             AvatarAnimator.TimeOverride = null;
 
@@ -109,7 +113,7 @@ namespace PleaseDontDrown.Editor
             // Two views: from the side (the way people standing round see it) and close up on the faces.
             Vector3 meet = Vector3.Lerp(mouth, animator.Lips, 0.5f);
             foreach ((string view, Vector3 offset, float fov) in new[] { ("behind", new Vector3(-0.8f, 1.25f, -2.4f), 38f), ("across", new Vector3(-0.3f, 1.25f, 2.5f), 38f),
-                         ("headend", new Vector3(2.5f, 1.25f, 0.4f), 38f), ("feetend", new Vector3(-2.6f, 1.25f, 0.9f), 38f) })
+                         ("headend", new Vector3(2.5f, 1.25f, 0.4f), 38f), ("feetend", new Vector3(-2.6f, 1.25f, 0.9f), 38f), ("close", new Vector3(0.05f, 0.08f, 0.75f), 34f) })
             {
                 Vector3 eye = meet + offset;
                 camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(meet - eye));

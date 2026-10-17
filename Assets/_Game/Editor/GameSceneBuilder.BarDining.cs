@@ -250,6 +250,12 @@ namespace PleaseDontDrown.Editor
         /// The golf cart (A9): a land <see cref="Vehicle"/> by the hotel bar, the driver's bench seat and a passenger's
         /// beside it. A greybox body for now (the Tripo model is part C's): white chassis and roof, four wheels.
         /// </summary>
+        /// <summary>
+        /// How far ahead of the cart's middle the steering wheel is: within reach of the lifeguard's short cartoon arms
+        /// from the seat (at 0.42 they leant 45 degrees and still fell 13 cm short; see PatchGolfCartReach).
+        /// </summary>
+        public const float CartWheelZ = 0.22f;
+
         private static void AddGolfCart(Transform bar, Transform hotel)
         {
             Transform old = hotel.Find("GolfCart");
@@ -306,7 +312,7 @@ namespace PleaseDontDrown.Editor
                 foreach (float z in new[] { -0.8f, 0.8f })
                     Primitive(PrimitiveType.Cylinder, "Wheel", r, new Vector3(x, 0.25f, z), new Vector3(0.5f, 0.1f, 0.5f), black, keepCollider: false)
                         .transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
-            Primitive(PrimitiveType.Cylinder, "SteeringWheel", r, new Vector3(-0.28f, 1.18f, 0.42f), new Vector3(0.36f, 0.02f, 0.36f), black, keepCollider: false)
+            Primitive(PrimitiveType.Cylinder, "SteeringWheel", r, new Vector3(-0.28f, 1.22f, CartWheelZ), new Vector3(0.36f, 0.02f, 0.36f), black, keepCollider: false)
                 .transform.localRotation = Quaternion.Euler(-55f, 0f, 0f);
             Transform P(string n, Vector3 p, Quaternion q)
             {
@@ -318,8 +324,8 @@ namespace PleaseDontDrown.Editor
             }
             Transform seat = P("Seat", new Vector3(-0.28f, 0.92f, -0.22f), Quaternion.identity);
             Transform passenger = P("PassengerSeat", new Vector3(0.28f, 0.92f, -0.22f), Quaternion.identity);
-            Transform gripL = P("GripLeft", new Vector3(-0.42f, 1.24f, 0.38f), Quaternion.LookRotation(Vector3.up, Vector3.back));
-            Transform gripR = P("GripRight", new Vector3(-0.14f, 1.24f, 0.38f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            Transform gripL = P("GripLeft", new Vector3(-0.4f, 1.24f, CartWheelZ - 0.03f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            Transform gripR = P("GripRight", new Vector3(-0.16f, 1.24f, CartWheelZ - 0.03f), Quaternion.LookRotation(Vector3.up, Vector3.back));
             Transform thrust = P("Thrust", new Vector3(0f, 0.25f, -1.0f), Quaternion.identity);
             Vehicle cart = FinishVehicle(root, "golf cart", "", seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.3f,
                 thrustForce: 6f, maxSpeed: 8f, turnRate: 1.4f);

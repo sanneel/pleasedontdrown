@@ -69,6 +69,24 @@ namespace PleaseDontDrown.Player
 
         public void SetLocal(bool local) => _rig.SetShadowsOnly(local);
 
+        /// <summary>A blow from <paramref name="push"/> (the way it travels, world): the body snaps away and comes back.</summary>
+        /// The harder the push (a knockback's speed, m/s), the bigger the snap: a jab nods the head, an overhand
+        /// bends them right back.
+        public void Flinch(Vector3 push) => _animator.Flinch(push, Mathf.Clamp(push.magnitude / 6.5f, 0.3f, 1f));
+
+        /// <summary>
+        /// Stop kneeling over somebody now (they just got up): CPR otherwise holds the kneel 1.3 s after the last press,
+        /// and the rescuer stayed down with the face in the belly of the friend who had stood up.
+        /// </summary>
+        public void EndCpr()
+        {
+            _lastPumpTime = -10f;
+            if (_hub != null && _hub.IsOwner && _hub.Look != null) _hub.Look.EndKneel();
+        }
+
+        /// <summary>Kneeling for CPR within <paramref name="range"/> metres of <paramref name="point"/>.</summary>
+        public bool CprNear(Vector3 point, float range) => Time.time - _lastPumpTime < 1.3f && (_cprPoint - point).sqrMagnitude < range * range;
+
         /// <summary>A gesture from this player (played locally for the owner, relayed to everyone else).</summary>
         public void OnGesture(AvatarGesture gesture) => OnGesture(gesture, Vector3.zero);
 
@@ -192,7 +210,9 @@ namespace PleaseDontDrown.Player
                 m.Holding = grip != PlayerHands.GripKind.None;
                 m.TwoHanded = grip == PlayerHands.GripKind.TwoHands;
                 m.CarryingPerson = grip == PlayerHands.GripKind.Person;
-                m.Shouldered = !local && m.TwoHanded && hands.HeldItem != null && PlayerHands.Shoulders(hands.HeldItem);
+                // (Our own third-person view shows the body the way everybody else sees it: rifle in the shoulder.)
+                bool seenFromOutside = !local || (_hub.Look != null && _hub.Look.ThirdPerson);
+                m.Shouldered = seenFromOutside && m.TwoHanded && hands.HeldItem != null && PlayerHands.Shoulders(hands.HeldItem);
                 if (local)
                 {
                     m.Charge = hands.Charge01;
@@ -358,7 +378,8 @@ namespace PleaseDontDrown.Player
                 m.Holding = m.TwoHanded = m.CarryingPerson = false;
                 return;
             }
-            if (PlayerCarry.CarriedBy(_hub) == null) return;
+            PlayerHub carried = PlayerCarry.CarriedBy(_hub);
+            if (carried == null) return;
             Quaternion facing = Quaternion.Euler(0f, m.FacingYaw, 0f);
             Vector3 forward = facing * Vector3.forward, right = facing * Vector3.right;
             Vector3 chest = position + Vector3.up * 1.2f;
@@ -370,6 +391,18 @@ namespace PleaseDontDrown.Player
             // (higher, it would be under our own chin: PlayerCarry.HoldOffset).
             m.GripLeft = new HandGrip(chest + forward * 0.32f + right * 0.16f - Vector3.up * 0.47f, -right, -forward, HandPose.Carry);
             m.GripRight = new HandGrip(chest + forward * 0.24f + right * 0.3f - Vector3.up * 0.12f, -right, -forward, HandPose.Carry);
+            // On the friend's own legs as they hang now: the right palm on the front of the thighs, the left on the
+            // front of the knees (fixed spots from our chest put the right forearm through the thighs).
+            AvatarRig legs = carried.Avatar != null ? carried.Avatar.Rig : null;
+            if (legs != null && legs.IsBuilt && legs[AvatarRig.Bone.ThighL] != null && legs[AvatarRig.Bone.ShinL] != null)
+            {
+                float palm = 0.03f * legs.Scale;
+                Vector3 thighs = (Vector3.Lerp(legs[AvatarRig.Bone.ThighL].position, legs[AvatarRig.Bone.ShinL].position, 0.55f) +
+                                  Vector3.Lerp(legs[AvatarRig.Bone.ThighR].position, legs[AvatarRig.Bone.ShinR].position, 0.55f)) * 0.5f;
+                Vector3 knees = (legs[AvatarRig.Bone.ShinL].position + legs[AvatarRig.Bone.ShinR].position) * 0.5f - Vector3.up * (0.04f * legs.Scale);
+                m.GripRight = new HandGrip(BodySpace.Surface(legs, thighs, forward, 0.5f) + forward * palm, -right, -forward, HandPose.Carry);
+                m.GripLeft = new HandGrip(BodySpace.Surface(legs, knees, forward, 0.5f) + forward * palm, -right, -forward, HandPose.Carry);
+            }
         }
 
         /// <summary>

@@ -118,6 +118,59 @@ namespace PleaseDontDrown.Rescue
         }
 
         /// <summary>
+        /// Where a lifeguard's hands hold this body in their arms (a bridal carry): one forearm under the knee pits, the
+        /// other under the shoulder blades, palms up on the skin, fingers pointing away from the carrier.
+        /// </summary>
+        public bool CarryPoints(Vector3 carrier, out Vector3 back, out Vector3 knees, out Vector3 palm, out Vector3 fingers)
+        {
+            back = knees = palm = fingers = default;
+            if (!CarrySpots(out Vector3 backUnder, out Vector3 kneeUnder)) return false;
+            Vector3 toward = Vector3.ProjectOnPlane(carrier - backUnder, Vector3.up);
+            if (toward.sqrMagnitude < 1e-4f) return false;
+            palm = Vector3.up;
+            fingers = -toward.normalized;
+            float palmThick = 0.03f * _avatar.Scale;
+            back = backUnder - Vector3.up * palmThick;
+            knees = kneeUnder - Vector3.up * palmThick;
+            return true;
+        }
+
+        /// <summary>
+        /// The underside of the thighs nearest the knee that a hand from <paramref name="shoulder"/> can reach
+        /// (a big body's knees are beyond the short cartoon arms: slid level toward the shoulder, the hand landed on
+        /// top of the thighs). Null when even the hips are out of reach.
+        /// </summary>
+        public Vector3? ThighUnderWithin(Vector3 shoulder, float reach)
+        {
+            if (_avatar == null || !_avatar.IsBuilt) return null;
+            Transform hips = _avatar[AvatarRig.Bone.Hips], shinL = _avatar[AvatarRig.Bone.ShinL], shinR = _avatar[AvatarRig.Bone.ShinR];
+            if (hips == null || shinL == null || shinR == null) return null;
+            float s = _avatar.Scale, drop = 0.03f * s;
+            Vector3 knee = (shinL.position + shinR.position) * 0.5f + Vector3.up * (0.02f * s);
+            for (float t = 1f; t >= 0.2f; t -= 0.1f)
+            {
+                Vector3 p = BodySpace.Below(_avatar, Vector3.Lerp(hips.position, knee, t), 0.08f * s) - Vector3.up * drop;
+                if ((p - shoulder).sqrMagnitude <= reach * reach) return p;
+            }
+            return null;
+        }
+
+        /// <summary>The skin under the shoulder blades and under the knee pits, as the body is posed now.</summary>
+        private bool CarrySpots(out Vector3 back, out Vector3 knees)
+        {
+            back = knees = default;
+            if (_avatar == null || !_avatar.IsBuilt) return false;
+            Transform spine = _avatar[AvatarRig.Bone.Spine], chest = _avatar[AvatarRig.Bone.Chest];
+            Transform shinL = _avatar[AvatarRig.Bone.ShinL], shinR = _avatar[AvatarRig.Bone.ShinR];
+            if (spine == null || chest == null || shinL == null || shinR == null) return false;
+            float s = _avatar.Scale;
+            back = BodySpace.Below(_avatar, chest.position, 0.14f * s);
+            // (The knee is where the shin starts; just above it, under the end of the thighs.)
+            knees = BodySpace.Below(_avatar, (shinL.position + shinR.position) * 0.5f + Vector3.up * (0.02f * s), 0.08f * s);
+            return true;
+        }
+
+        /// <summary>
         /// How far from the middle of the body a rescuer kneels beside them: clear of the widest of the torso (a round
         /// dad's belly spreads far wider than a slim tourist's waist), close enough for the hands to reach the chest.
         /// </summary>
@@ -369,6 +422,9 @@ namespace PleaseDontDrown.Rescue
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Cough);
         }
 
+        private readonly System.Collections.Generic.List<AvatarRig> _nearBodies = new();
+        private bool _towed; // held while swimming (towed on the back), not carried across the arms
+
         // ------------------------------------------------------------------ holding
 
         public void GetHoldPose(PlayerHub holder, out Vector3 offset, out Quaternion rotation, out float pitchFollow)
@@ -376,6 +432,7 @@ namespace PleaseDontDrown.Rescue
             // Decided from the holder's synced position, so every machine agrees on the pose.
             Vector3 feet = holder != null ? holder.transform.position : transform.position;
             bool towing = WaterSurface.Exists && WaterSurface.HeightAt(feet) - feet.y > 1.1f;
+            _towed = towing;
             if (towing)
             {
                 // Lifeguard tow: on their back at the surface, a little ahead and to the right (keeps your view clear).
@@ -386,10 +443,57 @@ namespace PleaseDontDrown.Rescue
             else
             {
                 // Carried across the arms, face up, head to the right.
-                offset = new Vector3(0.05f, -0.64f, 0.62f); // close to the chest, in both arms
-                rotation = Quaternion.LookRotation(Vector3.up, Vector3.right);
+                // In both arms, against the chest under the chin, where the lifeguard's short cartoon arms (0.56 m)
+                // reach underneath. (Seen from outside this used to be pulled a third closer, PlayerHands'
+                // remote hold scale, which put a big belly into the big head.)
+                offset = new Vector3(0.05f, -0.78f, 0.45f);
+                // Face up, head to the right and carried a little higher than the legs (level, the limp head end hung
+                // down lower than the feet).
+                rotation = Quaternion.LookRotation(new Vector3(-0.54f, 0.84f, 0f), new Vector3(0.84f, 0.54f, 0f));
                 pitchFollow = 0.3f;
+                if (CradleOffset(holder, rotation, out Vector3 cradle))
+                {
+                    offset = cradle;
+                    pitchFollow = 0f;
+                }
             }
+        }
+
+        /// <summary>
+        /// Where the body goes to lie across the lifeguard's forearms (relative to their head, turned with them):
+        /// its back down on the forearms at elbow height, its near side against their belly. From both bodies' real
+        /// sizes, so the forearms can run underneath and be seen holding it up (held out in front, the short cartoon
+        /// arms could only reach its near side and it seemed to float with no hands).
+        /// </summary>
+        private bool CradleOffset(PlayerHub holder, Quaternion rotation, out Vector3 offset)
+        {
+            offset = default;
+            AvatarRig carrier = holder != null && holder.Avatar != null ? holder.Avatar.Rig : null;
+            if (carrier == null || !carrier.IsBuilt || holder.Head == null || !CarrySpots(out Vector3 backSpot, out Vector3 kneeSpot)) return false;
+            Transform shoulderL = carrier[AvatarRig.Bone.UpperArmL], shoulderR = carrier[AvatarRig.Bone.UpperArmR], belly = carrier[AvatarRig.Bone.Spine];
+            Transform hips = _avatar[AvatarRig.Bone.Hips];
+            if (shoulderL == null || shoulderR == null || belly == null || hips == null) return false;
+            Vector3 head = holder.Head.position, look = holder.Head.forward;
+            Quaternion yaw = Quaternion.Euler(0f, Mathf.Atan2(look.x, look.z) * Mathf.Rad2Deg, 0f);
+            Vector3 fwd = yaw * Vector3.forward;
+            float s = carrier.Scale;
+            // The lifeguard: forearms out in front at a little above the elbows hanging at their side, the belly.
+            float shoulderY = (shoulderL.position.y + shoulderR.position.y) * 0.5f;
+            float forearmY = shoulderY - carrier.UpperArmLength * 0.8f + 0.035f * s;
+            float front = Vector3.Dot(BodySpace.Surface(carrier, belly.position, fwd, 0.6f) - head, fwd);
+            // The spots and the bottom, from the root, turned the way the body is held.
+            Quaternion held = yaw * rotation, unturn = Quaternion.Inverse(transform.rotation);
+            Vector3 Held(Vector3 world) => held * (unturn * (world - transform.position));
+            Vector3 spots = (Held(backSpot) + Held(kneeSpot)) * 0.5f;
+            Vector3 nearDir = transform.rotation * (Quaternion.Inverse(held) * -fwd);
+            Vector3 bottom = Held(BodySpace.Surface(_avatar, hips.position, nearDir, 0.6f));
+            // The spots on the forearms, a forearm's reach out in front of the belly, and the bottom clear of the belly.
+            float ahead = Mathf.Max(front + 0.16f * s - Vector3.Dot(spots, fwd), front + 0.03f * s - Vector3.Dot(bottom, fwd));
+            Vector3 world = head + fwd * ahead;
+            world.y = forearmY - spots.y;
+            offset = Quaternion.Inverse(yaw) * (world - head);
+            offset.x = 0.1f * s; // (a little to the right: the back over the right forearm, coming straight forward from the elbow)
+            return true;
         }
 
         // ------------------------------------------------------------------ per frame (every machine)
@@ -471,7 +575,8 @@ namespace PleaseDontDrown.Rescue
             if (_avatar == null || !_avatar.IsBuilt) return;
             VictimState state = _brain.State;
             float armBend, legBend;
-            if (!state.IsConscious()) { armBend = 8f; legBend = 6f; }
+            if (_item.IsHeld && !_towed) { armBend = state.IsConscious() ? 25f : 10f; legBend = 88f; } // knees over the arm, shins hanging
+            else if (!state.IsConscious()) { armBend = 8f; legBend = 6f; }
             else if (_item.IsHeld) { armBend = 25f; legBend = 30f; }
             else if (state.IsStruggling()) { armBend = 30f + 15f * Mathf.Sin(Time.time * 5f); legBend = 35f + 20f * Mathf.Sin(Time.time * 4f); }
             else if (_wading || _walkingAway) { armBend = 18f; legBend = 22f; }
@@ -487,6 +592,20 @@ namespace PleaseDontDrown.Rescue
                 AvatarRig.Bone lower = upper + 1;
                 _avatar[upper].rotation = limb.Body.transform.rotation; // both hang down their local -Y at rest
                 _avatar[lower].localRotation = limb.IsArm ? Quaternion.Euler(-armBend, 0f, 0f) : Quaternion.Euler(legBend, 0f, 0f);
+            }
+
+            // The limp arms hang where the ragdoll lets them: carried against a lifeguard's chest, or with somebody
+            // kneeling right beside, they went into that body. Swung out at the shoulder until clear.
+            Transform hipsBone = _avatar[AvatarRig.Bone.Hips];
+            if (hipsBone != null)
+            {
+                BodySpace.Near(hipsBone.position, 0.9f, _avatar, null, _nearBodies);
+                if (_nearBodies.Count > 0)
+                {
+                    float radius = 0.03f * _avatar.Scale;
+                    BodySpace.SwingArmClear(_avatar[AvatarRig.Bone.UpperArmL], _avatar[AvatarRig.Bone.ForearmL], _avatar[AvatarRig.Bone.HandL], radius, _nearBodies);
+                    BodySpace.SwingArmClear(_avatar[AvatarRig.Bone.UpperArmR], _avatar[AvatarRig.Bone.ForearmR], _avatar[AvatarRig.Bone.HandR], radius, _nearBodies);
+                }
             }
 
             // Hands: limp when out cold, clawing at the water in a panic, reaching open-handed while going under.
@@ -591,6 +710,7 @@ namespace PleaseDontDrown.Rescue
                 return; // someone else simulates the torso, or a lifeguard's hands steer it
 
             _mode = "-";
+            if (!(state is VictimState.Fine or VictimState.Saved)) _riseStart = -1f; // (a fresh get-up next time they recover)
             if (Time.time < _layDownUntil)
             {
                 _mode = "laydown";
@@ -857,18 +977,58 @@ namespace PleaseDontDrown.Rescue
 
         private void WadeAshore() => StandAndWalk(true);
 
-        /// <summary>Lift a rescued person off the sand, right the torso, then let them walk inland.</summary>
+        // Getting up after being brought round: when it started (-1: not yet), and which way the body pointed then.
+        private float _riseStart = -1f;
+        private Vector3 _riseFromUp = Vector3.up;
+        private const float CatchBreath = 0.8f, RiseTime = 1.2f;
+
+        /// <summary>
+        /// Lift a rescued person off the sand, right the torso, then let them walk inland. Someone just brought round
+        /// on the sand first lies a moment catching their breath, then comes up over a second or so (the torso used to
+        /// whip upright in a fifth of a second, pivoting about its middle, often right into the lifeguard kneeling
+        /// there), easing away from whoever is right beside them.
+        /// </summary>
         private void StandAndWalk(bool moving)
         {
             Vector3 p = _rb.position;
             Vector3 v = _rb.linearVelocity;
             Quaternion rotation = _rb.rotation;
             Vector3 up = rotation * Vector3.up, forward = rotation * Vector3.forward;
-            // Held high enough that the feet clear the sand: dragging feet tipped the body forward into a stoop.
-            float lift = Mathf.Clamp((_groundY + 1.24f - p.y) * 90f - v.y * 20f + 10f, -30f, 55f);
+
+            if (_riseStart < 0f)
+            {
+                // (Already upright, wading out, say: nothing to get up from.)
+                _riseStart = up.y < 0.6f && !_wading ? Time.time : Time.time - CatchBreath - RiseTime;
+                _riseFromUp = up;
+            }
+            float since = Time.time - _riseStart;
+            if (since < CatchBreath)
+            {
+                KeepOnBack();
+                _riseFromUp = up;
+                return;
+            }
+            float rise = Mathf.SmoothStep(0f, 1f, (since - CatchBreath) / RiseTime);
+
+            // Held high enough that the feet clear the sand (dragging feet tipped the body forward into a stoop): that
+            // height comes up with the rise, not all at once.
+            float height = Mathf.Lerp(0.3f, 1.24f, rise);
+            float lift = Mathf.Clamp((_groundY + height - p.y) * 90f - v.y * 20f + 10f * rise, -30f, 55f);
             _rb.AddForce(Vector3.up * lift, ForceMode.Acceleration);
 
-            Vector3 tilt = Vector3.Cross(up, Vector3.up);
+            // Make room: don't come up inside the lifeguard kneeling right beside us.
+            if (rise < 1f)
+                foreach (Player.PlayerHub hub in Player.PlayerHub.All)
+                {
+                    if (hub == null) continue;
+                    Vector3 away = p - hub.transform.position;
+                    away.y = 0f;
+                    float d = away.magnitude;
+                    if (d < 0.75f && d > 1e-3f) _rb.AddForce(away / d * ((0.75f - d) * 14f), ForceMode.Acceleration);
+                }
+
+            Vector3 goal = Vector3.Slerp(_riseFromUp, Vector3.up, rise);
+            Vector3 tilt = Vector3.Cross(up, goal);
             if (tilt.sqrMagnitude < 0.001f && up.y < 0f)
                 tilt = rotation * Vector3.right; // an upside-down body needs a direction to start rolling
             // Turning toward the beach waits for the body to come upright (lying down, it only spun them on the sand).
@@ -1014,8 +1174,10 @@ namespace PleaseDontDrown.Rescue
                     {
                         // Out cold in somebody's arms: a soft carried shape (legs draped over the arm, arms hanging
                         // a little), not a rag folding over the carrier's head.
-                        SetDrive(limb, 60f, 6f);
-                        SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 12f, 10f) : LegPose(limb, 55f, 4f));
+                        // In the arms: the thighs held up and over the forearm (a strong drive: hung limp, the legs went
+                        // straight down to the sand and the body looked like it floated), the arms hanging a little.
+                        SetDrive(limb, limb.IsArm ? 60f : 900f, limb.IsArm ? 6f : 40f);
+                        SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 12f, 10f) : LegPose(limb, _towed ? 32f : 62f, 4f));
                         continue;
                     }
                     if (_brain.IsAshore)
@@ -1032,8 +1194,8 @@ namespace PleaseDontDrown.Rescue
                 if (held)
                 {
                     // Held: arms along the body, legs a little bent, a bit stiff.
-                    SetDrive(limb, 90f, 8f);
-                    SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 18f, 5f) : LegPose(limb, 15f, 6f));
+                    SetDrive(limb, limb.IsArm ? 90f : 900f, limb.IsArm ? 8f : 40f);
+                    SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 18f, 5f) : LegPose(limb, _towed ? 15f : 62f, 6f));
                     continue;
                 }
 

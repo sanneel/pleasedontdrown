@@ -54,6 +54,14 @@ namespace PleaseDontDrown.Player
         private readonly Hand _left = new() { Right = false, Side = -1f };
         private readonly Hand _right = new() { Right = true, Side = 1f };
         private SkinnedMeshRenderer _renderer;
+        private bool _shown = true;
+
+        /// <summary>Off in the third-person view (the body is seen there instead).</summary>
+        public void SetShown(bool shown)
+        {
+            _shown = shown;
+            if (_renderer != null) _renderer.enabled = shown;
+        }
         private Mesh _mesh;
         private AvatarLook _look;
         private bool _built;
@@ -141,6 +149,7 @@ namespace PleaseDontDrown.Player
             if (_renderer == null)
             {
                 _renderer = _root.gameObject.AddComponent<SkinnedMeshRenderer>();
+                _renderer.enabled = _shown;
                 _renderer.shadowCastingMode = ShadowCastingMode.Off;
                 _renderer.receiveShadows = false;
                 _renderer.updateWhenOffscreen = true;

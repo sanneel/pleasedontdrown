@@ -66,6 +66,119 @@ namespace PleaseDontDrown.Avatars
             return PushOut(ref p, radius, ignore, ignoreToo) && (p - point).sqrMagnitude > 0.0001f;
         }
 
+        /// <summary>The (drawn, measured) bodies other than these whose hips are within <paramref name="reach"/> of the point.</summary>
+        public static void Near(Vector3 point, float reach, AvatarRig ignore, AvatarRig ignoreToo, List<AvatarRig> result)
+        {
+            result.Clear();
+            for (int i = 0; i < _rigs.Count; i++)
+            {
+                AvatarRig rig = _rigs[i];
+                if (ReferenceEquals(rig, ignore) || ReferenceEquals(rig, ignoreToo) || !rig.IsBuilt) continue;
+                Transform hips = rig[Bone.Hips];
+                if (ReferenceEquals(hips, null)) continue;
+                float r = reach + 1.4f * rig.Scale;
+                if ((hips.position - point).sqrMagnitude > r * r) continue;
+                if (!rig.Renderer || !rig.Renderer.enabled || !rig.gameObject.activeInHierarchy || ShapeOf(rig) == null) continue;
+                result.Add(rig);
+            }
+        }
+
+        /// <summary>Moves the point out of these bodies (see <see cref="Near"/>). True when it had to move.</summary>
+        public static bool PushOut(ref Vector3 point, float radius, List<AvatarRig> bodies)
+        {
+            bool moved = false;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                bool hit = false;
+                for (int i = 0; i < bodies.Count; i++) hit |= ShapeOf(bodies[i]).PushOut(bodies[i], ref point, radius);
+                moved |= hit;
+                if (!hit) break;
+            }
+            return moved;
+        }
+
+        private static readonly Vector3[] ArmPoints = new Vector3[3];
+
+        /// <summary>
+        /// Swings an arm that no animator poses (a limp tourist's) out of these bodies at the shoulder, a few degrees
+        /// at a time, until its forearm and hand are clear.
+        /// </summary>
+        public static void SwingArmClear(Transform upper, Transform fore, Transform hand, float radius, List<AvatarRig> bodies)
+        {
+            if (bodies.Count == 0 || upper == null || fore == null || hand == null) return;
+            for (int step = 0; step < 12; step++)
+            {
+                ArmPoints[0] = hand.position;
+                ArmPoints[1] = Vector3.Lerp(fore.position, hand.position, 0.5f);
+                ArmPoints[2] = fore.position;
+                Vector3 best = Vector3.zero, from = Vector3.zero;
+                foreach (Vector3 p in ArmPoints)
+                {
+                    Vector3 q = p;
+                    if (!PushOut(ref q, radius, bodies)) continue;
+                    if ((q - p).sqrMagnitude > best.sqrMagnitude) { best = q - p; from = p; }
+                }
+                if (best.sqrMagnitude < 1e-6f) return;
+                Vector3 arm = from - upper.position;
+                Vector3 axis = Vector3.Cross(arm, best);
+                if (axis.sqrMagnitude < 1e-8f) return;
+                float angle = Mathf.Min(10f, Mathf.Rad2Deg * best.magnitude / Mathf.Max(0.1f, arm.magnitude) + 2f);
+                upper.rotation = Quaternion.AngleAxis(angle, axis.normalized) * upper.rotation;
+            }
+        }
+
+        /// <summary>
+        /// The skin of this body seen from <paramref name="direction"/>: from <paramref name="inside"/>, out along it
+        /// until clear of the body (at most <paramref name="reach"/>).
+        /// </summary>
+        public static Vector3 Surface(AvatarRig rig, Vector3 inside, Vector3 direction, float reach)
+        {
+            if (rig == null || !rig.IsBuilt || ShapeOf(rig) == null) return inside + direction * (reach * 0.3f);
+            float step = 0.01f * rig.Scale;
+            for (float d = 0f; d <= reach; d += step)
+            {
+                Vector3 p = inside + direction * d;
+                if (!InsideOf(rig, p, 0.004f)) return p;
+            }
+            return inside + direction * reach;
+        }
+
+        /// <summary>How deep the point (with that radius) is inside this one body (0: outside).</summary>
+        public static float DepthIn(AvatarRig rig, Vector3 point, float radius, bool arms = true)
+        {
+            if (rig == null || !rig.IsBuilt) return 0f;
+            Shape shape = ShapeOf(rig);
+            if (shape == null) return 0f;
+            Vector3 p = point;
+            return shape.PushOut(rig, ref p, radius, arms) ? (p - point).magnitude : 0f;
+        }
+
+        /// <summary>True when the point (with that radius) is inside this one body.</summary>
+        public static bool InsideOf(AvatarRig rig, Vector3 point, float radius)
+        {
+            if (rig == null || !rig.IsBuilt) return false;
+            Shape shape = ShapeOf(rig);
+            if (shape == null) return false;
+            Vector3 p = point;
+            return shape.PushOut(rig, ref p, radius) && (p - point).sqrMagnitude > 0.0001f;
+        }
+
+        /// <summary>
+        /// The underside of this body below <paramref name="from"/> (inside it): straight down until clear of its
+        /// skin. Falls back to <paramref name="fallbackDepth"/> under it when the body has no measured shape.
+        /// </summary>
+        public static Vector3 Below(AvatarRig rig, Vector3 from, float fallbackDepth)
+        {
+            if (rig == null || !rig.IsBuilt || ShapeOf(rig) == null) return from - Vector3.up * fallbackDepth;
+            float step = 0.015f * rig.Scale, limit = 0.6f * rig.Scale;
+            for (float d = 0f; d <= limit; d += step)
+            {
+                Vector3 p = from - Vector3.up * d;
+                if (!InsideOf(rig, p, 0.005f)) return p;
+            }
+            return from - Vector3.up * fallbackDepth;
+        }
+
         // ------------------------------------------------------------------ shapes
 
         private static readonly Dictionary<Mesh, Shape> _shapes = new();
@@ -222,12 +335,12 @@ namespace PleaseDontDrown.Avatars
                 return picked[Mathf.Clamp(Mathf.RoundToInt(q * (picked.Length - 1)), 0, picked.Length - 1)];
             }
 
-            public bool PushOut(AvatarRig rig, ref Vector3 point, float radius)
+            public bool PushOut(AvatarRig rig, ref Vector3 point, float radius, bool arms = true)
             {
                 bool hit = false;
                 for (int k = 0; k < Tubes.Length; k++)
                 {
-                    if (!_has[k]) continue;
+                    if (!_has[k] || (!arms && k >= 4 && k <= 7)) continue;
                     Transform bone = rig[Tubes[k].bone];
                     if (ReferenceEquals(bone, null)) continue;
                     Vector3 local = bone.InverseTransformPoint(point);

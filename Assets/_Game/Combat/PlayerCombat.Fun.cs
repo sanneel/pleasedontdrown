@@ -24,6 +24,7 @@ namespace PleaseDontDrown.Combat
         private static readonly string[] Ows = { "OW!", "HEY!", "MY HEAD!", "WHO THREW THAT?!", "OUCH!" };
 
         private float _dazedUntil = float.NegativeInfinity;
+        private bool _wasDazed;
         private float _dazeLength = 1f;
         private readonly Dictionary<PlayerHub, (int count, float time)> _combo = new();
         // Cannonball: where the feet were last frame against the water.
@@ -139,6 +140,9 @@ namespace PleaseDontDrown.Combat
                     look.ExtraDrop = k * 1.1f;
                 }
                 if (IsDazed && _hub.Motor != null) _hub.Motor.Stun(0.1f);
+                // The daze over: getting up off the sand takes a moment (AvatarAnimator.GetUpTime) before we can run.
+                if (_wasDazed && !IsDazed && _hub.Motor != null) _hub.Motor.Stun(0.9f);
+                _wasDazed = IsDazed;
             }
             UpdateCannonball();
         }

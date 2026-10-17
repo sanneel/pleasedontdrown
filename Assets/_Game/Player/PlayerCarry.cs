@@ -216,7 +216,7 @@ namespace PleaseDontDrown.Player
         private void UpdateCarrying(PlayerHub carried)
         {
             if (!GameInput.GameplayActive) return;
-            Transform aim = _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _hub.Head;
+            Transform aim = _hub.Look != null && _hub.Look.Aim != null ? _hub.Look.Aim : _hub.Head;
             Vector3 forward = aim.forward;
             if (GameInput.Drop.WasPressedThisFrame())
             {

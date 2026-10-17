@@ -30,6 +30,9 @@ namespace PleaseDontDrown.Avatars
         public Vector3[] FingerBasesL, FingerBasesR;
         [Tooltip("Bone lengths, three per finger.")]
         public float[] FingerLengthsL, FingerLengthsR;
+        [Tooltip("Which way each finger points from its knuckle, in hand space, as a right hand (empty: straight down). " +
+                 "Cartoon hands fan their fingers out; bent the straight-down way they curled sideways into a claw.")]
+        public Vector3[] FingerDirsL, FingerDirsR;
         [Tooltip("Eyelids on the eye bones and an open mouth on the mouth bone are part of the mesh: scaling those bones " +
                  "up closes the eyes / opens the mouth over the painted face.")]
         public bool HasFace;

@@ -148,11 +148,19 @@ namespace PleaseDontDrown.Combat
             }
             _lastLeft = left;
             _punchedAt[left ? 1 : 0] = Time.time;
-            Transform view = _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _hub.Head;
+            Transform view = _hub.Look != null && _hub.Look.Aim != null ? _hub.Look.Aim : _hub.Head;
             bool found = FindTarget(view.position, view.forward, out RaycastHit hit);
             Transform target = found ? hit.collider.transform : null;
             Vector3 local = found ? target.InverseTransformPoint(hit.point - view.forward * 0.15f) : Vector3.zero; // stop short of the surface
-            _hub.Gesture(AvatarGesture.Punch, found ? hit.point : view.position + view.forward * 1.1f);
+            // (Seen from outside as the same kind of punch, from the same hand: AvatarAnimator.Strike.)
+            AvatarGesture gesture = kind switch
+            {
+                PunchKind.Hook => left ? AvatarGesture.HookLeft : AvatarGesture.Hook,
+                PunchKind.Uppercut => left ? AvatarGesture.UppercutLeft : AvatarGesture.Uppercut,
+                PunchKind.Overhand => left ? AvatarGesture.OverhandLeft : AvatarGesture.Overhand,
+                _ => left ? AvatarGesture.PunchLeft : AvatarGesture.Punch,
+            };
+            _hub.Gesture(gesture, found ? hit.point : view.position + view.forward * 1.1f);
             if (_hub.Arms != null) _hub.Arms.PlayPunch(kind, left, target, local);
             PlaySwish();
             StartCoroutine(LandPunch(found, hit, target, local, damage, kind == PunchKind.Uppercut));
@@ -162,7 +170,7 @@ namespace PleaseDontDrown.Combat
         private System.Collections.IEnumerator LandPunch(bool found, RaycastHit hit, Transform target, Vector3 local, int damage, bool upward)
         {
             yield return new WaitForSeconds(StrikeTime);
-            Transform view = _hub.Look != null && _hub.Look.Camera != null ? _hub.Look.Camera.transform : _hub.Head;
+            Transform view = _hub.Look != null && _hub.Look.Aim != null ? _hub.Look.Aim : _hub.Head;
             Vector3 dir = view.forward;
             if (found && target != null) hit.point = target.TransformPoint(local);
             else if (!FindTarget(view.position, dir, out hit)) yield break; // swung at nothing
@@ -189,7 +197,7 @@ namespace PleaseDontDrown.Combat
                 if (_hub.Look != null) _hub.Look.Shake(0.25f, Random.value < 0.5f ? -1f : 1f); // a little kick back up the arm
             }
             else if (otherPlayer != null && otherPlayer != _hub)
-                ShovePlayerServer(otherPlayer, dir);
+                ShovePlayerServer(otherPlayer, dir, damage);
             else if (Item.FromCollider(hit.collider) is { } item && !item.IsHeld)
             {
                 // Knock loose things about (we take over their physics for a moment).
@@ -244,7 +252,7 @@ namespace PleaseDontDrown.Combat
         }
 
         [ServerRpc]
-        private void ShovePlayerServer(PlayerHub other, Vector3 dir)
+        private void ShovePlayerServer(PlayerHub other, Vector3 dir, int damage)
         {
             if (other == null || Time.time - _lastServerPunch < _cooldown * 0.6f) return;
             if ((other.transform.position - transform.position).sqrMagnitude > 4f * 4f) return;
@@ -252,7 +260,12 @@ namespace PleaseDontDrown.Combat
             Vector3 flat = new Vector3(dir.x, 0f, dir.z).normalized;
             if (other.TryGetComponent(out PlayerCombat combat))
             {
-                combat.ServerKnockback(flat * _shove + Vector3.up * 2.5f, _hub.DisplayName);
+                // As hard as the punch: a jab barely moves them (the next one still lands), an overhand sends them
+                // reeling. (Every punch used to shove a metre back, so the second of a combo hit air.)
+                float power = Mathf.Clamp01(damage / 45f);
+                power *= power;
+                combat.ServerKnockback(flat * (_shove * power) + Vector3.up * (2.5f * Mathf.Max(0.35f, power)), _hub.DisplayName);
+                Debug.Log($"[Fight] {_hub.DisplayName} punches {other.DisplayName} ({damage}, push {_shove * power:F1} m/s)");
                 ServerCountCombo(other, combat); // the third quick one knocks them flat
             }
             PunchFxObservers(other.transform.position + Vector3.up * 1.4f, false);
@@ -281,7 +294,7 @@ namespace PleaseDontDrown.Combat
         public void ServerKnockback(Vector3 velocity, string byWhom)
         {
             KnockTarget(Owner, velocity, byWhom ?? string.Empty);
-            KnockFxObservers();
+            KnockFxObservers(velocity);
         }
 
         [TargetRpc]
@@ -290,11 +303,16 @@ namespace PleaseDontDrown.Combat
             LastKnockedTime = Time.time;
             if (GodMode.On) return; // god mode: nothing knocks you about
             if (_hub.Motor != null && _hub.Motor.Seat == null) _hub.Motor.AddImpulse(velocity);
+            // The view takes the blow too (which way it jolts: the side it came from).
+            if (_hub.Look != null && _hub.Look.Camera != null)
+                _hub.Look.Shake(Mathf.Clamp(velocity.magnitude / 8f, 0.25f, 0.9f), Vector3.Dot(velocity, _hub.Look.Camera.transform.right) >= 0f ? 1f : -1f);
         }
 
         [ObserversRpc]
-        private void KnockFxObservers()
+        private void KnockFxObservers(Vector3 push)
         {
+            // Every machine sees the body take it: head snaps, chest twists, arms fly (it used to just slide back).
+            if (_hub.Avatar != null) _hub.Avatar.Flinch(push);
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Punch, 0.9f);
         }
     }

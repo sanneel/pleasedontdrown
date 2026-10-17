@@ -28,7 +28,52 @@ namespace PleaseDontDrown.Dev
                 StartCoroutine(Tap(key));
             }, owner: this);
 
-        private void OnDisable() => DevCommands.Unregister("presskey", this);
+        private void OnDisable()
+        {
+            DevCommands.Unregister("presskey", this);
+            DevCommands.Unregister("click", this);
+        }
+
+        private void Start() =>
+            DevCommands.Register("click", "[left|right] [seconds]", "Press a mouse button through the Input System, as a real click arrives.", args =>
+            {
+                bool right = args.Length > 0 && args[0].Equals("right", StringComparison.OrdinalIgnoreCase);
+                float hold = 0.05f;
+                foreach (string a in args)
+                    if (float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float h)) hold = h;
+                StartCoroutine(Click(right, hold));
+            }, owner: this);
+
+        private static IEnumerator Click(bool right, float hold)
+        {
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            Mouse mouse = Mouse.current ?? InputSystem.AddDevice<Mouse>();
+            if (!mouse.enabled) InputSystem.EnableDevice(mouse);
+            InputAction primary = right ? GameInput.Secondary : GameInput.Primary;
+            void Performed(InputAction.CallbackContext c) => Debug.Log($"[Keys] {c.action.name} performed");
+            primary.performed += Performed;
+            void Changed(object o, InputActionChange change)
+            {
+                if (change is InputActionChange.ActionStarted or InputActionChange.ActionPerformed or InputActionChange.ActionCanceled) return;
+                Debug.Log($"[Keys] change {change} on {(o as InputAction)?.name ?? (o as InputActionMap)?.name ?? (o as InputActionAsset)?.name ?? o?.ToString()} at frame {Time.frameCount}: {System.Environment.StackTrace}");
+            }
+            InputSystem.onActionChange += Changed;
+            Debug.Log($"[Keys] click {(right ? "right" : "left")}: mouse enabled {mouse.enabled}, action enabled {primary.enabled}, " +
+                      $"gameplay {GameInput.GameplayActive}, ignore devices {GameInput.IgnoreDevices}, cursor {Cursor.lockState}");
+            var state = new MouseState().WithButton(right ? MouseButton.Right : MouseButton.Left, true);
+            float until = Time.unscaledTime + hold;
+            do
+            {
+                InputSystem.QueueStateEvent(mouse, state);
+                yield return null;
+                Debug.Log($"[Keys] frame {Time.frameCount}: pressed {(right ? mouse.rightButton : mouse.leftButton).isPressed}, action {primary.phase}, enabled {primary.enabled}, wasPressed {primary.WasPressedThisFrame()}");
+            } while (Time.unscaledTime < until);
+            Debug.Log($"[Keys] button down: isPressed {(right ? mouse.rightButton : mouse.leftButton).isPressed}");
+            InputSystem.QueueStateEvent(mouse, new MouseState());
+            yield return null;
+            primary.performed -= Performed;
+            InputSystem.onActionChange -= Changed;
+        }
 
         private static IEnumerator Tap(Key key)
         {
