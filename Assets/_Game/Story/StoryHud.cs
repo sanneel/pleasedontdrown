@@ -88,6 +88,7 @@ namespace PleaseDontDrown.Story
         private void DrawObjective()
         {
             StoryDirector story = StoryDirector.Instance;
+            float below = Hud.Margin; // where the next thing in the top left can go
             if (story != null && !string.IsNullOrEmpty(story.Objective))
             {
                 if (story.Objective != _objective || story.Progress != _objectiveProgress || story.Goal != _objectiveGoal)
@@ -108,7 +109,9 @@ namespace PleaseDontDrown.Story
                     Hud.Bar(new Rect(card.x + 22f, card.yMax - 20f, width - 116f, 7f), (float)story.Progress / story.Goal, Hud.Teal);
                     Hud.Label(new Rect(card.xMax - 86f, card.yMax - 32f, 64f, 27f), $"{story.Progress} / {story.Goal}", 17f, Hud.Sand, TextAnchor.MiddleRight, shadow: false);
                 }
+                below = card.yMax + 6f;
             }
+            if (story != null && story.GalaGoal > 0) DrawGalaBar(story, below);
             if (Economy.Instance != null)
             {
                 // Wallet sits above the vitals as a compact, readable status chip.
@@ -124,6 +127,24 @@ namespace PleaseDontDrown.Story
                 Hud.Label(new Rect(pill.x + 18f, pill.y + 10f, pill.width - 36f, 18f), "TEAM FUNDS", 14f, Hud.Muted, TextAnchor.MiddleLeft, shadow: false);
                 Hud.Label(new Rect(pill.x + 18f, pill.y + 29f, pill.width - 36f, 33f), _moneyText, 28f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             }
+        }
+
+        /// <summary>
+        /// The gala fund (chapter 2): a plain bar under the objective that fills with the team's money toward the gala
+        /// ($1,000 per lifeguard). No numbers and no percent on purpose (Shako, Docs/16); it glows gold once full.
+        /// </summary>
+        private static void DrawGalaBar(StoryDirector story, float top)
+        {
+            const float width = 300f;
+            float fill = story.GalaFill01;
+            Hud.Label(new Rect(Hud.Margin + 2f, top, width, 20f), "GALA FUND", 15f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true);
+            var bar = new Rect(Hud.Margin, top + 24f, width, 12f);
+            if (fill >= 1f)
+            {
+                float glow = 0.35f + 0.25f * Mathf.Sin(Time.unscaledTime * 4f);
+                Hud.Fill(new Rect(bar.x - 3f, bar.y - 3f, bar.width + 6f, bar.height + 6f), new Color(1f, 0.82f, 0.35f, glow), 9f);
+            }
+            Hud.Bar(bar, fill, new Color(1f, 0.8f, 0.32f));
         }
 
         private void DrawMarker(Camera cam, PlayerHub local)

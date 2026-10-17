@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using FishNet.Connection;
 using FishNet.Object;
@@ -53,8 +54,8 @@ namespace PleaseDontDrown.Fun
         private int _shownBet;
         private float _nextPress;
 
-        private static bool Closed => StoryDirector.Instance != null && StoryDirector.Instance.BeatId is { } b &&
-                                      (b.StartsWith("2.6") || b.StartsWith("2.7") || b.StartsWith("3.") || b.StartsWith("4."));
+        // Open through the gala, closed for good once the pirates have robbed it (the team can't lose its money here then).
+        private static bool Closed => StoryDirector.Instance != null && StoryDirector.Instance.CasinoClosed;
 
         private int Bet => Bets[Mathf.Clamp(_betIndex, 0, Bets.Length - 1)];
 
@@ -123,6 +124,36 @@ namespace PleaseDontDrown.Fun
                     case "double": DoubleServer(); break;
                 }
             }, cheat: true, owner: this);
+            DevCommands.Register("bjtest", "[bet]", "Walk up to the blackjack table and play one hand by the book (hit under 17), then print the result.", args =>
+                StartCoroutine(PlayOneHand(args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 25)), cheat: true, owner: this);
+        }
+
+        /// <summary>The 'bjtest' command: stand at the felt, deal, hit under 17, stand, print what happened.</summary>
+        private IEnumerator PlayOneHand(int bet)
+        {
+            PlayerHub me = PlayerHub.Local;
+            if (me == null || _felt == null) yield break;
+            // The players' side of the felt, looking at the dealer's edge.
+            Vector3 side = _felt.right;
+            side.y = 0f;
+            Vector3 stand = _felt.position + side.normalized * 1.45f;
+            // On the casino floor under that spot (the felt is about a metre up).
+            if (Physics.Raycast(stand + Vector3.up * 0.3f, Vector3.down, out RaycastHit floor, 3f, ~0, QueryTriggerInteraction.Ignore))
+                stand = floor.point + Vector3.up * 0.05f;
+            me.Motor.Teleport(stand);
+            me.Look.LookAt(_felt.position + side.normalized * 0.45f);
+            yield return new WaitForSeconds(1f);
+            int money = Economy.Money;
+            DealServer(bet);
+            yield return new WaitForSeconds(1.2f);
+            for (int i = 0; i < 6 && _inHand && Total(_myCards) < 17; i++)
+            {
+                HitServer();
+                yield return new WaitForSeconds(1.2f);
+            }
+            if (_inHand) StandServer();
+            yield return new WaitForSeconds(1.5f);
+            Debug.Log($"[Blackjack] bjtest: you {Total(_myCards)}, wallet ${money} -> ${Economy.Money}");
         }
 
         // ------------------------------------------------------------------ host: dealing
@@ -321,6 +352,7 @@ namespace PleaseDontDrown.Fun
         {
             base.OnStopClient();
             DevCommands.Unregister("blackjack", this);
+            DevCommands.Unregister("bjtest", this);
             foreach (HandView view in _views.Values) view.Clear();
             _views.Clear();
         }

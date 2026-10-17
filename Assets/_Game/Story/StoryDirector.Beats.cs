@@ -83,7 +83,8 @@ namespace PleaseDontDrown.Story
             Add("2.4", "Shark!", SharkAttack);
             Add("2.5", "One more guest", OneMoreGuest);
             Add("2.5b", "The Kleptopus", Kleptopus);
-            Add("2.6", "Pirates", Pirates);
+            Add("2.5c", "The gala fund", GalaFund);
+            Add("2.6", "Gala night", GalaNightRaid);
             Add("2.7", "Your boat now", TheBoat);
             Add("3.1", "Sneak in", SkullCove);
             Add("3.2", "The THIEF", TheThief);
@@ -673,15 +674,11 @@ namespace PleaseDontDrown.Story
                 "(over the speaker) ", "Rescue the hotel guest");
         }
 
-        private IEnumerator Pirates()
-        {
-            _island = _island2;
-            EnsureOnIsland2();
-            yield return PirateRaid(_receptionist);
-        }
-
-        /// <summary>The pirate boat comes in, four pirates land and go for the lifeguards; done when they're all down.</summary>
-        private IEnumerator PirateRaid(StoryNpc receptionist)
+        /// <summary>
+        /// The pirate boat comes in, four pirates land and go for the lifeguards; done when they're all down. A robbery
+        /// (gala night): they go for the casino, and once they're down their boat gets away with the money anyway.
+        /// </summary>
+        private IEnumerator PirateRaid(StoryNpc receptionist, bool robbery = false)
         {
             if (_pirateBoat == null || _pirateBoatStart == null || _pirateLanding == null) yield break;
             _pirateBoat.ServerSetLocked(true, "Pirate boat (take down the pirates first)");
@@ -721,6 +718,7 @@ namespace PleaseDontDrown.Story
 
             // Everybody off! They charge up the beach toward the hotel.
             Vector3 hotel = _hotelDoor != null ? _hotelDoor.position : _pirateLanding.position + Vector3.forward * -20f;
+            if (robbery && CasinoDoor != null) hotel = CasinoDoor.position; // the casino's money
             for (int i = 0; i < pirates.Count; i++)
             {
                 StoryNpc pirate = pirates[i];
@@ -729,7 +727,7 @@ namespace PleaseDontDrown.Story
                 if (!float.IsNaN(ground)) off.y = ground;
                 pirate.ServerTeleport(off, _pirateLanding.eulerAngles.y + 180f); // jumped off onto the beach
                 pirate.ServerAggressive(true, hotel);
-                pirate.ServerShout(i == 0 ? "ARRR! Grab the loot, lads!" : "YARR!", false);
+                pirate.ServerShout(i == 0 ? (robbery ? "ARRR! To the casino, lads!" : "ARRR! Grab the loot, lads!") : "YARR!", false);
             }
             _defeated.Clear();
             int down = 0;
@@ -749,6 +747,11 @@ namespace PleaseDontDrown.Story
             }
             NoMarker();
             foreach (StoryNpc p in pirates) StartCoroutine(RemoveLater(p, 20f));
+            if (robbery)
+            {
+                yield return LootBoatEscapes();
+                yield break;
+            }
             if (receptionist != null)
             {
                 receptionist.ServerSetMood(AvatarMood.Happy);
@@ -760,15 +763,31 @@ namespace PleaseDontDrown.Story
         {
             _island = _island2;
             EnsureOnIsland2();
-            if (_pirateBoat == null) yield break;
-            _pirateBoat.ServerSetLocked(false);
-            SetObjective("The pirate boat is yours now. Get on board!");
-            Marker("Your boat", _pirateBoat.NetworkObject);
-            while (_pirateBoat.Driver == null) yield return null;
+            // The hotel's yacht at the marina (Task 8); without one, the pirates' boat back off the beach.
+            Vehicle boat = Yacht != null ? Yacht : _pirateBoat;
+            if (boat == null) yield break;
+            if (boat == _pirateBoat && _pirateLanding != null && (boat.transform.position - _pirateLanding.position).sqrMagnitude > 150f * 150f)
+                boat.ServerPlace(_pirateLanding.position + _pirateLanding.forward * 13f, _pirateLanding.eulerAngles.y);
+            if (_director != null)
+            {
+                SetObjective("Talk to the hotel director (lobby)");
+                Marker("Director", _director.NetworkObject);
+                yield return WaitTalk(_director, "Talk to the director");
+                _director.ServerSetTalkable(false);
+                NoMarker();
+                _director.ServerSetMood(AvatarMood.Angry);
+                yield return Say(_director, "Pirates. At MY gala. They sailed south, to Skull Cove. Everybody knows it, nobody goes there.");
+                _director.ServerSetMood(AvatarMood.Neutral);
+                yield return Say(_director, "You go. Get the casino's money back. Take the hotel's yacht, here are the keys. Don't scratch it.");
+            }
+            boat.ServerSetLocked(false);
+            SetObjective(boat == _pirateBoat ? "Take the pirates' boat. Get on board!" : "Take the hotel's yacht at the marina");
+            Marker(boat == _pirateBoat ? "Your boat" : "Yacht", boat.NetworkObject);
+            while (boat.Driver == null) yield return null;
             NoMarker();
             PopulateIsland3(); // Skull Cove's lookouts, guards and animals take their places while you're out at sea
             yield return Say(_receptionist, "(on the radio) Leaving already? Come back soon! ...Seriously. Please.");
-            yield return Say(_sandy, "(on the radio) A jet ski, and now a pirate ship? Who ARE you?");
+            yield return Say(_sandy, "(on the radio) A jet ski, and now a yacht? Who ARE you?");
             yield return ChapterReport("CHAPTER 2 COMPLETE");
             // On to Skull Cove, where the pirates took the casino's money (by boat, or the travel pads).
             Vector3 cove = NightDock; // the little dock on the mountain side (round the back of the island, at night)
@@ -776,6 +795,42 @@ namespace PleaseDontDrown.Story
             Marker("Skull Cove", cove + Vector3.up * 3f);
             while (StoryNpc.NearestPlayer(cove, 90f) == null) yield return new WaitForSeconds(0.5f);
             NoMarker();
+        }
+
+        /// <summary>The hotel's yacht (Task 8: a Vehicle called "Yacht" at the marina), or null.</summary>
+        private static Vehicle Yacht
+        {
+            get
+            {
+                foreach (Vehicle v in Vehicle.All)
+                    if (v != null && v.name == "Yacht") return v;
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Gala night: while the lifeguards fought the landing party, the rest ran the casino's money aboard: the boat pulls
+        /// away (too fast to catch) and is gone. It ends up at Skull Cove, where chapter 3 goes after it.
+        /// </summary>
+        private IEnumerator LootBoatEscapes()
+        {
+            if (_pirateBoat == null || _pirateBoatStart == null) yield break;
+            StoryNpc helm = SpawnNpc("Cap'n Gristle", NpcRole.Pirate, PirateLook(3), _pirateBoat.transform.position, 0f, 100);
+            helm.ServerRide(_pirateBoat, new Vector3(0f, 0.86f, -0.6f));
+            helm.ServerShout("HAR HAR! Thanks for the money, lifeguards!", false);
+            SetObjective("Their boat is getting away with the casino's money!");
+            Marker("Pirate boat", _pirateBoat.NetworkObject);
+            Vector3 away = _pirateBoatStart.position + (_pirateBoatStart.position - _pirateLanding.position).normalized * 120f;
+            _pirateBoat.ServerAutopilot(away, 16f);
+            float started = Time.time;
+            while (Time.time - started < 16f) yield return new WaitForSeconds(0.25f);
+            _pirateBoat.ServerAutopilot(null);
+            NoMarker();
+            Remove(helm);
+            // Out of sight: moored off Skull Cove's mountain-side dock (chapter 3 lands next to it), still locked.
+            _pirateBoat.ServerPlace(NightDock + new Vector3(-30f, 0f, 12f), 90f);
+            _pirateBoat.ServerSetLocked(true, "The pirates' boat");
+            Debug.Log("[Story] the pirates got away with the casino's money");
         }
     }
 }

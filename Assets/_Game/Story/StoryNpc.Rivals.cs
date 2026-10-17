@@ -156,6 +156,14 @@ namespace PleaseDontDrown.Story
             if (best._rival == null) best.StartRivalry(this, BarBrawlSeconds, null);
         }
 
+        /// <summary>Host: start a fight with another character now (a bar brawl), for <paramref name="seconds"/> or until one is down.</summary>
+        [Server]
+        public void ServerBrawlWith(StoryNpc other, float seconds, string shout)
+        {
+            if (other == null || other == this || IsDefeated || other.IsDefeated || !_fighting) return;
+            StartRivalry(other, seconds, shout);
+        }
+
         // ------------------------------------------------------------------ fighting a rival (from FightThink)
 
         /// <summary>Host: one step of a fight with another character. True while there is one (the lifeguards wait).</summary>

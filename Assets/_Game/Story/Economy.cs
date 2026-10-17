@@ -22,6 +22,10 @@ namespace PleaseDontDrown.Story
         [SerializeField] private int _payHospital = 200;
         [Tooltip("What the rival company bills the team for every tourist it has to airlift (never more than the team has).")]
         [SerializeField] private int _airliftBill = 30;
+        [Tooltip("Rescues on the hotel island (island 2) pay this much more (the hotel pays better).")]
+        [SerializeField] private float _hotelPayScale = 1.5f;
+        [Tooltip("What a VIP hotel guest tips the team for being rescued (min, max).")]
+        [SerializeField] private Vector2Int _vipTip = new(100, 300);
         [SerializeField] private AudioSource _audio;
 
         private readonly SyncVar<int> _money = new SyncVar<int>();
@@ -85,9 +89,22 @@ namespace PleaseDontDrown.Story
                 VictimEvent.Hospitalized => _payHospital,
                 _ => 0
             };
+            if (pay > 0 && OnHotelIsland(victim.transform.position)) pay = Mathf.RoundToInt(pay * _hotelPayScale);
             if (pay > 0) ServerAdd(pay, e == VictimEvent.Zapped ? "defibrillator" : e.ToString().ToLowerInvariant(), victim.Body.HeadPosition + Vector3.up);
+            // A VIP guest pulled out (and OK) tips on top, once. VIPs never take money away.
+            bool ok = e is VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized or VictimEvent.SelfRescue ||
+                      (e == VictimEvent.Saved && victim.State == VictimState.Saved);
+            if (ok && victim.IsVip && !victim.VipTipped)
+            {
+                victim.VipTipped = true;
+                int tip = Mathf.RoundToInt(Random.Range(_vipTip.x, _vipTip.y + 1) / 10f) * 10;
+                ServerAdd(tip, "VIP tip", victim.Body.HeadPosition + Vector3.up * 1.5f);
+                if (RescueService.Instance != null)
+                    RescueService.Instance.ServerAnnounce($"<color=#ffd24a><b>{victim.Name}</b> tips the team ${tip}!</color>");
+                return;
+            }
             // Lost to the rival company: they send the bill for the airlift.
-            if (e == VictimEvent.Lost && _airliftBill > 0 && _money.Value > 0)
+            if (e == VictimEvent.Lost && !victim.IsVip && _airliftBill > 0 && _money.Value > 0)
             {
                 int bill = Mathf.Min(_airliftBill, _money.Value);
                 ServerAdd(-bill, "airlift bill", victim.Body.HeadPosition + Vector3.up);
@@ -95,6 +112,9 @@ namespace PleaseDontDrown.Story
                     RescueService.Instance.ServerAnnounce($"<color=#ff9080>The rival company bills you ${bill} for the airlift.</color>");
             }
         }
+
+        /// <summary>On the hotel island (island 2), sea included: island 1 is round z 0, island 3 round z -900.</summary>
+        public static bool OnHotelIsland(Vector3 p) => p.z < -150f && p.z > -580f;
 
         /// <summary>Host: earn money (shown where it happened).</summary>
         [Server]

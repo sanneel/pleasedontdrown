@@ -39,6 +39,7 @@ namespace PleaseDontDrown.Rescue
         [SerializeField] private Transform _visual;
         [Tooltip("The cartoon body; its arms and legs follow the physics limbs.")]
         [SerializeField] private AvatarRig _avatar;
+        public AvatarRig Avatar => _avatar;
         [Tooltip("Spring bones (feminine figures): kicked by CPR compressions and breaths.")]
         [SerializeField] private AvatarJiggle _jiggle;
         [Tooltip("Torso-space height of the hips (where the leg joints are).")]
