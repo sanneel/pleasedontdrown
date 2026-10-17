@@ -61,6 +61,7 @@ namespace PleaseDontDrown.World
         private readonly List<Light> _lights = new();
         private readonly List<Light> _flicker = new();
         private float _applied = -1f;
+        private float _appliedMoon = -1f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Create()
@@ -136,7 +137,10 @@ namespace PleaseDontDrown.World
             Camera cam = Camera.main;
             float k = cam != null ? NightAt(cam.transform.position) : _applied < 0f ? 0f : _applied;
             Night = k;
-            if (!Mathf.Approximately(k, _applied)) Apply(k);
+            // The moon's angle only for island 3's own night: the gala keeps the sun's angle (a low moon made thousands
+            // more things cast shadows over the hotel island: +2 ms a frame on High).
+            float moon = cam != null ? Island3NightAt(cam.transform.position) : Mathf.Max(0f, _appliedMoon);
+            if (!Mathf.Approximately(k, _applied) || !Mathf.Approximately(moon, _appliedMoon)) Apply(k, moon);
             // Underwater has its own fog (UnderwaterFx); above it, the night's (or the day's).
             if (!UnderwaterFx.CameraUnderwater && k > 0.001f)
             {
@@ -153,27 +157,33 @@ namespace PleaseDontDrown.World
                     if (l != null) l.intensity = 2.6f * (0.82f + 0.18f * Mathf.PerlinNoise(Time.time * 7f, l.GetInstanceID() * 0.13f));
         }
 
+        /// <summary>Island 3's own night: 1 on it and close round it, 0 out past the channel.</summary>
+        private static float Island3NightAt(Vector3 p)
+        {
+            float dx = Mathf.Max(0f, Mathf.Abs(p.x - Centre.x) - Half.x), dz = Mathf.Max(0f, Mathf.Abs(p.z - Centre.y) - Half.y);
+            return 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(FullNightOut, DayOut, Mathf.Sqrt(dx * dx + dz * dz)));
+        }
+
         /// <summary>1 on island 3 and close round it, 0 out past the channel (and the same round island 2 during the gala).</summary>
         public static float NightAt(Vector3 p)
         {
-            float dx = Mathf.Max(0f, Mathf.Abs(p.x - Centre.x) - Half.x), dz = Mathf.Max(0f, Mathf.Abs(p.z - Centre.y) - Half.y);
-            float out_ = Mathf.Sqrt(dx * dx + dz * dz);
-            float k = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(FullNightOut, DayOut, out_));
+            float k = Island3NightAt(p);
             if (_hotelBlend <= 0f) return k;
-            dx = Mathf.Max(0f, Mathf.Abs(p.x - HotelCentre.x) - HotelHalf.x);
-            dz = Mathf.Max(0f, Mathf.Abs(p.z - HotelCentre.y) - HotelHalf.y);
+            float dx = Mathf.Max(0f, Mathf.Abs(p.x - HotelCentre.x) - HotelHalf.x);
+            float dz = Mathf.Max(0f, Mathf.Abs(p.z - HotelCentre.y) - HotelHalf.y);
             float hotel = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(HotelFullNightOut, HotelDayOut, Mathf.Sqrt(dx * dx + dz * dz)));
             return Mathf.Max(k, hotel * _hotelBlend);
         }
 
-        private void Apply(float k)
+        private void Apply(float k, float moon)
         {
             _applied = k;
+            _appliedMoon = moon;
             if (_sun != null)
             {
                 _sun.color = Color.Lerp(_daySunColor, NightMoon, k);
                 _sun.intensity = Mathf.Lerp(_daySunIntensity, NightMoonIntensity, k);
-                _sun.transform.rotation = Quaternion.Slerp(_daySunRotation, MoonRotation, k);
+                _sun.transform.rotation = Quaternion.Slerp(_daySunRotation, MoonRotation, moon);
             }
             if (_sky != null)
             {
