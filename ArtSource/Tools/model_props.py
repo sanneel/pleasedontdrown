@@ -1625,6 +1625,447 @@ def shack():
     bpy.context.view_layer.objects.active = ob
     bpy.ops.object.modifier_apply(modifier=mod.name)
 
+# ======================================================================================== island 1's beach village
+# (the user, 2026-10-18: bigger buildings, a bigger bar, boardwalks, sunbeds, volleyball, grass, a rope fence and a
+# welcome arch at the docks). Sizes match GameSceneBuilder.Island1Town.cs, which builds the colliders from them.
+
+# The lifeguard station (station-local: the sea is +z; the ground floor's front wall stands at z 0, the sand at y 0).
+LS = dict(F=0.3, gx=4.5, gz0=-6.0, h1=3.3, U=3.5, sx=4.7, sz0=-6.2, sz1=2.0, cx=3.0, cz0=-5.4, cz1=-1.6, E=6.1,
+          door=(-3.5, -2.4), door_h=2.2, cab_door=(1.3, 2.3), sx_stair=(4.75, 5.95), stair_low=1.6, stair_high=-4.0)
+
+@prop
+def lifeguard_station():
+    """Island 1's lifeguard station, two storeys: a white board ground floor (a door, windows) behind a plank porch,
+    a roof deck with railings over it, a glass-sided lookout cabin with a red gable roof and a flag, outside stairs up
+    the +x side to a landing, rescue boards, life rings and a LIFEGUARD board on the front railing."""
+    rng = random.Random(21)
+    F, gx, gz0, h1, U, sx, sz0, sz1 = LS["F"], LS["gx"], LS["gz0"], LS["h1"], LS["U"], LS["sx"], LS["sz0"], LS["sz1"]
+    cx, cz0, cz1, E = LS["cx"], LS["cz0"], LS["cz1"], LS["E"]
+    d0, d1 = LS["door"]
+    # Base: a concrete footing under the floor and porch, planks on top.
+    box("Footing", (0, (F - 0.6) / 2 - 0.03, (gz0 + sz1) / 2), (2 * sx, F + 0.6 - 0.06, sz1 - gz0), "concrete", bevel=0.02)
+    z, i = sz1, 0
+    while z > gz0 + 0.01:
+        w = min(0.22, z - gz0)
+        box(f"Plank{i}", (0, F - 0.03, z - w / 2), (2 * sx - 0.04, 0.06, w - 0.015), rng.choice(["wood_light", "wood_light", "wood"]), bevel=0.008)
+        z -= w; i += 1
+    # Ground floor walls: white boards, blue corners, a door and windows.
+    tones = ["siding", "siding", "siding_warm"]
+    wy = (F + 0.95, F + 2.25)
+    sided_wall("GFront", 'z', 0.0, 1, (-gx, gx), (F, h1), [(d0, d1, F, F + LS["door_h"]), (-1.4, 1.2, *wy), (2.0, 3.9, *wy)], 0.2, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("GBack", 'z', gz0, -1, (-gx, gx), (F, h1), [(-2.0, 0.0, *wy)], 0.2, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("GLeft", 'x', -gx, -1, (gz0, 0.0), (F, h1), [(-4.4, -1.6, *wy)], 0.2, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("GRight", 'x', gx, 1, (gz0, 0.0), (F, h1), [(-3.6, -2.0, *wy)], 0.2, tones, "siding_shadow", rng, inner="siding")
+    window("WinF1", 'z', 0.0, 1, -1.4, 1.2, *wy, "trim_blue", "glass", 0.2, sill="white")
+    window("WinF2", 'z', 0.0, 1, 2.0, 3.9, *wy, "trim_blue", "glass", 0.2, sill="white")
+    window("WinB", 'z', gz0, -1, -2.0, 0.0, *wy, "trim_blue", "glass", 0.2, sill="white")
+    window("WinL", 'x', -gx, -1, -4.4, -1.6, *wy, "trim_blue", "glass", 0.2, sill="white")
+    window("WinR", 'x', gx, 1, -3.6, -2.0, *wy, "trim_blue", "glass", 0.2, sill="white")
+    for x in (-gx, gx):
+        for zz in (gz0, 0.0):
+            box(f"GCorner{x}{zz}", (x, (F + h1) / 2, zz), (0.18, h1 - F, 0.18), "trim_blue", bevel=0.015)
+    box("GCeiling", (0, h1 - 0.03, gz0 / 2), (2 * gx - 0.1, 0.04, -gz0 - 0.1), "siding", bevel=0)
+    # Inside: a bench along the back wall and a first-aid cabinet.
+    box("BenchSeat", (1.8, F + 0.45, gz0 + 0.45), (2.4, 0.06, 0.45), "wood", bevel=0.01)
+    for x in (0.8, 2.8):
+        box(f"BenchLeg{x}", (x, F + 0.22, gz0 + 0.45), (0.06, 0.44, 0.4), "wood_dark", bevel=0.01)
+    box("Cabinet", (-3.6, F + 1.5, gz0 + 0.18), (0.7, 0.8, 0.25), "white", bevel=0.02)
+    box("CabinetCrossH", (-3.6, F + 1.5, gz0 + 0.31), (0.42, 0.12, 0.02), "red", bevel=0)
+    box("CabinetCrossV", (-3.6, F + 1.5, gz0 + 0.31), (0.12, 0.42, 0.02), "red", bevel=0)
+    # The roof deck: a slab with a white fascia, planks on top, over the porch on four posts.
+    box("DeckSlab", (0, 3.3 + (U - 3.3) / 2 - 0.03, (sz0 + sz1) / 2), (2 * sx, U - 3.3 - 0.06, sz1 - sz0), "white", bevel=0.01)
+    z, i = sz1, 0
+    while z > sz0 + 0.01:
+        w = min(0.22, z - sz0)
+        box(f"DeckPlank{i}", (0, U - 0.03, z - w / 2), (2 * sx - 0.04, 0.06, w - 0.015), rng.choice(["wood_light", "wood_light", "wood"]), bevel=0.008)
+        z -= w; i += 1
+    for x in (-gx, -1.5, 1.5, gx):
+        box(f"PorchPost{x}", (x, (F + 3.3) / 2, sz1 - 0.15), (0.2, 3.3 - F, 0.2), "white", bevel=0.02)
+    box("PorchBeam", (0, 3.18, sz1 - 0.15), (2 * sx, 0.22, 0.22), "white", bevel=0.015)
+    # The stairs' landing beside the deck, on two posts.
+    s0, s1 = LS["sx_stair"]
+    hz0, hz1 = LS["stair_low"], LS["stair_high"]
+    box("LandingSlab", ((sx + s1) / 2, 3.3 + (U - 3.3) / 2 - 0.03, (sz0 + hz1) / 2), (s1 - sx, U - 3.3 - 0.06, hz1 - sz0), "white", bevel=0.01)
+    box("LandingPlanks", ((sx + s1) / 2, U - 0.03, (sz0 + hz1) / 2), (s1 - sx - 0.04, 0.06, hz1 - sz0 - 0.04), "wood_light", bevel=0.008)
+    for zz in (sz0 + 0.15, hz1 - 0.15):
+        box(f"LandingPost{zz}", (s1 - 0.12, 3.3 / 2 - 0.15, zz), (0.18, 3.6, 0.18), "white", bevel=0.015)
+    stairs("Stairs", (s0 + s1) / 2, s1 - s0, (0.0, hz0), (U, hz1), 17, "wood_light", "wood", "white", rail=None)
+    # Railings round the deck (none where the landing joins it), the landing's outer edges, a hand rail up the stairs.
+    railing("RailFront", -sx + 0.04, sx - 0.04, sz1 - 0.04, True, U, 1.0, rng)
+    railing("RailLeft", sz0 + 0.04, sz1 - 0.04, -sx + 0.04, False, U, 1.0, rng)
+    railing("RailBack", -sx + 0.04, s1 - 0.04, sz0 + 0.04, True, U, 1.0, rng)
+    railing("RailRight", hz1, sz1 - 0.04, sx - 0.04, False, U, 1.0, rng)
+    railing("RailLanding", sz0 + 0.04, hz1, s1 - 0.04, False, U, 1.0, rng)
+    box("StairPostLow", (s1 - 0.04, 0.5, hz0 - 0.1), (0.08, 1.0, 0.08), "white", bevel=0.01)
+    tube("StairHand", [(s1 - 0.04, 1.0, hz0 - 0.1), (s1 - 0.04, U + 1.0, hz1)], 0.04, "white", seg=8)
+    # The LIFEGUARD board on the front railing, life rings on the sides.
+    box("SignBoard", (0, U + 0.6, sz1 + 0.06), (5.4, 0.8, 0.07), "white", bevel=0.02)
+    for side in (-1, 1):
+        box(f"SignRim{side}", (0, U + 0.6 + side * 0.42, sz1 + 0.07), (5.5, 0.07, 0.09), "trim_blue", bevel=0.01)
+    text3d("SignText", "LIFEGUARD", (0, U + 0.6, sz1 + 0.11), 0.52, 0.04, "red")
+    life_ring_at("RingL", (-sx - 0.06, U + 0.55, -2.0), 'x')
+    life_ring_at("RingR", (s1 + 0.04, U + 0.55, -5.1), 'x')
+    life_ring_at("RingFront", (-gx + 0.5, F + 1.75, 0.16), 'z')
+    # Rescue boards: one leaning between the front windows, two on the left wall.
+    prism("Board0", rounded_rect(0.52, 2.4, 0.25, 5), -0.04, 0.04, "red", plane='xy', centre=(1.6, F + 1.2, 0.22), rot=(-8, 0, 0), bevel=0.02)
+    box("BoardStripe0", (1.6, F + 1.2, 0.27), (0.06, 1.9, 0.012), "white", rot=(-8, 0, 0), bevel=0)
+    for k, zz in ((1, -2.6), (2, -3.4)):
+        prism(f"Board{k}", rounded_rect(0.52, 2.4, 0.25, 5), -0.04, 0.04, "red", plane='xy', centre=(-gx - 0.2, F + 1.2, zz), rot=(0, 90, 8), bevel=0.02)
+        box(f"BoardStripe{k}", (-gx - 0.25, F + 1.2, zz), (0.012, 1.9, 0.06), "white", rot=(0, 0, 8), bevel=0)
+    # The lookout cabin: glass all round, a doorway at the front right.
+    a0, a1 = LS["cab_door"]
+    cy = (U + 0.95, U + 2.15)
+    sided_wall("CFront", 'z', cz1, 1, (-cx, cx), (U, E), [(a0, a1, U, U + 2.15), (-2.6, 0.9, *cy)], 0.18, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("CBack", 'z', cz0, -1, (-cx, cx), (U, E), [(-2.4, 2.4, *cy)], 0.18, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("CLeft", 'x', -cx, -1, (cz0, cz1), (U, E), [(-4.9, -2.1, *cy)], 0.18, tones, "siding_shadow", rng, inner="siding")
+    sided_wall("CRight", 'x', cx, 1, (cz0, cz1), (U, E), [(-4.9, -2.1, *cy)], 0.18, tones, "siding_shadow", rng, inner="siding")
+    window("CWinF", 'z', cz1, 1, -2.6, 0.9, *cy, "trim_blue", None, 0.2, sill="white")  # open: a lookout you see out of
+    window("CWinB", 'z', cz0, -1, -2.4, 2.4, *cy, "trim_blue", None, 0.2, sill="white")  # open: a lookout you see out of
+    window("CWinL", 'x', -cx, -1, -4.9, -2.1, *cy, "trim_blue", None, 0.2, sill="white")  # open: a lookout you see out of
+    window("CWinR", 'x', cx, 1, -4.9, -2.1, *cy, "trim_blue", None, 0.2, sill="white")  # open: a lookout you see out of
+    for side, (sa, sb, ya, yb) in {"L": (a0 - 0.08, a0, U, U + 2.15), "R": (a1, a1 + 0.08, U, U + 2.15), "T": (a0 - 0.08, a1 + 0.08, U + 2.15, U + 2.23)}.items():
+        _wall_box(f"CDoorTrim{side}", 'z', cz1, (sa, sb), (ya, yb), 0.26, "trim_blue", bevel=0.008)
+    for x in (-cx, cx):
+        for zz in (cz0, cz1):
+            box(f"CCorner{x}{zz}", (x, (U + E) / 2, zz), (0.16, E - U, 0.16), "trim_blue", bevel=0.012)
+    box("CCeiling", (0, E - 0.02, (cz0 + cz1) / 2), (2 * cx - 0.1, 0.04, cz1 - cz0 - 0.1), "siding", bevel=0)
+    # Gable roof, the ridge along x, red sheets with courses, white rakes and fascias.
+    H, ov = 1.3, 0.45
+    ridge = E + H
+    for zz in (cz0, cz1):
+        verts = [(-cx - 0.08, E, zz - 0.05), (cx + 0.08, E, zz - 0.05), (0, ridge, zz - 0.05),
+                 (-cx - 0.08, E, zz + 0.05), (cx + 0.08, E, zz + 0.05), (0, ridge, zz + 0.05)]
+        add(f"Gable{zz}", verts, [(0, 1, 2), (3, 5, 4), (0, 3, 4, 1), (1, 4, 5, 2), (2, 5, 3, 0)], "siding")
+    for side in (-1, 1):
+        eave = Vector((side * (cx + ov), E - ov * H / cx, 0))
+        top = Vector((0, ridge, 0))
+        d = eave - top
+        ang = math.degrees(math.atan2(d.y, d.x))
+        normal = Vector((-d.y, d.x, 0)).normalized()
+        if normal.y < 0: normal = -normal
+        mid = (eave + top) / 2 + normal * 0.05
+        zlen = (cz1 - cz0) + 2 * ov
+        box(f"Roof{side}", (mid.x, mid.y, (cz0 + cz1) / 2), (d.length + 0.06, 0.1, zlen), "roof_red", rot=(0, 0, ang), bevel=0.02)
+        for zz in (cz0 - ov, cz1 + ov):
+            box(f"Rake{side}{zz}", (mid.x - normal.x * 0.06, mid.y - normal.y * 0.06, zz), (d.length + 0.06, 0.16, 0.06), "white", rot=(0, 0, ang), bevel=0.01)
+        box(f"Fascia{side}", (eave.x, eave.y - 0.06, (cz0 + cz1) / 2), (0.06, 0.18, zlen), "white", bevel=0.01)
+        for k in range(1, 6):
+            p = top + d * (k / 6) + normal * 0.105
+            box(f"Course{side}{k}", (p.x, p.y, (cz0 + cz1) / 2), (0.05, 0.025, zlen - 0.02), "roof_red_dark", rot=(0, 0, ang), bevel=0)
+    box("RidgeCap", (0, ridge + 0.08, (cz0 + cz1) / 2), (0.24, 0.1, (cz1 - cz0) + 2 * ov + 0.04), "roof_red_dark", bevel=0.03)
+    # A tall flag on the front of the ridge.
+    fz = cz1 + ov - 0.15
+    tube("FlagPole", [(0, ridge, fz), (0, ridge + 2.3, fz)], 0.035, "white", seg=8)
+    lathe("PoleTop", (0, ridge + 2.32, fz), arc_profile(0.06, -0.05, 0.05, 5), "gold", seg=8)
+    flag = []
+    for i in range(10):
+        u = i / 9
+        wave = math.sin(u * 6.0) * 0.1 * u
+        flag.append((0.05 + u * 1.3, ridge + 2.2 - u * 0.06, fz + wave))
+        flag.append((0.05 + u * 1.3, ridge + 1.4 + u * 0.06, fz + wave))
+    ob = add("Flag", flag, [(2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2) for i in range(9)], "red")
+    paint(ob, lambda c, n: "yellow" if c.y < ridge + 1.8 else None)
+    mod = ob.modifiers.new("solid", 'SOLIDIFY'); mod.thickness = 0.015
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+# The big beach bar (bar-local: the counter faces +z; the deck's floor centre at the origin).
+BB = dict(W=4.4, D=2.4, top=3.0, roof=1.7, terrace=4.2, stools=8)
+
+@prop
+def beach_bar_big():
+    """Island 1's beach bar, made big: the tiki bar's look (bamboo, thatch, a dark counter, shelves of bottles, bulbs)
+    twice as long with eight stools, a taller three-tier thatch, a big BEACH BAR board on the roof, and a plank terrace
+    in front with three round bar tables, their stools and two tiki torches."""
+    rng = random.Random(12)
+    W, D, H0, top, T = BB["W"], BB["D"], 0.15, BB["top"], BB["terrace"]
+    box("Deck", (0, H0 / 2, T / 2), (2 * W + 0.4, H0, 2 * D + 0.4 + T), "wood", bevel=0.015)
+    n = 26
+    for i in range(n):
+        z = -D - 0.1 + (i + 0.5) * (2 * D + 0.2 + T) / n
+        box(f"DeckBoard{i}", (0, H0 + 0.004, z), (2 * W + 0.35, 0.008, (2 * D + 0.2 + T) / n - 0.02), "wood_light" if i % 2 else "wood", bevel=0)
+    def bamboo(name, x, z, y0, y1, r=0.07):
+        lathe(name, (x, y0, z), [(0.0, 0.0), (r, 0.0), (r, y1 - y0), (0.0, y1 - y0)], "bamboo", seg=10)
+        k_n = int((y1 - y0) / 0.45)
+        for k in range(1, k_n + 1):
+            yk = y0 + k * (y1 - y0) / (k_n + 1)
+            lathe(f"{name}Ring{k}", (x, yk - 0.02, z), [(0.0, 0.0), (r + 0.012, 0.0), (r + 0.012, 0.04), (0.0, 0.04)], "bamboo_dark", seg=10)
+    for i, (x, z) in enumerate(((-W, -D), (0, -D), (W, -D), (-W, D), (0, D), (W, D))):
+        bamboo(f"Post{i}", x, z, H0, top + 0.1, 0.1)
+    box("BeamFront", (0, top + 0.05, D), (2 * W + 0.3, 0.16, 0.16), "bamboo_dark", bevel=0.02)
+    box("BeamBack", (0, top + 0.05, -D), (2 * W + 0.3, 0.16, 0.16), "bamboo_dark", bevel=0.02)
+    cz, ch = D - 0.35, 1.1
+    canes = 58
+    for i in range(canes):
+        x = -W + 0.15 + i * (2 * W - 0.3) / (canes - 1)
+        lathe(f"Cane{i}", (x, H0, cz + 0.22), [(0.0, 0.0), (0.045, 0.0), (0.045, ch - H0 - 0.06), (0.0, ch - H0 - 0.06)], "bamboo" if i % 2 else "bamboo_dark", seg=8)
+    box("CounterBody", (0, (H0 + ch) / 2, cz), (2 * W - 0.2, ch - H0, 0.4), "wood_dark", bevel=0.01)
+    box("CounterTop", (0, ch + 0.035, cz + 0.05), (2 * W + 0.1, 0.07, 0.7), "wood_dark", bevel=0.015)
+    box("CounterEdge", (0, ch + 0.035, cz + 0.4), (2 * W + 0.1, 0.09, 0.03), "teal_dark", bevel=0.006)
+    sz = -D + 0.25
+    box("ShelfBack", (0, 1.3, sz - 0.12), (2 * W - 0.4, 2.0, 0.04), "wood", bevel=0.01)
+    for k, y in enumerate((0.95, 1.45, 1.95)):
+        box(f"Shelf{k}", (0, y, sz), (2 * W - 0.4, 0.04, 0.26), "wood_light", bevel=0.006)
+        for b in range(20):
+            x = -W + 0.45 + b * (2 * W - 0.9) / 19 + rng.uniform(-0.04, 0.04)
+            mat = rng.choice(["bottle_green", "bottle_amber", "bottle_blue", "glass"])
+            h = rng.uniform(0.22, 0.32)
+            lathe(f"Bottle{k}{b}", (x, y + 0.02, sz), [(0.0, 0.0), (0.045, 0.0), (0.045, h * 0.6), (0.018, h * 0.78), (0.016, h), (0.0, h)], mat, seg=10)
+    box("BarBelowShelf", (0, 0.5, sz), (2 * W - 0.4, 0.7, 0.26), "teal", bevel=0.01)
+    for i, x in enumerate((-3.0, -0.3, 2.6)):
+        blob(f"CocoCup{i}", (x, ch + 0.13, cz - 0.05), (0.075, 0.065, 0.075), "husk", subdiv=2, rough=0.04, seed=i)
+        tube(f"Straw{i}", [(x, ch + 0.17, cz - 0.05), (x + 0.03, ch + 0.3, cz - 0.05)], 0.006, "red", seg=6)
+    def stool(name, x, z, colour):
+        lathe(f"{name}Seat", (x, 0.72, z), [(0.0, 0.0), (0.2, 0.0), (0.21, 0.04), (0.19, 0.08), (0.0, 0.08)], colour, seg=18)
+        lathe(f"{name}Post", (x, H0, z), [(0.0, 0.0), (0.035, 0.0), (0.035, 0.72 - H0), (0.0, 0.72 - H0)], "steel", seg=8)
+        lathe(f"{name}Foot", (x, H0, z), [(0.0, 0.0), (0.18, 0.0), (0.16, 0.03), (0.0, 0.03)], "steel", seg=14)
+        lathe(f"{name}Ring", (x, 0.38, z), [(0.13, 0.0), (0.15, 0.0), (0.15, 0.025), (0.13, 0.025)], "steel", seg=14)
+    for i in range(BB["stools"]):
+        stool(f"Stool{i}", -3.5 + i * 1.0, D + 0.35, "teal" if i % 2 else "orange")
+    # The terrace: three round bar tables, two stools at each, tiki torches at the front corners.
+    tz = D + 2.6
+    for t, x in enumerate((-3.0, 0.0, 3.0)):
+        lathe(f"Table{t}Top", (x, 1.02, tz), [(0.0, 0.0), (0.45, 0.0), (0.45, 0.05), (0.0, 0.05)], "wood_dark", seg=22)
+        lathe(f"Table{t}Leg", (x, H0, tz), [(0.0, 0.0), (0.06, 0.0), (0.06, 1.02 - H0), (0.0, 1.02 - H0)], "bamboo", seg=10)
+        lathe(f"Table{t}Foot", (x, H0, tz), [(0.0, 0.0), (0.28, 0.0), (0.25, 0.04), (0.0, 0.04)], "bamboo_dark", seg=16)
+        for s, dx in enumerate((-0.75, 0.75)):
+            stool(f"T{t}Stool{s}", x + dx, tz + 0.15, "orange" if (t + s) % 2 else "teal")
+    for side in (-1, 1):
+        x, z = side * (W - 0.1), D + T - 0.1
+        bamboo(f"Torch{side}", x, z, H0, 2.1, 0.045)
+        lathe(f"TorchCup{side}", (x, 2.05, z), [(0.0, 0.0), (0.07, 0.0), (0.11, 0.2), (0.0, 0.2)], "bamboo_dark", seg=10)
+        blob(f"TorchFlame{side}", (x, 2.36, z), (0.07, 0.16, 0.07), "orange", subdiv=2, rough=0.05, seed=side)
+        blob(f"TorchCore{side}", (x, 2.31, z), (0.045, 0.1, 0.045), "yellow", subdiv=2, rough=0.03, seed=side + 3)
+    # A low bamboo rail along the terrace's sides.
+    for side in (-1, 1):
+        x = side * (W + 0.1)
+        tube(f"RailTop{side}", [(x, 0.85, D + 0.3), (x, 0.85, D + T)], 0.04, "bamboo", seg=8)
+        for k in range(4):
+            zz = D + 0.3 + k * (T - 0.3) / 3
+            lathe(f"RailPost{side}{k}", (x, H0, zz), [(0.0, 0.0), (0.05, 0.0), (0.05, 0.75), (0.0, 0.75)], "bamboo_dark", seg=8)
+    # Thatched hip roof in three tiers, a shaggy fringe on each.
+    peak = top + BB["roof"]
+    ov = 0.75
+    base = [(-W - ov, -D - ov), (W + ov, -D - ov), (W + ov, D + ov), (-W - ov, D + ov)]
+    for tier, (shrink, lift) in enumerate(((1.0, 0.0), (0.72, 0.36), (0.45, 0.68))):
+        y0 = top + (peak - top) * lift + tier * 0.06
+        cs = [(x * shrink, z * shrink) for x, z in base]
+        ra, rb = (-W * 0.45 * shrink, peak + tier * 0.06, 0), (W * 0.45 * shrink, peak + tier * 0.06, 0)
+        slabs = []
+        for i in range(4):
+            (x0, z0), (x1, z1) = cs[i], cs[(i + 1) % 4]
+            if i == 1: verts, faces = [(x0, y0, z0), (x1, y0, z1), rb], [(0, 1, 2)]
+            elif i == 3: verts, faces = [(x0, y0, z0), (x1, y0, z1), ra], [(0, 1, 2)]
+            elif i == 0: verts, faces = [(x0, y0, z0), (x1, y0, z1), rb, ra], [(0, 1, 2, 3)]
+            else: verts, faces = [(x0, y0, z0), (x1, y0, z1), ra, rb], [(0, 1, 2, 3)]
+            slabs.append(add(f"Thatch{tier}{i}", verts, faces, ["straw", "straw_light", "straw"][tier]))
+        for o in slabs:
+            mod = o.modifiers.new("solid", 'SOLIDIFY'); mod.thickness = 0.14; mod.offset = 0
+            bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier=mod.name)
+        for i in range(4):
+            (x0, z0), (x1, z1) = cs[i], cs[(i + 1) % 4]
+            count = max(12, int(math.hypot(x1 - x0, z1 - z0) / 0.2))
+            ang = math.degrees(math.atan2(x1 - x0, z1 - z0))
+            for k in range(count):
+                u = (k + 0.5) / count
+                x, z = x0 + (x1 - x0) * u, z0 + (z1 - z0) * u
+                length = rng.uniform(0.3, 0.46) * (1.0 if tier == 0 else 0.75)
+                box(f"Fringe{tier}{i}{k}", (x, y0 - length / 2 + 0.06, z), (0.22, length, 0.05), rng.choice(["straw", "straw_dark", "straw_light"]),
+                    rot=(rng.uniform(-8, 8), ang + 90, rng.uniform(-6, 6)), bevel=0)
+    box("RidgeCap", (0, peak + 0.17, 0), (W * 0.45 * 2 * 0.45 + 0.4, 0.14, 0.26), "straw_dark", bevel=0.03)
+    # The big BEACH BAR board over the front, bulbs along the eave, chalkboard menus at both ends.
+    box("SignBoard", (0, top + 0.62, D + ov * 0.5), (3.6, 0.72, 0.08), "teal_dark", bevel=0.03)
+    box("SignRim", (0, top + 0.62, D + ov * 0.5 - 0.02), (3.75, 0.85, 0.06), "bamboo_dark", bevel=0.02)
+    text3d("SignText", "BEACH BAR", (0, top + 0.62, D + ov * 0.5 + 0.06), 0.42, 0.03, "yellow")
+    for side in (-1, 1):
+        box(f"SignPost{side}", (side * 1.5, top + 0.18, D + ov * 0.5), (0.08, 0.5, 0.08), "bamboo_dark", bevel=0.01)
+    bulbs = ["red", "yellow", "teal", "orange", "green", "blue"]
+    path = []
+    for k in range(25):
+        u = k / 24
+        x = -W - 0.5 + (2 * W + 1.0) * u
+        y = top - 0.15 - math.sin(u * math.pi * 6) ** 2 * 0.2
+        path.append((x, y, D + ov - 0.05))
+    tube("BulbWire", path, 0.008, "dark", seg=5)
+    for k, (x, y, z) in enumerate(path[1:-1]):
+        blob(f"Bulb{k}", (x, y - 0.06, z), (0.035, 0.05, 0.035), bulbs[k % len(bulbs)], subdiv=1, rough=0.0)
+    for side in (-1, 1):
+        x = side * (W + 0.34)
+        box(f"MenuFrame{side}", (x, 0.95, D - 0.1), (0.03, 0.78, 0.63), "wood_dark", bevel=0.01)
+        box(f"MenuBoard{side}", (x + side * 0.02, 0.95, D - 0.1), (0.02, 0.7, 0.55), "chalk", bevel=0.005)
+        text3d(f"MenuText{side}", "DRINKS", (x + side * 0.035, 1.15, D - 0.1), 0.08, 0.006, "white", face='+x' if side > 0 else '-x')
+        box(f"MenuLeg{side}", (x, 0.3, D - 0.1), (0.05, 0.6, 0.05), "wood_dark", bevel=0.008)
+
+@prop
+def boardwalk():
+    """A 2 m piece of boardwalk (local: along z, centred at the origin, the sand at y 0): planks across on two
+    runners, 1.8 m wide, the walking surface 8 cm up; pieces laid end to end make a path."""
+    rng = random.Random(5)
+    for x in (-0.7, 0.7):
+        box(f"Runner{x}", (x, 0.025, 0), (0.12, 0.05, 2.0), "wood_dark", bevel=0.01)
+    n = 9
+    for i in range(n):
+        z = -1.0 + (i + 0.5) * 2.0 / n
+        box(f"Plank{i}", (rng.uniform(-0.02, 0.02), 0.065, z), (1.8, 0.03, 2.0 / n - 0.025), rng.choice(["wood_light", "wood_light", "wood", "wood_old"]),
+            rot=(0, rng.uniform(-1.2, 1.2), 0), bevel=0.006)
+
+def _sunbed(cushion):
+    """A wooden sun lounger (local: 2 m along z, the head end at -z raised, its feet on the sand at y 0)."""
+    L, Wd, h = 2.0, 0.72, 0.32
+    for x in (-Wd / 2 + 0.04, Wd / 2 - 0.04):
+        box(f"Side{x}", (x, h - 0.05, 0.1), (0.06, 0.1, L - 0.2), "wood", bevel=0.01)
+        for z in (-0.8, 0.95):
+            box(f"Leg{x}{z}", (x, (h - 0.1) / 2, z), (0.07, h - 0.1, 0.07), "wood_dark", bevel=0.01)
+    for i in range(8):
+        z = -0.1 + i * 0.15
+        box(f"Slat{i}", (0, h, z), (Wd, 0.025, 0.11), "wood_light", bevel=0.005)
+    box("Mattress", (0, h + 0.06, 0.4), (Wd - 0.06, 0.09, 1.2), cushion, bevel=0.04, segments=2)
+    ang = 38
+    c = Vector((0, h + 0.06 + math.sin(math.radians(ang)) * 0.38, -0.2 - math.cos(math.radians(ang)) * 0.38))
+    box("Back", (0, c.y - 0.06, c.z), (Wd, 0.04, 0.8), "wood_light", rot=(-ang, 0, 0), bevel=0.01)
+    box("BackCushion", (0, c.y, c.z + 0.02), (Wd - 0.06, 0.08, 0.76), cushion, rot=(-ang, 0, 0), bevel=0.035, segments=2)
+    box("Prop", (0, h + 0.09, -0.45), (Wd - 0.16, 0.04, 0.04), "wood_dark", rot=(60, 0, 0), bevel=0.008)
+
+@prop
+def sunbed():
+    _sunbed("teal")
+
+@prop
+def sunbed_orange():
+    _sunbed("orange")
+
+def _parasol(a, b):
+    """A beach umbrella (local: the pole's foot at the origin): sixteen panels striped in two colours on a 2.45 m pole."""
+    tube("Pole", [(0, -0.3, 0), (0, 2.45, 0)], 0.035, "white", seg=8)
+    n = 16
+    rim, top, R = 2.0, 2.45, 1.25
+    verts = [(0, top, 0)] + [(math.cos(2 * math.pi * i / n) * R, rim, math.sin(2 * math.pi * i / n) * R) for i in range(n)]
+    faces = [(0, 1 + (i + 1) % n, 1 + i) for i in range(n)]
+    ob = add("Canopy", verts, faces, a)
+    paint(ob, lambda c, nn: b if int(((math.degrees(math.atan2(c.z, c.x)) + 360) % 360) / 22.5) % 2 else None)
+    mod = ob.modifiers.new("solid", 'SOLIDIFY'); mod.thickness = 0.03
+    bpy.context.view_layer.objects.active = ob; bpy.ops.object.modifier_apply(modifier=mod.name)
+    for i in range(n):
+        t = 2 * math.pi * (i + 0.5) / n
+        box(f"Flap{i}", (math.cos(t) * (R - 0.02), rim - 0.07, math.sin(t) * (R - 0.02)), (0.02, 0.12, 2 * R * math.sin(math.pi / n) * 0.98),
+            b if i % 2 else a, rot=(0, -math.degrees(t), 0), bevel=0)
+    lathe("Finial", (0, top, 0), arc_profile(0.05, -0.02, 0.08, 5), "white", seg=8)
+
+@prop
+def parasol_red():
+    _parasol("white", "red")
+
+@prop
+def parasol_teal():
+    _parasol("white", "teal")
+
+@prop
+def volleyball_net():
+    """A beach volleyball court (local: the net along x at z 0, the sand at y 0): two posts 9.6 m apart, the net's
+    top tape 2.43 m up over a mesh of cords, guy ropes to pegs, and the court's blue boundary ropes (8 m across,
+    16 m long) lying on the sand."""
+    for side in (-1, 1):
+        x = side * 4.8
+        tube(f"Post{side}", [(x, -0.4, 0), (x, 2.6, 0)], 0.06, "white", seg=10)
+        lathe(f"PostCap{side}", (x, 2.6, 0), arc_profile(0.07, -0.03, 0.05, 4), "red", seg=10)
+        for dz in (-1, 1):
+            tube(f"Guy{side}{dz}", [(x, 2.55, 0), (x + side * 1.4, 0.03, dz * 1.2)], 0.008, "rope", seg=5)
+            box(f"Peg{side}{dz}", (x + side * 1.4, 0.04, dz * 1.2), (0.06, 0.08, 0.06), "wood_dark", bevel=0.01)
+    box("TopTape", (0, 2.40, 0), (9.0, 0.07, 0.02), "white", bevel=0.004)
+    box("BottomTape", (0, 1.43, 0), (9.0, 0.05, 0.02), "white", bevel=0.004)
+    for side in (-1, 1):
+        box(f"SideTape{side}", (side * 4.0, 1.92, 0), (0.05, 1.0, 0.02), "white", bevel=0.004)
+        tube(f"Antenna{side}", [(side * 4.0, 1.43, 0), (side * 4.0, 3.2, 0)], 0.008, "red", seg=6)
+    for k in range(1, 9):
+        y = 1.43 + k * (2.40 - 1.43) / 9
+        box(f"CordH{k}", (0, y, 0), (8.0, 0.008, 0.008), "dark", bevel=0)
+    for k in range(1, 80):
+        x = -4.0 + k * 8.0 / 80
+        box(f"CordV{k}", (x, 1.92, 0), (0.008, 0.97, 0.008), "dark", bevel=0)
+    for side in (-1, 1):
+        tube(f"LineSide{side}", [(side * 4.0, 0.025, -8.0), (side * 4.0, 0.025, 8.0)], 0.025, "blue", seg=6)
+        tube(f"LineEnd{side}", [(-4.0, 0.025, side * 8.0), (4.0, 0.025, side * 8.0)], 0.025, "blue", seg=6)
+        for x in (-4.0, 4.0):
+            box(f"Corner{side}{x}", (x, 0.03, side * 8.0), (0.12, 0.06, 0.12), "blue_dark", bevel=0.01)
+
+@prop
+def beach_grass():
+    """A clump of dune grass (local: its root at the origin), about 0.8 m tall: thin tapering blades fanning out."""
+    rng = random.Random(17)
+    for i in range(34):
+        a = rng.uniform(0, 2 * math.pi)
+        lean = rng.uniform(8, 40)
+        h = rng.uniform(0.45, 0.95)
+        r0 = rng.uniform(0.0, 0.12)
+        base = Vector((math.cos(a) * r0, 0.0, math.sin(a) * r0))
+        dirv = Vector((math.cos(a) * math.sin(math.radians(lean)), math.cos(math.radians(lean)), math.sin(a) * math.sin(math.radians(lean))))
+        tip = base + dirv * h
+        side = Vector((-math.sin(a), 0, math.cos(a))) * rng.uniform(0.012, 0.022)
+        mid = base + dirv * h * 0.55 + Vector((math.cos(a), -0.2, math.sin(a))) * 0.04 * h
+        verts = [base - side, base + side, mid + side * 0.7, mid - side * 0.7, tip]
+        add(f"Blade{i}", verts, [(0, 1, 2, 3), (3, 2, 4)], rng.choice(["green", "moss", "straw", "moss", "green"]))
+
+@prop
+def rope_fence():
+    """4 m of rope fence (local: along x from -2 to 2, the sand at y 0): three weathered posts with a thick rope
+    sagging between them; pieces put end to end."""
+    for x in (-2.0, 0.0, 2.0):
+        box(f"Post{x}", (x, 0.35, 0), (0.1, 1.0, 0.1), "wood_old", bevel=0.015)
+        lathe(f"Cap{x}", (x, 0.85, 0), [(0.0, 0.0), (0.075, 0.0), (0.075, 0.03), (0.0, 0.05)], "wood_dark", seg=8)
+    path = []
+    for k in range(21):
+        x = -2.0 + k * 0.2
+        u = ((x + 2.0) % 2.0) / 2.0
+        path.append((x, 0.72 - math.sin(u * math.pi) * 0.14, 0.06))
+    tube("Rope", path, 0.022, "rope", seg=7)
+
+@prop
+def welcome_arch():
+    """The welcome arch where a dock lands (local: you walk through it along z, posts at x +-2.6, the sand at y 0):
+    two thick posts wrapped in rope, a bowed teal board reading PLEASE DON'T DROWN on both faces, a life ring on top
+    and pennants on a rope."""
+    for side in (-1, 1):
+        x = side * 3.0
+        box(f"Post{side}", (x, 2.0, 0), (0.3, 4.6, 0.3), "wood", bevel=0.03)
+        for k in range(6):
+            lathe(f"Wrap{side}{k}", (x, 0.5 + k * 0.08, 0), [(0.18, 0.0), (0.19, 0.03), (0.18, 0.06)], "rope", seg=10)
+        lathe(f"Cap{side}", (x, 4.3, 0), [(0.0, 0.0), (0.21, 0.0), (0.21, 0.08), (0.0, 0.2)], "red", seg=10)
+    box("Beam", (0, 3.6, 0), (6.4, 0.22, 0.24), "wood_dark", bevel=0.02)
+    n = 14
+    lo, hi = [], []
+    for i in range(n + 1):
+        u = i / n
+        x = -3.15 + 6.3 * u
+        lift = math.sin(u * math.pi) * 0.35
+        lo.append((x, 3.75 + lift, 0)); hi.append((x, 4.55 + lift, 0))
+    verts = []
+    for i in range(n + 1):
+        for z in (-0.06, 0.06):
+            verts.append((lo[i][0], lo[i][1], z)); verts.append((hi[i][0], hi[i][1], z))
+    faces = []
+    for i in range(n):
+        a, b = 4 * i, 4 * (i + 1)
+        faces += [(a + 2, a + 3, b + 3, b + 2), (a + 1, a, b, b + 1), (a + 3, a + 1, b + 1, b + 3), (a, a + 2, b + 2, b)]
+    faces += [(0, 1, 3, 2), (4 * n, 4 * n + 2, 4 * n + 3, 4 * n + 1)]
+    add("Board", verts, faces, "teal")
+    tube("RimTop", [(p[0], p[1] + 0.04, 0) for p in hi], 0.05, "yellow", seg=6)
+    tube("RimLow", [(p[0], p[1] - 0.04, 0) for p in lo], 0.05, "yellow", seg=6)
+    for face, zz in (("+z", 0.075), ("-z", -0.075)):
+        t = text3d(f"Text{face}", "PLEASE DON'T DROWN", (0, 4.15, zz), 0.31, 0.03, "white", face=face)
+        for v in t.data.vertices:  # follow the board's bow
+            u3 = U(v.co)
+            k = (u3.x + 3.15) / 6.3
+            v.co = B((u3.x, u3.y + math.sin(max(0.0, min(1.0, k)) * math.pi) * 0.35, u3.z))
+    life_ring_at("Ring", (0, 5.25, 0), 'z', radius=0.36, tube_r=0.09)
+    path = []
+    for k in range(17):
+        u = k / 16
+        path.append((-3.0 + 6.0 * u, 3.45 - math.sin(u * math.pi) * 0.45, 0.17))
+    tube("FlagRope", path, 0.01, "rope", seg=5)
+    cols = ["red", "yellow", "teal", "orange", "blue", "green"]
+    for k, (x, y, z) in enumerate(path[1:-1]):
+        add(f"Pennant{k}", [(x - 0.12, y, z), (x + 0.12, y, z), (x, y - 0.28, z)], [(0, 1, 2)], cols[k % len(cols)])
+
 # ---------------------------------------------------------------------------------------- run
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -1637,7 +2078,9 @@ VIEWS = {"watch_tower": (0.9, 0.55, 1.0), "shack": (0.9, 0.55, 1.0), "dock": (1.
          "trampoline": (0.9, 0.6, 1.0), "human_cannon": (1.0, 0.5, 0.6), "cannon_barrel": (1.0, 0.5, 0.6), "cannon_wheel": (1.0, 0.2, 0.2), "diving_board": (1.0, 0.5, 0.8),
          "zipline_post": (1.0, 0.3, 1.0), "zipline_handle": (1.0, 0.3, 1.0),
          "banana_boat": (1.0, 0.5, 0.7), "parrot": (0.8, 0.35, 1.0), "parrot_wing": (1.0, 0.3, 0.3),
-         "beach_toilets": (0.8, 0.45, 1.0), "beach_bar": (0.8, 0.45, 1.0)}
+         "beach_toilets": (0.8, 0.45, 1.0), "beach_bar": (0.8, 0.45, 1.0),
+         "lifeguard_station": (0.8, 0.5, 1.0), "beach_bar_big": (0.8, 0.45, 1.0), "welcome_arch": (0.6, 0.3, 1.0),
+         "volleyball_net": (0.7, 0.6, 1.0), "sunbed": (0.8, 0.6, 0.6), "boardwalk": (0.8, 0.8, 0.6)}
 for name, build in PROPS.items():
     if only and name not in only: continue
     for ob in [o for o in bpy.data.objects if o.type == 'MESH']: bpy.data.objects.remove(ob)

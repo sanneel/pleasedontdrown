@@ -831,7 +831,7 @@ namespace PleaseDontDrown.Editor
         {
             float height = Mathf.Max(Mathf.Max(ProfileHeight(ShoreCoordinate(x, z), x, z, true), Island2Ground(x, z)),
                 Mathf.Max(ProfileHeight(DevIslandShore(x, z), x, z, false), Island3Height(x, z)));
-            return BasketballGroundHeight(x, z, height);
+            return BasketballGroundHeight(x, z, height + Island1DuneHeight(x, z));
         }
 
         private static float ProfileHeight(float shore, float x, float z, bool dunesInland)

@@ -40,3 +40,24 @@ Removed on request: the water slide and the soccer goal.
 Tested by code: `dunk` scores a swish; a thrown ring brought a tourist in round the dock and credited the thrower; the
 island 1 story (with the hut scene in beat 1.2 or 1.5) passes with a client. Not tested: punches between two real
 players, the cannonball, how it all feels.
+
+## The beach village (2026-10-18)
+
+Asked for by the user: bigger buildings (Sandy's house and the toilets stay as they are), a bigger bar, and the empty
+middle filled. Built by `GameSceneBuilder.Island1TownBatch` (`Editor/GameSceneBuilder.Island1Town.cs`) as edits to the
+saved scene; it replaces what it made before, so **run it again after taking someone else's Game.unity in a merge**.
+
+| What | Where / how |
+|---|---|
+| **Lifeguard station** | Replaces the red-roof house (`Environment/Tower` is gone; now `Environment/LifeguardStation`, same spot). Two storeys: a room you walk into (real door), a roof deck over the porch with a LIFEGUARD board, a lookout cabin with open windows and a stool, outside stairs on the west side. Model `lifeguard_station` (model_props.py), colliders from the same numbers (`St*` constants). |
+| **Beach bar** | Same object, big model `beach_bar_big`: an 8.8 m counter with 8 stools, a terrace with 3 bar tables and tiki torches. The barista, his 8 serving spots, the wipe and drink spots moved with the counter (ordering a beer tested). |
+| **Boardwalks** | From both docks to a promenade behind the station (z 18), up to the toilets, the bar's terrace and the lighthouse (`Island1Boardwalks`). |
+| **Welcome arches** | PLEASE DON'T DROWN arches where the west dock and Milo's pier land (`welcome_arch`). |
+| **Sunbeds** | 18 sunbeds in pairs with striped umbrellas: two rows in the middle, one on the west side. |
+| **Volleyball** | A court with a net east of the bar (`volleyball_net`, its lines on the sand). |
+| **Dunes** | Four low dunes in the terrain itself (`Island1Dunes`, added in `BeachHeight`), with beach grass, rocks and a rope fence. |
+| **Lighthouse** | Tripo (`.claude/skills/pdd-tripo/prompts/island1.md`), 16 m, at the back (22, 47.5), door toward the beach, rocks round its foot, mesh collider. |
+
+Palms, towels and loose items that stood where these went were moved to free sand (the batch logs every move to
+`Logs/island1-town.txt`). Cost on Low: about +0.2 ms a frame at the spawn (3.1 ms). The island 1 story autoplay
+still runs through to 2.2.
