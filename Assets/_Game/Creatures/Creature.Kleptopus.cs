@@ -73,7 +73,7 @@ namespace PleaseDontDrown.Creatures
             _boss.PhaseChanged += phase =>
             {
                 _bossPhase.Value = (byte)phase;
-                RoarObservers(phase == 2 ? "The Kleptopus is fuming!" : "The Kleptopus goes berserk!");
+                RoarObservers(phase == 2 ? $"{(_cousin.Value ? DisplayName : "The Kleptopus")} is fuming!" : $"{(_cousin.Value ? DisplayName : "The Kleptopus")} goes berserk!");
                 ServerBossPhase?.Invoke(this, phase);
             };
             _bossPhase.Value = 1;
@@ -126,7 +126,13 @@ namespace PleaseDontDrown.Creatures
                 default:
                     if (!ActDone) break;
                     // Grab sunbathers in phase 1 (now and then in 2).
-                    if ((phase == 1 || (phase == 2 && Random.value < 0.4f)) && Time.time >= _nextGrab && FreeArm(out int a))
+                    if (_cousin.Value && Time.time >= _nextGrab && FreeArm(out int c))
+                    {
+                        // The cousin: tourists in the water, in every phase.
+                        _nextGrab = Time.time + _boss.ByPhase(6f, 8f, 11f);
+                        GrabSwimmer(c);
+                    }
+                    else if (!_cousin.Value && (phase == 1 || (phase == 2 && Random.value < 0.4f)) && Time.time >= _nextGrab && FreeArm(out int a))
                     {
                         _nextGrab = Time.time + _boss.ByPhase(9f, 14f, 99f);
                         GrabSunbather(a);
@@ -139,7 +145,7 @@ namespace PleaseDontDrown.Creatures
                         _nextSteal = Mathf.Min(_nextSteal, Time.time + 1.2f); // the snatch comes out of the cloud
                         break;
                     }
-                    if (phase == 2 && !_holdsGun.Value && Time.time >= _nextSteal && FreeArm(out int s))
+                    if (phase == 2 && !_cousin.Value && !_holdsGun.Value && Time.time >= _nextSteal && FreeArm(out int s))
                     {
                         _nextSteal = Time.time + 12f;
                         TrySteal(s);
@@ -168,6 +174,11 @@ namespace PleaseDontDrown.Creatures
 
         private void ArmThink(int i, float dt)
         {
+            if (_draggedVictim[i] != null && Arm(i) is ArmState.Reach or ArmState.Drag)
+            {
+                VictimArmThink(i, dt); // (the cousin: a tourist in the water)
+                return;
+            }
             switch (Arm(i))
             {
                 case ArmState.Reach:
@@ -229,6 +240,7 @@ namespace PleaseDontDrown.Creatures
         /// <summary>Let go of whoever the arm drags: in the water they're a rescue now; still on the sand, they run.</summary>
         private void LetGoOf(int arm, bool unconscious = false)
         {
+            if (LetGoOfVictim(arm)) return; // (the cousin's: still in the water, a rescue)
             StoryNpc npc = _dragged[arm];
             _dragged[arm] = null;
             if (npc == null) return;
@@ -448,7 +460,7 @@ namespace PleaseDontDrown.Creatures
         {
             ReleaseEverything();
             _bossOpen.Value = false;
-            RoarObservers("THE KLEPTOPUS IS BEATEN!");
+            RoarObservers(_cousin.Value ? $"{DisplayName.ToUpperInvariant()} IS BEATEN!" : "THE KLEPTOPUS IS BEATEN!");
             // The loot spills out onto the sand by the pier: things the guests lost, to give back.
             string[] kinds = { "Wallet", "Phone", "Sunglasses", "Watch", "Wallet", "Sunglasses" };
             Vector3 shore = _pierEdge;
@@ -465,7 +477,7 @@ namespace PleaseDontDrown.Creatures
                 toward.y = 0f;
                 StartCoroutine(Toss(item, toward.normalized * Random.Range(3f, 6f) + Vector3.up * 5f));
             }
-            if (Economy.Instance != null) Economy.Instance.ServerAdd(KleptopusReward, "the Kleptopus (the hotel's thanks)", transform.position);
+            if (Economy.Instance != null && !_cousin.Value) Economy.Instance.ServerAdd(KleptopusReward, "the Kleptopus (the hotel's thanks)", transform.position);
         }
     }
 }

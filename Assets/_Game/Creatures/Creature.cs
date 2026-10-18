@@ -89,6 +89,7 @@ namespace PleaseDontDrown.Creatures
             base.OnStartNetwork();
             _all.Add(this);
             _kind.OnChange += (_, kind, _) => BuildBody(kind);
+            _cousin.OnChange += (_, _, _) => ApplyCousinLook();
             BuildBody(_kind.Value);
         }
 
