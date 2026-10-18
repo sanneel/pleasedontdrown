@@ -633,6 +633,9 @@ namespace PleaseDontDrown.Editor
             Primitive(PrimitiveType.Cube, "Sofa", villa, new Vector3(-5.2f, 0.45f, 2.5f), new Vector3(1.1f, 0.7f, 3.6f), FkOrange);
             for (int i = 0; i < 4; i++)
                 PropModel(i % 2 == 0 ? "wallet" : "watch", villa, new Vector3(-0.8f + i * 0.5f, 0.97f, 3.3f), i * 40f, 1.6f);
+            // The giant grabber claw from the Lost & Found, on its stand by the sofa (she takes it for the last fight:
+            // StoryDirector copies this one into her hand).
+            BuildGrabberClaw(villa, new Vector3(-6.6f, 0.25f, 4.6f));
             var lamp = new GameObject("VillaLight").AddComponent<Light>();
             lamp.transform.SetParent(villa, false);
             lamp.transform.localPosition = new Vector3(0f, vh - 0.6f, 0f);
@@ -674,6 +677,40 @@ namespace PleaseDontDrown.Editor
             I4Point("CliffPathTop", I4At(I4RampTop, 0.1f), 50f);
         }
 
+        /// <summary>
+        /// A 2.6 m grabber (a litter picker for giants): orange pole, black grip at the near end, three gold fingers at
+        /// the far one. Its "Claw" child points along +z from the grip (the hand holds it at its origin). Looks only.
+        /// </summary>
+        private static void BuildGrabberClaw(Transform parent, Vector3 standFoot)
+        {
+            Material gold = GetMaterial("FkStatueGold", new Color(0.93f, 0.72f, 0.3f), metallic: 0.85f, smoothness: 0.62f);
+            var stand = new GameObject("ClawStand").transform;
+            stand.SetParent(parent, false);
+            stand.localPosition = standFoot;
+            Primitive(PrimitiveType.Cube, "Base", stand, new Vector3(0f, 0.05f, 0f), new Vector3(0.6f, 0.1f, 0.6f), FkDark, keepCollider: false);
+            var claw = new GameObject("GrabberClaw").transform;
+            claw.SetParent(stand, false);
+            claw.localPosition = new Vector3(0f, 0.15f, 0f);
+            claw.localRotation = Quaternion.Euler(-82f, 0f, 0f); // standing up on its end
+            GameObject pole = Primitive(PrimitiveType.Cylinder, "Pole", claw, new Vector3(0f, 0f, 1.3f), new Vector3(0.07f, 1.3f, 0.07f), FkOrange, keepCollider: false);
+            pole.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            GameObject grip = Primitive(PrimitiveType.Cylinder, "Grip", claw, new Vector3(0f, 0f, 0.12f), new Vector3(0.1f, 0.14f, 0.1f), FkDark, keepCollider: false);
+            grip.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            Primitive(PrimitiveType.Cube, "Trigger", claw, new Vector3(0f, -0.08f, 0.22f), new Vector3(0.04f, 0.12f, 0.06f), FkDark, keepCollider: false);
+            Primitive(PrimitiveType.Sphere, "Knuckle", claw, new Vector3(0f, 0f, 2.62f), Vector3.one * 0.16f, gold, keepCollider: false);
+            for (int i = 0; i < 3; i++)
+            {
+                var finger = new GameObject("Finger").transform;
+                finger.SetParent(claw, false);
+                finger.localPosition = new Vector3(0f, 0f, 2.64f);
+                finger.localRotation = Quaternion.Euler(0f, 0f, i * 120f);
+                Primitive(PrimitiveType.Cube, "Bone", finger, new Vector3(0f, 0.12f, 0.16f), new Vector3(0.05f, 0.05f, 0.34f), gold, keepCollider: false)
+                    .transform.localRotation = Quaternion.Euler(-28f, 0f, 0f);
+                Primitive(PrimitiveType.Cube, "Tip", finger, new Vector3(0f, 0.16f, 0.36f), new Vector3(0.05f, 0.05f, 0.16f), gold, keepCollider: false)
+                    .transform.localRotation = Quaternion.Euler(30f, 0f, 0f);
+            }
+        }
+
         // ------------------------------------------------------------------ Sandy's private jetty (the final fight)
 
         private static void BuildI4SandyJetty(Transform root, List<Vector3> taken)
@@ -711,6 +748,18 @@ namespace PleaseDontDrown.Editor
             for (float x = x0 + 1f; x <= I4SandyJettyEnd.x + 3f; x += 4f)
                 foreach (float s in new[] { -1.4f, 1.4f })
                     Primitive(PrimitiveType.Cylinder, "Post", jetty, new Vector3(x, I4Deck - 3.6f, z + s * (x > x1 ? 3.4f : 1f)), new Vector3(0.28f, 3.5f, 0.28f), FkWhite, keepCollider: false);
+            // Two swim-up ramps on the head's north and south sides (knocked in by the claw: climb back out).
+            foreach (float side in new[] { 1f, -1f })
+            {
+
+                Vector3 low = new(I4SandyJettyEnd.x - 1f, WaterLevel - 0.8f, z + side * 9.8f), high = new(I4SandyJettyEnd.x - 1f, I4Deck - 0.05f, z + side * 4.9f);
+                Vector3 c = (low + high) * 0.5f;
+                float len = Vector3.Distance(low, high);
+                GameObject ramp = Primitive(PrimitiveType.Cube, "SwimRamp", jetty, c, new Vector3(2.4f, 0.16f, len + 0.4f), FkDeck);
+                ramp.transform.rotation = Quaternion.LookRotation(high - low);
+                for (float d = 0.4f; d < len; d += 0.45f)
+                    Primitive(PrimitiveType.Cube, "Tread", ramp.transform, new Vector3(0f, 0.6f, -0.5f + d / (len + 0.4f)), new Vector3(1f, 0.5f, 0.06f / (len + 0.4f)), FkOrange, keepCollider: false);
+            }
             // Gold bollards and a private sign.
             Material gold = GetMaterial("FkStatueGold", new Color(0.93f, 0.72f, 0.3f), metallic: 0.85f, smoothness: 0.62f);
             foreach (float s in new[] { -4.6f, 4.6f })
@@ -749,10 +798,38 @@ namespace PleaseDontDrown.Editor
             Primitive(PrimitiveType.Cube, "Board", sign, new Vector3(0f, 1.7f, 0f), new Vector3(0.05f, 0.45f, 1.4f), blue, keepCollider: false);
             FkText(sign, "Words", new Vector3(-0.03f, 1.7f, 0f), "POLICE", 0.24f, Color.white, 90f);
             FkText(sign, "Words2", new Vector3(0.03f, 1.7f, 0f), "POLICE", 0.24f, Color.white, 270f);
+            BuildPoliceBoat(root, new Vector3(x + 30f, WaterLevel, z1 + 140f), 200f);
             I4Point("PoliceDock", new Vector3(x, I4Deck + 0.1f, z1 - 3f), 180f);
             I4Point("PoliceBoatBerth", new Vector3(x + 4.2f, WaterLevel, z1 - 4f), 0f);
             I4Point("PoliceBoatStart", new Vector3(x + 30f, WaterLevel, z1 + 140f), 200f);
             taken.Add(new Vector3(x, (z0 + z1) * 0.5f, 4f));
+        }
+
+        /// <summary>The police launch for the ending (a scripted boat: World/ScriptedBoat), waiting out at sea.</summary>
+        private static void BuildPoliceBoat(Transform parent, Vector3 at, float yaw)
+        {
+            Material blue = GetMaterial("PoliceBlue", new Color(0.12f, 0.24f, 0.62f));
+            Material red = GetMaterial("PoliceLightRed", new Color(1f, 0.15f, 0.12f), emission: new Color(2.5f, 0.3f, 0.2f));
+            Material lightBlue = GetMaterial("PoliceLightBlue", new Color(0.2f, 0.4f, 1f), emission: new Color(0.3f, 0.6f, 2.8f));
+            var boat = new GameObject("PoliceBoat").transform;
+            boat.SetParent(parent, false);
+            boat.SetPositionAndRotation(at, Quaternion.Euler(0f, yaw, 0f));
+            boat.gameObject.AddComponent<NetworkObject>();
+            var sync = boat.gameObject.AddComponent<NetworkTransform>();
+            sync.SetSynchronizeScale(false);
+            boat.gameObject.AddComponent<ScriptedBoat>();
+            TagSurface(boat.gameObject, SurfaceKind.Wood);
+            Primitive(PrimitiveType.Cube, "Hull", boat, new Vector3(0f, 0.25f, 0f), new Vector3(2.8f, 0.9f, 8f), FkWhite);
+            GameObject bow = Primitive(PrimitiveType.Cube, "Bow", boat, new Vector3(0f, 0.35f, 4.1f), new Vector3(1.98f, 0.7f, 1.98f), FkWhite, keepCollider: false);
+            bow.transform.localRotation = Quaternion.Euler(0f, 45f, 0f);
+            Primitive(PrimitiveType.Cube, "Stripe", boat, new Vector3(0f, 0.45f, 0f), new Vector3(2.84f, 0.18f, 7.6f), blue, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "Deck", boat, new Vector3(0f, 0.72f, 0f), new Vector3(2.5f, 0.08f, 7.6f), FkDeck);
+            Primitive(PrimitiveType.Cube, "Cabin", boat, new Vector3(0f, 1.6f, -1.6f), new Vector3(2f, 1.7f, 2.6f), FkWhite);
+            Primitive(PrimitiveType.Cube, "Windscreen", boat, new Vector3(0f, 1.95f, -0.28f), new Vector3(1.8f, 0.8f, 0.05f), FkGlass, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "LightBarL", boat, new Vector3(-0.4f, 2.55f, -1.6f), new Vector3(0.7f, 0.18f, 0.3f), red, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "LightBarR", boat, new Vector3(0.4f, 2.55f, -1.6f), new Vector3(0.7f, 0.18f, 0.3f), lightBlue, keepCollider: false);
+            foreach (float side in new[] { 1f, -1f })
+                FkText(boat, "Police", new Vector3(side * 1.43f, 0.47f, 0.6f), "POLICE", 0.5f, Color.white, side > 0 ? 270f : 90f);
         }
 
         // ------------------------------------------------------------------ paving

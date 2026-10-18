@@ -279,7 +279,8 @@ namespace PleaseDontDrown.Story
             _hints = null;
             _waitingForTalk = false;
             foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
-            if (_sandy != null && index > 0) StartCoroutine(SandyGoesHome()); // interrupted mid-walk: back to the kiosk
+            // Interrupted mid-walk: back to the kiosk (not once she has been found out on her island, 4.6 on).
+            if (_sandy != null && index > 0 && (index < _beats.FindIndex(b => b.Id == "4.6") || _beats.FindIndex(b => b.Id == "4.6") < 0)) StartCoroutine(SandyGoesHome());
             CleanupActors();
             _running = true;
             _runner = StartCoroutine(RunFrom(index));
@@ -424,6 +425,14 @@ namespace PleaseDontDrown.Story
             if (npc == _sandy && !_waitingForTalk && _running) StartCoroutine(SandyChats(by));
         }
 
+        private static readonly string[] SandyReformedLines =
+        {
+            "Community service, dear. I hand things BACK now. It's horrible.",
+            "Found something? I'll give it to its owner. For free. *twitch*",
+            "Don't look at me like that. I'm taking swimming lessons.",
+            "The kiss of life. I still think about it. Don't make it weird."
+        };
+
         private static readonly string[] SandyLines =
         {
             "Found something? Put it on the counter out front, I'll pay you.",
@@ -441,7 +450,9 @@ namespace PleaseDontDrown.Story
                 yield return Say(_sandy, "Ooh, lovely. Somebody will be very happy. Here you go.");
                 yield break;
             }
-            yield return Say(_sandy, SandyLines[Random.Range(0, SandyLines.Length)]);
+            // After the story (chapter 4 done): community service at her old kiosk, honest at last. Mostly.
+            string[] lines = _freePlay ? SandyReformedLines : SandyLines;
+            yield return Say(_sandy, lines[Random.Range(0, lines.Length)]);
         }
         private void OnDefeated(StoryNpc npc, PlayerHub by) { if (!_freePlay) _defeated.Add(npc); }
         private void OnPurchased(ShopCounter shop, PlayerHub by, string item) { if (!_freePlay) _purchases.Add(item); }
@@ -872,6 +883,8 @@ namespace PleaseDontDrown.Story
             RegisterThreatCommands();
             RegisterKillCommands();
             RegisterGalaCommands();
+            DevCommands.Register("finalboss", "<2|3>", "Skip the final boss ahead: 2 = the airlift won, 3 = Grabby beaten (tests, pictures).", args =>
+                CheatServer("finalboss", args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 2), cheat: true, owner: this);
             DevCommands.Register("chapter4check", "", "Host: plays chapter 4 through with your lifeguard and checks each beat (log: [Check]).", _ =>
                 CheatServer("chapter4check", 0), cheat: true, owner: this);
         }
@@ -879,7 +892,7 @@ namespace PleaseDontDrown.Story
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat", "chapter4check" })
+            foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat", "chapter4check", "finalboss" })
                 DevCommands.Unregister(c, this);
             UnregisterMissionCommands();
             UnregisterThreatCommands();
@@ -974,6 +987,14 @@ namespace PleaseDontDrown.Story
             if (ServerThreatCheat(what, value, by)) return;
             if (ServerKillCheat(what, by)) return;
             if (ServerGalaCheat(what, value, by)) return;
+            if (what == "finalboss")
+            {
+                // Tests and pictures: skip the final boss ahead (2: the airlift won, 3: Grabby beaten).
+                if (value >= 2 && _bossPhase == 1) _raceYours = AirliftGoal;
+                if (value >= 3 && _grabby != null && !_grabby.IsDead && by != null)
+                    ((Combat.IDamageable)_grabby).ServerTakeHit(_grabby.Health + 1, Combat.DamageKind.Bullet, by, _grabby.TopPosition, Vector3.down);
+                return;
+            }
             if (what == "chapter4check")
             {
                 if (by != null) by.StartCoroutine(Chapter4Check(by)); // not ours: jumping to 4.1 stops all of ours

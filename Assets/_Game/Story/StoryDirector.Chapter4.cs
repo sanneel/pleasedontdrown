@@ -663,6 +663,7 @@ namespace PleaseDontDrown.Story
             t = Time.time;
             while (_beat.Value == "4.5" && Time.time - t < 90f) yield return null;
             Check("4.5 his story told moves on", _beat.Value == "end" || _beats.FindIndex(b => b.Id == _beat.Value) > _beats.FindIndex(b => b.Id == "4.5"), _beat.Value);
+            yield return Chapter4CheckBoss(me);
             Debug.Log($"[Check] DONE: {(_checkFails == 0 ? "ALL PASS" : _checkFails + " FAILED")}");
         }
     }

@@ -36,7 +36,7 @@ namespace PleaseDontDrown.Dev
         private static readonly string[] Beats =
         {
             "1.1", "1.2", "1.3", "1.4", "1.5", "1.9", "1.10", "2.1", "2.2", "2.3", "2.4", "2.5", "2.5b", "2.5c", "2.6", "2.7",
-            "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.7b", "3.8", "3.9", "3.10", "4.1", "4.2", "4.3", "4.4", "4.5", "end"
+            "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.7b", "3.8", "3.9", "3.10", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7", "4.8", "4.9", "end"
         };
 
         private readonly List<string> _errors = new();
@@ -437,7 +437,7 @@ namespace PleaseDontDrown.Dev
             yield return new WaitForSeconds(0.8f);
         }
 
-        private static Vector3 Shoreward(Vector3 at) => at.x > 380f ? Vector3.right : at.z < -120f ? Vector3.back : Vector3.forward; // (island 4: its lagoon is to the east)
+        private static Vector3 Shoreward(Vector3 at) => at.x > 640f ? Vector3.left : at.x > 380f ? Vector3.right : at.z < -120f ? Vector3.back : Vector3.forward; // (island 4: its lagoon is to the east)
 
         /// <summary>Out to them, grab, tow to the beach in short hops, lay them down, CPR.</summary>
         private IEnumerator Rescue(PlayerHub me, VictimBrain v)
@@ -967,6 +967,24 @@ namespace PleaseDontDrown.Dev
                 case "4.5":
                     yield return TalkToMarked(me);
                     Tagged("thief", me, 1);
+                    break;
+                case "4.6":
+                    yield return TalkToMarked(me);
+                    Tagged("sandy", me, 1);
+                    break;
+                case "4.7":
+                    if (ActiveBoss() is { } grabby) { yield return HitBoss(me, grabby); Tagged("grabby", me, 2); break; }
+                    if (!StoryDirector.MissionRunning && Island4Point("SandyJetty") is { } sj) Stand(me, sj.position);
+                    yield return new WaitForSeconds(0.8f);
+                    break;
+                case "4.8":
+                    yield return new WaitForSeconds(0.5f);
+                    break;
+                case "4.9":
+                    // Along to wherever the ending is (the police dock, then the beach with everyone on it).
+                    if (StoryDirector.Instance.MarkerPosition is { } m && (me.transform.position - m).sqrMagnitude > 10f * 10f) Stand(me, m - Vector3.up * 2f + Vector3.back * 4f);
+                    Tagged("ending", me, 3);
+                    yield return new WaitForSeconds(1f);
                     break;
             }
         }
