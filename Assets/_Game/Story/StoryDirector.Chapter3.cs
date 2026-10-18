@@ -209,8 +209,29 @@ namespace PleaseDontDrown.Story
                     if (z.Part == "Head") head = z.transform;
             for (int i = 0; boss != null && !boss.IsDead && head != null && i < 400; i++)
                 ((IDamageable)boss).ServerTakeHit(60, DamageKind.Bullet, me, head.position, me.Head.forward);
-            yield return WaitBeat("3.8", 15f);
-            Check("3.7 beating Old Snapper moves on", _beat.Value == "3.8");
+            yield return WaitBeat("3.7b", 15f);
+            Check("3.7 beating Old Snapper moves on", _beat.Value == "3.7b");
+
+            // 3.7b: into the sewer, up the ladder into the castle, the Pirate King's fight in the throne room.
+            Transform sewer = Island3Point("SewerEntrance"), throne = Island3Point("PalaceThrone");
+            Check("3.7b the sewer and the throne room exist", sewer != null && throne != null);
+            if (sewer != null) Stand(sewer.position);
+            yield return new WaitForSeconds(1.5f);
+            Check("3.7b the sewer marker moves on to the palace", _markerLabel.Value == "The palace");
+            if (throne != null) Stand(throne.position + throne.forward * 6f);
+            t = Time.time;
+            while (!MissionRunning && Time.time - t < 10f) yield return null;
+            StoryNpc king = null;
+            foreach (StoryNpc n in StoryNpc.All) if (n != null && n.Name == "The Pirate King") king = n;
+            Check("3.7b the Pirate King is in his throne room", king != null && throne != null && (king.transform.position - throne.position).magnitude < 4f);
+            Check("3.7b he wears his own model", king != null && king.Look.Body == AvatarLook.Bodies.PirateKing);
+            for (int i = 0; king != null && !king.IsDefeated && i < 40; i++)
+            {
+                ((IDamageable)king).ServerTakeHit(Damage.Punch, DamageKind.Punch, me, king.HeadPosition, me.Head.forward);
+                yield return new WaitForSeconds(0.2f);
+            }
+            yield return WaitBeat("3.8", 25f);
+            Check("3.7b beating the Pirate King moves on", _beat.Value == "3.8");
 
             Transform mouth = Island3Point("CaveMouth"), ledge = Island3Point("CaveLedge");
             if (mouth != null) Stand(mouth.position);
