@@ -7,13 +7,13 @@ using UnityEngine;
 namespace PleaseDontDrown.Dev
 {
     /// <summary>
-    /// Fight tuning helper: console <c>brawlbot [seconds] [mash|timed|smart]</c> fights for the local lifeguard like a
-    /// player would. It keeps looking at the nearest fighter on its feet and punches whoever is in reach: <c>mash</c>
-    /// clicks as fast as the fists allow (the button-masher), <c>timed</c> jabs twice then hooks (jab, jab, hook),
-    /// pausing between, <c>smart</c> reads the fighter (host only): steps back out of a blow that's coming, hooks into a
-    /// raised guard now and then, and steps in with a flurry when the guard is down after their swing. The host log gets one
-    /// <c>[BrawlBot]</c> line at the end: how long it lasted, punches thrown, how often the lifeguard went down and how
-    /// many fighters were beaten.
+    /// Fight tuning helper: console <c>brawlbot [seconds] [mash|hooks|timed|smart]</c> fights for the local lifeguard
+    /// like a player would. It keeps looking at the nearest fighter on its feet and punches whoever is in reach:
+    /// <c>mash</c> clicks as fast as the fists allow (the button-masher; <c>hooks</c> mashes the hook button),
+    /// <c>timed</c> jabs twice then hooks (jab, jab, hook), pausing between, <c>smart</c> reads the fighter (host only):
+    /// steps back out of a blow that's coming, hooks into a raised guard now and then, and steps in with a flurry when
+    /// the guard is down after their swing. The host log gets one <c>[BrawlBot]</c> line at the end: how long it
+    /// lasted, punches thrown, how often the lifeguard went down and how many fighters were beaten.
     /// </summary>
     public sealed class BrawlBot : MonoBehaviour
     {
@@ -25,7 +25,7 @@ namespace PleaseDontDrown.Dev
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Register() =>
-            DevCommands.Register("brawlbot", "[seconds] [mash|timed]", "Fight like a player for a while (nearest fighter, punches in reach; tests).", args =>
+            DevCommands.Register("brawlbot", "[seconds] [mash|hooks|timed|smart]", "Fight like a player for a while (nearest fighter, punches in reach; tests).", args =>
             {
                 if (_running != null) Destroy(_running.gameObject);
                 var bot = new GameObject("BrawlBot").AddComponent<BrawlBot>();
@@ -101,7 +101,7 @@ namespace PleaseDontDrown.Dev
                         _next = Time.time + 0.8f;
                         break;
                     default:
-                        combat.PressPunch(hook: _step == 2); // open: jab, jab, hook
+                        combat.PressPunch(hook: _step != 1); // open: hook, jab, hook (the big one first, while it's open)
                         _next = Time.time + 0.15f;
                         _step = (_step + 1) % 3;
                         break;
@@ -116,7 +116,7 @@ namespace PleaseDontDrown.Dev
             }
             else
             {
-                combat.PressPunch();
+                combat.PressPunch(hook: _style == "hooks"); // (hooks: mashing the other button)
                 _next = Time.time + 0.12f; // a fast clicker (the fists still set the real pace)
             }
             _punches++;

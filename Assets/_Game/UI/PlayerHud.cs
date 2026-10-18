@@ -338,12 +338,21 @@ namespace PleaseDontDrown.UI
             float edge = Mathf.Max(hurt, low);
             if (edge > 0.01f)
             {
-                const float band = 140f;
-                var red = new Color(0.85f, 0.05f, 0.05f, edge * 0.5f);
-                Hud.Fill(new Rect(0f, 0f, Hud.Width, band), red, 0f);
-                Hud.Fill(new Rect(0f, Hud.Height - band, Hud.Width, band), red, 0f);
-                Hud.Fill(new Rect(0f, band, band, Hud.Height - band * 2f), red, 0f);
-                Hud.Fill(new Rect(Hud.Width - band, band, band, Hud.Height - band * 2f), red, 0f);
+                // A red glow fading in from the screen's edges: thin rings, each fainter than the one outside it (four
+                // flat 140 px bands made a hard-edged red box round the view).
+                const float band = 160f;
+                const int rings = 16;
+                const float ring = band / rings;
+                for (int i = 0; i < rings; i++)
+                {
+                    float fade = 1f - i / (float)rings;
+                    var red = new Color(0.85f, 0.05f, 0.05f, edge * 0.55f * fade * fade);
+                    float inset = i * ring, across = Hud.Width - inset * 2f, down = Hud.Height - (inset + ring) * 2f;
+                    Hud.Fill(new Rect(inset, inset, across, ring), red, 0f);
+                    Hud.Fill(new Rect(inset, Hud.Height - inset - ring, across, ring), red, 0f);
+                    Hud.Fill(new Rect(inset, inset + ring, ring, down), red, 0f);
+                    Hud.Fill(new Rect(Hud.Width - inset - ring, inset + ring, ring, down), red, 0f);
+                }
             }
 
             if (!combat.IsDowned) return;

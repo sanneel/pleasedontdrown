@@ -561,12 +561,12 @@ namespace PleaseDontDrown.Story
             // break through with a hook or an uppercut.)
             float guard = _fight == FightState.WindUp ? _fighter.Guard * 0.9f : _guardUp ? _fighter.Guard : 0f;
             if (guard > 0f && front && kind is DamageKind.Punch or DamageKind.Blade && attacker != null &&
-                Random.value < guard * (damage >= 35 ? 0.35f : 1f))
+                Random.value < guard * (_lastHitHeavy ? 0.8f : 1f))
             {
                 _blocked++;
                 _lastHitBlocked = true;
                 BlockObservers(HeadPosition);
-                if (attacker.TryGetComponent(out PlayerCombat theirs)) theirs.ServerStun(PlayerCombat.BlockedRecoil, blocked: true); // their arm bounces off
+                if (attacker.TryGetComponent(out PlayerCombat theirs)) theirs.ServerStun(_lastHitHeavy ? PlayerCombat.BlockedRecoil + 0.15f : PlayerCombat.BlockedRecoil, blocked: true); // their arm bounces off (a big swing further)
                 // Blocking sets up a quick counter: the next swing comes at once and fast.
                 if (_foe == attacker && _fight is not (FightState.WindUp or FightState.Down) && TakeTurn(MeleeTurns, attacker, brawler ? 1 : 2))
                 {
@@ -594,13 +594,14 @@ namespace PleaseDontDrown.Story
             else if (front && _fighter.Style == FightStyle.Pirate && Time.time - _lastLandedOnUs < 1f) _coverUntil = Time.time + 0.9f;
             if (front) _lastLandedOnUs = Time.time;
 
-            // Enough at once knocks them over (they get back up if there's any fight left in them).
+            // Enough at once knocks them over (they get back up if there's any fight left in them). A hook or an uppercut
+            // that catches them open after their own swing counts double: the timed big one puts them on the sand.
             if (Time.time - _poiseSince > 1.3f)
             {
                 _poiseSince = Time.time;
                 _poiseDamage = 0f;
             }
-            _poiseDamage += damage;
+            _poiseDamage += damage * (_lastHitHeavy && _fight == FightState.Recover ? 2f : 1f);
             if (_poiseDamage >= _fighter.Poise && _health.Value - damage > 0)
             {
                 _poiseDamage = 0f;

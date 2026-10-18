@@ -73,7 +73,7 @@ namespace PleaseDontDrown.Combat
         public FightStyle Style;
         public float Skill;     // aim, reaction, how often a combo follows
         public int Poise;       // damage taken within a moment that knocks them over
-        public float Guard;     // with the fists up, how often a blow from the front is blocked (a heavy one a third as often)
+        public float Guard;     // with the fists up, how often a blow from the front is blocked (a heavy one a bit less often)
 
         // (Poise: two jabs used to floor a pirate, so mashing the button kept them all on the ground. Now it takes a
         // combo: jab, jab, hook is 25 + 25 + 50.)
