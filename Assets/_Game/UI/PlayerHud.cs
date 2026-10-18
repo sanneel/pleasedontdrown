@@ -27,6 +27,11 @@ namespace PleaseDontDrown.UI
         private readonly float[] _lift = new float[PlayerHands.SlotCount];
         private readonly float[] _filledAt = new float[PlayerHands.SlotCount];
         private readonly Items.Item[] _slotItems = new Items.Item[PlayerHands.SlotCount];
+        // The hotbar eases back (half see-through) once nothing in it has changed for a while, and comes straight
+        // back when a slot is picked or filled.
+        private const float HotbarIdleSeconds = 7f, HotbarIdleAlpha = 0.5f;
+        private int _activeShown = -1;
+        private float _hotbarChangedAt, _hotbarAlpha = 1f;
         private Items.Item _held;
         private float _heldSince;
         private float _staminaShown, _airShown;
@@ -210,6 +215,16 @@ namespace PleaseDontDrown.UI
             const float size = Hud.SlotSize, gap = Hud.SlotGap;
             float total = PlayerHands.SlotCount * size + (PlayerHands.SlotCount - 1) * gap;
             float x0 = cx - total * 0.5f, y0 = Hud.Height - Hud.SlotBottom - size;
+            if (hands.ActiveSlot != _activeShown)
+            {
+                _activeShown = hands.ActiveSlot;
+                _hotbarChangedAt = Time.unscaledTime;
+            }
+            for (int i = 0; i < PlayerHands.SlotCount; i++)
+                if (hands.SlotItem(i) != _slotItems[i]) _hotbarChangedAt = Time.unscaledTime;
+            bool idle = Time.unscaledTime - _hotbarChangedAt > HotbarIdleSeconds;
+            _hotbarAlpha = Mathf.MoveTowards(_hotbarAlpha, idle ? HotbarIdleAlpha : 1f, dt * (idle ? 0.4f : 4f));
+            float fade = _hotbarAlpha;
             for (int i = 0; i < PlayerHands.SlotCount; i++)
             {
                 bool active = i == hands.ActiveSlot;
@@ -226,9 +241,10 @@ namespace PleaseDontDrown.UI
                 // Light glass, not dark blocks: an empty slot is little more than its thin frame; the one in your hands
                 // is lifted, framed in teal and a little darker so its picture stands out.
                 bool empty = item == null;
-                Hud.Fill(r, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, active ? 0.42f : empty ? 0.12f : 0.24f), 14f);
-                Hud.Frame(r, active ? Hud.Teal : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, empty ? 0.2f : 0.36f), active ? 3f : 1.5f, 14f);
-                if (active) Hud.Fill(new Rect(r.x + 18f, r.yMax - 5f, r.width - 36f, 3f), Hud.Teal, 1.5f);
+                Color teal = new(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, fade);
+                Hud.Fill(r, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, (active ? 0.42f : empty ? 0.12f : 0.24f) * fade), 14f);
+                Hud.Frame(r, active ? teal : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, (empty ? 0.2f : 0.36f) * fade), active ? 3f : 1.5f, 14f);
+                if (active) Hud.Fill(new Rect(r.x + 18f, r.yMax - 5f, r.width - 36f, 3f), teal, 1.5f);
 
                 if (item != null)
                 {
@@ -236,13 +252,13 @@ namespace PleaseDontDrown.UI
                     float inset = size * 0.5f - size * 0.41f * pop;
                     var inner = new Rect(r.x + inset, r.y + inset, size - inset * 2f, size - inset * 2f);
                     Texture picture = ItemIcons.Get(item);
-                    if (picture != null) Hud.Picture(inner, picture, active ? Color.white : new Color(1f, 1f, 1f, 0.8f));
-                    else Hud.Label(new Rect(r.x + 6f, r.y + 24f, size - 12f, size - 30f), item.DisplayName, 15f, Color.white, TextAnchor.MiddleCenter, wrap: true);
+                    if (picture != null) Hud.Picture(inner, picture, new Color(1f, 1f, 1f, (active ? 1f : 0.8f) * fade));
+                    else Hud.Label(new Rect(r.x + 6f, r.y + 24f, size - 12f, size - 30f), item.DisplayName, 15f, new Color(1f, 1f, 1f, fade), TextAnchor.MiddleCenter, wrap: true);
                 }
                 // The slot's number in its corner: a teal chip on the one in your hands, plain outlined digits elsewhere.
                 var number = new Rect(r.x + 7f, r.y + 7f, 24f, 24f);
-                if (active) Hud.Fill(number, Hud.Teal, 5f);
-                Hud.Label(number, SlotNumbers[i], 15f, active ? Hud.Ink : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, empty ? 0.55f : 0.85f), heavy: true, shadow: false);
+                if (active) Hud.Fill(number, teal, 5f);
+                Hud.Label(number, SlotNumbers[i], 15f, active ? new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, fade) : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, (empty ? 0.55f : 0.85f) * fade), heavy: true, shadow: false);
             }
         }
 

@@ -137,14 +137,14 @@ namespace PleaseDontDrown.Fun
                 _moneyText = "Team funds  $" + _moneyShown.ToString("N0");
             }
 
-            Hud.Dim(0.35f);
+            Hud.Dim(0.6f);
             float height = 120f + menu.Length * Row + 100f;
             float fit = Mathf.Min(1f, (Hud.Height - 40f) / height);
             Matrix4x4 before = GUI.matrix;
             if (fit < 1f) GUIUtility.ScaleAroundPivot(new Vector2(fit, fit), new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
             var panel = new Rect((Hud.Width - CardWidth) * 0.5f, (Hud.Height - height) * 0.5f, CardWidth, height);
             Hud.Panel(panel, 0.94f);
-            Hud.Label(new Rect(panel.x + 36f, panel.y + 22f, CardWidth - 72f, 60f), "MENU", 44f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Title(new Rect(panel.x + 36f, panel.y + 18f, CardWidth - 72f, 66f), "MENU", 50f, Hud.Sand, TextAnchor.MiddleLeft);
             Hud.Label(new Rect(panel.x + 36f, panel.y + 22f, CardWidth - 72f, 60f), _moneyText, 26f, Hud.Sand, TextAnchor.MiddleRight, heavy: true, shadow: false);
             Hud.Fill(new Rect(panel.x + 36f, panel.y + 92f, CardWidth - 72f, 2f), new Color(1f, 1f, 1f, 0.15f));
 

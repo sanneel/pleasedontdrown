@@ -128,6 +128,8 @@ namespace PleaseDontDrown.UI
             // Right in front of you, or out cold at your feet: the prompts under the crosshair (and the CPR card) say it
             // all, a pin on the screen's edge would only repeat it.
             if (distance < 2.6f && (!offscreen || state == VictimState.Unconscious)) return;
+            // Saved in view: the green SAVED! over them and the message in the top right say it (the label made it three).
+            if (state == VictimState.Saved && !offscreen) return;
             if (offscreen)
             {
                 // Pin to the edge in the target's direction.

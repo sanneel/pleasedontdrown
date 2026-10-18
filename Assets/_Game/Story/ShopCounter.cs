@@ -110,7 +110,7 @@ namespace PleaseDontDrown.Story
             int parts = _parts != null ? _parts.Count : 0;
             if (_products.Length != _productNames?.Length) NameProducts();
 
-            Hud.Dim(0.45f);
+            Hud.Dim(0.6f);
             float width = ProductsWidth + (parts > 0 ? PartsWidth : 0f);
             float height = 104f + Mathf.Max(_products.Length * ProductRow, parts > 0 ? 50f + parts * PartRow : 0f) + 92f;
             // A long list on a small window shrinks to fit instead of running off the screen.
@@ -119,7 +119,7 @@ namespace PleaseDontDrown.Story
             if (fit < 1f) GUIUtility.ScaleAroundPivot(new Vector2(fit, fit), new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
             var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f, width, height);
             Hud.Panel(panel, 0.92f);
-            Hud.FitLabel(new Rect(panel.x + 32f, panel.y + 18f, width - 300f, 56f), _titleUpper ??= _title.ToUpperInvariant(), 36f, Hud.Paper, heavy: true);
+            Hud.FitTitle(new Rect(panel.x + 32f, panel.y + 14f, width - 300f, 62f), _titleUpper ??= _title.ToUpperInvariant(), 42f, Hud.Paper, TextAnchor.MiddleLeft);
             if (!_free)
             {
                 if (_moneyShown != Economy.Money || _moneyText == null)

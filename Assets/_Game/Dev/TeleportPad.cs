@@ -52,10 +52,10 @@ namespace PleaseDontDrown.Dev
             const float width = 440f, row = 60f, gap = 10f;
             int count = DevIsland.DestinationNames.Length; // the other islands + "stay here"
             float height = 96f + count * (row + gap) + 14f;
-            Hud.Dim(0.45f);
+            Hud.Dim(0.6f);
             var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f, width, height);
             Hud.Panel(panel, 0.92f);
-            Hud.Label(new Rect(panel.x, panel.y + 18f, width, 56f), "TRAVEL TO", 40f, Color.white, heavy: true, shadow: false);
+            Hud.Title(new Rect(panel.x, panel.y + 14f, width, 62f), "TRAVEL TO", 46f, Color.white);
             float y = panel.y + 96f;
             for (int i = 0; i < DevIsland.DestinationNames.Length; i++)
             {
