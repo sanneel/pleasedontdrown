@@ -144,9 +144,8 @@ namespace PleaseDontDrown.Story
             if (!onIsland4)
             {
                 if (_island2Spawn != null && !TeamOnIsland2() && !AnyAtSea()) EnsureOnIsland2();
-                if (_pirateBoat != null && _pirateLanding != null && (_pirateBoat.transform.position - _pirateLanding.position).sqrMagnitude > 200f * 200f &&
-                    (_pirateBoat.transform.position - berth.position).sqrMagnitude > 200f * 200f)
-                    _pirateBoat.ServerPlace(_pirateLanding.position + _pirateLanding.forward * 13f, _pirateLanding.eulerAngles.y);
+                // The boat at the hotel beach, in deep enough water (not left on the sand, not left at Skull Cove).
+                if (_pirateBoat != null && (_pirateBoat.transform.position - berth.position).sqrMagnitude > 200f * 200f) MooredAtHotel();
             }
             if (_pirateBoat != null) _pirateBoat.ServerSetLocked(false);
             PopulateIsland4(); // its people take their places while you're out at sea
@@ -211,6 +210,7 @@ namespace PleaseDontDrown.Story
 
         private readonly List<VictimBrain> _raceTourists = new();
         private readonly List<StoryNpc> _raceRivals = new();
+        private readonly Dictionary<StoryNpc, Vector3> _rivalAim = new();
         private int _raceYours, _raceTheirs;
 
         /// <summary>Host (tests): the race's score.</summary>
@@ -236,6 +236,7 @@ namespace PleaseDontDrown.Story
                 if (v != null && v.IsSpawned) Despawn(v.gameObject);
             _raceTourists.Clear();
             _raceRivals.Clear();
+            _rivalAim.Clear();
             _raceYours = _raceTheirs = 0;
         }
 
@@ -326,8 +327,13 @@ namespace PleaseDontDrown.Story
                     StartCoroutine(Airlifted(best));
                     continue;
                 }
-                // Swim at them (a little slower than a lifeguard sprinting: it's a race, not a rout).
-                rival.ServerMoveTo(best.transform.position, Shore.WaterDepthAt(rival.transform.position + Vector3.up * 0.1f) > 1.1f ? 2.6f : 3.4f, water: true);
+                // Swim at them (a little slower than a lifeguard sprinting: it's a race, not a rout). A new route only when
+                // they've drifted or the rival stopped (each one is a path search).
+                if (!rival.IsMoving || !_rivalAim.TryGetValue(rival, out Vector3 aim) || (aim - best.transform.position).sqrMagnitude > 2f * 2f)
+                {
+                    _rivalAim[rival] = best.transform.position;
+                    rival.ServerMoveTo(best.transform.position, Shore.WaterDepthAt(rival.transform.position + Vector3.up * 0.1f) > 1.1f ? 2.6f : 3.4f, water: true);
+                }
             }
             return took;
         }

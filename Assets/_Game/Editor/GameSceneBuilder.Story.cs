@@ -403,7 +403,7 @@ namespace PleaseDontDrown.Editor
                 ("Island2", new Bounds(new Vector3(20f, 15f, -345f), new Vector3(392f, 70f, 330f))),
                 ("DevIsland", new Bounds(new Vector3(-230f, 0f, -60f), new Vector3(110f, 40f, 90f))),
                 ("Island3", new Bounds(new Vector3(20f, 25f, -900f), new Vector3(440f, 90f, 500f))),
-                ("Island4", new Bounds(new Vector3(560f, 15f, -400f), new Vector3(330f, 60f, 330f)))
+                ("Island4", new Bounds(new Vector3(560f, 21f, -400f), new Vector3(330f, 48f, 330f))) // (down to 3 m deep only: path searches over the whole deep seabed cost ~200 ms; swimmers go straight in deep water)
             };
             var baked = new List<Object>();
             foreach ((string name, Bounds bounds) in areas)

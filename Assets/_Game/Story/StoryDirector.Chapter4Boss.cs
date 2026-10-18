@@ -33,6 +33,7 @@ namespace PleaseDontDrown.Story
         private Creature _grabby;
         private VictimBrain _sandyInWater;
         private int _bossPhase;
+        private int _bossCheckpoint = 1; // (a failed try starts again at the phase it failed in, not the airlift)
 
         /// <summary>Host (tests): which phase of the final boss is on (0: none).</summary>
         public int FinalBossPhase => _bossPhase;
@@ -115,6 +116,7 @@ namespace PleaseDontDrown.Story
             _sandy.ServerTeleport(end.position, end.eulerAngles.y, keepExact: true);
             yield return Reach(Island4Point("SandyJetty") is { } j ? j.position : end.position, 14f);
             NoMarker();
+            _bossCheckpoint = 1;
             yield return RunMission("Sandy", top.position, FinalBossBody, ResetFinalBoss);
             HideBossBar();
             _bossPhase = 0;
@@ -149,6 +151,11 @@ namespace PleaseDontDrown.Story
             ResetRace();
             Transform drop = Island4Point("HeliDrop"), end = Island4Point("SandyJettyEnd"), jetty = Island4Point("SandyJetty"), lair = Island4Point("KrakenLair");
             if (drop == null || end == null || jetty == null || lair == null) yield break;
+            var counted = new HashSet<VictimBrain>();
+            int dropped = 0;
+            float nextDrop = Time.time + 4f;
+            if (_bossCheckpoint >= 3) goto Phase3;
+            if (_bossCheckpoint == 2) goto Phase2;
 
             // ---- phase 1: the airlift
             _bossPhase = 1;
@@ -157,14 +164,15 @@ namespace PleaseDontDrown.Story
             if (Helicopter != null) Helicopter.ServerFlyTo(drop.position, drop.eulerAngles.y, 14f);
             for (int i = 0; i < 3; i++)
             {
-                StoryNpc rival = SpawnNpc(RivalNames[5 + i % 3], NpcRole.Rival, RivalLook(5 + i), jetty.position + Vector3.forward * (i - 1) * 0.9f, 90f);
-                rival.ServerTeleport(jetty.position + new Vector3(i * 1.2f, 0f, (i - 1) * 0.9f), 90f, keepExact: true);
+                // Already in the water beside the jetty (diving off its deck, they asked for a path down to the seabed).
+                Vector3 swim = end.position + new Vector3(-3f - i * 2f, 0f, 6.5f + (i % 2) * 1.5f);
+                swim.y = (WaterSurface.Exists ? WaterSurface.HeightAt(swim) : 0f) - 1.2f;
+                StoryNpc rival = SpawnNpc(RivalNames[5 + i % 3], NpcRole.Rival, RivalLook(5 + i), swim, 90f);
+                rival.ServerTeleport(swim, 90f, keepExact: true);
                 _raceRivals.Add(rival);
             }
             TitleObservers("PHASE 1: THE AIRLIFT", $"Save {AirliftGoal} before the clock runs out. Her lifeguards will try to grab them.");
-            var counted = new HashSet<VictimBrain>();
-            float started = Time.time, nextDrop = Time.time + 4f;
-            int dropped = 0;
+            float started = Time.time;
             while (_raceYours < AirliftGoal)
             {
                 float left = AirliftSeconds - (Time.time - started);
@@ -185,10 +193,13 @@ namespace PleaseDontDrown.Story
             }
             foreach (StoryNpc r in _raceRivals) if (r != null) Remove(r);
             _raceRivals.Clear();
+            _bossCheckpoint = 2;
 
+        Phase2:
             // ---- phase 2: Grabby
             _bossPhase = 2;
             BossBar(0f);
+            if (Helicopter != null && !Helicopter.EngineOn) Helicopter.ServerFlyTo(drop.position, drop.eulerAngles.y, 14f); // (a retry: back out)
             yield return Say(_sandy, "GRABBY! Mummy needs you, sweetie!");
             Vector3 at = lair.position;
             at.y = WaterSurface.Exists ? WaterSurface.HeightAt(at) - 1.1f * Creature.CousinSize : at.y;
@@ -200,7 +211,7 @@ namespace PleaseDontDrown.Story
             {
                 _raceTourists.RemoveAll(v => v == null || !v.IsSpawned);
                 int inWater = _raceTourists.FindAll(v => v.State.NeedsHelp()).Count;
-                if (inWater < 2 && Time.time > nextDrop && Helicopter != null)
+                if (inWater < 2 && Time.time > nextDrop && Helicopter != null && Helicopter.Arrived)
                 {
                     VictimBrain v = DropTourist(Helicopter.transform.position, dropped++);
                     if (v != null) _raceTourists.Add(v);
@@ -221,6 +232,8 @@ namespace PleaseDontDrown.Story
             if (Helicopter != null && Island4Point("HeliPark") is { } park) Helicopter.ServerFlyTo(park.position + Vector3.up * 0.01f, park.eulerAngles.y, 12f);
             yield return Say(_sandy, "GRABBY! Oh, you've upset him. Fine. If you want something done...");
 
+            _bossCheckpoint = 3;
+        Phase3:
             // ---- phase 3: Sandy and the claw
             _bossPhase = 3;
             BossBar(0f);

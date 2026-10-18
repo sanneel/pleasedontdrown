@@ -900,6 +900,8 @@ namespace PleaseDontDrown.Dev
             StoryDirector story = StoryDirector.Instance;
             PlayerCombat combat = me.GetComponent<PlayerCombat>();
             if (combat != null && combat.IsDowned) combat.ServerStandUp(PlayerCombat.MaxHealth, 0f);
+            // The final boss: kept on its feet (a player would dodge the claw and the flying loot; the test just stands there).
+            if (combat != null && beat == "4.7" && StoryDirector.MissionRunning) combat.ServerStandUp(PlayerCombat.MaxHealth, 0f);
             if (beat == "4.1" && story.MarkerLabel == "Finders Keepers") { yield return SailToIsland4(me); yield break; }
             if (me.Motor.Seat != null) { Exec("getoff"); yield return new WaitForSeconds(0.8f); yield break; }
             // Someone in trouble off the lagoon: out to them first.

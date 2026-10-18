@@ -33,6 +33,18 @@ namespace PleaseDontDrown.Story
         /// <summary>Host (tests): sacks stowed on the pirate boat.</summary>
         public int CargoSacks => _cargo.Value;
 
+        /// <summary>Where the pirate boat waits off the hotel beach: 32 m out (13 m out it sat on the sand).</summary>
+        private Vector3 HotelBerth => _pirateLanding != null ? _pirateLanding.position + _pirateLanding.forward * 32f + Vector3.down * _pirateLanding.position.y : Vector3.zero;
+
+        /// <summary>Host: the pirate boat, nobody driving it, tied up at <see cref="HotelBerth"/>.</summary>
+        private void MooredAtHotel()
+        {
+            if (_pirateBoat == null || _pirateLanding == null || _pirateBoat.Driver != null) return;
+            _pirateBoat.ServerKickAll();
+            _pirateBoat.ServerPlace(HotelBerth, _pirateLanding.eulerAngles.y);
+            Vehicles.Mooring.Tie(_pirateBoat, HotelBerth, _pirateLanding.eulerAngles.y);
+        }
+
         // Where the boat ties up: along the west side of the night dock's head, bow out to sea.
         private Vector3 NightBerth => NightDock + new Vector3(-4.6f, 0f, 0f);
 
@@ -212,7 +224,7 @@ namespace PleaseDontDrown.Story
             if (thief != null) { Remove(thief); if (_thief == thief) _thief = null; SetCargo(GoldSacks - 1); }
             NoMarker();
             _pirateBoat.ServerSetLocked(true, "The gold's boat");
-            Vehicles.Mooring.Tie(_pirateBoat, stop, _pirateLanding.eulerAngles.y);
+            Vehicles.Mooring.Tie(_pirateBoat, HotelBerth, _pirateLanding.eulerAngles.y);
             // Marisol comes down to the beach to count it.
             StoryNpc marisol = _receptionist;
             Vector3 home = marisol != null ? marisol.transform.position : stop;
@@ -267,6 +279,7 @@ namespace PleaseDontDrown.Story
             SetObjective("Chapter 3 complete");
             yield return ChapterReport("CHAPTER 3 COMPLETE");
             SetCargo(0); // the hotel has the gold now
+            MooredAtHotel(); // (out in deep enough water for the trip in 4.1, not on the sand)
             if (marisol != null) { marisol.ServerMoveTo(home, run: false); StartCoroutine(TurnLater(marisol, homeYaw, 20f)); }
             if (tag != null && tag.IsSpawned && !tag.IsHeld) Despawn(tag.gameObject);
         }
