@@ -88,6 +88,7 @@ namespace PleaseDontDrown.Avatars
             _animator.applyRootMotion = false;
             _animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             _animator.runtimeAnimatorController = null;
+            _animator.Rebind(); // (bind the new humanoid to the bones)
 
             _graph = PlayableGraph.Create("AvatarClips " + _rig.name);
             _graph.SetTimeUpdateMode(DirectorUpdateMode.Manual); // (AvatarAnimator evaluates it, in its own order)
@@ -179,6 +180,18 @@ namespace PleaseDontDrown.Avatars
                 {
                     Transform t = rig[b];
                     if (t != null) t.rotation = Quaternion.FromToRotation(-t.up, outward) * t.rotation; // (limbs point down their -Y)
+                }
+                // Palms down, thumbs forward, as a humanoid's T-pose has them: each hand turned about the arm until the
+                // line across its knuckles (little finger to index) points ahead (left as they hang, the palms came out
+                // of every clip turned 80 degrees forward).
+                Transform hand = rig[left ? Bone.HandL : Bone.HandR];
+                HandBones fingers = rig.Hand(!left);
+                if (hand != null && fingers != null)
+                {
+                    Transform index = fingers.Bones[HandBones.BoneIndex(1, 0)], pinky = fingers.Bones[HandBones.BoneIndex(4, 0)];
+                    Vector3 across = Vector3.ProjectOnPlane(index.position - pinky.position, outward);
+                    if (across.sqrMagnitude > 1e-8f)
+                        hand.rotation = Quaternion.AngleAxis(Vector3.SignedAngle(across, Vector3.forward, outward), outward) * hand.rotation;
                 }
             }
 

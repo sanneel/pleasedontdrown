@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using PleaseDontDrown.Avatars;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Playables;
 using Object = UnityEngine.Object;
 
 namespace PleaseDontDrown.Editor
@@ -58,6 +60,9 @@ namespace PleaseDontDrown.Editor
             AvatarLook look = body == AvatarLook.Bodies.Goofy ? AvatarLook.Lifeguard
                 : new AvatarLook { Body = body, Figure = (byte)(AvatarLook.Bodies.IsFeminine(body) ? 1 : 0) };
             rig.Build(look);
+            // (Outside play mode a body with an Animator is only re-skinned by the game loop, which batch runs don't
+            // have: make every render take the bones as they are.)
+            if (rig.Renderer != null) rig.Renderer.forceMatrixRecalculationPerRender = true;
             return rig;
         }
 
@@ -102,6 +107,172 @@ namespace PleaseDontDrown.Editor
             return ok;
         }
 
+        /// <summary>InfoBatch: what the imported Mixamo files are (their humanoid, their clips).</summary>
+        public static void InfoBatch()
+        {
+            foreach (string path in AssetDatabase.FindAssets("t:Model", new[] { "Assets/_Game/Resources/Mixamo" }))
+            {
+                string file = AssetDatabase.GUIDToAssetPath(path);
+                foreach (Object o in AssetDatabase.LoadAllAssetsAtPath(file))
+                {
+                    if (o is UnityEngine.Avatar a) Debug.Log($"[ClipCheck] {file}: avatar valid {a.isValid} human {a.isHuman}");
+                    if (o is AnimationClip c && !c.name.StartsWith("__preview__"))
+                        Debug.Log($"[ClipCheck] {file}: clip '{c.name}' {c.length:0.00} s, human motion {c.isHumanMotion}, looping {c.isLooping}, average speed {c.averageSpeed}");
+                }
+                var importer = (ModelImporter)AssetImporter.GetAtPath(file);
+                Debug.Log($"[ClipCheck] {file}: {importer.humanDescription.human.Length} human bones mapped, e.g. " +
+                          string.Join(", ", Array.ConvertAll(importer.humanDescription.human, h => h.humanName + "=" + h.boneName)).Substring(0, 200));
+            }
+            EditorApplication.Exit(0);
+        }
+
+        /// <summary>ElbowBatch: the idle and walk at a few moments, the elbow bend on Mixamo's own skeleton and on ours.</summary>
+        public static void ElbowBatch()
+        {
+            try
+            {
+                AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
+                var go = new GameObject("ElbowCheck");
+                AvatarRig rig = Spawn(go, AvatarLook.Bodies.Lola);
+                foreach (string file in new[] { "Breathing Idle", "Walking" })
+                {
+                    var model = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/_Game/Resources/Mixamo/{file}.fbx");
+                    GameObject source = Object.Instantiate(model);
+                    AnimationClip clip = null;
+                    foreach (Object o in AssetDatabase.LoadAllAssetsAtPath($"Assets/_Game/Resources/Mixamo/{file}.fbx"))
+                        if (o is AnimationClip c && !c.name.StartsWith("__preview__")) clip = c;
+                    Transform Find(string bone) => source.GetComponentsInChildren<Transform>().First(t => t.name == "mixamorig:" + bone);
+                    foreach (float at in new[] { 0f, 0.25f, 0.5f })
+                    {
+                        float time = at * clip.length;
+                        clip.SampleAnimation(source, time);
+                        float mixL = Elbow(Find("LeftArm"), Find("LeftForeArm"), Find("LeftHand"));
+                        float mixR = Elbow(Find("RightArm"), Find("RightForeArm"), Find("RightHand"));
+                        // Ours, posed by the same clip at the same moment.
+                        rig.ResetPose();
+                        UnityEngine.Avatar avatar = AvatarClips.BuildAvatar(rig);
+                        if (!go.TryGetComponent(out Animator animator)) animator = go.AddComponent<Animator>();
+                        animator.avatar = avatar;
+                        animator.Rebind();
+                        var graph = UnityEngine.Playables.PlayableGraph.Create("elbow");
+                        var output = UnityEngine.Animations.AnimationPlayableOutput.Create(graph, "o", animator);
+                        var play = UnityEngine.Animations.AnimationClipPlayable.Create(graph, clip);
+                        output.SetSourcePlayable(play);
+                        play.SetTime(time);
+                        graph.Evaluate(0f);
+                        float ourL = Elbow(rig[AvatarRig.Bone.UpperArmL], rig[AvatarRig.Bone.ForearmL], rig[AvatarRig.Bone.HandL]);
+                        float ourR = Elbow(rig[AvatarRig.Bone.UpperArmR], rig[AvatarRig.Bone.ForearmR], rig[AvatarRig.Bone.HandR]);
+                        Vector3 mixForeL = (Find("LeftHand").position - Find("LeftForeArm").position).normalized;
+                        Vector3 ourForeL = (rig[AvatarRig.Bone.HandL].position - rig[AvatarRig.Bone.ForearmL].position).normalized;
+                        Debug.Log($"[ClipCheck] {file} at {at:0.00}: elbow bend Mixamo L {mixL:0} R {mixR:0}, ours L {ourL:0} R {ourR:0}; left forearm points Mixamo {mixForeL} ours {ourForeL}");
+                        // The hand: toward the middle finger, and the thumb's side (the palm's turn).
+                        Vector3 mixFinger = (Find("LeftHandMiddle1").position - Find("LeftHand").position).normalized;
+                        Vector3 mixThumb = (Find("LeftHandIndex1").position - Find("LeftHandPinky1").position).normalized;
+                        Transform middle = rig.transform.GetComponentsInChildren<Transform>().First(t => t.name == "Middle1L");
+                        Transform thumb = rig.transform.GetComponentsInChildren<Transform>().First(t => t.name == "Index1L");
+                        Transform pinky = rig.transform.GetComponentsInChildren<Transform>().First(t => t.name == "Pinky1L");
+                        Vector3 ourFinger = (middle.position - rig[AvatarRig.Bone.HandL].position).normalized;
+                        Vector3 ourThumb = (thumb.position - pinky.position).normalized;
+                        Debug.Log($"[ClipCheck]   left hand: fingers point Mixamo {mixFinger} ours {ourFinger} ({Vector3.Angle(mixFinger, ourFinger):0} deg apart); across the knuckles Mixamo {mixThumb} ours {ourThumb} ({Vector3.Angle(mixThumb, ourThumb):0} deg apart)");
+                        graph.Destroy();
+                        Object.DestroyImmediate(avatar);
+                    }
+                    Object.DestroyImmediate(source);
+                }
+                Object.DestroyImmediate(go);
+                EditorApplication.Exit(0);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ClipCheck] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
+        /// <summary>How far the elbow is bent (0: straight), degrees.</summary>
+        private static float Elbow(Transform upper, Transform fore, Transform hand) =>
+            Vector3.Angle(fore.position - upper.position, hand.position - fore.position);
+
+        // ------------------------------------------------------------------ single poses (finding a retarget problem)
+
+        /// <summary>
+        /// PoseBatch: one body in Unity's neutral humanoid pose (every muscle 0) and in the clips at a few moments,
+        /// front and side, to Screenshots/Review/clippose_*.jpg.
+        /// </summary>
+        public static void PoseBatch()
+        {
+            try
+            {
+                EditorSceneManager.OpenScene("Assets/_Game/Scenes/Game.unity");
+                var camera = GameObject.Find("MenuCamera").GetComponent<Camera>();
+                camera.farClipPlane = 2000f;
+                camera.nearClipPlane = 0.05f;
+                camera.fieldOfView = 30f;
+                AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
+                Directory.CreateDirectory("Screenshots/Review");
+                var go = new GameObject("PoseCheck");
+                go.transform.position = new Vector3(400f, 300f, 0f);
+                AvatarRig rig = Spawn(go, AvatarLook.Bodies.Lola);
+                void Shoot(string name)
+                {
+                    Vector3 mid = go.transform.position + Vector3.up * 0.9f;
+                    camera.transform.position = mid + new Vector3(0f, 0.2f, 5.2f);
+                    camera.transform.LookAt(mid);
+                    RenderTo(camera, $"Screenshots/Review/clippose_{name}_front.jpg");
+                    camera.transform.position = mid + new Vector3(-5.2f, 0.2f, 0f);
+                    camera.transform.LookAt(mid);
+                    RenderTo(camera, $"Screenshots/Review/clippose_{name}_side.jpg");
+                }
+                Shoot("rest");
+                UnityEngine.Avatar avatar = AvatarClips.BuildAvatar(rig);
+                var handler = new HumanPoseHandler(avatar, rig.transform);
+                var pose = new HumanPose();
+                handler.GetHumanPose(ref pose);
+                Debug.Log($"[ClipCheck] rest pose as muscles: body {pose.bodyPosition} {pose.bodyRotation.eulerAngles}");
+                for (int m = 0; m < pose.muscles.Length; m++)
+                    if (Mathf.Abs(pose.muscles[m]) > 0.2f) Debug.Log($"[ClipCheck]   {HumanTrait.MuscleName[m]} = {pose.muscles[m]:0.00}");
+                for (int m = 0; m < pose.muscles.Length; m++) pose.muscles[m] = 0f;
+                handler.SetHumanPose(ref pose);
+                Shoot("zero");
+                handler.Dispose();
+                Object.DestroyImmediate(avatar);
+
+                // The clips alone first (none of the animator's own steps after them).
+                rig.ResetPose();
+                var bare = new AvatarClips(rig);
+                if (!bare.Prepare()) throw new InvalidOperationException("clips didn't prepare");
+                foreach (var (name, speed, steps) in new[] { ("bare_idle", 0f, 3), ("bare_walk", 1.4f, 12), ("bare_walk2", 1.4f, 19) })
+                {
+                    for (int i = 0; i < steps; i++) { rig.ResetPose(); bare.Evaluate(speed, 1f / 30f); }
+                    Transform hips = rig[AvatarRig.Bone.Hips];
+                    Vector3 hl = hips.InverseTransformPoint(rig[AvatarRig.Bone.HandL].position), hr = hips.InverseTransformPoint(rig[AvatarRig.Bone.HandR].position);
+                    Vector3 fl = hips.InverseTransformPoint(rig[AvatarRig.Bone.FootL].position), fr = hips.InverseTransformPoint(rig[AvatarRig.Bone.FootR].position);
+                    Debug.Log($"[ClipCheck] {name}: hands L {hl} R {hr}, feet L {fl} R {fr} (hips space: +z ahead)");
+                    Shoot(name);
+                }
+                bare.Release();
+
+                var animator = go.AddComponent<AvatarAnimator>();
+                animator.Rig = rig;
+                animator.UseClips = true;
+                foreach (var (name, speed, steps) in new[] { ("idle", 0f, 1), ("walk", 1.4f, 1), ("walk2", 1.4f, 9), ("run", 4.5f, 1), ("run2", 4.5f, 6) })
+                {
+                    animator.Motion = new AvatarMotion { Velocity = Vector3.forward * speed, Grounded = true, Sprinting = speed > 3f };
+                    for (int i = 0; i < 40 + steps; i++) animator.Tick(1f / 30f);
+                    Shoot(name);
+                }
+                animator.SendMessage("OnDestroy", SendMessageOptions.DontRequireReceiver);
+                Object.DestroyImmediate(go);
+                Debug.Log("[ClipCheck] poses done");
+                EditorApplication.Exit(0);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ClipCheck] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         // ------------------------------------------------------------------ side by side
 
         public static void CompareBatch()
@@ -135,7 +306,8 @@ namespace PleaseDontDrown.Editor
             if (Directory.Exists(folder)) Directory.Delete(folder, true);
             Directory.CreateDirectory(folder);
 
-            // High over the sea (nothing in the way), the two walking side by side along +Z.
+            // High over the sea (nothing in the way), far apart so neither is in the other's picture: each has its
+            // own camera at the same place beside it, and the two pictures go side by side (left hand-made, right clips).
             var start = new Vector3(400f, 300f, 0f);
             var spawned = new List<GameObject>();
             AvatarAnimator Make(Vector3 at, bool clips)
@@ -149,7 +321,7 @@ namespace PleaseDontDrown.Editor
                 animator.UseClips = clips;
                 return animator;
             }
-            AvatarAnimator handMade = Make(start + Vector3.left * 0.7f, false), clipped = Make(start + Vector3.right * 0.7f, true);
+            AvatarAnimator handMade = Make(start, false), clipped = Make(start + Vector3.right * 40f, true);
 
             // The route: (seconds, speed in m/s).
             (float until, float speed)[] route = { (2f, 0f), (6f, 1.4f), (10f, 5.5f), (13f, 1.4f), (15.5f, 0f) };
@@ -169,18 +341,33 @@ namespace PleaseDontDrown.Editor
                     a.Motion = new AvatarMotion { Velocity = Vector3.forward * speed, FacingYaw = 0f, Grounded = true, Sprinting = speed > 3f };
                     a.Tick(dt);
                 }
-                // From the side and a little ahead, following them.
-                Vector3 mid = new(start.x, start.y + 0.9f, start.z + z);
-                camera.transform.position = mid + new Vector3(-7.5f, 0.6f, 3.2f);
-                camera.transform.LookAt(mid + Vector3.forward * 0.3f);
-                Render(camera, $"{folder}/f{frame:0000}.jpg");
+                if (frame % 60 == 0)
+                {
+                    Transform thigh = clipped.Rig[AvatarRig.Bone.ThighL], hips = clipped.Rig[AvatarRig.Bone.Hips];
+                    Debug.Log($"[ClipCheck] t {t:0.0} speed {speed:0.0}: clips {clipped.ClipDriven}, hips {hips.localPosition}, left thigh {thigh.localEulerAngles}");
+                }
+                // From the side and a little ahead, following each of them.
+                foreach (AvatarAnimator a in new[] { handMade, clipped })
+                {
+                    Vector3 mid = a.transform.position + Vector3.up * 0.9f;
+                    camera.transform.position = mid + new Vector3(-4.6f, 0.4f, 2.0f);
+                    camera.transform.LookAt(mid + Vector3.forward * 0.2f);
+                    Render(camera, $"{folder}/{(a == handMade ? "a" : "b")}{frame:0000}.jpg");
+                }
             }
-            foreach (GameObject go in spawned) Object.DestroyImmediate(go);
+            foreach (GameObject go in spawned)
+            {
+                if (go.TryGetComponent(out AvatarAnimator a)) a.SendMessage("OnDestroy", SendMessageOptions.DontRequireReceiver);
+                Object.DestroyImmediate(go);
+            }
         }
 
-        private static void Render(Camera camera, string path)
+        private static void RenderTo(Camera camera, string path) => Render(camera, path, 900, 1000);
+
+        private static void Render(Camera camera, string path) => Render(camera, path, 960, 1080);
+
+        private static void Render(Camera camera, string path, int w, int h)
         {
-            const int w = 1280, h = 720;
             var rt = new RenderTexture(w, h, 24) { antiAliasing = 4 };
             camera.targetTexture = rt;
             camera.Render();
