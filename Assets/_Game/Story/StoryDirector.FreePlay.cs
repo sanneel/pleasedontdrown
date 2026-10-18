@@ -34,8 +34,10 @@ namespace PleaseDontDrown.Story
             SetObjective("Open shift: fish tourists out of the sea, then trickshot them back in");
             // Everything the story locked is open now.
             SetRentalAccess(true);
+            GalaStateFor("end");
             if (_reception != null) _reception.ServerSetAvailable(true);
             if (_pirateBoat != null) _pirateBoat.ServerSetLocked(false);
+            if (Yacht != null) Yacht.ServerSetLocked(false);
             if (_sandy != null) SandySits();
             Debug.Log("[Story] open shift (free play) running");
             StartCoroutine(FreePlayLoop());
@@ -57,7 +59,9 @@ namespace PleaseDontDrown.Story
                 _island = island;
                 int figure = Random.value < 0.5f ? 0 : 1;
                 bool silent = Random.value < 0.15f;
-                SpawnStoryTourist(island, Profile(island, figure, silent));
+                TouristProfile profile = Profile(island, figure, silent);
+                profile.Vip = island == _island2 && !silent && Random.value < _vipChance; // the hotel's rich guests tip
+                SpawnStoryTourist(island, profile);
             }
         }
 

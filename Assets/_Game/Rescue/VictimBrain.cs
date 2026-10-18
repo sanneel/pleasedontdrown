@@ -45,6 +45,8 @@ namespace PleaseDontDrown.Rescue
         public ulong Look;
         [Tooltip("What they shout instead of 'help!' while in trouble, separated by '|' (story gags). Empty = 'help!'.")]
         public string Shouts;
+        [Tooltip("A rich hotel guest: gold hat, \"VIP\" before the name, tips the team when rescued (island 2).")]
+        public bool Vip;
 
         public static TouristProfile Default => new() { Figure = -1, BleedSeconds = 60f };
     }
@@ -126,6 +128,8 @@ namespace PleaseDontDrown.Rescue
         private readonly SyncVar<bool> _legLost = new SyncVar<bool>();
         private readonly SyncVar<float> _bleedLeft = new SyncVar<float>(0f, new SyncTypeSettings(0.25f));
         private readonly SyncVar<string> _shouts = new SyncVar<string>();
+        private readonly SyncVar<bool> _vip = new SyncVar<bool>();
+        private readonly SyncVar<bool> _knockedOut = new SyncVar<bool>();
         private string[] _shoutLines = System.Array.Empty<string>();
 
         private Item _item;
@@ -171,6 +175,12 @@ namespace PleaseDontDrown.Rescue
         public bool IsSilent => _silent.Value;
         public bool IsFlatlined => _flatline.Value;
         public bool HasLostLeg => _legLost.Value;
+        /// <summary>A VIP hotel guest (gold hat; the team gets a tip for the rescue).</summary>
+        public bool IsVip => _vip.Value;
+        /// <summary>Host: the VIP tip has been paid (once per guest).</summary>
+        public bool VipTipped { get; set; }
+        /// <summary>Knocked out in a fight on land (a bar brawler): carry them to the infirmary's bed.</summary>
+        public bool IsKnockedOut => _knockedOut.Value;
         public float BleedSecondsLeft => _bleedLeft.Value;
         /// <summary>What they shout in trouble instead of "help!" (empty = the usual).</summary>
         public string[] Shouts => _shoutLines;
@@ -199,6 +209,7 @@ namespace PleaseDontDrown.Rescue
             _seed.OnChange += (_, _, _) => ApplyLook();
             _look.OnChange += (_, _, _) => ApplyLook();
             _state.OnChange += OnStateChanged;
+            _vip.OnChange += (_, next, _) => AvatarVipHat.Set(_body.Avatar, next);
             _shouts.OnChange += (_, next, _) =>
                 _shoutLines = string.IsNullOrEmpty(next) ? System.Array.Empty<string>() : next.Split('|');
         }
@@ -254,6 +265,7 @@ namespace PleaseDontDrown.Rescue
             _name.Value = !string.IsNullOrEmpty(profile.Name) ? profile.Name : !string.IsNullOrEmpty(displayName) ? displayName : RandomName(look.Feminine);
             _silent.Value = profile.Silent;
             _shouts.Value = profile.Shouts ?? string.Empty;
+            _vip.Value = profile.Vip;
             _drownSeconds = Mathf.Max(0f, profile.SecondsToUnconscious);
             _flatlineAfter = Mathf.Max(0f, profile.FlatlineAfter);
             _bleedSeconds = profile.BleedSeconds > 0f ? profile.BleedSeconds : 60f;
@@ -266,6 +278,12 @@ namespace PleaseDontDrown.Rescue
             SetState(state);
             if (state.NeedsHelp()) _troubleSince = Time.time;
         }
+
+        private static readonly string[] VipMen = { "Mr. Vanderbilt", "Mr. Montague", "Sir Reginald", "Mr. Goldberg", "Count Orsini", "Mr. Ashford" };
+        private static readonly string[] VipWomen = { "Mrs. Astor", "Lady Penelope", "Ms. Fairchild", "Mrs. Rothwell", "Duchess Ines", "Mrs. Sterling" };
+
+        /// <summary>A rich guest's name, "VIP Mrs. Astor" (the prompt and every announcement show it).</summary>
+        public static string VipName(bool female) => "VIP " + (female ? VipWomen[Random.Range(0, VipWomen.Length)] : VipMen[Random.Range(0, VipMen.Length)]);
 
         public static string RandomName() => RandomName(Random.value < 0.5f);
         public static string RandomName(bool female) => female ? FemaleNames[Random.Range(0, FemaleNames.Length)] : MaleNames[Random.Range(0, MaleNames.Length)];
@@ -725,11 +743,21 @@ namespace PleaseDontDrown.Rescue
             Debug.Log($"[Victim] {Name} bitten by a shark");
         }
 
+        /// <summary>Host: knocked out in a fight on land (a bar brawler): lying there, to be carried to the infirmary.</summary>
+        [Server]
+        public void ServerKnockedOut()
+        {
+            _knockedOut.Value = true;
+            _ashore.Value = true;
+            _autoState = false;
+            SetState(VictimState.Injured, VictimEvent.InjuredAshore, $"{Name} is out cold after the bar fight. Carry {They} to the infirmary!");
+        }
+
         /// <summary>Host: carried onto a hospital bed. Bleeding stops, they're saved.</summary>
         [Server]
         public void ServerHospitalize(Vector3 position, Quaternion rotation, PlayerHub by)
         {
-            if (!_legLost.Value || _hospitalized) return;
+            if ((!_legLost.Value && !_knockedOut.Value) || _hospitalized) return;
             _hospitalized = true;
             PlayerHub holder = _item.Holder;
             _item.ServerForceDrop();
@@ -737,7 +765,21 @@ namespace PleaseDontDrown.Rescue
             _air.Value = 1f;
             _panic.Value = 0f;
             string who = by != null ? by.DisplayName : holder != null ? holder.DisplayName : "the lifeguards";
+            if (_knockedOut.Value)
+            {
+                // He stays lying on the bed, sleeping it off, and is gone a moment later (getting up on the bed looked broken).
+                _rescued.Value = true;
+                Announce(VictimEvent.Hospitalized, $"{Name} is sleeping it off in the infirmary. Brought in by {who}.", by ?? holder);
+                StartCoroutine(SleepItOff());
+                return;
+            }
             SetState(VictimState.Saved, VictimEvent.Hospitalized, $"{Name} is in the infirmary with {_bleedLeft.Value:F0}s to spare. Brought in by {who}!", by ?? holder);
+        }
+
+        private System.Collections.IEnumerator SleepItOff()
+        {
+            yield return new WaitForSeconds(3f);
+            if (IsSpawned) Despawn(gameObject);
         }
 
         // ------------------------------------------------------------------ announcements (every machine)

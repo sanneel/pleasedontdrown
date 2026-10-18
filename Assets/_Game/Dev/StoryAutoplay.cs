@@ -35,7 +35,7 @@ namespace PleaseDontDrown.Dev
         private const float BeatLimit = 300f;       // game seconds one beat may take before the run counts as stuck
         private static readonly string[] Beats =
         {
-            "1.1", "1.2", "1.3", "1.4", "1.5", "1.9", "1.10", "2.1", "2.2", "2.3", "2.4", "2.5", "2.5b", "2.6", "2.7",
+            "1.1", "1.2", "1.3", "1.4", "1.5", "1.9", "1.10", "2.1", "2.2", "2.3", "2.4", "2.5", "2.5b", "2.5c", "2.6", "2.7",
             "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.8", "end"
         };
 
@@ -136,6 +136,7 @@ namespace PleaseDontDrown.Dev
                     Say($"beat {now} (after {Time.time - started:0} s): {story.Objective}");
                     beat = now;
                     beatStart = Time.time;
+                    if (beat == "2.5c") _galaFundSince = Time.time;
                     if (Array.IndexOf(Beats, beat) > Array.IndexOf(Beats, last)) break;
                     _nextPeriodic = Time.time + 2f;
                 }
@@ -228,7 +229,14 @@ namespace PleaseDontDrown.Dev
             if (beat.StartsWith("3.")) { yield return Chapter3(me, beat); yield break; }
             if (beat == "2.1") { yield return TalkToMarked(me); yield break; }
             if (beat == "2.2" && !Carries(me, "Pistol")) { yield return BuyAt(me, "Pistol"); yield break; }
-            if (beat == "2.7") { yield return SailToSkullCove(me); yield break; }
+            if (beat == "2.7") { yield return Beat27(me); yield break; }
+            if (beat == "2.5c" && StoryDirector.Instance.MarkerLabel == "Director") { yield return TalkToMarked(me); yield break; }
+            if (beat == "2.6" && StoryDirector.Instance.MarkerLabel == "Gala" && StoryDirector.Instance.MarkerPosition is { } gala)
+            {
+                Stand(me, gala - Vector3.up * 1.5f + Vector3.right * 1.5f);
+                yield return new WaitForSeconds(0.5f);
+                yield break;
+            }
 
             // Someone in trouble comes first.
             foreach (VictimBrain v in VictimBrain.All)
@@ -247,7 +255,7 @@ namespace PleaseDontDrown.Dev
 
             // A robber (or pirate) on his feet: knock him down.
             foreach (StoryNpc n in StoryNpc.All)
-                if (n != null && n.MaxHealth > 0 && n.Health > 0 && n.Role is NpcRole.Robber or NpcRole.Pirate)
+                if (n != null && n.MaxHealth > 0 && n.Health > 0 && (n.Role is NpcRole.Robber or NpcRole.Pirate || (n.Role == NpcRole.Guest && n.IsFighting)) && n.Ride == null)
                 {
                     Exec($"goto {FirstWord(n.Name)}");
                     yield return new WaitForSeconds(0.3f);
@@ -292,6 +300,13 @@ namespace PleaseDontDrown.Dev
                 }
             }
 
+            // The gala fund: the beach shift pays as it goes; after a minute of it the test tops the wallet up (galamoney).
+            if (beat == "2.5c" && StoryDirector.Instance.GalaGoal > 0 && Time.time - _galaFundSince > 60f && Economy.Money < StoryDirector.Instance.GalaGoal)
+            {
+                Say($"gala fund: ${Economy.Money} earned in a minute of shift, topping up to ${StoryDirector.Instance.GalaGoal}");
+                Exec($"galamoney {StoryDirector.Instance.GalaGoal - Economy.Money}");
+                yield return new WaitForSeconds(1f);
+            }
             if (beat == "1.8") yield return WadeToFalseAlarm(me);
             if (beat == "1.10") yield return RideToIsland2(me);
             // Sent somewhere (the Kleptopus's pier): go where the marker is.
@@ -303,6 +318,15 @@ namespace PleaseDontDrown.Dev
                 me.Motor.Teleport(at + Vector3.back * 6f);
                 yield return new WaitForSeconds(1f);
             }
+        }
+
+        private float _galaFundSince = float.MaxValue;
+
+        /// <summary>2.7: talk to the director for the yacht keys (marked), then sail.</summary>
+        private IEnumerator Beat27(PlayerHub me)
+        {
+            if (StoryDirector.Instance.MarkerLabel == "Director") { yield return TalkToMarked(me); yield break; }
+            yield return SailToSkullCove(me);
         }
 
         private IEnumerator TalkRental(PlayerHub me)
@@ -627,7 +651,7 @@ namespace PleaseDontDrown.Dev
             {
                 Vehicle boat = null;
                 foreach (Vehicle v in Vehicle.All)
-                    if (v.DisplayName == "Pirate Boat" && !v.IsLocked && v.Driver == null) boat = v;
+                    if ((v.DisplayName == "Yacht" || v.DisplayName == "Pirate Boat") && !v.IsLocked && v.Driver == null) boat = v;
                 if (boat == null) yield break;
                 Vector3 boarding = boat.transform.position + boat.transform.right * 2.5f;
                 boarding.y = WaterSurface.Exists ? WaterSurface.HeightAt(boarding) - 1.0f : boarding.y;
@@ -645,7 +669,8 @@ namespace PleaseDontDrown.Dev
             // Skull Cove's dock is on its east shore (the island is x -75 .. 115, z -1020 .. -780): come in from the east.
             Vector3 p = ride.transform.position;
             Vector3 target = cove.position;
-            if (p.z > -500f && p.x > -205f) target = new Vector3(-225f, 0f, p.z - 40f);
+            if (p.z > -300f && p.z < -170f && p.x > -120f) target = new Vector3(p.x - 25f, 0f, -150f); // by the hotel beach (the marina): out to sea first
+            else if (p.z > -500f && p.x > -205f) target = new Vector3(-225f, 0f, p.z - 40f);
             else if (p.z > -500f) target = new Vector3(-225f, 0f, -530f);
             else if (!north && p.x < 150f && p.z > -890f) target = new Vector3(165f, 0f, Mathf.Min(p.z, -740f) - 25f);
             else if (!north && p.x < 150f) target = new Vector3(165f, 0f, cove.position.z);

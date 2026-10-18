@@ -86,6 +86,8 @@ namespace PleaseDontDrown.Vehicles
         public bool IsLand => _land;
         public PlayerHub Driver => _driver.Value;
         public bool IsLocked => _locked.Value;
+        /// <summary>Host: driving itself to a point (ServerAutopilot).</summary>
+        public bool OnAutopilot => _autopilotTarget.HasValue;
         public Rigidbody Body => _rb;
         public float Speed => _rb != null ? _rb.linearVelocity.magnitude : 0f;
         /// <summary>Host: raised when someone gets on.</summary>

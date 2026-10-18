@@ -18,6 +18,9 @@ namespace PleaseDontDrown.World
         // night reaches: full night inside, gone this far beyond the coast.
         private static readonly Vector2 Centre = new(20f, -900f), Half = new(95f, 118f);
         private const float FullNightOut = 40f, DayOut = 190f;
+        // Island 2 (the hotel) at night only for the gala (Docs/16): its footprint and how far the night reaches from it.
+        private static readonly Vector2 HotelCentre = new(-5f, -268f), HotelHalf = new(95f, 62f);
+        private const float HotelFullNightOut = 60f, HotelDayOut = 230f, HotelFadeSeconds = 5f;
 
         private struct SkyLook { public Color Top, Horizon, Bottom, Sun, Cloud, CloudShade; public float SunIntensity, SunRadius, SunGlow, Stars; }
         private struct SeaLook { public Color Shallow, Deep, Sky, Ripple, Foam; }
@@ -42,6 +45,9 @@ namespace PleaseDontDrown.World
 
         /// <summary>0 day .. 1 night, for this machine's camera (anyone may read it: sounds, sentries' sight...).</summary>
         public static float Night { get; private set; }
+        /// <summary>The gala is on: island 2 goes to night too (set on every machine from the story's synced state).</summary>
+        public static bool HotelGala { get; set; }
+        private static float _hotelBlend; // the gala's night fading in and out (0..1)
 
         private Light _sun;
         private Color _daySunColor;
@@ -55,11 +61,14 @@ namespace PleaseDontDrown.World
         private readonly List<Light> _lights = new();
         private readonly List<Light> _flicker = new();
         private float _applied = -1f;
+        private float _appliedMoon = -1f;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Create()
         {
             Night = 0f;
+            HotelGala = false;
+            _hotelBlend = 0f;
             if (GameObject.Find("Environment/Island3") == null) return; // not the game scene
             new GameObject("IslandNight").AddComponent<IslandNight>();
         }
@@ -124,10 +133,14 @@ namespace PleaseDontDrown.World
 
         private void LateUpdate()
         {
+            _hotelBlend = Mathf.MoveTowards(_hotelBlend, HotelGala ? 1f : 0f, Time.deltaTime / HotelFadeSeconds);
             Camera cam = Camera.main;
             float k = cam != null ? NightAt(cam.transform.position) : _applied < 0f ? 0f : _applied;
             Night = k;
-            if (!Mathf.Approximately(k, _applied)) Apply(k);
+            // The moon's angle only for island 3's own night: the gala keeps the sun's angle (a low moon made thousands
+            // more things cast shadows over the hotel island: +2 ms a frame on High).
+            float moon = cam != null ? Island3NightAt(cam.transform.position) : Mathf.Max(0f, _appliedMoon);
+            if (!Mathf.Approximately(k, _applied) || !Mathf.Approximately(moon, _appliedMoon)) Apply(k, moon);
             // Underwater has its own fog (UnderwaterFx); above it, the night's (or the day's).
             if (!UnderwaterFx.CameraUnderwater && k > 0.001f)
             {
@@ -144,22 +157,33 @@ namespace PleaseDontDrown.World
                     if (l != null) l.intensity = 2.6f * (0.82f + 0.18f * Mathf.PerlinNoise(Time.time * 7f, l.GetInstanceID() * 0.13f));
         }
 
-        /// <summary>1 on island 3 and close round it, 0 out past the channel.</summary>
-        public static float NightAt(Vector3 p)
+        /// <summary>Island 3's own night: 1 on it and close round it, 0 out past the channel.</summary>
+        private static float Island3NightAt(Vector3 p)
         {
             float dx = Mathf.Max(0f, Mathf.Abs(p.x - Centre.x) - Half.x), dz = Mathf.Max(0f, Mathf.Abs(p.z - Centre.y) - Half.y);
-            float out_ = Mathf.Sqrt(dx * dx + dz * dz);
-            return 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(FullNightOut, DayOut, out_));
+            return 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(FullNightOut, DayOut, Mathf.Sqrt(dx * dx + dz * dz)));
         }
 
-        private void Apply(float k)
+        /// <summary>1 on island 3 and close round it, 0 out past the channel (and the same round island 2 during the gala).</summary>
+        public static float NightAt(Vector3 p)
+        {
+            float k = Island3NightAt(p);
+            if (_hotelBlend <= 0f) return k;
+            float dx = Mathf.Max(0f, Mathf.Abs(p.x - HotelCentre.x) - HotelHalf.x);
+            float dz = Mathf.Max(0f, Mathf.Abs(p.z - HotelCentre.y) - HotelHalf.y);
+            float hotel = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(HotelFullNightOut, HotelDayOut, Mathf.Sqrt(dx * dx + dz * dz)));
+            return Mathf.Max(k, hotel * _hotelBlend);
+        }
+
+        private void Apply(float k, float moon)
         {
             _applied = k;
+            _appliedMoon = moon;
             if (_sun != null)
             {
                 _sun.color = Color.Lerp(_daySunColor, NightMoon, k);
                 _sun.intensity = Mathf.Lerp(_daySunIntensity, NightMoonIntensity, k);
-                _sun.transform.rotation = Quaternion.Slerp(_daySunRotation, MoonRotation, k);
+                _sun.transform.rotation = Quaternion.Slerp(_daySunRotation, MoonRotation, moon);
             }
             if (_sky != null)
             {

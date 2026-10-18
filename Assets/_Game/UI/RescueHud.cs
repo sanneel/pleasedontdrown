@@ -140,6 +140,7 @@ namespace PleaseDontDrown.UI
                 VictimState.Unconscious when v.IsFlatlined => $"NO PULSE: DEFIBRILLATOR!  {v.ConditionSecondsLeft:F0}s",
                 VictimState.Unconscious => $"UNCONSCIOUS  {v.ConditionSecondsLeft:F0}s",
                 VictimState.Saved => "SAVED",
+                VictimState.Injured when v.IsKnockedOut => "KNOCKED OUT: TO THE INFIRMARY",
                 _ => state.Label()
             };
             if (v.HasLostLeg && state != VictimState.Saved && state != VictimState.Lost) info += $"  BLEEDING {v.BleedSecondsLeft:F0}s";

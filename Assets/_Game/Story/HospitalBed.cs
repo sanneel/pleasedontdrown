@@ -19,7 +19,7 @@ namespace PleaseDontDrown.Story
         private static VictimBrain Carried(PlayerHub player)
         {
             var held = player != null && player.Hands != null ? player.Hands.HeldItem : null;
-            return held != null && held.TryGetComponent(out VictimBrain v) && v.HasLostLeg && v.State != VictimState.Saved && v.State != VictimState.Lost ? v : null;
+            return held != null && held.TryGetComponent(out VictimBrain v) && (v.HasLostLeg || v.IsKnockedOut) && v.State != VictimState.Saved && v.State != VictimState.Lost ? v : null;
         }
 
         public bool CanInteract(PlayerHub player) => Carried(player) != null;
@@ -27,7 +27,7 @@ namespace PleaseDontDrown.Story
         public string GetPrompt(PlayerHub player)
         {
             VictimBrain v = Carried(player);
-            return v != null ? $"Put {v.Name} on the hospital bed ({v.BleedSecondsLeft:F0}s left)" : "Hospital bed";
+            return v == null ? "Hospital bed" : v.IsKnockedOut ? $"Put {v.Name} on the hospital bed" : $"Put {v.Name} on the hospital bed ({v.BleedSecondsLeft:F0}s left)";
         }
 
         public void OnInteract(PlayerHub player)

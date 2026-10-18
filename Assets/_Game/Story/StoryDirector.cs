@@ -153,7 +153,11 @@ namespace PleaseDontDrown.Story
         /// <summary>Host (tests): tourists rescued / lost and lost things handed in during the current chapter.</summary>
         public (int rescued, int lost, int returned, int earned) ChapterStats => (_chapterRescued, _chapterLost, _chapterReturned, _chapterEarned);
 
-        private void Awake() => Instance = this;
+        private void Awake()
+        {
+            Instance = this;
+            GalaAwake();
+        }
 
         private void OnDestroy()
         {
@@ -253,6 +257,7 @@ namespace PleaseDontDrown.Story
             if (_receptionist != null) _receptionist.ServerSetTalkable(false);
             if (_reception != null) _reception.ServerSetAvailable(false);
             if (_pirateBoat != null) _pirateBoat.ServerSetLocked(true, "Somebody's boat (not yours... yet)");
+            if (Yacht != null) Yacht.ServerSetLocked(true, "The hotel's yacht (the director has the keys)");
             if (_rentalOperator != null)
             {
                 _rentalHome = _rentalOperator.transform.position;
@@ -285,6 +290,7 @@ namespace PleaseDontDrown.Story
                 _beatIndex = i;
                 Beat beat = _beats[i];
                 _beat.Value = beat.Id;
+                GalaStateFor(beat.Id);
                 SetChapter(beat.Id.StartsWith("3.") ? "Chapter 3: Skull Cove" : beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
                 Debug.Log($"[Story] beat {beat.Id}: {beat.Title}");
                 ClearWaits();
@@ -614,6 +620,11 @@ namespace PleaseDontDrown.Story
                 Despawn(swimmer.gameObject);
             }
             else if (!rescue.TryFindSeaSpot(island.SeaX, island.SeaZ, minDepth, maxDepth, out spot)) return null;
+            // A VIP guest: "VIP Mrs. Astor" (the gold hat comes with the flag). A VIP swimmer from the beach stays one.
+            if (swimmer != null) profile.Vip = swimmer.IsVip; // (the beach crowd has its one in five already)
+            if (profile.Vip && (profile.Name == null || !profile.Name.StartsWith("VIP ")))
+                profile.Name = !string.IsNullOrEmpty(profile.Name) && swimmer == null ? "VIP " + profile.Name
+                    : VictimBrain.VipName(profile.Look != 0 ? AvatarLook.Unpack(profile.Look).Feminine : profile.Figure == 1);
             VictimBrain v = rescue.SpawnVictim(spot, yaw, VictimState.Distressed, 30f, 1f, profile);
             if (v == null) return null;
             _waveTourists.Add(v);
@@ -743,6 +754,7 @@ namespace PleaseDontDrown.Story
         /// <summary>Resuming a save on island 2: bring everyone (and the jet ski) over.</summary>
         private void EnsureOnIsland2()
         {
+            PopulateIsland2();
             if (_island2Spawn == null) return;
             bool anyFar = false;
             foreach (PlayerHub p in PlayerHub.All)
@@ -837,6 +849,7 @@ namespace PleaseDontDrown.Story
             RegisterMissionCommands();
             RegisterThreatCommands();
             RegisterKillCommands();
+            RegisterGalaCommands();
         }
 
         public override void OnStopClient()
@@ -847,6 +860,7 @@ namespace PleaseDontDrown.Story
             UnregisterMissionCommands();
             UnregisterThreatCommands();
             UnregisterKillCommands();
+            UnregisterGalaCommands();
         }
 
         private static Transform FindByName(string part)
@@ -874,7 +888,7 @@ namespace PleaseDontDrown.Story
             if (args[0] == "list")
             {
                 DevCommands.Print("1.1 meet Sandy, 1.2 five rescues, 1.3 thief, 1.4 return loot, 1.5 three men, 1.6 silent one, 1.7 drugs, 1.8 one more, " +
-                                  "1.9 thief again, 1.10 jet ski; 2.1 check in, 2.2 buy pistol, 2.3 three guests, 2.4 shark, 2.5 two more, 2.5b the Kleptopus, 2.6 pirates, 2.7 the boat; " +
+                                  "1.9 thief again, 1.10 jet ski; 2.1 check in, 2.2 buy pistol, 2.3 three guests, 2.4 shark, 2.5 two more, 2.5b the Kleptopus, 2.5c the gala fund, 2.6 gala night (pirates), 2.7 the yacht; " +
                                   "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.8 gold vault");
                 return;
             }
@@ -935,6 +949,7 @@ namespace PleaseDontDrown.Story
             if (ServerMissionCheat(what, value, by)) return;
             if (ServerThreatCheat(what, value, by)) return;
             if (ServerKillCheat(what, by)) return;
+            if (ServerGalaCheat(what, value, by)) return;
             // 6 m ahead on the level (looking down must not put things underground).
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")
