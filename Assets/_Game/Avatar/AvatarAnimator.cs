@@ -76,6 +76,15 @@ namespace PleaseDontDrown.Avatars
         public AvatarMotion Motion;
 
         /// <summary>
+        /// Motion-captured clips for this one (<see cref="AvatarClips"/>; <see cref="AvatarClips.Enabled"/> turns them
+        /// on for everyone): while it just stands, walks or runs, the body, legs and arms come from the clips.
+        /// </summary>
+        public bool UseClips;
+        private AvatarClips _clips;
+        /// <summary>This frame's body came from the clips (the head and the rest go on top of it).</summary>
+        public bool ClipDriven { get; private set; }
+
+        /// <summary>
         /// Sitting on a towel (<see cref="AvatarPose.Sit"/>), the hips sit this far behind the character's root. Lying
         /// poses have the feet at the root and the body behind it, so all towel poses share one root: turning over or
         /// sitting up blends in place instead of jumping.
@@ -312,10 +321,23 @@ namespace PleaseDontDrown.Avatars
             UpdateIdle();
             SampleGround(dt);
             _rig.ResetPose(fingers: false); // PoseHands sets every finger bone
-            PoseBody();
-            PoseBurp();
-            PoseLegs();
-            PoseArms();
+            ClipDriven = WantsClips() && _clips.Prepare();
+            if (ClipDriven)
+            {
+                // Standing, walking or running: the clips pose the body, legs and arms; the hands rest as they hang.
+                Vector3 ground = Motion.Velocity;
+                ground.y = 0f;
+                _clips.Evaluate(ground.magnitude, dt);
+                _rig.LeftHand?.Pose(HandPose.Relaxed);
+                _rig.RightHand?.Pose(HandPose.Relaxed);
+            }
+            else
+            {
+                PoseBody();
+                PoseBurp();
+                PoseLegs();
+                PoseArms();
+            }
             PoseHead();
             PoseSpecial();
             KeepHandsOutOfHead();
@@ -335,6 +357,23 @@ namespace PleaseDontDrown.Avatars
             }
             _seatDropWanted = false;
         }
+
+        /// <summary>
+        /// Only plain standing, walking and running go to the clips for now: anything with hands on something, a pose
+        /// of its own, water, a seat or a fight stays with the hand-made animation.
+        /// </summary>
+        private bool WantsClips()
+        {
+            if (!UseClips && !AvatarClips.Enabled) return false;
+            AvatarMotion m = Motion;
+            if (!m.Grounded || m.Swimming || m.Underwater || m.Climbing || m.Pose != AvatarPose.Normal || m.Seated || m.Cpr ||
+                m.Defib || m.CarryingPerson || m.Holding || m.Stance != FightStance.None || m.Flying || m.StarJump ||
+                m.Crouch > 0.05f || m.Eating || m.Drinking || m.Charge > 0.01f) return false;
+            _clips ??= new AvatarClips(_rig);
+            return true;
+        }
+
+        private void OnDestroy() => _clips?.Release();
 
         /// <summary>
         /// Never a hand inside somebody else: a punch stops on the face, CPR hands rest on the chest, arms round a
@@ -2544,9 +2583,12 @@ namespace PleaseDontDrown.Avatars
             tilt -= 12f * aiming;
             // Carrying somebody: chin up, looking over them, not down into their belly.
             pitch = Mathf.Lerp(pitch, Mathf.Min(pitch, -14f), CarryLean * standing);
-            B(Bone.Neck).localRotation = Quaternion.Euler(pitch * 0.3f + swimTilt * 0.4f, yaw * 0.25f + turn * 0.4f, tilt * 0.4f);
+            Quaternion neck = Quaternion.Euler(pitch * 0.3f + swimTilt * 0.4f, yaw * 0.25f + turn * 0.4f, tilt * 0.4f);
             // (CPR: chin well up, so the big head stays clear above the hands on the chest.)
-            B(Bone.Head).localRotation = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 32f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
+            Quaternion head = Quaternion.Euler(pitch * 0.55f + swimTilt * 0.6f - _cpr * 32f, yaw * 0.5f + turn * 0.6f, tilt * 0.6f);
+            // On the clips' body the looking goes on top of the clip's own head movement.
+            B(Bone.Neck).localRotation = ClipDriven ? B(Bone.Neck).localRotation * neck : neck;
+            B(Bone.Head).localRotation = ClipDriven ? B(Bone.Head).localRotation * head : head;
         }
 
         private void PoseFace()

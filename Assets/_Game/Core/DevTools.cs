@@ -29,6 +29,11 @@ namespace PleaseDontDrown.Core
             }, owner: this);
             DevCommands.Register("frameshot", "<name>", "Capture the final displayed frame, including post-processing and HUD.", args =>
                 StartCoroutine(CaptureFrame(args.Length > 0 ? args[0] : "frame")), owner: this);
+            DevCommands.Register("clips", "[on|off]", "Motion-captured clips for standing, walking and running on everyone (Avatars.AvatarClips).", args =>
+            {
+                Avatars.AvatarClips.Enabled = args.Length == 0 ? !Avatars.AvatarClips.Enabled : args[0] != "off";
+                DevCommands.Print($"clips {(Avatars.AvatarClips.Enabled ? "on" : "off")}{(Avatars.AvatarClips.Available ? "" : " (no clips in Resources/Mixamo yet)")}");
+            }, owner: this);
             DevCommands.Register("where", "", "Where the camera is and where it looks (to report a spot that needs fixing).", _ =>
             {
                 Camera cam = Camera.main;
@@ -46,6 +51,7 @@ namespace PleaseDontDrown.Core
             DevCommands.Unregister("screenshot", this);
             DevCommands.Unregister("viewshot", this);
             DevCommands.Unregister("skin", this);
+            DevCommands.Unregister("clips", this);
             DevCommands.Unregister("frameshot", this);
             DevCommands.Unregister("where", this);
         }
