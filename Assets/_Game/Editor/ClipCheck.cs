@@ -193,6 +193,66 @@ namespace PleaseDontDrown.Editor
         private static float Elbow(Transform upper, Transform fore, Transform hand) =>
             Vector3.Angle(fore.position - upper.position, hand.position - fore.position);
 
+        /// <summary>
+        /// BodiesBatch: every body on the clips (standing, two moments of the walk, two of the run), seen from in front
+        /// at an angle, to Screenshots/ClipBodies/&lt;body&gt;_&lt;pose&gt;.jpg: arms through bellies, coats and hips show here.
+        /// </summary>
+        public static void BodiesBatch()
+        {
+            try
+            {
+                EditorSceneManager.OpenScene("Assets/_Game/Scenes/Game.unity");
+                var camera = GameObject.Find("MenuCamera").GetComponent<Camera>();
+                camera.farClipPlane = 2000f;
+                camera.nearClipPlane = 0.05f;
+                camera.fieldOfView = 30f;
+                AvatarRig.SharedMaterial = GameSceneBuilder.AvatarMaterial();
+                const string folder = "Screenshots/ClipBodies";
+                if (Directory.Exists(folder)) Directory.Delete(folder, true);
+                Directory.CreateDirectory(folder);
+                foreach (byte body in AllBodies)
+                {
+                    var go = new GameObject("ClipBody " + body);
+                    go.transform.position = new Vector3(400f, 300f, 0f);
+                    AvatarRig rig = Spawn(go, body);
+                    var animator = go.AddComponent<AvatarAnimator>();
+                    animator.Rig = rig;
+                    animator.UseClips = true;
+                    float t = 0f;
+                    foreach (var (pose, speed, until) in new[] { ("idle", 0f, 1.5f), ("walk1", 1.4f, 3.0f), ("walk2", 1.4f, 3.37f), ("run1", 4.5f, 5.0f), ("run2", 4.5f, 5.16f) })
+                    {
+                        animator.Motion = new AvatarMotion { Velocity = Vector3.forward * speed, Grounded = true, Sprinting = speed > 3f };
+                        for (; t < until; t += 1f / 30f) animator.Tick(1f / 30f);
+                        Vector3 mid = go.transform.position + Vector3.up * 0.95f;
+                        camera.transform.position = mid + new Vector3(-2.6f, 0.25f, 3.6f);
+                        camera.transform.LookAt(mid);
+                        Render(camera, $"{folder}/{body:00}_{pose}.jpg", 600, 900);
+                        // How deep each hand is in its own body (trunk, legs, head; the hand's palm, wrist and fingertips).
+                        string depths = "";
+                        foreach (bool right in new[] { false, true })
+                        {
+                            Transform hand = rig[right ? AvatarRig.Bone.HandR : AvatarRig.Bone.HandL];
+                            float deepest = BodySpace.DepthIn(rig, hand.position - hand.up * (rig.HandLength * 0.5f), 0.035f * rig.Scale, arms: false);
+                            HandBones fingers = rig.Hand(right);
+                            for (int f = 0; f < HandBones.Fingers && fingers != null; f++)
+                                deepest = Mathf.Max(deepest, BodySpace.DepthIn(rig, fingers.Tip(f), 0.014f * rig.Scale, arms: false));
+                            depths += $" {(right ? "R" : "L")} {deepest * 100f:0.0} cm";
+                        }
+                        Debug.Log($"[ClipCheck] {body} {pose}: hands in own body{depths}");
+                    }
+                    animator.SendMessage("OnDestroy", SendMessageOptions.DontRequireReceiver);
+                    Object.DestroyImmediate(go);
+                }
+                Debug.Log("[ClipCheck] bodies done");
+                EditorApplication.Exit(0);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ClipCheck] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         // ------------------------------------------------------------------ single poses (finding a retarget problem)
 
         /// <summary>

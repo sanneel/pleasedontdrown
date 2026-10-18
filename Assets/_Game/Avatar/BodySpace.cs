@@ -143,6 +143,17 @@ namespace PleaseDontDrown.Avatars
             return inside + direction * reach;
         }
 
+        /// <summary>
+        /// Moves the point (with that radius) out of this one body's trunk, legs and head, not its arms: a hand out of
+        /// its own hips or belly. True when it had to move.
+        /// </summary>
+        public static bool PushOutOfOwn(AvatarRig rig, ref Vector3 point, float radius)
+        {
+            if (rig == null || !rig.IsBuilt) return false;
+            Shape shape = ShapeOf(rig);
+            return shape != null && shape.PushOut(rig, ref point, radius, arms: false);
+        }
+
         /// <summary>How deep the point (with that radius) is inside this one body (0: outside).</summary>
         public static float DepthIn(AvatarRig rig, Vector3 point, float radius, bool arms = true)
         {

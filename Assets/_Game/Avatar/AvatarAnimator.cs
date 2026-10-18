@@ -342,6 +342,7 @@ namespace PleaseDontDrown.Avatars
             PoseSpecial();
             KeepHandsOutOfHead();
             KeepHandsOutOfOthers();
+            if (ClipDriven) KeepHandsOutOfSelf();
             PoseFace();
             if (DebugFists) { _rig.LeftHand?.Pose(HandPose.Fist); _rig.RightHand?.Pose(HandPose.Fist); }
             _rig.DriveShoulders();
@@ -480,6 +481,46 @@ namespace PleaseDontDrown.Avatars
         }
 
         /// <summary>The push that takes this point out of the bodies near, if it is the biggest so far.</summary>
+        /// <summary>
+        /// The clips' arms swing across the body as they did on the slim dummy they were made on: on our rounder hips,
+        /// bellies and skirts a hand sank in. Each hand is moved out to its own skin by bending the arm (as for other
+        /// people, <see cref="KeepHandsOutOfOthers"/>), keeping the way it was turned.
+        /// </summary>
+        private void KeepHandsOutOfSelf()
+        {
+            float s = _rig.Scale;
+            float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+            for (int i = 0; i < 2; i++)
+            {
+                bool right = i == 1;
+                Transform upper = B(right ? Bone.UpperArmR : Bone.UpperArmL), fore = B(right ? Bone.ForearmR : Bone.ForearmL), hand = B(right ? Bone.HandR : Bone.HandL);
+                if (upper == null || fore == null || hand == null) continue;
+                HandBones fingers = _rig.Hand(right);
+                for (int pass = 0; pass < 3; pass++)
+                {
+                    Vector3 palm = hand.position - hand.up * (_rig.HandLength * 0.5f); // (limbs point down their -Y)
+                    Vector3 push = Vector3.zero;
+                    PushOwn(palm, 0.035f * s, ref push);
+                    PushOwn(hand.position, 0.03f * s, ref push);
+                    if (fingers != null)
+                        for (int f = 0; f < HandBones.Fingers; f++) PushOwn(fingers.Tip(f), 0.014f * s, ref push);
+                    if (push.sqrMagnitude < 1e-6f) break;
+                    Vector3 target = palm + push;
+                    Quaternion turned = hand.rotation;
+                    Vector3 elbow = fore.position - (upper.position + target) * 0.5f;
+                    IK.Solve(upper, fore, la, lb, target, elbow, 1f, false);
+                    hand.rotation = turned;
+                }
+            }
+        }
+
+        private void PushOwn(Vector3 point, float radius, ref Vector3 push)
+        {
+            Vector3 q = point;
+            if (!BodySpace.PushOutOfOwn(_rig, ref q, radius)) return;
+            if ((q - point).sqrMagnitude > push.sqrMagnitude) push = q - point;
+        }
+
         private void PushPoint(Vector3 point, float radius, ref Vector3 push)
         {
             Vector3 q = point;
