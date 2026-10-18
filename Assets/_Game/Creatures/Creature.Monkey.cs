@@ -184,13 +184,13 @@ namespace PleaseDontDrown.Creatures
         [FishNet.Object.ObserversRpc]
         private void HatTakenObservers(FishNet.Object.NetworkObject victim)
         {
-            if (victim != null && victim.IsOwner) UI.PlayerHud.ShowToast("<b>A monkey stole your hat!</b> Your disguise is gone: get it back.", 4f);
+            if (victim != null && victim.IsOwner) UI.PlayerHud.ShowToast("<b>A monkey stole your hat!</b> Your disguise is gone: get it back.", 4f, UI.ToastKind.Warning);
         }
 
         [FishNet.Object.ObserversRpc]
         private void HatBackObservers(FishNet.Object.NetworkObject who)
         {
-            if (who != null && who.IsOwner) UI.PlayerHud.ShowToast("Hat back on. You're a pirate again.", 3f);
+            if (who != null && who.IsOwner) UI.PlayerHud.ShowToast("Hat back on. You're a pirate again.", 3f, UI.ToastKind.Good);
         }
     }
 }

@@ -235,7 +235,7 @@ namespace PleaseDontDrown.Creatures
         private void GrabObservers(NetworkObject who)
         {
             if (_audio != null) _audio.PlayOneShot(Core.ProceduralAudio.Crunch, 1f);
-            if (who != null && who.IsOwner) PlayerHud.ShowToast($"<b>The {DisplayName.ToLowerInvariant()} has you!</b> Punch it to break free!", 3f);
+            if (who != null && who.IsOwner) PlayerHud.ShowToast($"<b>The {DisplayName.ToLowerInvariant()} has you!</b> Punch it to break free!", 3f, ToastKind.Warning);
         }
 
         [ObserversRpc]

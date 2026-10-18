@@ -7,8 +7,8 @@ namespace PleaseDontDrown.UI
 {
     /// <summary>
     /// "Customize your lifeguard": body, skin, hair, clothes, hat, glasses and extras, with a live 3D preview that
-    /// you can spin by dragging (on a sand disc in a deep-sea studio, his shadow under him). The options come in
-    /// groups (shape, colours, things to wear). The look is saved locally and worn in every session (synced by
+    /// you can spin by dragging (on a sand disc in a deep-sea studio, his shadow under him). An outfit preset first,
+    /// then the parts in tabs by where they are (FACE, where the camera comes in close; BODY; CLOTHES). The look is saved locally and worn in every session (synced by
     /// PlayerHub). Drawn with <see cref="Hud"/> on its 1080-high sheet, like the other menus.
     /// </summary>
     [DefaultExecutionOrder(210)] // frame the preview after funny head scaling and avatar animation
@@ -34,6 +34,7 @@ namespace PleaseDontDrown.UI
         private bool _framePreview;
         private Vector3 _previewCenter;
         private float _previewDistance = 4.2f;
+        private float _focus; // 0: the whole lifeguard in the preview, 1: in close on the face
 
         /// <summary>The look this player wears (saved between sessions).</summary>
         public static AvatarLook LocalLook
@@ -83,7 +84,11 @@ namespace PleaseDontDrown.UI
         {
             _instance = this;
             useGUILayout = false; // drawn with fixed boxes: no layout pass needed
-            DevCommands.Register("customize", "", "Open the lifeguard customization panel.", _ => SetOpen(true), owner: this);
+            DevCommands.Register("customize", "[face|body|clothes]", "Open the lifeguard customization panel (on a tab).", args =>
+            {
+                if (args.Length > 0) _tab = args[0] == "face" ? Tab.Face : args[0] == "clothes" ? Tab.Clothes : Tab.Body;
+                SetOpen(true);
+            }, owner: this);
         }
 
         private void OnDestroy()
@@ -181,8 +186,19 @@ namespace PleaseDontDrown.UI
             if (!_open || _camera == null) return;
             if (_framePreview) FramePreview();
             Vector3 center = _previewCenter;
+            float distance = _previewDistance;
+            // FACE: the camera comes in close on the head (it eases there and back).
+            _focus = Mathf.MoveTowards(_focus, _tab == Tab.Face ? 1f : 0f, Time.unscaledDeltaTime * 2.5f);
+            if (_focus > 0f && _rig != null && _rig.IsBuilt)
+            {
+                float k = Mathf.SmoothStep(0f, 1f, _focus);
+                Vector3 head = _rig[AvatarRig.Bone.Head].position + Vector3.up * (_rig.HeadTop * 0.42f);
+                float headDistance = Mathf.Max(0.22f, _rig.HeadTop * 0.85f) * 1.25f / Mathf.Tan(_camera.fieldOfView * .5f * Mathf.Deg2Rad) + _rig.HeadHalfWidth;
+                center = Vector3.Lerp(center, head, k);
+                distance = Mathf.Lerp(distance, headDistance, k);
+            }
             // Yaw 0 = in front of the character (it faces +z), a little above.
-            _camera.transform.position = center + Quaternion.Euler(-9f, _orbit, 0f) * new Vector3(0f, 0f, _previewDistance);
+            _camera.transform.position = center + Quaternion.Euler(-9f, _orbit, 0f) * new Vector3(0f, 0f, distance);
             _camera.transform.LookAt(center);
         }
 
@@ -206,7 +222,13 @@ namespace PleaseDontDrown.UI
         // ------------------------------------------------------------------ panel
 
         private const float PanelWidth = 1300f, PanelHeight = 880f;
-        private const float RowHeight = 38f, LabelWidth = 196f, ChipSize = 28f, ChipGap = 5f;
+        private const float RowHeight = 54f, LabelWidth = 196f, ChipSize = 32f, ChipGap = 6f;
+
+        /// <summary>The character screen's tabs, by part of the body: the face (the camera comes in close), the body, the clothes.</summary>
+        private enum Tab { Face, Body, Clothes }
+        private static readonly string[] TabNames = { "FACE", "BODY", "CLOTHES" };
+        private Tab _tab = Tab.Body;
+        private float _tabLine = -1f;
 
         private void OnGUI()
         {
@@ -222,12 +244,12 @@ namespace PleaseDontDrown.UI
             Hud.Title(new Rect(panel.x + 36f, panel.y + 10f, 900f, 60f), "YOUR LIFEGUARD", 50f, Color.white, TextAnchor.MiddleLeft);
             Hud.Label(new Rect(panel.x + 38f, panel.y + 62f, 900f, 26f), "Everyone in your game sees you like this.", 19f, Hud.Muted, TextAnchor.MiddleLeft, shadow: false);
 
-            // Preview (drag to spin): the studio picture, framed.
-            var preview = new Rect(panel.x + 36f, panel.y + 100f, 470f, 611f);
+            // The preview, big on the left (drag to spin): the studio picture, framed, the hint inside its foot.
+            var preview = new Rect(panel.x + 36f, panel.y + 100f, 520f, 676f);
             Hud.Fill(preview, StudioColor, 16f);
             if (_texture != null) Hud.Picture(preview, _texture, Color.white);
             Hud.Frame(preview, new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, 0.35f), 2f, 16f);
-            Hud.Label(new Rect(preview.x, preview.yMax + 6f, preview.width, 28f), "Drag to turn", 18f, new Color(1f, 1f, 1f, 0.6f), shadow: false);
+            Hud.Label(new Rect(preview.x, preview.yMax - 40f, preview.width, 30f), "Drag to turn", 18f, new Color(1f, 1f, 1f, 0.6f), shadow: false);
             Event e = Event.current;
             if (e.type == EventType.MouseDrag && Hud.Hovered(preview))
             {
@@ -238,7 +260,7 @@ namespace PleaseDontDrown.UI
             AvatarLook look = LocalLook;
             bool changed = false;
             bool presetApplied = false;
-            float x = panel.x + 540f, y = panel.y + 96f;
+            float x = panel.x + 612f, w = panel.xMax - 36f - x, y = panel.y + 100f;
             // Always the goofy lifeguard: the code-built "Classic" body is gone (the team, 2026-10-12).
             if (!look.IsGoofy)
             {
@@ -248,6 +270,7 @@ namespace PleaseDontDrown.UI
             bool goofy = true;
             if (goofy)
             {
+                // A whole outfit in one go first, then the parts in tabs.
                 int direction = Arrows(x, ref y, "OUTFIT PRESET", _preset < 0 ? "Custom" : AvatarPresets.Names[_preset]);
                 if (direction != 0)
                 {
@@ -256,29 +279,47 @@ namespace PleaseDontDrown.UI
                     look = AvatarPresets.Apply(_preset, look);
                     changed = presetApplied = true;
                 }
-                // The goofy lifeguard: shape and face first (that's the fun), then colours and things to wear.
-                Group(x, ref y, "SHAPE");
-                if (Arrows(x, ref y, "HEAD", AvatarLook.HeadSizeName(look.HeadSize)) != 0)
+                y += 18f;
+                // The tabs across the column, a line under them with the open tab's part teal (it slides).
+                const float tabGap = 8f;
+                float tabWidth = (w - tabGap * (TabNames.Length - 1)) / TabNames.Length;
+                for (int i = 0; i < TabNames.Length; i++)
+                    if (Hud.Button(new Rect(x + i * (tabWidth + tabGap), y, tabWidth, 48f), TabNames[i], centred: true, small: true, selected: (int)_tab == i))
+                        _tab = (Tab)i;
+                float lineTo = x + (int)_tab * (tabWidth + tabGap);
+                _tabLine = _tabLine < 0f ? lineTo : Mathf.Lerp(_tabLine, lineTo, 1f - Mathf.Exp(-Time.unscaledDeltaTime * 18f));
+                Hud.Fill(new Rect(x, y + 58f, w, 1.5f), new Color(1f, 1f, 1f, 0.16f));
+                Hud.Fill(new Rect(_tabLine, y + 56f, tabWidth, 4f), Hud.Teal, 2f);
+                y += 80f;
+
+                switch (_tab)
                 {
-                    look.HeadSize = look.HeadSize == AvatarLook.SmallHead ? (byte)0 : AvatarLook.SmallHead;
-                    changed = true;
+                    case Tab.Face:
+                        changed |= Row(x, ref y, "EYES", AvatarLook.EyeNames[look.Eyes & 3], ref look.Eyes, 4);
+                        changed |= Row(x, ref y, "NOSE", AvatarLook.NoseNames[look.Nose & 3], ref look.Nose, 4);
+                        changed |= Row(x, ref y, "TEETH", AvatarLook.TeethNames[look.Teeth & 3], ref look.Teeth, 4);
+                        changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
+                        changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
+                        changed |= Toggle(x, ref y, "SUNSCREEN NOSE", ref look.Extras, AvatarExtras.Sunscreen);
+                        break;
+                    case Tab.Body:
+                        if (Arrows(x, ref y, "HEAD", AvatarLook.HeadSizeName(look.HeadSize)) != 0)
+                        {
+                            look.HeadSize = look.HeadSize == AvatarLook.SmallHead ? (byte)0 : AvatarLook.SmallHead;
+                            changed = true;
+                        }
+                        changed |= Row(x, ref y, "BELLY", AvatarLook.BellyNames[look.Belly & 3], ref look.Belly, 4);
+                        changed |= ColorRow(x, ref y, "SKIN", ref look.Skin, AvatarLook.SkinTones);
+                        changed |= ColorRow(x, ref y, "HAIR", ref look.HairColor, AvatarLook.HairColors);
+                        break;
+                    default:
+                        changed |= ColorRow(x, ref y, "TOP", ref look.TopColor, AvatarLook.ClothColors);
+                        changed |= ColorRow(x, ref y, "SHORTS", ref look.BottomColor, AvatarLook.ClothColors);
+                        changed |= HatRow(x, ref y, ref look.Hat);
+                        changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
+                        changed |= Toggle(x, ref y, "ARM FLOATIES", ref look.Extras, AvatarExtras.Floaties);
+                        break;
                 }
-                changed |= Row(x, ref y, "BELLY", AvatarLook.BellyNames[look.Belly & 3], ref look.Belly, 4);
-                changed |= Row(x, ref y, "NOSE", AvatarLook.NoseNames[look.Nose & 3], ref look.Nose, 4);
-                changed |= Row(x, ref y, "EYES", AvatarLook.EyeNames[look.Eyes & 3], ref look.Eyes, 4);
-                changed |= Row(x, ref y, "TEETH", AvatarLook.TeethNames[look.Teeth & 3], ref look.Teeth, 4);
-                Group(x, ref y, "COLOURS");
-                changed |= ColorRow(x, ref y, "SKIN", ref look.Skin, AvatarLook.SkinTones);
-                changed |= ColorRow(x, ref y, "HAIR", ref look.HairColor, AvatarLook.HairColors);
-                changed |= ColorRow(x, ref y, "TOP", ref look.TopColor, AvatarLook.ClothColors);
-                changed |= ColorRow(x, ref y, "SHORTS", ref look.BottomColor, AvatarLook.ClothColors);
-                Group(x, ref y, "THINGS TO WEAR");
-                changed |= HatRow(x, ref y, ref look.Hat);
-                changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
-                changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
-                changed |= EnumRow(x, ref y, "FACIAL HAIR", ref look.Face);
-                changed |= Toggle(x, ref y, "SUNSCREEN NOSE", ref look.Extras, AvatarExtras.Sunscreen);
-                changed |= Toggle(x, ref y, "ARM FLOATIES", ref look.Extras, AvatarExtras.Floaties);
             }
             else
             {
@@ -301,36 +342,27 @@ namespace PleaseDontDrown.UI
                 changed |= Toggle(x, ref y, "ARM FLOATIES", ref look.Extras, AvatarExtras.Floaties);
             }
 
+            // Under the preview: a random look, the uniform, a wave; DONE bottom right.
             float by = panel.yMax - 84f, bx = panel.x + 36f;
-            if (Hud.Button(new Rect(bx, by, 220f, 56f), "RANDOM", centred: true, small: true))
+            if (Hud.Button(new Rect(bx, by, 170f, 56f), "RANDOM", centred: true, small: true))
             {
                 AvatarLook random = AvatarLook.Random(new System.Random(Environment.TickCount));
                 if (!goofy) { random.Body = 0; random.Hat = (HatStyle)((int)random.Hat % 8); random.Glasses = (GlassesStyle)((int)random.Glasses % 4); }
                 look = random;
                 changed = true;
             }
-            if (Hud.Button(new Rect(bx + 232f, by, 238f, 56f), "UNIFORM", centred: true, small: true))
+            if (Hud.Button(new Rect(bx + 182f, by, 170f, 56f), "UNIFORM", centred: true, small: true))
             {
                 look = goofy ? AvatarLook.Lifeguard : AvatarLook.ClassicLifeguard;
                 changed = true;
             }
-            if (Hud.Button(new Rect(bx + 510f, by, 160f, 56f), "WAVE", centred: true, small: true) && _animator != null)
+            if (Hud.Button(new Rect(bx + 364f, by, 156f, 56f), "WAVE", centred: true, small: true) && _animator != null)
                 _animator.Play(AvatarGesture.Wave);
             bool done = Hud.Button(new Rect(panel.xMax - 276f, by, 240f, 56f), "DONE", centred: true, primary: true);
             GUI.matrix = before;
 
             if (changed) { if (!presetApplied) _preset = -1; Set(look); }
             if (done) SetOpen(false);
-        }
-
-        /// <summary>A small heading over a group of rows, with a thin line out to the right.</summary>
-        private static void Group(float x, ref float y, string title)
-        {
-            y += 6f;
-            Hud.Label(new Rect(x, y, 300f, 22f), title, 15f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, 0.9f), TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            float w = Hud.TextWidth(title, 15f, heavy: true);
-            Hud.Fill(new Rect(x + w + 12f, y + 10f, 700f - w - 12f, 1.5f), new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, 0.25f));
-            y += 24f;
         }
 
         private static bool Row(float x, ref float y, string label, string value, ref byte field, int count)
@@ -363,19 +395,19 @@ namespace PleaseDontDrown.UI
             return true;
         }
 
-        /// <summary>The palette as chips to click: the one worn has a white frame.</summary>
+        /// <summary>The palette as chips to click, under the row's name: the one worn has a white frame.</summary>
         private static bool ColorRow(float x, ref float y, string label, ref byte field, Color[] palette)
         {
-            Hud.Label(new Rect(x, y, LabelWidth, RowHeight), label, 20f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Label(new Rect(x, y + 4f, LabelWidth, 26f), label, 20f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             bool changed = false;
             for (int i = 0; i < palette.Length; i++)
             {
-                var chip = new Rect(x + LabelWidth + i * (ChipSize + ChipGap), y + (RowHeight - ChipSize) * 0.5f, ChipSize, ChipSize);
+                var chip = new Rect(x + i * (ChipSize + ChipGap), y + 34f, ChipSize, ChipSize);
                 if (!Hud.Chip(chip, palette[i], i == field % palette.Length) || i == field) continue;
                 field = (byte)i;
                 changed = true;
             }
-            y += RowHeight;
+            y += 34f + ChipSize + 18f;
             return changed;
         }
 
@@ -383,7 +415,7 @@ namespace PleaseDontDrown.UI
         {
             bool on = (extras & flag) != 0;
             Hud.Label(new Rect(x, y, LabelWidth, RowHeight), label, 20f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            bool pressed = Hud.Button(new Rect(x + LabelWidth, y + 3f, 110f, RowHeight - 6f), on ? "YES" : "NO", centred: true, small: true, selected: on);
+            bool pressed = Hud.Button(new Rect(x + LabelWidth, y + 6f, 110f, RowHeight - 12f), on ? "YES" : "NO", centred: true, small: true, selected: on);
             y += RowHeight;
             if (pressed) extras ^= flag;
             return pressed;
@@ -396,9 +428,9 @@ namespace PleaseDontDrown.UI
             int dir = 0;
             Hud.Label(new Rect(x, y, LabelWidth, RowHeight), label, 20f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             float bx = x + LabelWidth;
-            if (Hud.Button(new Rect(bx, y + 3f, arrow, RowHeight - 6f), "<", centred: true, small: true)) dir = -1;
+            if (Hud.Button(new Rect(bx, y + 6f, arrow, RowHeight - 12f), "<", centred: true, small: true)) dir = -1;
             Hud.FitLabel(new Rect(bx + arrow + 8f, y, wide - 16f, RowHeight), value, 22f, Hud.Paper, TextAnchor.MiddleCenter, heavy: true);
-            if (Hud.Button(new Rect(bx + arrow + wide, y + 3f, arrow, RowHeight - 6f), ">", centred: true, small: true)) dir = 1;
+            if (Hud.Button(new Rect(bx + arrow + wide, y + 6f, arrow, RowHeight - 12f), ">", centred: true, small: true)) dir = 1;
             y += RowHeight;
             return dir;
         }

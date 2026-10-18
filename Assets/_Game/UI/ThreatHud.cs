@@ -147,9 +147,19 @@ namespace PleaseDontDrown.UI
         private static Rect BossCard(string title, string status, float fraction, Color accent)
         {
             // The boss's name big over a thick bar, its phase small at the bar's right end (no box: outlined words).
+            // While the boss's title card is up its name flies up here at the end: the bar waits until the name has
+            // landed, then fills in under it, and only then is the name drawn here (it showed twice, middle and top).
             const float width = 640f;
             var card = new Rect((Hud.Width - width) * 0.5f, Hud.BossTop, width, 96f);
-            Hud.FitTitle(new Rect(card.x, card.y + 2f, width, 48f), title.ToUpperInvariant(), 40f, Hud.Paper);
+            float intro = Story.StoryHud.BossIntroAge, shown = 1f;
+            if (intro >= 0f)
+            {
+                shown = Mathf.SmoothStep(0f, 1f, (intro - 4.05f) / 0.45f);
+                if (shown <= 0f) return card;
+                fraction *= shown;
+                accent.a *= shown;
+            }
+            else Hud.FitTitle(Story.StoryHud.BossNameRect, title.ToUpperInvariant(), Story.StoryHud.BossNameSize, Hud.Paper);
             Hud.Bar(new Rect(card.x + 20f, card.y + 52f, width - 40f, 18f), fraction, accent);
             Hud.Label(new Rect(card.x + 20f, card.y + 72f, width - 40f, 22f), status, 16f, accent, TextAnchor.MiddleRight, heavy: true, shadow: false);
             return card;

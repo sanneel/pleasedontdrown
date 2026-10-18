@@ -7,12 +7,12 @@ namespace PleaseDontDrown.UI
 {
     /// <summary>
     /// Start screen, pause menu, and quick in-game guide, laid out like How to Fish's: on the start screen the big
-    /// title sits top left over the island and a column of wide buttons bottom left (a button lights up with a white
-    /// frame under the mouse); the pause menu is the same buttons in a centred column over the dimmed game.
+    /// title sits top left over the island and a column of wide buttons bottom left, a page (options, join) opening
+    /// beside them; the pause menu is the same buttons down the left with the lifeguard's log (or options) beside.
     /// </summary>
     public class DevConnectMenu : MonoBehaviour
     {
-        private enum Page { Main, Join, Options, Controls, Invite, Travel, ConfirmLeave, ConfirmQuit }
+        private enum Page { Main, Join, Options, Invite, Travel, ConfirmLeave, ConfirmQuit }
 
         [SerializeField] private ConnectionService _connection;
 
@@ -34,12 +34,14 @@ namespace PleaseDontDrown.UI
         {
             GameInput.ToggleMenu.performed += OnToggleMenu;
             GameInput.ToggleOverlay.performed += OnToggleOverlay;
-            DevCommands.Register("menu", "<pause|options|keys|guide|close>", "Open a menu page (to look at it in tests).", args =>
+            DevCommands.Register("menu", "<pause|options|sound|keys|guide|close>", "Open a menu page (to look at it in tests).", args =>
             {
                 string page = args.Length > 0 ? args[0] : "pause";
                 _guideOpen = page == "guide";
-                if (_connection.IsActive) SetPause(page is "pause" or "options" or "keys");
-                _page = page == "options" ? Page.Options : page == "keys" ? Page.Controls : Page.Main;
+                bool options = page is "options" or "sound" or "keys";
+                if (_connection.IsActive) SetPause(page == "pause" || options);
+                _page = options ? Page.Options : Page.Main;
+                if (options) _optionsTab = page == "keys" ? OptionsTab.Controls : page == "sound" ? OptionsTab.Sound : OptionsTab.Video;
             }, owner: this);
             DevCommands.Register("hudsize", "<0.85-1.3>", "How big the in-game HUD is drawn (Options: HUD SIZE, default 1).", args =>
             {
@@ -63,7 +65,7 @@ namespace PleaseDontDrown.UI
             if (GameInput.IsRebinding || GameInput.RebindJustEnded) return; // that Esc cancelled a key change
             if (_page != Page.Main && (_pauseOpen || !_connection.IsActive))
             {
-                _page = _page == Page.Controls ? Page.Options : Page.Main; // Esc steps back out of a sub-screen first
+                _page = Page.Main; // Esc steps back out of a sub-screen first
                 return;
             }
             if (!_connection.IsActive) return;
@@ -185,7 +187,7 @@ namespace PleaseDontDrown.UI
             if (!string.IsNullOrEmpty(_connection.LastError))
                 Hud.Label(new Rect(x, y - 74f, 900f, 60f), _connection.LastError, 22f, Hud.Coral, TextAnchor.LowerLeft, wrap: true);
 
-            bool options = _page is Page.Options or Page.Controls;
+            bool options = _page == Page.Options;
             Rect Next(int i)
             {
                 Rect r = Row(x, ref y);
@@ -208,8 +210,11 @@ namespace PleaseDontDrown.UI
             if (Hud.Button(Next(4), "QUIT")) Application.Quit();
 
             if (_page == Page.Join) DrawJoinPanel(x + ButtonWidth + 30f, height - 52f);
-            else if (_page == Page.Options) DrawOptionsPanel(new Rect(x + ButtonWidth + 30f, height - 52f - OptionsHeight, OptionsWidth, OptionsHeight));
-            else if (_page == Page.Controls) DrawControlsPanel(new Rect(x + ButtonWidth + 30f, height - 52f - ControlsHeight, ControlsWidth, ControlsHeight));
+            else if (_page == Page.Options)
+            {
+                float tall = OptionsHeight(_optionsTab);
+                DrawOptionsPanel(new Rect(x + ButtonWidth + 30f, height - 52f - tall, OptionsWidth, tall));
+            }
 
             // Top right: whether friends can join (a green dot with Steam, grey without); the build, small, above it.
             float status = In(0.5f, 0.6f);
@@ -291,10 +296,18 @@ namespace PleaseDontDrown.UI
 
         // ------------------------------------------------------------------ pause
 
+        private const float PauseLeft = 72f, PaneGap = 56f;
+
+        /// <summary>
+        /// Paused: PAUSED and the buttons down the left, and beside them a page: the lifeguard's log (the chapter, what
+        /// to do now, the chapter's numbers, who's on duty), or OPTIONS when it's picked. Invite, travel and the yes/no
+        /// questions are their own centred screens.
+        /// </summary>
         private void DrawPauseMenu()
         {
             float width = Hud.Width, height = Hud.Height;
-            Hud.Fill(new Rect(0f, 0f, width, height), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.66f * Hud.Ease(PauseDimId, true))); // (fades in)
+            float open = Hud.Ease(PauseDimId, true);
+            Hud.Fill(new Rect(0f, 0f, width, height), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.7f * open)); // (fades in)
             var nm = _connection.NetworkManager;
             bool host = nm.IsServerStarted;
             float x = (width - ButtonWidth) * 0.5f;
@@ -302,20 +315,6 @@ namespace PleaseDontDrown.UI
             switch (_page)
             {
                 case Page.Invite: DrawInvitePage(width, height); return;
-                case Page.Options:
-                {
-                    var panel = new Rect((width - OptionsWidth) * 0.5f, (height - OptionsHeight - ButtonHeight - 20f) * 0.5f, OptionsWidth, OptionsHeight);
-                    DrawOptionsPanel(panel);
-                    if (Hud.Button(new Rect(x, panel.yMax + 20f, ButtonWidth, ButtonHeight), "BACK", centred: true)) _page = Page.Main;
-                    return;
-                }
-                case Page.Controls:
-                {
-                    var panel = new Rect((width - ControlsWidth) * 0.5f, (height - ControlsHeight - ButtonHeight - 20f) * 0.5f, ControlsWidth, ControlsHeight);
-                    DrawControlsPanel(panel);
-                    if (!GameInput.IsRebinding && Hud.Button(new Rect(x, panel.yMax + 20f, ButtonWidth, ButtonHeight), "BACK", centred: true)) _page = Page.Options;
-                    return;
-                }
                 case Page.Travel:
                 {
                     int count = Dev.DevIsland.DestinationNames.Length + 1;
@@ -352,33 +351,136 @@ namespace PleaseDontDrown.UI
             string info = (host ? "Hosting" : "Joined") + "  ·  " + _connection.Mode.ToString().ToLowerInvariant() + "  ·  " + players + (players == 1 ? " player" : " players");
             if (!SteamLobbyService.InLobby && SteamBootstrap.IsReady)
                 info += "\nOffline session: friends can't join it. Leave and press PLAY to host through Steam.";
-            // The player's menu is short; the testing switches only exist in development builds, in a small row below.
-            bool dev = DevCommands.CheatsAllowed;
-            int rows = 5 + (SteamLobbyService.InLobby ? 1 : 0);
-            float top = Header("PAUSED", info, rows + (dev ? 1 : 0), ButtonWidth, out _);
 
-            if (Hud.Button(Row(x, ref top), "RESUME", centred: true, primary: true)) SetPause(false);
-            if (SteamLobbyService.InLobby && Hud.Button(Row(x, ref top), "INVITE FRIENDS", centred: true)) _page = Page.Invite;
-            if (Hud.Button(Row(x, ref top), "CHARACTER", centred: true)) AvatarCustomizer.Open();
-            if (Hud.Button(Row(x, ref top), "OPTIONS", centred: true)) _page = Page.Options;
-            if (Hud.Button(Row(x, ref top), "MAIN MENU", centred: true)) _page = Page.ConfirmLeave;
-            if (Hud.Button(Row(x, ref top), "QUIT", centred: true)) _page = Page.ConfirmQuit;
-            if (dev) DrawDevRow(top + 14f, host);
+            // The left: PAUSED, how the session runs, the buttons (sliding in from the left as the screen dims).
+            float slide = (1f - open) * 50f;
+            float left = PauseLeft - slide, top = Mathf.Max(36f, height * 0.5f - 420f);
+            Hud.Title(new Rect(left, top, 700f, 96f), "PAUSED", 86f, Color.white, TextAnchor.MiddleLeft);
+            float infoHeight = Hud.TextHeight(info, 520f, 19f);
+            Hud.Label(new Rect(left + 4f, top + 94f, 520f, infoHeight + 4f), info, 19f, new Color(1f, 1f, 1f, 0.75f), TextAnchor.UpperLeft, wrap: true);
+            float y0 = top + 120f + infoHeight + 20f, row = y0;
+            bool options = _page == Page.Options;
+            if (Hud.Button(Row(left, ref row), "RESUME", primary: true)) SetPause(false);
+            if (SteamLobbyService.InLobby && Hud.Button(Row(left, ref row), "INVITE FRIENDS")) _page = Page.Invite;
+            if (Hud.Button(Row(left, ref row), "CHARACTER")) AvatarCustomizer.Open();
+            if (Hud.Button(Row(left, ref row), "OPTIONS", selected: options)) _page = options ? Page.Main : Page.Options;
+            if (Hud.Button(Row(left, ref row), "MAIN MENU")) _page = Page.ConfirmLeave;
+            if (Hud.Button(Row(left, ref row), "QUIT")) _page = Page.ConfirmQuit;
+            // The testing switches only exist in development builds, small, under the buttons.
+            if (DevCommands.CheatsAllowed) DrawDevRow(left, row + 34f, host);
+
+            // The right: the page beside the buttons (sliding in from the right).
+            float paneX = PauseLeft + ButtonWidth + PaneGap + slide;
+            float paneWidth = Mathf.Min(OptionsWidth, width - paneX - PauseLeft);
+            if (options) DrawOptionsPanel(new Rect(paneX, top + 12f, paneWidth, OptionsHeight(_optionsTab)));
+            else DrawLogbook(new Rect(paneX, top + 12f, paneWidth, height - top - 60f));
+        }
+
+        /// <summary>
+        /// The pause screen's page: the chapter and what to do now, the chapter's numbers so far (the host counts them),
+        /// the team's money, and everyone on duty with what they're doing.
+        /// </summary>
+        private static void DrawLogbook(Rect pane)
+        {
+            Hud.Panel(pane);
+            float x = pane.x + 28f, w = pane.width - 56f, y = pane.y + 12f;
+            Hud.Title(new Rect(x, y, w, 52f), "LIFEGUARD'S LOG", 42f, Hud.Sand, TextAnchor.MiddleLeft);
+            y += 66f;
+
+            Story.StoryDirector story = Story.StoryDirector.Instance;
+            if (story != null && !string.IsNullOrEmpty(story.Objective))
+            {
+                Hud.FitLabel(new Rect(x, y, w, 26f), (story.Chapter ?? string.Empty).ToUpperInvariant(), 19f, Hud.Teal, heavy: true);
+                y += 32f;
+                float body = Hud.TextHeight(story.Objective, w, 30f, heavy: true);
+                Hud.Label(new Rect(x, y, w, body + 4f), story.Objective, 30f, Hud.Paper, TextAnchor.UpperLeft, heavy: true, wrap: true);
+                y += body + 10f;
+                if (story.Goal > 0)
+                {
+                    Hud.Bar(new Rect(x, y + 8f, w - 110f, 10f), (float)story.Progress / story.Goal, Hud.Teal);
+                    Hud.Label(new Rect(x + w - 100f, y - 2f, 100f, 30f), $"{story.Progress} / {story.Goal}", 22f, Hud.Sand, TextAnchor.MiddleRight, heavy: true, shadow: false);
+                    y += 34f;
+                }
+                y += 12f;
+                Divider(x, ref y, w);
+            }
+
+            // The numbers: this chapter's so far (only the host counts them) and the team's money.
+            bool counted = story != null && story.IsServerInitialized;
+            var stats = counted ? story.ChapterStats : default;
+            Hud.Label(new Rect(x, y, w, 24f), counted ? "THIS CHAPTER" : "THE TEAM", 17f, Hud.Muted, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            y += 32f;
+            int tiles = counted ? 5 : 1;
+            const float gap = 14f, tall = 98f;
+            float tile = counted ? (w - (tiles - 1) * gap) / tiles : 240f, tx = x;
+            void Tile(string number, string label, Color color)
+            {
+                var r = new Rect(tx, y, tile, tall);
+                Hud.Frame(r, new Color(1f, 1f, 1f, 0.16f), 1.5f, 12f);
+                Hud.FitTitle(new Rect(r.x + 8f, r.y + 8f, r.width - 16f, 54f), number, 46f, color);
+                Hud.Label(new Rect(r.x, r.y + 64f, r.width, 24f), label, 16f, Hud.Muted, TextAnchor.MiddleCenter, heavy: true, shadow: false);
+                tx += tile + gap;
+            }
+            if (counted)
+            {
+                Tile(stats.rescued.ToString(), "RESCUED", Hud.Paper);
+                Tile(stats.lost.ToString(), "LOST", stats.lost > 0 ? Hud.Danger : Hud.Paper);
+                Tile(stats.returned.ToString(), "RETURNED", Hud.Paper);
+                Tile("$" + stats.earned.ToString("N0"), "EARNED", Hud.Teal);
+            }
+            Tile("$" + Story.Economy.Money.ToString("N0"), "TEAM FUNDS", Hud.Sand);
+            y += tall + 22f;
+            Divider(x, ref y, w);
+
+            // Who's on duty: you first, then the others, each with what they're doing now.
+            Hud.Label(new Rect(x, y, w, 24f), "ON DUTY", 17f, Hud.Muted, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            y += 34f;
+            Player.PlayerHub local = Player.PlayerHub.Local;
+            if (local != null) DutyRow(local, true, x, ref y, w);
+            foreach (Player.PlayerHub p in Player.PlayerHub.All)
+                if (p != null && p != local && y < pane.yMax - 40f) DutyRow(p, false, x, ref y, w);
+        }
+
+        private static void DutyRow(Player.PlayerHub p, bool you, float x, ref float y, float w)
+        {
+            string status;
+            Color color = Hud.Muted;
+            Items.Item held = p.Hands != null ? p.Hands.HeldItem : null;
+            if (p.TryGetComponent(out Combat.PlayerCombat combat) && combat.IsDowned)
+            {
+                status = "DOWN: needs CPR";
+                color = Hud.Danger;
+            }
+            else if (held != null && held.TryGetComponent(out Rescue.VictimBrain victim))
+            {
+                status = "carrying " + victim.Name;
+                color = Hud.Teal;
+            }
+            else status = held != null ? "holding the " + held.DisplayName.ToLowerInvariant() : "on watch";
+            Hud.Fill(new Rect(x + 2f, y + 12f, 14f, 14f), you ? Hud.Teal : Hud.Sand, 7f);
+            Hud.FitLabel(new Rect(x + 28f, y, w * 0.5f, 38f), you ? p.DisplayName + "  (you)" : p.DisplayName, 23f, Hud.Paper, heavy: true);
+            Hud.FitLabel(new Rect(x + w * 0.5f, y, w * 0.5f, 38f), status, 20f, color, TextAnchor.MiddleRight);
+            y += 44f;
+        }
+
+        private static void Divider(float x, ref float y, float w)
+        {
+            Hud.Fill(new Rect(x, y, w, 1.5f), new Color(1f, 1f, 1f, 0.14f));
+            y += 22f;
         }
 
         /// <summary>Development builds: god mode, flying, travel and a story restart, small, under the menu.</summary>
-        private void DrawDevRow(float y, bool host)
+        private void DrawDevRow(float x, float y, bool host)
         {
             bool travel = Dev.DevIsland.Instance != null;
             bool story = host && Story.StoryDirector.Instance != null;
-            int count = 2 + (travel ? 1 : 0) + (story ? 1 : 0);
-            const float w = 170f, gap = 8f;
-            float total = count * w + (count - 1) * gap, x = (Hud.Width - total) * 0.5f;
-            Hud.Label(new Rect(x, y - 26f, total, 22f), "DEV", 15f, new Color(1f, 1f, 1f, 0.45f), TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            const float w = 155f, gap = 8f;
+            Hud.Label(new Rect(x, y - 26f, 300f, 22f), "DEV", 15f, new Color(1f, 1f, 1f, 0.45f), TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            int n = 0;
             Rect Next()
             {
-                var r = new Rect(x, y, w, 42f);
-                x += w + gap;
+                var r = new Rect(x + (n % 2) * (w + gap), y + (n / 2) * 50f, w, 42f);
+                n++;
                 return r;
             }
             if (Hud.Button(Next(), Player.GodMode.On ? "GOD: ON" : "GOD: OFF", small: true, selected: Player.GodMode.On)) Player.GodMode.Toggle();
@@ -393,77 +495,139 @@ namespace PleaseDontDrown.UI
 
         // ------------------------------------------------------------------ options
 
-        private const float OptionsWidth = 620f, OptionsHeight = 694f;
+        /// <summary>The options' tabs: what you see, what you hear, how you play.</summary>
+        private enum OptionsTab { Video, Sound, Controls }
+        private static readonly string[] OptionsTabs = { "VIDEO", "SOUND", "CONTROLS" };
+        private OptionsTab _optionsTab;
+        private float _tabLine = -1f; // where the teal line under the open tab is (it slides to the one picked)
+        private const float OptionsWidth = 900f, KeyRow = 46f;
+
+        /// <summary>The options panel's height for a tab (each tab only as tall as it needs).</summary>
+        private static float OptionsHeight(OptionsTab tab) => 104f + tab switch
+        {
+            OptionsTab.Video => 2f * 82f,
+            OptionsTab.Sound => 2f * 64f,
+            _ => 64f + ((GameInput.Rebindable != null ? GameInput.Rebindable.Length : 14) + 1) / 2 * KeyRow + 8f
+        } + 90f;
 
         /// <summary>
-        /// Graphics quality and the display first (picked from a row), then mouse sensitivity, field of view and the
-        /// volumes, each a slider with its number; they apply as you drag.
+        /// OPTIONS: the tabs across the top (VIDEO, SOUND, CONTROLS) and the open one's settings in two columns
+        /// underneath, applied as you change them; RESET puts the open tab back as it came.
         /// </summary>
         private void DrawOptionsPanel(Rect panel)
         {
+            bool waiting = GameInput.IsRebinding;
             Hud.Panel(panel);
-            Hud.Title(new Rect(panel.x + 28f, panel.y + 12f, panel.width - 56f, 50f), "OPTIONS", 42f, Color.white, TextAnchor.MiddleLeft);
-            float y = panel.y + 72f;
+            Hud.Title(new Rect(panel.x + 28f, panel.y + 12f, 320f, 50f), "OPTIONS", 42f, Color.white, TextAnchor.MiddleLeft);
 
-            int tier = (int)GraphicsQuality.Current;
-            int picked = ChoiceRow(panel, ref y, "GRAPHICS", new[] { "LOW", "MEDIUM", "HIGH" }, tier);
-            if (picked != tier) GraphicsQuality.Set((GraphicsQuality.Tier)picked, true);
-            int display = GameDisplay.IsFullscreen ? 1 : 0;
-            if (ChoiceRow(panel, ref y, "DISPLAY", new[] { "WINDOWED", "FULLSCREEN" }, display) != display) GameDisplay.Toggle();
+            // The tabs, on the title's line at the right; a line runs under them and the open tab's part of it is teal.
+            const float tabWidth = 158f, tabGap = 8f;
+            float tabsX = panel.xMax - 28f - OptionsTabs.Length * tabWidth - (OptionsTabs.Length - 1) * tabGap;
+            GUI.enabled = !waiting;
+            for (int i = 0; i < OptionsTabs.Length; i++)
+            {
+                var tab = new Rect(tabsX + i * (tabWidth + tabGap), panel.y + 16f, tabWidth, 44f);
+                if (Hud.Button(tab, OptionsTabs[i], centred: true, small: true, selected: (int)_optionsTab == i)) _optionsTab = (OptionsTab)i;
+            }
+            GUI.enabled = true;
+            float lineTo = tabsX + (int)_optionsTab * (tabWidth + tabGap);
+            _tabLine = _tabLine < 0f ? lineTo : Mathf.Lerp(_tabLine, lineTo, 1f - Mathf.Exp(-Time.unscaledDeltaTime * 18f));
+            Hud.Fill(new Rect(panel.x + 28f, panel.y + 72f, panel.width - 56f, 1.5f), new Color(1f, 1f, 1f, 0.16f));
+            Hud.Fill(new Rect(_tabLine, panel.y + 70f, tabWidth, 4f), Hud.Teal, 2f);
 
-            // Shown as a plain number, 1.0 = the default.
-            float sensitivity = LookSettings.Sensitivity / LookSettings.DefaultSensitivity;
-            float changed = OptionRow(panel, ref y, "MOUSE SENSITIVITY", sensitivity, LookSettings.MinSensitivity / LookSettings.DefaultSensitivity,
-                LookSettings.MaxSensitivity / LookSettings.DefaultSensitivity, sensitivity.ToString("0.00"));
-            if (!Mathf.Approximately(changed, sensitivity)) LookSettings.Sensitivity = Mathf.Round(changed * 20f) / 20f * LookSettings.DefaultSensitivity;
+            // Two columns under the tabs.
+            float column = (panel.width - 16f) * 0.5f, top = panel.y + 92f;
+            var left = new Rect(panel.x, panel.y, column, panel.height);
+            var right = new Rect(panel.x + column + 16f, panel.y, column, panel.height);
+            float y = top, y2 = top;
+            float changed;
+            switch (_optionsTab)
+            {
+                case OptionsTab.Video:
+                {
+                    int tier = (int)GraphicsQuality.Current;
+                    int picked = ChoiceRow(left, ref y, "GRAPHICS", new[] { "LOW", "MEDIUM", "HIGH" }, tier);
+                    if (picked != tier) GraphicsQuality.Set((GraphicsQuality.Tier)picked, true);
+                    int display = GameDisplay.IsFullscreen ? 1 : 0;
+                    if (ChoiceRow(left, ref y, "DISPLAY", new[] { "WINDOWED", "FULLSCREEN" }, display) != display) GameDisplay.Toggle();
 
-            float fov = LookSettings.Fov;
-            changed = OptionRow(panel, ref y, "FIELD OF VIEW", fov, LookSettings.MinFov, LookSettings.MaxFov, Mathf.RoundToInt(fov) + "°");
-            if (!Mathf.Approximately(changed, fov)) LookSettings.Fov = Mathf.Round(changed);
+                    float fov = LookSettings.Fov;
+                    changed = OptionRow(right, ref y2, "FIELD OF VIEW", fov, LookSettings.MinFov, LookSettings.MaxFov, Mathf.RoundToInt(fov) + "°");
+                    if (!Mathf.Approximately(changed, fov)) LookSettings.Fov = Mathf.Round(changed);
+                    // How big the in-game HUD is drawn (the menus stay as they are).
+                    float hud = Hud.HudSize;
+                    changed = OptionRow(right, ref y2, "HUD SIZE", hud, Hud.MinHudSize, Hud.MaxHudSize, Mathf.RoundToInt(hud * 100f) + "%");
+                    if (!Mathf.Approximately(changed, hud)) Hud.HudSize = Mathf.Round(changed * 20f) / 20f;
+                    break;
+                }
+                case OptionsTab.Sound:
+                {
+                    // Everything the game plays, as a percentage.
+                    float volume = SoundSettings.Volume;
+                    changed = OptionRow(left, ref y, "VOLUME", volume, 0f, 1f, Mathf.RoundToInt(volume * 100f).ToString());
+                    if (!Mathf.Approximately(changed, volume)) SoundSettings.Volume = Mathf.Round(changed * 20f) / 20f;
+                    float music = SoundSettings.Music;
+                    changed = OptionRow(left, ref y, "MUSIC", music, 0f, 1f, Mathf.RoundToInt(music * 100f).ToString());
+                    if (!Mathf.Approximately(changed, music)) SoundSettings.Music = Mathf.Round(changed * 20f) / 20f;
+                    float voice = SoundSettings.Voice;
+                    changed = OptionRow(right, ref y2, "VOICES", voice, 0f, 1f, Mathf.RoundToInt(voice * 100f).ToString());
+                    if (!Mathf.Approximately(changed, voice)) SoundSettings.Voice = Mathf.Round(changed * 20f) / 20f;
+                    break;
+                }
+                default:
+                {
+                    // Shown as a plain number, 1.0 = the default; the keys under it.
+                    GUI.enabled = !waiting;
+                    float sensitivity = LookSettings.Sensitivity / LookSettings.DefaultSensitivity;
+                    changed = OptionRow(left, ref y, "MOUSE SENSITIVITY", sensitivity, LookSettings.MinSensitivity / LookSettings.DefaultSensitivity,
+                        LookSettings.MaxSensitivity / LookSettings.DefaultSensitivity, sensitivity.ToString("0.00"));
+                    if (!Mathf.Approximately(changed, sensitivity)) LookSettings.Sensitivity = Mathf.Round(changed * 20f) / 20f * LookSettings.DefaultSensitivity;
+                    GUI.enabled = true;
+                    DrawKeys(panel, y + 8f);
+                    break;
+                }
+            }
 
-            // How big the in-game HUD is drawn (the menus stay as they are).
-            float hud = Hud.HudSize;
-            changed = OptionRow(panel, ref y, "HUD SIZE", hud, Hud.MinHudSize, Hud.MaxHudSize, Mathf.RoundToInt(hud * 100f) + "%");
-            if (!Mathf.Approximately(changed, hud)) Hud.HudSize = Mathf.Round(changed * 20f) / 20f;
-
-            // Everything the game plays, as a percentage.
-            float volume = SoundSettings.Volume;
-            changed = OptionRow(panel, ref y, "VOLUME", volume, 0f, 1f, Mathf.RoundToInt(volume * 100f).ToString());
-            if (!Mathf.Approximately(changed, volume)) SoundSettings.Volume = Mathf.Round(changed * 20f) / 20f;
-
-            float music = SoundSettings.Music;
-            changed = OptionRow(panel, ref y, "MUSIC", music, 0f, 1f, Mathf.RoundToInt(music * 100f).ToString());
-            if (!Mathf.Approximately(changed, music)) SoundSettings.Music = Mathf.Round(changed * 20f) / 20f;
-
-            float voice = SoundSettings.Voice;
-            changed = OptionRow(panel, ref y, "VOICES", voice, 0f, 1f, Mathf.RoundToInt(voice * 100f).ToString());
-            if (!Mathf.Approximately(changed, voice)) SoundSettings.Voice = Mathf.Round(changed * 20f) / 20f;
-
+            GUI.enabled = !waiting;
             if (Hud.Button(new Rect(panel.x + 28f, panel.yMax - 66f, 220f, 46f), "RESET", small: true))
             {
-                LookSettings.Sensitivity = LookSettings.DefaultSensitivity;
-                LookSettings.Fov = LookSettings.DefaultFov;
-                SoundSettings.Volume = SoundSettings.DefaultVolume;
-                SoundSettings.Music = SoundSettings.DefaultMusic;
-                SoundSettings.Voice = SoundSettings.DefaultVoice;
-                Hud.HudSize = 1f;
+                switch (_optionsTab)
+                {
+                    case OptionsTab.Video:
+                        LookSettings.Fov = LookSettings.DefaultFov;
+                        Hud.HudSize = 1f;
+                        break;
+                    case OptionsTab.Sound:
+                        SoundSettings.Volume = SoundSettings.DefaultVolume;
+                        SoundSettings.Music = SoundSettings.DefaultMusic;
+                        SoundSettings.Voice = SoundSettings.DefaultVoice;
+                        break;
+                    default:
+                        LookSettings.Sensitivity = LookSettings.DefaultSensitivity;
+                        GameInput.ResetBindings();
+                        break;
+                }
                 PlayerPrefs.Save();
             }
-            if (Hud.Button(new Rect(panel.xMax - 248f, panel.yMax - 66f, 220f, 46f), "KEYS", small: true)) _page = Page.Controls;
+            GUI.enabled = true;
+            string note = _optionsTab switch
+            {
+                OptionsTab.Video => "Fullscreen also on F11.",
+                OptionsTab.Sound => "Voices: what the tourists and the island's people say.",
+                _ => waiting ? "Press the new key or mouse button. Esc keeps the old one." : "Click a key to change it. Slots 1-6 and the gamepad stay as they are."
+            };
+            Hud.Label(new Rect(panel.x + 270f, panel.yMax - 66f, panel.width - 298f, 46f), note, 18f, Hud.Muted, TextAnchor.MiddleRight, wrap: true, shadow: false);
         }
 
         // ------------------------------------------------------------------ keys
 
-        private const float ControlsWidth = 900f, ControlsHeight = 526f;
         private int _rebindRow = -1;
         private string[] _keyLabels;
         private int _keyLabelsVersion = -1;
 
-        /// <summary>Every key that can be changed, in two columns: click one, then press the key it should be.</summary>
-        private void DrawControlsPanel(Rect panel)
+        /// <summary>Every key that can be changed, in two columns from <paramref name="top"/>: click one, then press its new key.</summary>
+        private void DrawKeys(Rect panel, float top)
         {
-            Hud.Panel(panel);
-            Hud.Title(new Rect(panel.x + 28f, panel.y + 12f, panel.width - 56f, 50f), "KEYS", 42f, Color.white, TextAnchor.MiddleLeft);
             GameInput.Rebind[] keys = GameInput.Rebindable;
             if (_keyLabels == null || _keyLabelsVersion != GameInput.BindingsVersion)
             {
@@ -473,14 +637,13 @@ namespace PleaseDontDrown.UI
             }
             bool waiting = GameInput.IsRebinding;
             if (!waiting) _rebindRow = -1;
-            const float row = 46f;
             int perColumn = (keys.Length + 1) / 2;
             float column = (panel.width - 56f - 24f) * 0.5f;
             for (int i = 0; i < keys.Length; i++)
             {
-                float x = panel.x + 28f + (i / perColumn) * (column + 24f), y = panel.y + 78f + (i % perColumn) * row;
-                Hud.Label(new Rect(x, y, column - 190f, row - 8f), keys[i].Label, 18f, Hud.Muted, TextAnchor.MiddleLeft, wrap: true, shadow: false);
-                var box = new Rect(x + column - 180f, y, 180f, row - 8f);
+                float x = panel.x + 28f + (i / perColumn) * (column + 24f), y = top + (i % perColumn) * KeyRow;
+                Hud.Label(new Rect(x, y, column - 190f, KeyRow - 8f), keys[i].Label, 18f, Hud.Muted, TextAnchor.MiddleLeft, wrap: true, shadow: false);
+                var box = new Rect(x + column - 180f, y, 180f, KeyRow - 8f);
                 if (i == _rebindRow)
                 {
                     Hud.Fill(box, Hud.Coral, 11f);
@@ -497,12 +660,6 @@ namespace PleaseDontDrown.UI
                     GUI.enabled = true;
                 }
             }
-            Hud.Label(new Rect(panel.x + 270f, panel.yMax - 66f, panel.width - 298f, 46f),
-                waiting ? "Press the new key or mouse button. Esc keeps the old one." : "Click a key to change it. Slots 1-6 and the gamepad stay as they are.",
-                18f, Hud.Muted, TextAnchor.MiddleRight, wrap: true, shadow: false);
-            GUI.enabled = !waiting;
-            if (Hud.Button(new Rect(panel.x + 28f, panel.yMax - 66f, 220f, 46f), "RESET KEYS", small: true)) GameInput.ResetBindings();
-            GUI.enabled = true;
         }
 
         /// <summary>A label, a slider and the value's number on one line; returns the slider's value.</summary>

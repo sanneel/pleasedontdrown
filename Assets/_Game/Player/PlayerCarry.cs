@@ -172,7 +172,7 @@ namespace PleaseDontDrown.Player
         {
             PlayerHub me = PlayerHub.Local;
             if (me == _hub)
-                PlayerHud.ShowToast($"<b>{carrier}</b> picked you up! Mash [{GameInput.KeyLabel(GameInput.Jump)}] to wriggle free.", 3f);
+                PlayerHud.ShowToast($"<b>{carrier}</b> picked you up! Mash [{GameInput.KeyLabel(GameInput.Jump)}] to wriggle free.", 3f, ToastKind.Warning);
             else if (me != null && me.NetworkObject == carrierObject)
                 PlayerHud.ShowToast($"You've got <b>{carried}</b>! Tap [{GameInput.KeyLabel(GameInput.Drop)}] to put them down, hold it to throw, or load them into the cannon.", 4f);
         }

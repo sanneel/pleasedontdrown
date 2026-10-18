@@ -240,7 +240,7 @@ namespace PleaseDontDrown.Story
         private void PartObservers(string gunName, int price, Vector3 at)
         {
             if (price > 0) FloatingText.Spawn(at, $"-${price}", new Color(1f, 0.55f, 0.4f), 1f, 1.6f);
-            PlayerHud.ShowToast($"Fitted to your <b>{gunName}</b>.", 3f);
+            PlayerHud.ShowToast($"Fitted to your <b>{gunName}</b>.", 3f, ToastKind.Good);
         }
 
         /// <summary>Host: sell product <paramref name="index"/> (also the 'buy' test command).</summary>
@@ -273,7 +273,7 @@ namespace PleaseDontDrown.Story
         private void BoughtObservers(string itemName, int price, Vector3 at)
         {
             if (price > 0) FloatingText.Spawn(at + Vector3.up * 0.4f, $"-${price}", new Color(1f, 0.55f, 0.4f), 1f, 1.6f);
-            PlayerHud.ShowToast(price > 0 ? $"Bought a <b>{itemName}</b>. It's on the counter." : $"A <b>{itemName}</b> is on the counter.", 3f);
+            PlayerHud.ShowToast(price > 0 ? $"Bought a <b>{itemName}</b>. It's on the counter." : $"A <b>{itemName}</b> is on the counter.", 3f, price > 0 ? ToastKind.Money : ToastKind.Good);
         }
 
         [TargetRpc]

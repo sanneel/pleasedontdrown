@@ -337,7 +337,7 @@ namespace PleaseDontDrown.Creatures
         [ObserversRpc]
         private void StolenObservers(NetworkObject owner)
         {
-            if (owner != null && owner.IsOwner) PlayerHud.ShowToast("<b>It snatched your pistol!</b> Punch the tentacle by the pier to get it back.", 4f);
+            if (owner != null && owner.IsOwner) PlayerHud.ShowToast("<b>It snatched your pistol!</b> Punch the tentacle by the pier to get it back.", 4f, ToastKind.Warning);
         }
 
         /// <summary>Host: the pistol drops out of the arm, tossed toward <paramref name="to"/> (or just down).</summary>

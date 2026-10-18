@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace PleaseDontDrown.UI
 {
-    public enum HudIcon { Food, Stamina, Air, Health }
+    public enum HudIcon { Food, Stamina, Air, Health, Check, Alert, Info }
 
     /// <summary>
     /// What every screen element is drawn with. The HUD and menus are laid out on a sheet 1080 units high (the sizes
@@ -287,7 +287,7 @@ namespace PleaseDontDrown.UI
         /// <summary>A rounded bar filled from the left.</summary>
         public static void Bar(Rect sheet, float value, Color fill)
         {
-            Fill(sheet, new Color(Ink.r, Ink.g, Ink.b, 0.9f), sheet.height * 0.5f);
+            Fill(sheet, new Color(Ink.r, Ink.g, Ink.b, 0.9f * fill.a), sheet.height * 0.5f); // (fades with its colour)
             value = Mathf.Clamp01(value);
             if (value > 0f)
             {
@@ -687,6 +687,13 @@ namespace PleaseDontDrown.UI
                     return InPolygon(p, Bolt);
                 case HudIcon.Health: // a heart: two round tops and a point at the bottom
                     return Disc(p, new Vector2(0.32f, 0.64f), 0.22f) || Disc(p, new Vector2(0.68f, 0.64f), 0.22f) || InPolygon(p, Heart);
+                case HudIcon.Check: // a tick
+                    return Capsule(p, new Vector2(0.22f, 0.50f), new Vector2(0.42f, 0.29f), 0.085f) ||
+                           Capsule(p, new Vector2(0.42f, 0.29f), new Vector2(0.80f, 0.71f), 0.085f);
+                case HudIcon.Alert: // an exclamation mark
+                    return Capsule(p, new Vector2(0.5f, 0.80f), new Vector2(0.5f, 0.43f), 0.09f) || Disc(p, new Vector2(0.5f, 0.2f), 0.095f);
+                case HudIcon.Info: // a small i
+                    return Disc(p, new Vector2(0.5f, 0.78f), 0.095f) || Capsule(p, new Vector2(0.5f, 0.56f), new Vector2(0.5f, 0.2f), 0.085f);
                 default: // bubbles
                     return Ring(p, new Vector2(0.38f, 0.36f), 0.28f, 0.11f) || Ring(p, new Vector2(0.73f, 0.71f), 0.18f, 0.09f) ||
                            Disc(p, new Vector2(0.30f, 0.84f), 0.09f);

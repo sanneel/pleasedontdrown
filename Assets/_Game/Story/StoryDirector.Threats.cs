@@ -276,7 +276,7 @@ namespace PleaseDontDrown.Story
             if (WaterSurface.Exists) at.y = Mathf.Max(at.y, WaterSurface.HeightAt(at) - 0.9f);
             Creature boss = SpawnCreature(CreatureKind.OldSnapper, at, Quaternion.LookRotation(-forward).eulerAngles.y, "Old Snapper");
             if (boss == null) yield break;
-            TitleObservers("OLD SNAPPER", "Its shell stops bullets. Hit the head when it gasps after a bite.");
+            BossIntroObservers("OLD SNAPPER", "Its shell stops bullets. Hit the head when it gasps after a bite."); // (as in the story: its name flies up into the bar)
             while (boss != null && !boss.IsDead)
             {
                 MissionObjective($"Beat Old Snapper (phase {boss.BossPhase}/{boss.BossPhases})");

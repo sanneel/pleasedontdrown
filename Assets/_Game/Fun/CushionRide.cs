@@ -292,7 +292,7 @@ namespace PleaseDontDrown.Fun
 
         [ObserversRpc]
         private void LapObservers(int guests, int pay) =>
-            PlayerHud.ShowToast($"Cushion tour done: {guests} happy guest{(guests == 1 ? "" : "s")}, +${pay}", 3f);
+            PlayerHud.ShowToast($"Cushion tour done: {guests} happy guest{(guests == 1 ? "" : "s")}, +${pay}", 3f, ToastKind.Money);
 
         [ObserversRpc]
         private void FlungObservers(Vector3 at) => AudioSource.PlayClipAtPoint(FunSounds.SlideDown, at, 0.9f);

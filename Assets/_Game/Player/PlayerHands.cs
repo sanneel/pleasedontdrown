@@ -372,7 +372,7 @@ namespace PleaseDontDrown.Player
             _eatProgress = 0f;
             StopEating();
             if (_hub.Vitals != null) _hub.Vitals.Eat(food.Food);
-            PlayerHud.ShowToast($"Mmm, {item.DisplayName.ToLowerInvariant()}.", 2f);
+            PlayerHud.ShowToast($"Mmm, {item.DisplayName.ToLowerInvariant()}.", 2f, ToastKind.Good);
             food.Consume(_hub);
             if (food.BurpAfter > 0f) _hub.BurpLater(food.BurpAfter);
             Invalidate();

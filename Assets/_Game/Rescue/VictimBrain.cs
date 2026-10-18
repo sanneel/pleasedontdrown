@@ -607,7 +607,7 @@ namespace PleaseDontDrown.Rescue
         {
             if (_flatline.Value)
             {
-                PlayerHud.ShowToast($"{Name} has no pulse. Bring the <b>defibrillator</b>, put it down next to them and press E on it.", 3f);
+                PlayerHud.ShowToast($"{Name} has no pulse. Bring the <b>defibrillator</b>, put it down next to them and press E on it.", 3f, ToastKind.Warning);
                 return;
             }
             CprStep step = _cprStep.Value;
@@ -794,7 +794,7 @@ namespace PleaseDontDrown.Rescue
                     if (!_silent.Value) FloatingText.Spawn(above, "PANIC!", new Color(1f, 0.55f, 0.2f), 0.9f);
                     break;
                 case VictimEvent.GoingUnder:
-                    PlayerHud.ShowToast($"{Name} is going under!");
+                    PlayerHud.ShowToast($"{Name} is going under!", 4f, ToastKind.Warning);
                     break;
                 case VictimEvent.Collapsed:
                     PlayerHud.ShowToast($"<color=#ff7060><b>{text}</b></color>", 5f);

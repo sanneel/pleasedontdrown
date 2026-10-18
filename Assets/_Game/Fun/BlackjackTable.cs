@@ -77,7 +77,7 @@ namespace PleaseDontDrown.Fun
                 return;
             }
             if (_inHand) HitServer();
-            else if (Economy.Money < Bet) PlayerHud.ShowToast($"Not enough in the wallet for ${Bet}.", 2f);
+            else if (Economy.Money < Bet) PlayerHud.ShowToast($"Not enough in the wallet for ${Bet}.", 2f, ToastKind.Warning);
             else DealServer(Bet);
         }
 

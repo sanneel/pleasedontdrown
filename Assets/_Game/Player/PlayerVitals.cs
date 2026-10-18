@@ -56,7 +56,7 @@ namespace PleaseDontDrown.Player
             if (Hungry && !_warned)
             {
                 _warned = true;
-                PlayerHud.ShowToast("<b>You're getting hungry.</b> Shake a palm tree for coconuts, then hold [RMB] to eat one.", 6f);
+                PlayerHud.ShowToast("<b>You're getting hungry.</b> Shake a palm tree for coconuts, then hold [RMB] to eat one.", 6f, ToastKind.Warning);
             }
             else if (!Hungry) _warned = false;
         }

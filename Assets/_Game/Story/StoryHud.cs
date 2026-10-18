@@ -15,6 +15,26 @@ namespace PleaseDontDrown.Story
     {
         private static string _title, _subtitle;
         private static float _titleAt = -100f;
+        private static bool _titleBoss;
+        // A boss's name flies up into its bar from 3.4 s, lands at 4.1 s, and the bar takes it over at 4.5 s.
+        private const float TitleSeconds = 4.5f, BossFlyFrom = 3.4f, BossFlyTo = 4.1f;
+
+        /// <summary>
+        /// Seconds since a boss's name came up as a title card, while it's up (-1 otherwise). It flies up into the boss
+        /// bar at the end, so the bar holds back its own name meanwhile (it showed twice).
+        /// </summary>
+        public static float BossIntroAge
+        {
+            get
+            {
+                float t = Time.unscaledTime - _titleAt;
+                return _titleBoss && _title != null && t <= TitleSeconds ? t : -1f;
+            }
+        }
+
+        /// <summary>Where the boss bar's name sits (ThreatHud.BossCard): the title card flies there.</summary>
+        public static Rect BossNameRect => new((Hud.Width - 640f) * 0.5f, Hud.BossTop + 2f, 640f, 48f);
+        public const float BossNameSize = 40f;
 
         // Lines of text that only change when what they show does (not built again every frame).
         private string _objective, _objectiveLine;
@@ -34,9 +54,13 @@ namespace PleaseDontDrown.Story
         {
             _title = _subtitle = null;
             _titleAt = -100f;
+            _titleBoss = false;
             _reportTitle = null;
             _reportAt = -100f;
         }
+
+        /// <summary>Where the top left's column (objective, gala fund) ends, in sheet units: the IN TROUBLE list goes under it.</summary>
+        public static float TopLeftBottom { get; private set; } = Hud.Margin;
 
         /// <summary>How long a chapter's report card stays up.</summary>
         public const float ReportSeconds = 9f;
@@ -70,16 +94,20 @@ namespace PleaseDontDrown.Story
             float report = Time.unscaledTime - _reportAt, title = Time.unscaledTime - _titleAt;
             float cover = 0f;
             if (_reportTitle != null && report <= ReportSeconds) cover = Mathf.Clamp01(report / 0.3f) * Mathf.Clamp01((ReportSeconds - report) / 0.8f);
-            if (_title != null && title <= 4.5f && viewportY > 0.45f) cover = Mathf.Max(cover, Mathf.Clamp01(title / 0.3f) * Mathf.Clamp01((4.5f - title) / 0.8f));
+            if (_title != null && title <= TitleSeconds && viewportY > 0.45f) cover = Mathf.Max(cover, Mathf.Clamp01(title / 0.3f) * Mathf.Clamp01((TitleSeconds - title) / 0.8f));
             return cover;
         }
 
-        /// <summary>A big centred card for a few seconds ("CHAPTER 2").</summary>
-        public static void ShowTitle(string title, string subtitle)
+        /// <summary>
+        /// A big centred card for a few seconds ("CHAPTER 2"). <paramref name="boss"/>: a boss's name, which ends by
+        /// flying up into the boss bar.
+        /// </summary>
+        public static void ShowTitle(string title, string subtitle, bool boss = false)
         {
             _title = title;
             _subtitle = subtitle;
             _titleAt = Time.unscaledTime;
+            _titleBoss = boss;
         }
 
         // Drawn on the HUD canvas (no IMGUI): see HudCanvas.
@@ -137,7 +165,12 @@ namespace PleaseDontDrown.Story
                 }
                 below = card.yMax + 6f;
             }
-            if (story != null && story.GalaGoal > 0) DrawGalaBar(story, below);
+            if (story != null && story.GalaGoal > 0)
+            {
+                DrawGalaBar(story, below);
+                below += 52f;
+            }
+            TopLeftBottom = below;
             if (Economy.Instance != null)
             {
                 // Wallet sits above the vitals as a compact, readable status chip.
@@ -303,13 +336,28 @@ namespace PleaseDontDrown.Story
         private void DrawTitle()
         {
             float t = Time.unscaledTime - _titleAt;
-            if (_title == null || t > 4.5f) return;
-            float a = Mathf.Clamp01(t / 0.4f) * Mathf.Clamp01((4.5f - t) / 0.8f);
+            if (_title == null || t > TitleSeconds) return;
+            float a = Mathf.Clamp01(t / 0.4f) * Mathf.Clamp01((TitleSeconds - t) / 0.8f);
             float y = Hud.Height * 0.24f;
             // (No dark band behind it: text sits straight on the game, outlined. The user, 2026-10-13 and again 2026-10-17.)
             // The words grow in, the teal line opens out under them, the subtitle follows.
             float grow = Hud.EaseOutBack(Mathf.Clamp01(t / 0.5f)), line = Mathf.SmoothStep(0f, 1f, (t - 0.15f) / 0.5f);
-            Hud.FitTitle(new Rect(80f, y, Hud.Width - 160f, 130f), _title, 112f * Mathf.Lerp(0.8f, 1f, grow), new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, a));
+            var words = new Rect(80f, y, Hud.Width - 160f, 130f);
+            float size = 112f * Mathf.Lerp(0.8f, 1f, grow), wordsAlpha = a;
+            Color tint = Hud.Sand;
+            if (_titleBoss)
+            {
+                // A boss's name doesn't fade: it shrinks and flies up to the top, where the boss bar takes it over.
+                float fly = Mathf.SmoothStep(0f, 1f, (t - BossFlyFrom) / (BossFlyTo - BossFlyFrom));
+                Rect to = BossNameRect;
+                words = new Rect(Mathf.Lerp(words.x, to.x, fly), Mathf.Lerp(words.center.y, to.center.y, fly), Mathf.Lerp(words.width, to.width, fly), Mathf.Lerp(words.height, to.height, fly));
+                words.y -= words.height * 0.5f;
+                size = Mathf.Lerp(size, BossNameSize, fly);
+                tint = Color.Lerp(Hud.Sand, Hud.Paper, fly); // (the bar's name is white: no jump when it takes over)
+                wordsAlpha = Mathf.Clamp01(t / 0.4f);
+                a *= 1f - Mathf.SmoothStep(0f, 1f, (t - (BossFlyFrom - 0.4f)) / 0.4f); // the line and the tip go first
+            }
+            Hud.FitTitle(words, _title, size, new Color(tint.r, tint.g, tint.b, wordsAlpha));
             Hud.Fill(new Rect(Hud.Width * 0.5f - 160f * line, y + 134f, 320f * line, 5f), new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, a), 2.5f);
             float sub = Mathf.Clamp01((t - 0.35f) / 0.4f) * a;
             Hud.Label(new Rect(80f, y + 148f, Hud.Width - 160f, 60f), _subtitle, 32f, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, sub), wrap: true, heavy: true);

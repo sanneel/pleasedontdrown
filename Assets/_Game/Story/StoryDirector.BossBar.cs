@@ -30,7 +30,7 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void BossIntroObservers(string title, string subtitle)
         {
-            StoryHud.ShowTitle(title, subtitle);
+            StoryHud.ShowTitle(title, subtitle, boss: true);
             Audio.GameMusic.Play(Audio.Jingle.Boss);
         }
 

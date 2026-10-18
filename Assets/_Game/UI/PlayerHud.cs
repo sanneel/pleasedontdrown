@@ -10,12 +10,16 @@ namespace PleaseDontDrown.UI
     /// hands lifted and framed), what you hold named above them, vitals as squares in the bottom left, the
     /// crosshair with its prompts, and short toast messages. Drawn with <see cref="Hud"/> (IMGUI).
     /// </summary>
+    /// <summary>What a message is about: the badge beside it in the top right.</summary>
+    public enum ToastKind : byte { Info, Good, Warning, Money }
+
     public class PlayerHud : MonoBehaviour
     {
         private struct Toast
         {
             public string Text;
             public float From, Until;
+            public ToastKind Kind;
         }
 
         private const float HintSeconds = 8f;   // the key hints fade once you've had time to read them
@@ -67,7 +71,14 @@ namespace PleaseDontDrown.UI
         {
             HudCanvas.Add(this, HudCanvas.OrderPlayer, DrawHud);
             HudCanvas.Add(gameObject, HudCanvas.OrderFade, DrawArrival);
-            DevCommands.Register("toast", "<text>", "Show a message in the top right (to look at it).", args => ShowToast(string.Join(" ", args)), owner: this);
+            DevCommands.Register("toast", "[info|good|warn|money] <text>", "Show a message in the top right (to look at it).", args =>
+            {
+                ToastKind? kind = args.Length > 1 ? args[0] switch
+                {
+                    "info" => ToastKind.Info, "good" => ToastKind.Good, "warn" => ToastKind.Warning, "money" => ToastKind.Money, _ => null
+                } : null;
+                ShowToast(string.Join(" ", args, kind != null ? 1 : 0, args.Length - (kind != null ? 1 : 0)), 4f, kind);
+            }, owner: this);
         }
 
         private void OnDisable()
@@ -95,11 +106,25 @@ namespace PleaseDontDrown.UI
         }
 
         /// <summary>Shows a short message to the local player only.</summary>
-        public static void ShowToast(string text, float seconds = 4f)
+        public static void ShowToast(string text, float seconds = 4f, ToastKind? kind = null)
         {
-            _toasts.Add(new Toast { Text = text, From = Time.unscaledTime, Until = Time.unscaledTime + seconds });
-            if (_toasts.Count > 2) _toasts.RemoveAt(0);
+            _toasts.Add(new Toast { Text = text, From = Time.unscaledTime, Until = Time.unscaledTime + seconds, Kind = kind ?? KindOf(text) });
+            if (_toasts.Count > 3) _toasts.RemoveAt(0);
         }
+
+        /// <summary>When the caller doesn't say: words in red or orange warn, green ones are good news, the rest is info.</summary>
+        private static ToastKind KindOf(string text) =>
+            text.Contains("<color=#ff") ? ToastKind.Warning : text.Contains("<color=#80ff80") ? ToastKind.Good : ToastKind.Info;
+
+        private static readonly Color GoodGreen = new(0.47f, 0.92f, 0.52f), MoneyGold = new(1f, 0.8f, 0.32f);
+
+        private static Color ColorOf(ToastKind kind) => kind switch
+        {
+            ToastKind.Good => GoodGreen,
+            ToastKind.Warning => Hud.Coral,
+            ToastKind.Money => MoneyGold,
+            _ => Hud.Teal
+        };
 
         private void DrawHud()
         {
@@ -165,10 +190,12 @@ namespace PleaseDontDrown.UI
             DrawHurt(local, cx, cy);
 
             _toasts.RemoveAll(t => t.Until < Time.unscaledTime);
-            // Messages under the top right of the screen, the newest on top: outlined words (no box) with a bar on
-            // their right edge, so they read as a message and not words floating in the sky (the team, 2026-10-12).
-            // Each one glides in from the right, and drifts up a little as it fades.
+            // Messages under the top right of the screen, the newest on top: outlined words (no box) beside a round
+            // badge that says what kind of message it is (i: info, tick: good news, !: trouble, $: money), so they
+            // read as messages and not words floating in the sky (the team, 2026-10-12). Each one glides in from the
+            // right, its badge pops, and it drifts up a little as it fades.
             float toastY = DevConnectMenu.GuideOpen ? 414f : Hud.Margin, toastTop = toastY;
+            const float toastSize = 21f, toastWidth = 420f, badge = 32f;
             for (int i = _toasts.Count - 1; i >= 0; i--)
             {
                 Toast toast = _toasts[i];
@@ -176,17 +203,25 @@ namespace PleaseDontDrown.UI
                 float alpha = Mathf.Clamp01(age / 0.18f) * Mathf.Clamp01(left / 0.45f);
                 float slide = Mathf.Pow(1f - Mathf.Clamp01(age / 0.32f), 3f) * 44f;
                 float drift = (1f - Mathf.Clamp01(left / 0.45f)) * 10f;
-                const float size = 21f, width = 420f;
-                float height = Hud.TextHeight(toast.Text, width, size) + 8f;
-                var line = new Rect(Hud.Width - Hud.Margin - width - 14f + slide, toastY - drift, width, height);
-                // (The bar turns coral for a warning: a message written in red.)
-                Color bar = toast.Text.Contains("#ff") ? Hud.Coral : Hud.Teal;
-                float grow = Hud.EaseOutBack(Mathf.Clamp01(age / 0.3f));
-                Hud.Fill(new Rect(line.xMax + 9f, line.y + 3f + (height - 8f) * 0.5f * (1f - grow), 5f, (height - 8f) * grow), new Color(bar.r, bar.g, bar.b, alpha), 2.5f);
-                Hud.Label(line, toast.Text, size, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, alpha), TextAnchor.UpperRight, wrap: true);
+                float height = Mathf.Max(badge + 2f, Hud.TextHeight(toast.Text, toastWidth, toastSize) + 8f);
+                float right = Hud.Width - Hud.Margin + slide, top = toastY - drift;
+                var line = new Rect(right - badge - 12f - toastWidth, top + 1f, toastWidth, height);
+                Color color = ColorOf(toast.Kind);
+                float pop = Hud.EaseOutBack(Mathf.Clamp01((age - 0.05f) / 0.3f)) * badge;
+                var disc = new Rect(right - badge * 0.5f - pop * 0.5f, top + badge * 0.5f - pop * 0.5f, pop, pop);
+                if (pop > 1f)
+                {
+                    Hud.Fill(new Rect(disc.x - 2f, disc.y - 2f, disc.width + 4f, disc.height + 4f), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.5f * alpha), pop * 0.5f + 2f);
+                    Hud.Fill(disc, new Color(color.r, color.g, color.b, alpha), pop * 0.5f);
+                    var ink = new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, alpha);
+                    var glyph = new Rect(disc.x + pop * 0.16f, disc.y + pop * 0.16f, pop * 0.68f, pop * 0.68f);
+                    if (toast.Kind == ToastKind.Money) Hud.Label(disc, "$", pop * 0.68f, ink, TextAnchor.MiddleCenter, heavy: true, shadow: false);
+                    else Hud.Picture(glyph, Hud.Icon(toast.Kind == ToastKind.Good ? HudIcon.Check : toast.Kind == ToastKind.Warning ? HudIcon.Alert : HudIcon.Info), ink);
+                }
+                Hud.Label(line, toast.Text, toastSize, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, alpha), TextAnchor.UpperRight, wrap: true);
                 toastY += height + 12f;
             }
-            ToastArea = _toasts.Count > 0 ? new Rect(Hud.Width - Hud.Margin - 440f, toastTop, 440f + Hud.Margin, toastY - toastTop) : Rect.zero;
+            ToastArea = _toasts.Count > 0 ? new Rect(Hud.Width - Hud.Margin - badge - 12f - toastWidth, toastTop, toastWidth + badge + 12f + Hud.Margin, toastY - toastTop) : Rect.zero;
         }
 
         /// <summary>

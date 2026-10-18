@@ -320,7 +320,7 @@ namespace PleaseDontDrown.Fun
         {
             PlayerHub me = PlayerHub.Local;
             if (me == null || (me.transform.position - _rim.position).sqrMagnitude > 30f * 30f) return;
-            PlayerHud.ShowToast(won ? $"<b>{line}</b>" : line, won ? 4f : 2.2f);
+            PlayerHud.ShowToast(won ? $"<b>{line}</b>" : line, won ? 4f : 2.2f, won ? ToastKind.Good : ToastKind.Info);
             if (won && _audio != null) { _audio.PlayOneShot(FunSounds.Cheer, 1f); _audio.PlayOneShot(FunSounds.Whoop, 0.9f); }
         }
 

@@ -215,7 +215,7 @@ namespace PleaseDontDrown.Combat
             FloatingText.Spawn(head + Vector3.up * 0.4f, "DOWN!", new Color(1f, 0.45f, 0.35f), 1.2f, 1.8f);
             if (!IsOwner) return;
             if (_hub.Hands != null && _hub.Hands.HeldItem != null) _hub.Hands.Drop();
-            PlayerHud.ShowToast(string.IsNullOrEmpty(byWhom) ? "You're down!" : $"<b>{byWhom}</b> put you down!", 3f);
+            PlayerHud.ShowToast(string.IsNullOrEmpty(byWhom) ? "You're down!" : $"<b>{byWhom}</b> put you down!", 3f, ToastKind.Warning);
         }
 
         [ObserversRpc]
@@ -234,7 +234,7 @@ namespace PleaseDontDrown.Combat
         private void RevivedObservers(string rescuer)
         {
             if (_audio != null) _audio.PlayOneShot(FunSounds.Cheer, 0.6f);
-            if (IsOwner) PlayerHud.ShowToast($"<b>{rescuer}</b> brought you back!", 2.5f);
+            if (IsOwner) PlayerHud.ShowToast($"<b>{rescuer}</b> brought you back!", 2.5f, ToastKind.Good);
         }
 
         /// <summary>Owner, every frame: lying on the sand while down; tell the host about god mode.</summary>
