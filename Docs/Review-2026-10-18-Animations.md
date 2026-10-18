@@ -75,7 +75,16 @@ ALL PASS.
 - `10_hurt_box_before_glow_after.jpg`: left the old hard red box (with the new hint text top right), right the new
   soft glow.
 
+## Story still plays through
+
+With the harder fights: story autoplay 1.1 to 3.8 reaches the end (gala raid, cage fight, all of chapter 3), no
+exceptions (it reports FAIL only for the usual headless rendering errors); `chapter3check` ALL PASS, `killcheck` ALL
+PASS.
+
 ## Still not perfect (not fixed tonight)
+
+- One picture at gala night showed Marisol's subtitle doubled (two lines on top of each other). Tried to make it happen
+  again (day, night, underwater, a new line over the last one): always clean. Tell me if you see it in the game.
 
 - Up close (first person, nose to nose) a pirate's guard fists look loosely closed; from normal distance they read as
   fists.
