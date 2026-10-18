@@ -7,20 +7,20 @@ outlined); no giant world text over faces; minimal down screen; the gala bar pla
 Scores are mine, judged from real screenshots of the dev build (1280x720). Each area lists what drags it down; the fix
 list at the bottom is the order of work. The "after" column is filled in as the work lands.
 
-| Area | Before | Pass 2 | Pass 3-4 | Main problems (before) |
-|---|---|---|---|---|
-| Main menu | 4.5 | 8 | 9 | Empty sky/sea behind it (the menu camera looks at nothing), PLAY's dark text with a black outline on coral is mud, FULLSCREEN is a main-menu button, "Development Build" sits on the version number, plain stacked boxes |
-| Options | 6 | 8.5 | 9 | No graphics quality (Low/Medium/High exists only in the console), no fullscreen toggle here, FOV slider shows 60 at its very left with no units |
-| Character screen | 5.5 | 8 | 8.5 | Flat light-blue box behind the lifeguard, long flat list with tiny `<` `>` buttons, DONE button mud like PLAY |
-| Pause menu | 5 | 8.5 | 9 | RESUME unreadable (dark on coral with a black outline), cheats (GOD MODE, FLY, TRAVEL, RESTART STORY) shown to players, 10 buttons in one column |
-| Story dialogue | 3.5 | 8 | 8.5 | NPC speech bubbles are world-sized: next to you they cover half the screen, cut off at the edges, over the objective; the same line is also a subtitle at the bottom; the name tag sits on the bubble text |
-| Objective and chapter | 6 | 8.5 | 9 | Small, no entrance when the objective changes, the chapter title is a small label in the middle |
-| Hotbar and vitals | 5.5 | 7.5 | 8.5 | Six dark boxes always on screen even when empty; the air ring (looks like a magnifier) always shown on land; TEAM FUNDS label tiny |
-| Prompts and CPR | 5.5 | 9 | 9 | `[RMB]` key chips are mud (same outline bug); CPR steps shown twice (middle and right panel); long one-line instructions |
-| Toasts and alerts | 6.5 | 7.5 | 8.5 | Fine but small, no motion, top-right alerts and the victim list crowd the same corner |
-| Report card | 6 | 7.5 | 8.5 | Plain list, no panel, no build-up |
-| UI motion | 4 | 7.5 | 8 | Almost nothing moves: no page transitions, no HUD entrances, no money tick-up feel |
-| **Overall** | **5.2** | **8.2** | **8.7** | |
+| Area | Before | Pass 2 | Pass 3-4 | Pass 5 | Main problems (before) |
+|---|---|---|---|---|---|
+| Main menu | 4.5 | 8 | 9 | 9 | Empty sky/sea behind it (the menu camera looks at nothing), PLAY's dark text with a black outline on coral is mud, FULLSCREEN is a main-menu button, "Development Build" sits on the version number, plain stacked boxes |
+| Options | 6 | 8.5 | 9 | 9.5 | No graphics quality (Low/Medium/High exists only in the console), no fullscreen toggle here, FOV slider shows 60 at its very left with no units |
+| Character screen | 5.5 | 8 | 8.5 | 9.3 | Flat light-blue box behind the lifeguard, long flat list with tiny `<` `>` buttons, DONE button mud like PLAY |
+| Pause menu | 5 | 8.5 | 9 | 9.5 | RESUME unreadable (dark on coral with a black outline), cheats (GOD MODE, FLY, TRAVEL, RESTART STORY) shown to players, 10 buttons in one column |
+| Story dialogue | 3.5 | 8 | 8.5 | 8.5 | NPC speech bubbles are world-sized: next to you they cover half the screen, cut off at the edges, over the objective; the same line is also a subtitle at the bottom; the name tag sits on the bubble text |
+| Objective and chapter | 6 | 8.5 | 9 | 9 | Small, no entrance when the objective changes, the chapter title is a small label in the middle |
+| Hotbar and vitals | 5.5 | 7.5 | 8.5 | 8.5 | Six dark boxes always on screen even when empty; the air ring (looks like a magnifier) always shown on land; TEAM FUNDS label tiny |
+| Prompts and CPR | 5.5 | 9 | 9 | 9 | `[RMB]` key chips are mud (same outline bug); CPR steps shown twice (middle and right panel); long one-line instructions |
+| Toasts and alerts | 6.5 | 7.5 | 8.5 | 9.2 | Fine but small, no motion, top-right alerts and the victim list crowd the same corner |
+| Report card | 6 | 7.5 | 8.5 | 8.5 | Plain list, no panel, no build-up |
+| UI motion | 4 | 7.5 | 8 | 8.7 | Almost nothing moves: no page transitions, no HUD entrances, no money tick-up feel |
+| **Overall** | **5.2** | **8.2** | **8.7** | **9.0** | |
 
 ## Fix list (in this order)
 
@@ -106,8 +106,30 @@ Pictures at 1920x1080: `Docs/UI-2026-10-18/19_final_*` to `24_final_*`.
   doesn't show through busy.
 - A saved tourist in view gets no SAVED label: the green SAVED! pop and the message in the top right already say it.
 
+## Pass 5: layouts, not only colours and fonts
+
+Sandro, 2026-10-18: "change the interface, not only colors and fonts". Pictures at 1920x1080:
+`Docs/UI-2026-10-18/25_pass5_*` to `33_pass5_*`.
+
+- **Pause:** PAUSED and the buttons down the left; beside them the **lifeguard's log**: the chapter and what to do now
+  (with its progress), this chapter's numbers as tiles (rescued, lost, returned, earned, team funds; the host counts
+  them, others see the funds), and ON DUTY: everyone in the session with what they're doing (carrying someone, down,
+  holding something, on watch). OPTIONS opens in the same place instead of replacing the screen.
+- **Options:** VIDEO / SOUND / CONTROLS tabs on the title's line, a teal underline sliding to the open one; settings in
+  two columns; the key list is the CONTROLS tab (no separate KEYS page); RESET resets the open tab only.
+- **Character screen:** the preview big on the left; the outfit preset, then FACE / BODY / CLOTHES tabs. On FACE the
+  camera eases in close on the head. Colour chips are bigger and sit under each row's name.
+- **Rescue HUD:** an **IN TROUBLE** list under the objective, the most urgent first: a little radar per tourist (you in
+  the middle, their blip on the ring in their direction), their state with seconds left, the distance, and an air
+  bar. It replaces the markers pinned to the screen's edges; markers over tourists you can see stay.
+- **Messages:** each has a kind shown as a round badge (i info, tick good news, ! trouble, $ money); up to three at once.
+- **Boss intro:** the name shows once. At the end of the title card it shrinks, flies up and turns white, lands where
+  the bar's name goes, and the bar fills in under it.
+- Dev commands for looking at these: `menu options|sound|keys`, `customize face|body|clothes`, `toast good|warn|money|info <text>`.
+
 ## Still between here and 9.9
 
-1. Toasts carry no type: 62 call sites pass plain text, so icons (coin, check, warning) need a small `ToastKind`.
-2. The boss intro: the boss's name shows twice for a few seconds (the title card and the bar).
-3. Sandro's own rating, on his screen in fullscreen.
+1. Story dialogue: a portrait or name plate for who's talking (still a plain subtitle line).
+2. The report card could use the logbook's tiles (same numbers, same look).
+3. Main menu: PLAY straight into hosting; a small "play / host / continue" card would explain what happens.
+4. Sandro's own rating, on his screen in fullscreen.
