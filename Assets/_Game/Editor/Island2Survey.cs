@@ -17,11 +17,19 @@ namespace PleaseDontDrown.Editor
     public static class Island2Survey
     {
         // The picture's area (world x/z) and its size.
-        private const float X0 = -115f, X1 = 115f, Z0 = -320f, Z1 = -150f;
+        private static float X0 = -115f, X1 = 115f, Z0 = -320f, Z1 = -150f;
         private const int Width = 2400;
 
         public static void Run()
         {
+            // -pdd-area x0 x1 z0 z1: another island (island 3: -80 125 -1030 -770).
+            string[] cl = System.Environment.GetCommandLineArgs();
+            int a = System.Array.IndexOf(cl, "-pdd-area");
+            if (a >= 0 && a + 4 < cl.Length)
+            {
+                X0 = float.Parse(cl[a + 1], System.Globalization.CultureInfo.InvariantCulture); X1 = float.Parse(cl[a + 2], System.Globalization.CultureInfo.InvariantCulture);
+                Z0 = float.Parse(cl[a + 3], System.Globalization.CultureInfo.InvariantCulture); Z1 = float.Parse(cl[a + 4], System.Globalization.CultureInfo.InvariantCulture);
+            }
             EditorSceneManager.OpenScene("Assets/_Game/Scenes/Game.unity");
             string folder = Path.GetFullPath("Screenshots/Survey");
             Directory.CreateDirectory(folder);

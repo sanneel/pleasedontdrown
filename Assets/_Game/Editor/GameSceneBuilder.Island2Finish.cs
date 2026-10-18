@@ -719,6 +719,19 @@ namespace PleaseDontDrown.Editor
             lowWater.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
+        /// <summary>Batch: only the dock's arch again (a full rebuild re-creates every island 2 piece).</summary>
+        public static void Island2ArchBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform root = FindByPath("Environment/" + Island2FinishName) ?? throw new InvalidOperationException("Run Island2FinishBatch first");
+            if (root.Find("DockArch") is { } old) Object.DestroyImmediate(old.gameObject);
+            Physics.SyncTransforms();
+            BuildDockArch(root);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[Island2Finish] PASS: arch rebuilt");
+        }
+
         // ------------------------------------------------------------------ the arch over the dock (task 9)
 
         private static void BuildDockArch(Transform parent)
@@ -731,17 +744,19 @@ namespace PleaseDontDrown.Editor
             float z = WaterlineZ(dock.position.x) - 2.5f;
             Material white = GetMaterial("ArchWhite", new Color(0.95f, 0.93f, 0.87f), smoothness: 0.3f);
             Material teal = GetMaterial("SignTeal", new Color(0.09f, 0.42f, 0.46f), smoothness: 0.35f);
+            float top = GroundUnder(new Vector3(dock.position.x, 0f, z)) + 4.7f;
             foreach (float side in new[] { -1f, 1f })
             {
-                var feet = new Vector3(dock.position.x + side * 2.1f, 0f, z);
-                feet.y = GroundUnder(feet);
-                Primitive(PrimitiveType.Cube, "Pillar", root, feet + Vector3.up * 1.9f, new Vector3(0.45f, 3.8f + 0.6f, 0.45f), white);
+                var feet = new Vector3(dock.position.x + side * 3.2f, 0f, z); // wide apart: big letters that read from the beach
+                feet.y = GroundUnder(feet) - 0.3f;
+                // Up into the beam's middle, thinner than it (same depth flickered through its face).
+                float h = top - feet.y;
+                Primitive(PrimitiveType.Cube, "Pillar", root, feet + Vector3.up * (h * 0.5f), new Vector3(0.45f, h, 0.42f), white);
             }
-            float top = GroundUnder(new Vector3(dock.position.x, 0f, z)) + 3.9f;
-            Primitive(PrimitiveType.Cube, "Beam", root, new Vector3(dock.position.x, top, z), new Vector3(5.1f, 0.7f, 0.5f), teal, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "Beam", root, new Vector3(dock.position.x, top, z), new Vector3(7.4f, 1.15f, 0.55f), teal, keepCollider: false);
             foreach (float side in new[] { 1f, -1f })
             {
-                TextMesh t = WorldText(root, "Name", new Vector3(dock.position.x, top, z + 0.27f * side), "GRAND CORAL", 90, 0.045f, new Color(1f, 0.82f, 0.4f));
+                TextMesh t = WorldText(root, "Name", new Vector3(dock.position.x, top, z + 0.3f * side), "GRAND CORAL", 90, 0.075f, new Color(1f, 0.82f, 0.4f));
                 t.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 180f : 0f, 0f);
             }
         }

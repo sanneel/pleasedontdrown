@@ -36,7 +36,7 @@ namespace PleaseDontDrown.Dev
         private static readonly string[] Beats =
         {
             "1.1", "1.2", "1.3", "1.4", "1.5", "1.9", "1.10", "2.1", "2.2", "2.3", "2.4", "2.5", "2.5b", "2.5c", "2.6", "2.7",
-            "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.8", "end"
+            "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.7b", "3.8", "end"
         };
 
         private readonly List<string> _errors = new();
@@ -753,6 +753,46 @@ namespace PleaseDontDrown.Dev
                     if (StoryPoint("SnapperPond") is { } pond && StoryPoint("UpRiver") is { } up)
                         Stand(me, pond.position + (up.position - pond.position).normalized * 12f);
                     yield return new WaitForSeconds(1f);
+                    break;
+                case "3.7b":
+                    // Into the sewer behind the back waterfall, up the ladder into the castle, then the throne room's fight
+                    // (fists put the king down: he's needed alive).
+                    if (StoryDirector.MissionRunning)
+                    {
+                        foreach (StoryNpc n in StoryNpc.All)
+                            if (n != null && n.Name == "The Pirate King" && !n.IsDefeated)
+                            {
+                                Exec("goto King");
+                                yield return new WaitForSeconds(0.3f);
+                                Exec("whack 2");
+                                yield return new WaitForSeconds(0.6f);
+                                break;
+                            }
+                        break;
+                    }
+                    if (StoryDirector.Instance.MarkerLabel == "The sewer" && StoryPoint("SewerEntrance") is { } sewer)
+                    {
+                        Stand(me, sewer.position);
+                        yield return new WaitForSeconds(1f);
+                        break;
+                    }
+                    if (StoryDirector.Instance.MarkerLabel == "The palace" && StoryPoint("PalaceThrone") is { } throne)
+                    {
+                        // The sewer's ladder: E at its foot comes out in the castle yard; then in through the keep's door.
+                        World.SewerLadder ladder = null;
+                        foreach (World.SewerLadder l in FindObjectsByType<World.SewerLadder>(FindObjectsSortMode.None))
+                            if (l.name == "SewerLadder") ladder = l;
+                        if (ladder != null)
+                        {
+                            Stand(me, ladder.transform.position + ladder.transform.forward * 1.2f); // (it faces down the tunnel)
+                            me.Look.LookAt(ladder.transform.position + Vector3.up * 1.3f);
+                            yield return new WaitForSeconds(0.5f);
+                            ladder.OnInteract(me);
+                            yield return new WaitForSeconds(1f);
+                        }
+                        Stand(me, throne.position + throne.forward * 6f);
+                        yield return new WaitForSeconds(1f);
+                    }
                     break;
                 case "3.8":
                     Transform mouth = StoryPoint("CaveMouth"), ledge = StoryPoint("CaveLedge");
