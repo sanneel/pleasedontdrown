@@ -35,7 +35,8 @@ namespace PleaseDontDrown.UI
         private static readonly string[] SlotNumbers = BuildSlotNumbers();
         private string _primary, _primaryLine, _secondary, _secondaryLine;
         private bool _heldIsPerson, _hintsWithSkin;
-        private string _hints;
+        private readonly List<(string key, string what)> _hints = new();
+        private bool _hintsBuilt;
         private int _bindingsVersion = -1;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -102,7 +103,8 @@ namespace PleaseDontDrown.UI
             {
                 // A key was changed in OPTIONS: the cached lines name the old one.
                 _bindingsVersion = GameInput.BindingsVersion;
-                _primary = _secondary = _hints = null;
+                _primary = _secondary = null;
+                _hintsBuilt = false;
             }
             string primary = local.Interactor.CurrentPrompt;
             string secondary = local.Interactor.CurrentSecondaryPrompt;
@@ -157,9 +159,11 @@ namespace PleaseDontDrown.UI
                 Toast toast = _toasts[i];
                 float alpha = Mathf.Clamp01((Time.unscaledTime - toast.From) / 0.15f) * Mathf.Clamp01((toast.Until - Time.unscaledTime) / 0.4f);
                 float slide = (1f - Mathf.Clamp01((Time.unscaledTime - toast.From) / 0.2f)) * 12f;
-                const float size = 18f, width = 340f;
+                // (A thin teal bar on its right edge makes it read as a message, not words floating in the sky.)
+                const float size = 19f, width = 360f;
                 float height = Hud.TextHeight(toast.Text, width, size) + 8f;
-                var pill = new Rect(Hud.Width - Hud.Margin - width + slide, toastY, width, height);
+                var pill = new Rect(Hud.Width - Hud.Margin - width - 12f + slide, toastY, width, height);
+                Hud.Fill(new Rect(pill.xMax + 8f, pill.y + 3f, 4f, height - 8f), new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, alpha), 2f);
                 Hud.Label(new Rect(pill.x, pill.y, width, height), toast.Text, size,
                     new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, alpha), TextAnchor.UpperRight, wrap: true);
                 toastY += height + 10f;
@@ -173,29 +177,15 @@ namespace PleaseDontDrown.UI
         private static float DrawKeyPrompt(float center, float y, string key, string text)
         {
             const float size = 22f, capHeight = 32f, gap = 10f;
-            float capWidth = Mathf.Max(capHeight, Hud.TextWidth(key, 17f, heavy: true) + 16f);
+            float capWidth = Mathf.Max(capHeight, Hud.TextWidth(key, capHeight * 0.53f, heavy: true) + capHeight * 0.5f);
             float textWidth = Mathf.Min(640f, Hud.TextWidth(text, size));
-            float total = capWidth + gap + textWidth, x = center - total * 0.5f;
-            var cap = new Rect(x, y + 2f, capWidth, capHeight);
-            Hud.Fill(new Rect(cap.x, cap.y + 3f, cap.width, cap.height), new Color(0f, 0f, 0f, 0.45f), 7f); // (its edge, below)
-            Hud.Fill(cap, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.96f), 7f);
-            Hud.Label(cap, key, 17f, Hud.Ink, heavy: true, shadow: false);
+            float x = center - (capWidth + gap + textWidth) * 0.5f;
+            Hud.KeyCap(x, y + 2f, key, capHeight);
             float height = Mathf.Max(capHeight + 6f, Hud.TextHeight(text, textWidth, size) + 10f);
-            Hud.Label(new Rect(cap.xMax + gap, y + 4f, textWidth + 4f, height), text, size, Hud.Paper, TextAnchor.UpperLeft, wrap: true, shadow: false);
+            Hud.Label(new Rect(x + capWidth + gap, y + 4f, textWidth + 4f, height), text, size, Hud.Paper, TextAnchor.UpperLeft, wrap: true, shadow: false);
             return height + 6f;
         }
 
-        private static float DrawPrompt(float center, float y, string text)
-        {
-            float width = Mathf.Min(720f, Hud.TextWidth(text, 22f) + 36f);
-            float height = Mathf.Max(40f, Hud.TextHeight(text, width - 36f, 22f) + 16f);
-            var rect = new Rect(center - width * 0.5f, y, width, height);
-            Hud.Surface(rect, 0.8f);
-            Hud.Label(new Rect(rect.x + 18f, y + 8f, width - 36f, height - 16f), text, 22f, Hud.Paper, wrap: true, shadow: false);
-            return height + 6f;
-        }
-
-        private static string Key(UnityEngine.InputSystem.InputAction action) => $"<color=#ffd24a>[{GameInput.KeyLabel(action)}]</color>";
 
         /// <summary>
         /// The hotbar, How to Fish style: six big slots in the bottom centre, each with its number and a picture of
@@ -251,7 +241,7 @@ namespace PleaseDontDrown.UI
                 _held = held;
                 _heldSince = Time.unscaledTime;
                 _heldIsPerson = held != null && held.GetComponent<Rescue.VictimBrain>() != null;
-                _hints = null;
+                _hintsBuilt = false;
             }
             if (held == null) return;
 
@@ -264,14 +254,13 @@ namespace PleaseDontDrown.UI
                 {
                     // The skin keys join the line once the item's skins are known to be ours to change.
                     bool withSkin = Items.ItemSkin.LocalHeld != null;
-                    if (_hints == null || withSkin != _hintsWithSkin)
+                    if (!_hintsBuilt || withSkin != _hintsWithSkin)
                     {
-                        _hints = Hints(held);
+                        Hints(held, _hints);
+                        _hintsBuilt = true;
                         _hintsWithSkin = withSkin;
                     }
-                    float width = Mathf.Min(1120f, Hud.Width - 120f);
-                    Hud.FitLabel(new Rect(cx - width * 0.5f, nameY - 30f, width, 28f), _hints, 18f,
-                        new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, hintAlpha), TextAnchor.MiddleCenter);
+                    Hud.KeyHints(cx, nameY - 34f, _hints, hintAlpha, 17f);
                 }
             }
 
@@ -292,22 +281,25 @@ namespace PleaseDontDrown.UI
             Hud.Arc(r, 0f, value, thick, fill);
         }
 
-        private static string Hints(Items.Item held)
+        /// <summary>What the keys do with the item in your hands, as keycap pairs (Hud.KeyHints).</summary>
+        private static void Hints(Items.Item held, List<(string key, string what)> hints)
         {
-            string drop = Key(GameInput.Drop);
-            string hints;
+            hints.Clear();
+            string drop = GameInput.KeyLabel(GameInput.Drop);
             var tool = held.GetComponent<Combat.IHeldTool>();
             if (tool is Combat.Weapon)
-                hints = $"{Key(GameInput.Primary)} shoot    {Key(GameInput.Secondary)} aim    {Key(GameInput.Reload)} reload    {Key(GameInput.Inspect)} inspect    hold {drop} throw";
-            else if (tool != null)
-                hints = $"{Key(GameInput.Primary)} {tool.UseLabel}    hold {drop} throw";
-            else
-                hints = $"{Key(GameInput.Primary)} or hold {drop} throw";
-            hints += $"    tap {drop} drop";
-            if (held.GetComponent<Items.Edible>() != null) hints += $"    hold {Key(GameInput.Secondary)} eat";
+            {
+                hints.Add((GameInput.KeyLabel(GameInput.Primary), "shoot"));
+                hints.Add((GameInput.KeyLabel(GameInput.Secondary), "aim"));
+                hints.Add((GameInput.KeyLabel(GameInput.Reload), "reload"));
+                hints.Add((GameInput.KeyLabel(GameInput.Inspect), "inspect"));
+            }
+            else if (tool != null) hints.Add((GameInput.KeyLabel(GameInput.Primary), tool.UseLabel));
+            else hints.Add((GameInput.KeyLabel(GameInput.Primary), "throw"));
+            if (held.GetComponent<Items.Edible>() != null) hints.Add((GameInput.KeyLabel(GameInput.Secondary), "hold to eat"));
+            hints.Add((drop, "drop, hold to throw"));
             if (Items.ItemSkin.LocalHeld != null)
-                hints += $"    <color=#ffd24a>[{GameInput.KeyLabel(GameInput.SkinPrev)}/{GameInput.KeyLabel(GameInput.SkinNext)}]</color> skin";
-            return hints;
+                hints.Add(($"{GameInput.KeyLabel(GameInput.SkinPrev)}/{GameInput.KeyLabel(GameInput.SkinNext)}", "skin"));
         }
 
         /// <summary>

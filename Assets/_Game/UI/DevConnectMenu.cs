@@ -96,6 +96,7 @@ namespace PleaseDontDrown.UI
 
             if (_pauseOpen && !_connection.IsActive)
                 SetPause(false);
+            if (_connection.IsActive) _playPressedAt = -100f; // (in: PLAY says PLAY again next time)
             if (!_connection.IsActive)
                 _guideOpen = false;
         }
@@ -116,6 +117,7 @@ namespace PleaseDontDrown.UI
         private float _startShownAt = -1f;
         private int _startFrame = -10;
         private const int PageDimId = 0x5ade0001, PauseDimId = 0x5ade0002; // (Hud.Ease ids)
+        private float _playPressedAt = -100f;
         private static Texture2D _backdrop;
 
         /// <summary>
@@ -183,7 +185,16 @@ namespace PleaseDontDrown.UI
                 r.x -= (1f - In(0.2f + i * 0.06f, 0.35f)) * (ButtonWidth + 60f);
                 return r;
             }
-            if (Hud.Button(Next(0), "PLAY", primary: true)) _connection.Play();
+            Rect play = Next(0);
+            bool starting = Time.unscaledTime - _playPressedAt < 15f && string.IsNullOrEmpty(_connection.LastError);
+            if (Hud.Button(play, starting ? "STARTING..." : "PLAY", primary: true) && !starting)
+            {
+                _playPressedAt = Time.unscaledTime;
+                _connection.Play();
+            }
+            if (starting) // (hosting through Steam takes a moment: say so instead of sitting there)
+                Hud.Label(new Rect(play.xMax + 18f, play.y, 420f, play.height), "Starting the island...", 22f,
+                    new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 5f)), TextAnchor.MiddleLeft, heavy: true);
             if (Hud.Button(Next(1), "JOIN GAME", selected: _page == Page.Join)) _page = _page == Page.Join ? Page.Main : Page.Join;
             if (Hud.Button(Next(2), "CHARACTER")) AvatarCustomizer.Open();
             if (Hud.Button(Next(3), "OPTIONS", selected: options)) _page = options ? Page.Main : Page.Options;

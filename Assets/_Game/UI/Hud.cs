@@ -440,6 +440,40 @@ namespace PleaseDontDrown.UI
             return pressed;
         }
 
+        /// <summary>
+        /// A key drawn as a little keycap: a light rounded key with its edge showing below, the dark letter on it
+        /// (no outline). <paramref name="height"/> sets the size; returns its width.
+        /// </summary>
+        public static float KeyCap(float x, float y, string key, float height = 32f, float alpha = 1f)
+        {
+            float letters = height * 0.53f;
+            float width = Mathf.Max(height, TextWidth(key, letters, heavy: true) + height * 0.5f);
+            var cap = new Rect(x, y, width, height);
+            float radius = height * 0.22f;
+            Fill(new Rect(cap.x, cap.y + height * 0.09f, cap.width, cap.height), new Color(0f, 0f, 0f, 0.45f * alpha), radius);
+            Fill(cap, new Color(Paper.r, Paper.g, Paper.b, 0.96f * alpha), radius);
+            Label(cap, key, letters, new Color(Ink.r, Ink.g, Ink.b, alpha), heavy: true, shadow: false);
+            return width;
+        }
+
+        /// <summary>A row of keycaps, each with what it does beside it, centred on <paramref name="center"/>.</summary>
+        public static void KeyHints(float center, float y, IReadOnlyList<(string key, string what)> hints, float alpha = 1f, float size = 18f)
+        {
+            float cap = size * 1.45f, gap = size * 0.4f, spacing = size * 1.4f, total = 0f;
+            for (int i = 0; i < hints.Count; i++)
+                total += Mathf.Max(cap, TextWidth(hints[i].key, cap * 0.53f, heavy: true) + cap * 0.5f) + gap + TextWidth(hints[i].what, size) + (i > 0 ? spacing : 0f);
+            float x = center - total * 0.5f;
+            var words = new Color(Paper.r, Paper.g, Paper.b, alpha);
+            for (int i = 0; i < hints.Count; i++)
+            {
+                if (i > 0) x += spacing;
+                x += KeyCap(x, y, hints[i].key, cap, alpha) + gap;
+                float w = TextWidth(hints[i].what, size);
+                Label(new Rect(x, y - 2f, w + 6f, cap + 2f), hints[i].what, size, words, TextAnchor.MiddleLeft, shadow: false);
+                x += w;
+            }
+        }
+
         private static readonly Dictionary<int, (float value, int frame)> _eased = new();
 
         /// <summary>

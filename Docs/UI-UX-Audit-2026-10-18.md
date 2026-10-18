@@ -16,11 +16,11 @@ list at the bottom is the order of work. The "after" column is filled in as the 
 | Story dialogue | 3.5 | 8 | NPC speech bubbles are world-sized: next to you they cover half the screen, cut off at the edges, over the objective; the same line is also a subtitle at the bottom; the name tag sits on the bubble text |
 | Objective and chapter | 6 | 8.5 | Small, no entrance when the objective changes, the chapter title is a small label in the middle |
 | Hotbar and vitals | 5.5 | 7.5 | Six dark boxes always on screen even when empty; the air ring (looks like a magnifier) always shown on land; TEAM FUNDS label tiny |
-| Prompts and CPR | 5.5 | 8.5 | `[RMB]` key chips are mud (same outline bug); CPR steps shown twice (middle and right panel); long one-line instructions |
-| Toasts and alerts | 6.5 | 7 | Fine but small, no motion, top-right alerts and the victim list crowd the same corner |
+| Prompts and CPR | 5.5 | 9 | `[RMB]` key chips are mud (same outline bug); CPR steps shown twice (middle and right panel); long one-line instructions |
+| Toasts and alerts | 6.5 | 7.5 | Fine but small, no motion, top-right alerts and the victim list crowd the same corner |
 | Report card | 6 | 7.5 | Plain list, no panel, no build-up |
 | UI motion | 4 | 7.5 | Almost nothing moves: no page transitions, no HUD entrances, no money tick-up feel |
-| **Overall** | **5.2** | **8.0** | |
+| **Overall** | **5.2** | **8.2** | |
 
 ## Fix list (in this order)
 
@@ -69,11 +69,17 @@ Pictures: `Docs/UI-2026-10-18/` (before/after).
   hurt glow soft (earlier tonight).
 - **Boss bar:** the boss's name big over a thick bar, the phase small under it (the mission clock moved beside it).
 
+## Pass 2
+
+- The keys under the name of what you hold are keycaps too (LMB shoot, RMB aim, R reload, F inspect, G drop / hold to
+  throw), one shared keycap drawing (Hud.KeyCap / Hud.KeyHints) for every prompt.
+- Messages in the top right carry a thin teal bar on their right edge (they read as messages, not words in the sky).
+- PLAY says STARTING... with "Starting the island..." beside it until the game is up (hosting through Steam takes a
+  moment).
+- Weapons: no ammo counter on purpose (How to Fish shows none; the gun tells you), left as it is.
+
 ## Still between here and 9.9
 
 1. A display font for titles and the logo (Roboto everywhere is clean but generic): needs a free (OFL) font downloaded.
-2. Toasts as proper notifications (icon, slide, stacking), and the alerts in the top right sorted against the
-   victim list.
-3. The guide (Tab) and the chapter report card laid out as cards with a little more structure.
-4. Weapon HUD (ammo, reload) and the item hints line checked and restyled the same way.
-5. A small loading line ("Starting the island...") between PLAY and the fade-up.
+2. The guide (Tab) and the chapter report card laid out as cards with a little more structure.
+3. The alerts in the top right sorted against the victim list when many tourists are in trouble at once.
