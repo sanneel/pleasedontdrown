@@ -402,7 +402,8 @@ namespace PleaseDontDrown.Editor
                 ("Island1", new Bounds(new Vector3(0f, 0f, 8f), new Vector3(130f, 40f, 124f))),
                 ("Island2", new Bounds(new Vector3(20f, 15f, -345f), new Vector3(392f, 70f, 330f))),
                 ("DevIsland", new Bounds(new Vector3(-230f, 0f, -60f), new Vector3(110f, 40f, 90f))),
-                ("Island3", new Bounds(new Vector3(20f, 25f, -900f), new Vector3(440f, 90f, 500f)))
+                ("Island3", new Bounds(new Vector3(20f, 25f, -900f), new Vector3(440f, 90f, 500f))),
+                ("Island4", new Bounds(new Vector3(560f, 15f, -400f), new Vector3(330f, 60f, 330f)))
             };
             var baked = new List<Object>();
             foreach ((string name, Bounds bounds) in areas)
