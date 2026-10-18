@@ -14,6 +14,8 @@ namespace PleaseDontDrown.Story
         public Color Color;
         public float Start;
         public float Duration;
+        /// <summary>Who in the world says it (null: the player, or a voice from nowhere).</summary>
+        public StoryNpc Npc;
     }
 
     /// <summary>
@@ -66,7 +68,7 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void SayObservers(string speaker, string text, StoryNpc npc, Color color, float duration)
         {
-            var line = new DialogueLine { Speaker = speaker, Text = text, Color = color, Start = Time.time, Duration = duration };
+            var line = new DialogueLine { Speaker = speaker, Text = text, Color = color, Start = Time.time, Duration = duration, Npc = npc };
             Current = line;
             _history.Add(line);
             if (_history.Count > 30) _history.RemoveAt(0);

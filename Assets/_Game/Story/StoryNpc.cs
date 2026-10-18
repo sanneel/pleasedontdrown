@@ -101,6 +101,8 @@ namespace PleaseDontDrown.Story
 
         public string Name => string.IsNullOrEmpty(_name.Value) ? "Someone" : _name.Value;
         public NpcRole Role => _role.Value;
+        /// <summary>The body (its bones: the dialogue's portrait camera looks at the head).</summary>
+        public AvatarRig Rig => _rig;
         public AvatarLook Look => AvatarLook.Unpack(_look.Value);
         public ulong LookPacked => _look.Value;
         /// <summary>A VIP hotel guest (gold hat): if they get into trouble in the water they're a VIP to rescue (tips).</summary>

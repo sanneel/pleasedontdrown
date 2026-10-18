@@ -284,6 +284,40 @@ namespace PleaseDontDrown.UI
             else GUI.DrawTexture(Px(sheet), picture, ScaleMode.ScaleToFit, true, 0f, tint, 0f, 0f);
         }
 
+        private static Material _round;
+
+        /// <summary>A picture cut to a circle (the speaker's portrait), filling <paramref name="sheet"/>.</summary>
+        public static void RoundPicture(Rect sheet, Texture picture, Color tint)
+        {
+            if (!Painting || picture == null) return;
+            if (!Retained)
+            {
+                Rect px = Px(sheet);
+                GUI.DrawTexture(px, picture, ScaleMode.StretchToFill, false, 0f, tint, 0f, px.width * 0.5f);
+                return;
+            }
+            if (_round == null)
+            {
+                Shader shader = Resources.Load<Shader>("HudRound");
+                if (shader == null) return;
+                _round = new Material(shader) { name = "HudRound", hideFlags = HideFlags.HideAndDontSave };
+            }
+            HudCanvas.Picture(Px(sheet), picture, tint, 0f, _round);
+        }
+
+        /// <summary>
+        /// A number in a thin frame with what it counts under it (the pause screen's log and the chapter report):
+        /// the number in the title face, the label in small capitals.
+        /// </summary>
+        public static void StatTile(Rect r, string number, string label, Color color, float alpha = 1f)
+        {
+            if (alpha <= 0.005f) return;
+            Frame(r, new Color(1f, 1f, 1f, 0.26f * alpha), 1.5f, 12f);
+            float big = Mathf.Min(46f, r.height * 0.47f);
+            FitTitle(new Rect(r.x + 8f, r.y + r.height * 0.08f, r.width - 16f, big * 1.18f), number, big, new Color(color.r, color.g, color.b, color.a * alpha));
+            Label(new Rect(r.x, r.yMax - r.height * 0.36f, r.width, r.height * 0.26f), label, 16f, new Color(Muted.r, Muted.g, Muted.b, alpha), TextAnchor.MiddleCenter, heavy: true, shadow: false);
+        }
+
         /// <summary>A rounded bar filled from the left.</summary>
         public static void Bar(Rect sheet, float value, Color fill)
         {

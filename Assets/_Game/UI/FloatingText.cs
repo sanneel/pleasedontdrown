@@ -27,6 +27,18 @@ namespace PleaseDontDrown.UI
         private bool _subtitled;
         private static readonly Dictionary<int, FloatingText> ActiveSpeech = new();
 
+        /// <summary>Speech bubbles off (or back on) for one camera's picture: the speaker's portrait (SpeakerPortrait).</summary>
+        public static void HideBubbles(bool hidden)
+        {
+            foreach (FloatingText ft in ActiveSpeech.Values)
+            {
+                if (ft == null) continue;
+                if (ft._text != null && ft._text.TryGetComponent(out MeshRenderer words)) words.enabled = !hidden;
+                if (ft._bubble != null) ft._bubble.enabled = !hidden;
+                if (ft._tail != null) ft._tail.enabled = !hidden;
+            }
+        }
+
         /// <summary>This character has a bubble up now (their name tag stays down meanwhile).</summary>
         public static bool IsSpeaking(StoryNpc speaker) =>
             speaker != null && ActiveSpeech.TryGetValue(speaker.GetInstanceID(), out FloatingText ft) && ft != null;

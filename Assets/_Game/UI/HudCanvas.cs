@@ -132,13 +132,17 @@ namespace PleaseDontDrown.UI
             image.color = AsImgui(color);
         }
 
-        /// <summary>A picture stretched over <paramref name="px"/>, turned <paramref name="angle"/> degrees clockwise about its middle.</summary>
-        internal static void Picture(Rect px, Texture texture, Color tint, float angle = 0f)
+        /// <summary>
+        /// A picture stretched over <paramref name="px"/>, turned <paramref name="angle"/> degrees clockwise about its
+        /// middle; <paramref name="material"/> draws it another way (a round cut: Hud.RoundPicture).
+        /// </summary>
+        internal static void Picture(Rect px, Texture texture, Color tint, float angle = 0f, Material material = null)
         {
             Node n = _instance.Next(Kind.Picture);
             n.Place(px, angle);
             RawImage image = n.Picture;
             if (image.texture != texture) image.texture = texture;
+            if (image.material != (material != null ? material : image.defaultMaterial)) image.material = material;
             image.color = AsImgui(tint);
         }
 

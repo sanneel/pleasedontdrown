@@ -415,10 +415,7 @@ namespace PleaseDontDrown.UI
             float tile = counted ? (w - (tiles - 1) * gap) / tiles : 240f, tx = x;
             void Tile(string number, string label, Color color)
             {
-                var r = new Rect(tx, y, tile, tall);
-                Hud.Frame(r, new Color(1f, 1f, 1f, 0.16f), 1.5f, 12f);
-                Hud.FitTitle(new Rect(r.x + 8f, r.y + 8f, r.width - 16f, 54f), number, 46f, color);
-                Hud.Label(new Rect(r.x, r.y + 64f, r.width, 24f), label, 16f, Hud.Muted, TextAnchor.MiddleCenter, heavy: true, shadow: false);
+                Hud.StatTile(new Rect(tx, y, tile, tall), number, label, color);
                 tx += tile + gap;
             }
             if (counted)
