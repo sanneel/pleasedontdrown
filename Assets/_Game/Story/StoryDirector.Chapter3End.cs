@@ -238,7 +238,7 @@ namespace PleaseDontDrown.Story
                 float t0 = Time.time;
                 while (marisol.IsMoving && Time.time - t0 < 25f) yield return new WaitForSeconds(0.3f);
                 if ((marisol.transform.position - meet).sqrMagnitude > 6f * 6f) marisol.ServerTeleport(meet, _pirateLanding.eulerAngles.y);
-                marisol.ServerFace(null); // (whoever comes over)
+                if (StoryNpc.NearestPlayer(marisol.transform.position, 40f) is { } who) marisol.ServerFace(who.transform.position); // (to the lifeguards, not out to sea)
                 Marker("Marisol", marisol.NetworkObject);
                 yield return Reach(marisol.transform.position, 12f);
                 SetObjective("Marisol counts the casino's money");

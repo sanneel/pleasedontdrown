@@ -612,7 +612,7 @@ namespace PleaseDontDrown.Editor
             // The villa: a white two-storey cube house with a glass front, on the plateau's east half.
             var villa = new GameObject("SandyVilla").transform;
             villa.SetParent(top, false);
-            villa.SetPositionAndRotation(new Vector3(I4Villa.x, I4PlateauTop, I4Villa.y), Quaternion.Euler(0f, 270f, 0f)); // its front faces west, the statue
+            villa.SetPositionAndRotation(new Vector3(I4Villa.x, I4PlateauTop, I4Villa.y), Quaternion.Euler(0f, 90f, 0f)); // its front (local -z) faces west: the path, the statue
             TagSurface(villa.gameObject, SurfaceKind.Rock);
             const float vw = 8f, vd = 6f, vh = 4f;
             Primitive(PrimitiveType.Cube, "Floor", villa, new Vector3(0f, 0.08f, 0f), new Vector3(vw * 2f, 0.3f, vd * 2f), FkDeck);
@@ -645,8 +645,8 @@ namespace PleaseDontDrown.Editor
             lamp.color = new Color(1f, 0.93f, 0.82f);
             lamp.shadows = LightShadows.None;
             NavKeepOut(villa, new Vector3(0f, vh * 0.5f, 0f), new Vector3(vw * 2f, vh, vd * 2f));
-            I4Point("SandyVilla", villa.TransformPoint(new Vector3(0f, 0.25f, 1.9f)), 90f); // behind her desk... in front of it, facing the door
-            I4Point("VillaDoor", villa.TransformPoint(new Vector3(0f, 0.25f, -vd - 3f)), 90f);
+            I4Point("SandyVilla", villa.TransformPoint(new Vector3(0f, 0.25f, 1.9f)), 270f); // in front of her desk, facing the door (west)
+            I4Point("VillaDoor", villa.TransformPoint(new Vector3(0f, 0.25f, -vd - 3f)), 90f); // (outside the door, looking in)
             taken.Add(new Vector3(I4Villa.x, I4Villa.y, 12f));
 
             // The statue: Sandy herself, 11 m tall, gold, on a white plinth.
