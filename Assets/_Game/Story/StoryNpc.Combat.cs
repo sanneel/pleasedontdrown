@@ -15,14 +15,25 @@ namespace PleaseDontDrown.Story
     /// fighter. The weapon in their hands (flintlock pistol, musket, cutlass) and how it moves is drawn by
     /// <see cref="NpcWeaponView"/> from the synced gun state; what makes a fight fair and readable is all here:
     ///
-    ///  * Turns: at most two fighters swing at one lifeguard at a time (one for a cage fighter, a duel); the rest
-    ///    circle at a few metres, facing them, waiting. Gunmen take turns too (two aiming at one lifeguard).
-    ///  * Every blow is wound up first (<see cref="NpcWeapon.WindUp"/>) and turns toward the target only so fast,
-    ///    so stepping back or round them makes it miss. It lands only if they are still in reach and in front.
-    ///  * Hitting a fighter mid wind-up stops the blow. Enough damage at once knocks them over; they get back up.
+    ///  * Turns: at most two fighters close in on one lifeguard at a time (one for a cage fighter, a duel), and only
+    ///    one of them winds up a blow at a time; the rest circle well back (4.5 m), spread out, waiting. Gunmen take
+    ///    turns too (two aiming at one lifeguard). Few shouts: one pirate every few seconds, not all of them at once.
+    ///  * Fist fighters square up (<see cref="FightStance"/>): fists up at the chin while closing in or circling,
+    ///    and a blow is wound up first (<see cref="NpcWeapon.WindUp"/>), the fist drawn back past the cheek: the tell.
+    ///    They turn toward the target only so fast, so stepping back or round them makes it miss.
+    ///  * The guard blocks blows from the front (<see cref="FighterProfile.Guard"/>; a hook or an uppercut gets through
+    ///    more often): a blocked blow does nothing, the lifeguard's arm bounces off (their next punch waits a moment,
+    ///    <see cref="PlayerCombat.ServerStun"/>) and it's answered with a quick counter. Two blows landing in a row
+    ///    make them cover up and back off a moment. A flinch doesn't drop the guard; after their own swing it is down:
+    ///    that's the moment to hit them (a jab then staggers them). So mashing the button into a raised guard gets you
+    ///    countered; timing, hooks and uppercuts, combos and coming in from the side win.
+    ///  * They square up a moment at arm's length before the first blow and between blows. Winding up, the other
+    ///    hand still guards (jabs mostly bounce off); a heavy blow early in the wind-up stops it, late in it they swing
+    ///    through. Stepping back out of the blow leaves them open. A blow that lands rocks the lifeguard a moment (no
+    ///    punching straight back). Enough damage at once (a combo) knocks them over; they get back up.
     ///  * Gunmen keep their distance, need a clear line, aim with a lag (a moving lifeguard is hard to hit, more so
     ///    far away), fire short bursts, reload, and move to a new spot now and then. Too close, they bash you.
-    ///  * Cage fighters guard: blows from the front are mostly blocked; they throw combos and slip back out.
+    ///  * Cage fighters guard almost every blow from the front; they throw combos and slip back out.
     /// Every fighter keeps a tally (swings, hits, misses, shots, blocks) printed when it ends, for tuning.
     /// </summary>
     public partial class StoryNpc
@@ -30,11 +41,12 @@ namespace PleaseDontDrown.Story
         private enum FightState : byte { Idle, Approach, Hold, Close, WindUp, Recover, Aim, Reload, Reposition, Down }
 
         private const float SeeRange = 40f, LoseRange = 45f;
-        private const float RingRadius = 3.4f, OrbitDegreesPerSecond = 18f;
+        private const float RingRadius = 4.5f, OrbitDegreesPerSecond = 14f, Elbow = 1.7f; // Elbow: room kept between fighters
         private const float StrafeSpeed = 2.1f, CloseSpeed = 4.2f, BackOffSpeed = 2.4f;
 
         // Who swings / shoots at whom right now (host). Fighters ask for a turn; most two per lifeguard.
         private static readonly Dictionary<PlayerHub, List<StoryNpc>> MeleeTurns = new(), ShotTurns = new();
+        private static float _nextFightShout; // one pirate's shout at a time across a fight
 
         private bool _fighting;
         private FighterProfile _fighter;
@@ -51,6 +63,13 @@ namespace PleaseDontDrown.Story
         private float _nextReplan, _knockedUntil, _poiseDamage, _poiseSince, _comboChain;
         // Tally for tuning.
         private int _swings, _landed, _missed, _shots, _shotsLanded, _blocked, _knockdowns;
+        // The guard (host): up this frame (blows from the front can be blocked); covering up after two blows in a row.
+        private bool _guardUp, _lastHitCommitted, _lastHitHeavy;
+        private float _coverUntil, _lastLandedOnUs = -10f, _nextSwingAt;
+        private bool _squaredUp; // already at arm's length with this lifeguard (the first blow waits a moment)
+        // Every machine: the fists up or a blow being drawn back (fist fighters), and when that wind-up started.
+        private readonly FishNet.Object.Synchronizing.SyncVar<FightStance> _stance = new();
+        private float _windUpShownAt = -10f, _windUpShownFor = 0.5f, _blockShownAt = -10f;
 
         // What's in their hand and what they're doing with it, on every machine (NpcWeaponView draws it).
         private readonly FishNet.Object.Synchronizing.SyncVar<NpcWeaponKind> _weaponKind = new();
@@ -76,6 +95,7 @@ namespace PleaseDontDrown.Story
         {
             MeleeTurns.Clear();
             ShotTurns.Clear();
+            _nextFightShout = 0f;
         }
 
         // ------------------------------------------------------------------ host API
@@ -96,6 +116,7 @@ namespace PleaseDontDrown.Story
             _swings = _landed = _missed = _shots = _shotsLanded = _blocked = _knockdowns = 0;
             _aggressive = false;
             _fleeing = false;
+            _coverUntil = 0f;
         }
 
         [Server]
@@ -109,12 +130,27 @@ namespace PleaseDontDrown.Story
             _fightGoal = null;
             _foe = null;
             ReleaseTurns(this);
+            _guardUp = false;
+            SetStance(FightStance.None);
         }
 
         // ------------------------------------------------------------------ thinking (host, every frame)
 
         /// <summary>Host: one step of the fight. Called from the brain instead of the role's own behaviour.</summary>
         private void FightThink(float dt)
+        {
+            _guardUp = false; // (each step below raises it where the fists are up)
+            FightStep(dt);
+            bool fists = _fighter.Weapon.Kind == NpcWeaponKind.Fists && !IsDefeated && _pose.Value == AvatarPose.Normal;
+            SetStance(!fists ? FightStance.None : _fight == FightState.WindUp ? FightStance.WindUp : _guardUp ? FightStance.Guard : FightStance.None);
+        }
+
+        private void SetStance(FightStance stance)
+        {
+            if (_stance.Value != stance) _stance.Value = stance;
+        }
+
+        private void FightStep(float dt)
         {
             if (IsDefeated)
             {
@@ -139,6 +175,7 @@ namespace PleaseDontDrown.Story
             {
                 if (_fight == FightState.WindUp) SetFight(FightState.Recover, 0.35f); // interrupted
                 _fightGoal = null;
+                _guardUp = _fight != FightState.Recover && _fighter.Style != FightStyle.Drunk; // a flinch, not an opening
                 return;
             }
 
@@ -161,7 +198,7 @@ namespace PleaseDontDrown.Story
             if (_gestureAt >= 0f && Time.time >= _gestureAt)
             {
                 _gestureAt = -1f;
-                GestureObservers(AvatarGesture.Punch, _foe.Head.position);
+                GestureObservers(AvatarGesture.Punch, FacePoint(_foe.transform, _foe.Head.position, _foe.Head.forward));
             }
 
             NpcWeapon w = _fighter.Weapon;
@@ -213,25 +250,94 @@ namespace PleaseDontDrown.Story
                 Approach();
                 return;
             }
+            _guardUp = distance < RingRadius + 1.5f; // squared up
+            if (Time.time < _coverUntil)
+            {
+                // Covering up after two blows in a row: guard high, half a step back, no swing for a moment.
+                _fight = FightState.Hold;
+                Goal(p - dir * 0.5f, BackOffSpeed);
+                return;
+            }
             int maxSwinging = _fighter.Style == FightStyle.Brawler ? 1 : 2;
             if (TakeTurn(MeleeTurns, _foe, maxSwinging))
             {
-                // Our turn: close in and swing as soon as they are in reach and roughly in front.
+                // Our turn: close in and swing as soon as they are in reach and roughly in front (unless the other one
+                // is already winding up: one blow at a time, the second waits just out of reach, guard up).
                 float reach = w.Reach * (_fighter.Style == FightStyle.Drunk ? 0.9f : 1f);
-                if (distance <= reach * 0.95f && Vector3.Angle(transform.forward, dir) < 35f)
+                // Coming in (not a counter): square up a moment at arm's length before the first blow (walking straight
+                // into a swing left them wide open to a flurry).
+                if (distance > reach * 1.8f) _squaredUp = false;
+                else if (!_squaredUp && distance <= reach * 1.25f)
+                {
+                    _squaredUp = true;
+                    if (_comboChain == 0) _nextSwingAt = Mathf.Max(_nextSwingAt, Time.time + GuardPause() * 0.7f);
+                }
+                if (Time.time < _nextSwingAt)
+                {
+                    // Back in the guard a moment between blows (they used to swing, recover and swing again at once, so
+                    // the guard was never up when it mattered): a step round them at arm's length, fists up.
+                    _fight = FightState.Close;
+                    Vector3 round = Vector3.Cross(Vector3.up, dir) * (_orbitSign * 0.35f);
+                    Goal(Spaced(_foe.transform.position - dir * reach * 1.05f + round), StrafeSpeed);
+                    return;
+                }
+                bool otherSwinging = OtherWindingUp(_foe);
+                if (!otherSwinging && distance <= reach * 0.95f && Vector3.Angle(transform.forward, dir) < 35f)
                 {
                     StartWindUp(w);
                     return;
                 }
                 _fight = FightState.Close;
-                Goal(_foe.transform.position - dir * reach * 0.75f, _fighter.Style == FightStyle.Drunk ? 2.6f : CloseSpeed);
+                Goal(Spaced(_foe.transform.position - dir * reach * (otherSwinging ? 1.3f : 0.75f)), _fighter.Style == FightStyle.Drunk ? 2.6f : CloseSpeed);
                 return;
             }
-            // Waiting for a turn: circle at a few metres, facing them (and egging the others on).
+            // Waiting for a turn: circle well back, spread out, facing them (and now and then egging the others on).
             _fight = FightState.Hold;
             Orbit(RingRadius, dt);
-            if (_fighter.Style == FightStyle.Pirate && Random.value < 0.25f * dt)
+            if (_fighter.Style == FightStyle.Pirate && Time.time >= _nextFightShout && Random.value < 0.4f * dt)
+            {
+                _nextFightShout = Time.time + Random.Range(4f, 7f);
                 ShoutObservers(PirateShouts[Random.Range(0, PirateShouts.Length)], false);
+            }
+        }
+
+        /// <summary>
+        /// Where a punch at someone's head lands: on the side of the head facing us, a little under the eyes (aimed at the
+        /// eyes themselves, a blow from the side went through the goofy lifeguard's big head to reach his face).
+        /// </summary>
+        private Vector3 FacePoint(Transform body, Vector3 eyes, Vector3 facing)
+        {
+            AvatarRig rig = body.GetComponentInChildren<AvatarRig>();
+            float half = rig != null && rig.HeadHalfWidth > 0.02f ? rig.HeadHalfWidth : 0.1f;
+            Vector3 fwd = Vector3.ProjectOnPlane(facing, Vector3.up);
+            fwd = fwd.sqrMagnitude > 1e-4f ? fwd.normalized : body.forward;
+            Vector3 centre = eyes - fwd * (half * 0.8f);
+            Vector3 toUs = Vector3.ProjectOnPlane(HeadPosition - centre, Vector3.up);
+            toUs = toUs.sqrMagnitude > 1e-4f ? toUs.normalized : fwd;
+            return centre + toUs * (half + 0.04f) - Vector3.up * 0.04f;
+        }
+
+        /// <summary>Someone else on this lifeguard is winding up a blow right now.</summary>
+        private bool OtherWindingUp(PlayerHub foe)
+        {
+            if (!MeleeTurns.TryGetValue(foe, out List<StoryNpc> list)) return false;
+            foreach (StoryNpc n in list)
+                if (n != null && n != this && n._fight == FightState.WindUp) return true;
+            return false;
+        }
+
+        /// <summary>A spot nudged clear of the other fighters on their feet (they bunched up into one heap).</summary>
+        private Vector3 Spaced(Vector3 spot)
+        {
+            foreach (StoryNpc other in _all)
+            {
+                if (other == this || other == null || !other._fighting || other.IsDefeated) continue;
+                Vector3 d = spot - other.transform.position;
+                d.y = 0f;
+                float m = d.magnitude;
+                if (m < Elbow) spot += (m > 0.01f ? d / m : transform.right) * (Elbow - m);
+            }
+            return spot;
         }
 
         private void ThinkGun(NpcWeapon w, Vector3 p, Vector3 dir, float distance, bool see, float dt)
@@ -309,6 +415,7 @@ namespace PleaseDontDrown.Story
             _swings++;
             float windUp = w.WindUp * (_fighter.Style == FightStyle.Drunk ? 1.4f : 1f) * (_comboChain > 0 ? 0.75f : 1f);
             SetFight(FightState.WindUp, windUp);
+            SetStance(_fighter.Weapon.Kind == NpcWeaponKind.Fists ? FightStance.WindUp : FightStance.None);
             // The arm goes back now and the jab plays out as the blow lands (the gesture is the punch we have).
             _gestureAt = Mathf.Max(Time.time, _fightUntil - 0.2f);
             _fightGoal = null;
@@ -333,6 +440,7 @@ namespace PleaseDontDrown.Story
                     Vector3 push = to.sqrMagnitude > 0.01f ? to.normalized : transform.forward;
                     combat.ServerKnockback(push * w.Knock + Vector3.up * 2.5f, Name);
                     combat.ServerDamage(w.MeleeDamage, Name, p);
+                    combat.ServerStun(PlayerCombat.HitStun); // rocked: no punching straight back through it
                 }
             }
             if (landed) _landed++;
@@ -350,9 +458,18 @@ namespace PleaseDontDrown.Story
             // A cage fighter often follows up; the others give someone else a go.
             bool combo = _fighter.Style == FightStyle.Brawler && _comboChain < 2 && Random.value < 0.35f + _fighter.Skill * 0.3f;
             _comboChain = combo ? _comboChain + 1 : 0;
+            if (!combo) _nextSwingAt = Time.time + GuardPause();
             if (!combo && _fighter.Style != FightStyle.Brawler) ReleaseTurn(MeleeTurns, this);
             SetFight(FightState.Idle, 0f);
         }
+
+        /// <summary>How long a fighter stays in the guard before the next blow.</summary>
+        private float GuardPause() => _fighter.Style switch
+        {
+            FightStyle.Brawler => Random.Range(0.35f, 0.7f),
+            FightStyle.Drunk => Random.Range(0.8f, 1.6f),
+            _ => Random.Range(0.6f, 1.2f)
+        };
 
         private void Fire(NpcWeapon w, float distance)
         {
@@ -416,7 +533,10 @@ namespace PleaseDontDrown.Story
         private bool FightStaggers()
         {
             if (!_fighting) return true;
-            if (_lastHitBlocked || Time.time < _staggerFreeUntil) return false;
+            if (_lastHitBlocked || _lastHitCommitted || Time.time < _staggerFreeUntil) return false;
+            // A jab into the guard is shrugged off (it used to stagger them, and the guard came down with it: a masher
+            // stun-locked anyone); a heavy blow, or anything that catches them open after a swing, rocks them.
+            if (!_lastHitHeavy && _fight != FightState.Recover && _fighter.Style != FightStyle.Drunk) return false;
             _staggerFreeUntil = Time.time + (_fighter.Style == FightStyle.Brawler ? 1.5f : 1f);
             return true;
         }
@@ -425,38 +545,54 @@ namespace PleaseDontDrown.Story
         private int FightOnHit(int damage, DamageKind kind, PlayerHub attacker, Vector3 direction)
         {
             _lastHitBlocked = false;
+            _lastHitCommitted = false;
+            _lastHitHeavy = damage >= 35; // a hook, an uppercut, an overhand (a jab is 25)
             if (!_fighting || IsDefeated) return damage;
             // Turn on whoever hit us (mostly).
             if (attacker != null && attacker != _foe && (_foe == null || Random.value < 0.6f)) _foe = attacker;
 
-            // A cage fighter's guard: a blow from the front, unless they're mid-swing, is mostly blocked.
+            // The guard: with the fists up, a blow from the front is often blocked (a heavy one, a hook or an uppercut,
+            // gets through more often). Never mid-swing, and not after their own swing: that's the opening.
             bool brawler = _fighter.Style == FightStyle.Brawler;
-            if (brawler && kind is DamageKind.Punch or DamageKind.Blade && _fight != FightState.WindUp && attacker != null)
+            Vector3 from = attacker != null ? attacker.transform.position - transform.position : -direction;
+            from.y = 0f;
+            bool front = Vector3.Angle(transform.forward, from) < 65f;
+            // (Winding up, the other hand still guards the chin: jabs mostly bounce off it. Step back from the blow, or
+            // break through with a hook or an uppercut.)
+            float guard = _fight == FightState.WindUp ? _fighter.Guard * 0.9f : _guardUp ? _fighter.Guard : 0f;
+            if (guard > 0f && front && kind is DamageKind.Punch or DamageKind.Blade && attacker != null &&
+                Random.value < guard * (damage >= 35 ? 0.35f : 1f))
             {
-                Vector3 from = attacker.transform.position - transform.position;
-                from.y = 0f;
-                if (Vector3.Angle(transform.forward, from) < 60f && Random.value < 0.45f + _fighter.Skill * 0.3f)
+                _blocked++;
+                _lastHitBlocked = true;
+                BlockObservers(HeadPosition);
+                if (attacker.TryGetComponent(out PlayerCombat theirs)) theirs.ServerStun(PlayerCombat.BlockedRecoil, blocked: true); // their arm bounces off
+                // Blocking sets up a quick counter: the next swing comes at once and fast.
+                if (_foe == attacker && _fight is not (FightState.WindUp or FightState.Down) && TakeTurn(MeleeTurns, attacker, brawler ? 1 : 2))
                 {
-                    _blocked++;
-                    _lastHitBlocked = true;
-                    BlockObservers(HeadPosition);
-                    // Blocking sets up a quick counter: the next swing comes at once and fast.
-                    if (_foe == attacker && TakeTurn(MeleeTurns, attacker, 1) && _fight != FightState.Down)
-                    {
-                        _comboChain = 1;
-                        SetFight(FightState.Idle, 0f);
-                    }
-                    return Mathf.Max(1, Mathf.RoundToInt(damage * 0.2f));
+                    _comboChain = 1;
+                    _coverUntil = 0f;
+                    _nextSwingAt = 0f;
+                    SetFight(FightState.Idle, 0f);
                 }
+                return 0;
             }
 
-            // Hit mid wind-up: the blow is lost (not a cage fighter's: they take it and swing anyway).
-            // (Only a hit that makes them stumble: straight after one they swing through the next.)
-            if (_fight == FightState.WindUp && damage >= 8 && !brawler && Time.time >= _staggerFreeUntil)
+            // Hit mid wind-up: a heavy blow early in it stops it; a jab doesn't, and late in it they swing through.
+            // (Not a cage fighter's: they take it and swing anyway.)
+            if (_fight == FightState.WindUp)
             {
-                _gestureAt = -1f;
-                SetFight(FightState.Recover, 0.4f);
+                float wound = (Time.time - _fightStart) / Mathf.Max(0.01f, _fightUntil - _fightStart);
+                if (!brawler && _lastHitHeavy && wound < 0.6f && Time.time >= _staggerFreeUntil)
+                {
+                    _gestureAt = -1f;
+                    SetFight(FightState.Recover, 0.4f);
+                }
+                else _lastHitCommitted = true;
             }
+            // Two blows landing in a row from the front: they cover up and back off a moment (a drunk just takes it).
+            else if (front && _fighter.Style == FightStyle.Pirate && Time.time - _lastLandedOnUs < 1f) _coverUntil = Time.time + 0.9f;
+            if (front) _lastLandedOnUs = Time.time;
 
             // Enough at once knocks them over (they get back up if there's any fight left in them).
             if (Time.time - _poiseSince > 1.3f)
@@ -531,8 +667,8 @@ namespace PleaseDontDrown.Story
         {
             _ringAngle += _orbitSign * OrbitDegreesPerSecond * dt;
             Vector3 spot = _foe.transform.position + Quaternion.Euler(0f, _ringAngle, 0f) * Vector3.forward * radius;
-            // Drift toward the slot round the near side, not straight through the lifeguard.
-            Goal(spot, StrafeSpeed);
+            // Drift toward the slot round the near side, not straight through the lifeguard, clear of the others.
+            Goal(Spaced(spot), StrafeSpeed);
         }
 
         private void TurnToward(Vector3 direction, float degreesPerSecond, float dt)
@@ -647,7 +783,16 @@ namespace PleaseDontDrown.Story
         {
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.KnifeSwish, 0.35f);
             if (_weaponView != null) _weaponView.OnWindUp(seconds);
+            _windUpShownAt = Time.time;
+            _windUpShownFor = seconds;
         }
+
+        /// <summary>Every machine: how far a fist fighter has drawn the blow back (all the way as the punch starts, 0.2 s
+        /// before it lands).</summary>
+        private float WindUpDrawn => Mathf.Clamp01((Time.time - _windUpShownAt) / Mathf.Max(0.08f, _windUpShownFor - 0.2f));
+
+        /// <summary>Every machine: the stance (fists up, a blow drawn back), for the animator and tests.</summary>
+        public FightStance Stance => _stance.Value;
 
         [ObserversRpc]
         private void WhiffObservers()
@@ -659,6 +804,9 @@ namespace PleaseDontDrown.Story
         private void BlockObservers(Vector3 at)
         {
             if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Thump, 0.9f);
+            // (Once in a while, not on every blocked jab of a flurry: a stack of words over one head.)
+            if (Time.time - _blockShownAt < 1.2f) return;
+            _blockShownAt = Time.time;
             UI.FloatingText.Spawn(at + Vector3.up * 0.3f, "BLOCKED", new Color(0.7f, 0.85f, 1f), 0.8f, 0.8f);
         }
 

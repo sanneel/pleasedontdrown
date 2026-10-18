@@ -50,7 +50,8 @@ namespace PleaseDontDrown.Story
             Vector3 above = HeadPosition + Vector3.up * 0.35f + Random.insideUnitSphere * 0.15f;
             float size = PopupSize(above);
             if (head) FloatingText.Spawn(above + Vector3.up * 0.15f * size, $"HEADSHOT  -{damage}", new Color(1f, 0.82f, 0.2f), 1.45f * size, 1.2f);
-            else if (damage > 0) FloatingText.Spawn(above, $"-{damage}", bullet ? new Color(1f, 0.95f, 0.85f) : new Color(1f, 0.75f, 0.45f), 1.15f * size, 0.9f);
+            else if (damage > 0 && bullet) FloatingText.Spawn(above, $"-{damage}", new Color(1f, 0.95f, 0.85f), 1.15f * size, 0.9f);
+            // (Punches: no number. A flurry put a cloud of them over every head in a brawl; the health bar shows it.)
 
             // Ours? The host says it landed.
             if (attacker != null && attacker == PlayerHub.Local)

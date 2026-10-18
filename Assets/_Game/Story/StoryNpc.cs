@@ -542,8 +542,14 @@ namespace PleaseDontDrown.Story
             bool head = IsHeadshot(kind, point);
             if (head) damage *= 2; // (StoryNpc.HitFeel)
             damage = FightOnHit(damage, kind, attacker, direction); // a fighter's guard, interrupted blows, knockdowns
+            if (_lastHitBlocked)
+            {
+                // Blocked: no flinch, no flash, no damage (BlockObservers made the thud).
+                if (attacker != null) Debug.Log($"[Hit] {attacker.DisplayName} hits {Name}: blocked");
+                return true;
+            }
             _health.Value = Mathf.Max(0, _health.Value - damage);
-            if (attacker != null) Debug.Log($"[Hit] {attacker.DisplayName} hits {Name}: -{damage} ({kind}{(head ? ", head" : "")}), {_health.Value} left");
+            if (attacker != null) Debug.Log($"[Hit] {attacker.DisplayName} hits {Name}: -{damage} ({kind}{(head ? ", head" : "")}), {_health.Value} left{(_fighting ? $" [{_fight}]" : "")}");
             // The last of their health to a gun or a bite kills them; to fists and blades it knocks them out (StoryNpc.Rivals).
             bool killed = _health.Value <= 0 && KillsOutright(kind);
             Vector3 push = new Vector3(direction.x, 0f, direction.z).normalized;
@@ -571,8 +577,9 @@ namespace PleaseDontDrown.Story
         {
             if (_animator != null) _animator.Flinch(push * (head ? 1.6f : bullet ? 1.3f : 1f));
             if (_audio != null && !bullet) _audio.PlayOneShot(ProceduralAudio.Punch, 1f);
-            // Words for a punch, the knockout and the kill; a ball shows its damage instead (StoryNpc.HitFeel).
-            string text = killed ? "KILLED!" : healthLeft <= 0 ? "K.O.!" : bullet ? null : Random.value < 0.5f ? "OW!" : "OOF!";
+            // Words for the knockout and the kill only (an OW!/OOF! on every punch of a flurry piled up over the heads;
+            // the flash, the health bar and the hit marker say a punch landed).
+            string text = killed ? "KILLED!" : healthLeft <= 0 ? "K.O.!" : null;
             Color colour = killed ? new Color(0.9f, 0.15f, 0.12f) : new Color(1f, 0.6f, 0.3f);
             if (text != null) FloatingText.Spawn(HeadPosition + Vector3.up * 0.55f, text, colour, (healthLeft <= 0 ? 1.4f : 0.9f) * PopupSize(HeadPosition), 1.2f);
             HitFeel(point, push, damage, bullet, head, killed, healthLeft, attacker);
@@ -632,7 +639,9 @@ namespace PleaseDontDrown.Story
                 Mood = _mood.Value,
                 Talking = Time.time < _talkUntil,
                 Seated = false,
-                LookBack = _role.Value == NpcRole.Robber && _pose.Value == AvatarPose.Normal && !swimming
+                LookBack = _role.Value == NpcRole.Robber && _pose.Value == AvatarPose.Normal && !swimming,
+                Stance = Stance, // squared up for a fist fight (StoryNpc.Combat)
+                WindUp = WindUpDrawn
             };
             // Leading a lifeguard by the hand (the beach hut gag): her right hand back in his.
             if (LoveHut.HandHold(transform, out LoveHut.HandGripPoint hold))

@@ -18,6 +18,10 @@ namespace PleaseDontDrown.Avatars
     /// <summary>Face on top of the automatic expression.</summary>
     public enum AvatarMood : byte { Neutral, Happy, Scared, Angry, Hurt }
 
+    /// <summary>A fist fighter squaring up (Story.StoryNpc.Combat): Guard, both fists up at the chin; WindUp, the
+    /// right fist drawing back for a blow (<see cref="AvatarMotion.WindUp"/> says how far), the tell to step out of.</summary>
+    public enum FightStance : byte { None, Guard, WindUp }
+
     /// <summary>What the body is doing this frame. Filled in by a driver (e.g. PlayerAvatar) before LateUpdate.</summary>
     public struct AvatarMotion
     {
@@ -54,6 +58,8 @@ namespace PleaseDontDrown.Avatars
         public AvatarMood Mood;
         public bool Talking;          // flap the mouth
         public bool LookBack;         // running away: glances back over the shoulder now and then
+        public FightStance Stance;    // squared up for a fist fight (story fighters)
+        public float WindUp;          // ...0..1 through drawing the fist back (FightStance.WindUp)
     }
 
     /// <summary>
@@ -2240,8 +2246,11 @@ namespace PleaseDontDrown.Avatars
             Kissing = 0f;
             float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
             Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
+            bool squared = Motion.Stance != FightStance.None && Motion.Pose == AvatarPose.Normal && !Motion.Swimming;
+            _stanceW = Mathf.MoveTowards(_stanceW, squared ? 1f : 0f, Time.deltaTime * (squared ? 5f : 3f));
             if (ActiveStrike(out StrikeKind strikeKind, out bool strikeLeft, out float strikeTime))
                 Strike(strikeKind, strikeLeft, strikeTime, upperL, foreL, upperR, foreR, la, lb);
+            else if (_stanceW > 0.001f) PoseFightStance(upperL, foreL, upperR, foreR, la, lb);
             else if (GestureActive(AvatarGesture.Breath, 1.1f))
             {
                 // Rescue breath, mouth to mouth: bend right down until our lips are on theirs (head tilted, eyes
@@ -2276,6 +2285,8 @@ namespace PleaseDontDrown.Avatars
 
         private float CarryLean => Motion.CarryingPerson ? _hold : 0f;
         private int _striking; // the arm throwing a punch this frame: 1 right, -1 left, 0 none
+        private float _stanceW; // 0..1 how far into the fight stance (fists up) the arms are
+        private float _drawn;   // 0..1 how far the right fist was drawn back when the blow was thrown (the punch starts there)
 
         /// <summary>A punch being thrown now: which kind, which hand, how long it takes.</summary>
         private bool ActiveStrike(out StrikeKind kind, out bool left, out float duration)
@@ -2345,16 +2356,11 @@ namespace PleaseDontDrown.Avatars
             }
 
             Vector3 shoulder = upper.position;
-            // The guard: fists up in front of the face, clear of the big cartoon heads (a chin guard sat inside the
-            // head, and KeepHandsOutOfHead swung that arm out, so the guard hand ended up stuck out flat).
-            // (From the lips, not the head bone: the goofy lifeguard's head bone is down at the neck, so "under the
-            // head" put the guard down at the chest.)
-            float faceFront = Mathf.Max(_rig.HeadFront, _rig.HeadHalfWidth) + 0.16f * s;
-            Transform mouth = B(Bone.Mouth);
-            Vector3 chin = mouth != null
-                ? mouth.position + fwd * (0.24f * s) - up * (0.06f * s)
-                : head.position + fwd * faceFront - up * (0.16f * s);
+            Vector3 chin = GuardChin();
             Vector3 guard = chin + side * (0.1f * s);
+            // A fighter squared up throws the blow from where the wind-up drew the fist back to (and stays in the guard).
+            if (!left && _drawn > 0f) guard = Vector3.Lerp(guard, DrawnFist(chin), _drawn * (1f - drive));
+            if (_stanceW > 0f) w = Mathf.Max(w, _stanceW);
             float reach = (la + lb) * 0.98f;
             Vector3 target = _gesturePoint != Vector3.zero ? _gesturePoint : shoulder + fwd * (0.7f * s);
             if (kind == StrikeKind.Uppercut) target += up * (0.06f * s); // up under the chin
@@ -2376,6 +2382,52 @@ namespace PleaseDontDrown.Avatars
             (left ? _rig.LeftHand : _rig.RightHand)?.Pose(HandPose.Fist);
             (left ? _rig.RightHand : _rig.LeftHand)?.Pose(HandPose.Lerp(HandPose.LooseFist, HandPose.Fist, 0.8f)); // the guard: a fist too
             Turn(head, transform.right, 6f * w); // chin tucked
+        }
+
+        /// <summary>
+        /// Where a fighter's guard sits: in front of the chin, clear of the big cartoon heads (a chin guard sat inside the
+        /// head, and KeepHandsOutOfHead swung that arm out, so the guard hand ended up stuck out flat). (From the lips, not
+        /// the head bone: the goofy lifeguard's head bone is down at the neck, so "under the head" put it at the chest.)
+        /// </summary>
+        private Vector3 GuardChin()
+        {
+            float s = _rig.Scale;
+            Vector3 fwd = transform.forward, up = Vector3.up;
+            Transform mouth = B(Bone.Mouth);
+            return mouth != null
+                ? mouth.position + fwd * (0.24f * s) - up * (0.06f * s)
+                : B(Bone.Head).position + fwd * (Mathf.Max(_rig.HeadFront, _rig.HeadHalfWidth) + 0.16f * s) - up * (0.16f * s);
+        }
+
+        /// <summary>The right fist drawn all the way back for a blow: beside the cheek, outside the head.</summary>
+        private Vector3 DrawnFist(Vector3 chin)
+        {
+            float s = _rig.Scale;
+            float clear = Mathf.Max(0.2f * s, _rig.HeadHalfWidth + 0.09f * s);
+            return chin + transform.right * clear - transform.forward * (0.2f * s) + Vector3.up * (0.03f * s);
+        }
+
+        /// <summary>
+        /// Squared up for a fist fight (<see cref="AvatarMotion.Stance"/>): both fists up in front of the chin, elbows
+        /// down, chin tucked. Winding up a blow the right fist draws back beside the cheek and the chest turns away from
+        /// the target (<see cref="AvatarMotion.WindUp"/>): the tell. <see cref="Strike"/> then throws it from there.
+        /// </summary>
+        private void PoseFightStance(Transform upperL, Transform foreL, Transform upperR, Transform foreR, float la, float lb)
+        {
+            float s = _rig.Scale, w = Mathf.SmoothStep(0f, 1f, _stanceW);
+            Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
+            float draw = Motion.Stance == FightStance.WindUp ? Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(Motion.WindUp)) : 0f;
+            _drawn = draw;
+            // Turning away to load it (as far as the punch's own cock goes, so the throw carries straight on).
+            Turn(B(Bone.Hips), up, 4f * draw * w);
+            Turn(B(Bone.Chest), up, 6f * draw * w);
+            Vector3 chin = GuardChin();
+            Vector3 rightFist = Vector3.Lerp(chin + right * (0.1f * s), DrawnFist(chin), draw);
+            IK.Solve(upperR, foreR, la, lb, rightFist, -up + right * (0.8f + 0.6f * draw), w, false);
+            IK.Solve(upperL, foreL, la, lb, chin - right * (0.1f * s) + fwd * (0.03f * s), -up - right * 0.8f, w * 0.95f, false);
+            _rig.RightHand?.Pose(HandPose.Lerp(HandPose.Relaxed, HandPose.Fist, w));
+            _rig.LeftHand?.Pose(HandPose.Lerp(HandPose.Relaxed, HandPose.Lerp(HandPose.LooseFist, HandPose.Fist, 0.8f), w));
+            Turn(B(Bone.Head), right, 6f * w); // chin tucked
         }
 
         private static Vector3 Bezier(Vector3 a, Vector3 b, Vector3 c, float t) =>
@@ -2435,11 +2487,11 @@ namespace PleaseDontDrown.Avatars
             // 2. Face down onto theirs, tilted sideways a little, eyes shut (the face code does the eyes).
             Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along * 0.35f, along) * Quaternion.Euler(0f, 0f, 38f);
             head.rotation = Quaternion.Slerp(head.rotation, faceDown, w * 0.85f);
-            // 3. Whatever is still missing: lean the hips in (up to 30 cm), knees stay; then curl the neck the last bit.
+            // 3. Whatever is still missing: lean the hips in (up to 40 cm), knees stay; then curl the neck the last bit.
             Vector3 gap = target - MouthPoint;
             if (gap.sqrMagnitude > 1e-6f)
             {
-                hips.position += Vector3.ClampMagnitude(gap, 0.3f * _rig.Scale) * w;
+                hips.position += Vector3.ClampMagnitude(gap, 0.4f * _rig.Scale) * w; // (0.3 left a big-bellied man 5 cm short)
                 PoseLegs();
             }
             for (int pass = 0; pass < 6; pass++)

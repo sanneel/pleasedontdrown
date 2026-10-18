@@ -127,6 +127,20 @@ namespace PleaseDontDrown.Combat
 
         private (PunchKind kind, bool left)? _forced;
 
+        /// <summary>Owner, tests (Dev/BrawlBot): exactly what a click does: Primary jabs now or queues the next jab,
+        /// Secondary hooks only when a fist is free.</summary>
+        public void PressPunch(bool hook = false)
+        {
+            if (hook)
+            {
+                if (!CanPunch()) return;
+                _forced = (PunchKind.Hook, !_lastLeft);
+                Punch();
+            }
+            else if (CanPunch()) Punch();
+            else _queued = true;
+        }
+
         /// <summary>Owner: punch (right, left, right...). The target is picked now; the fist lands on it in 1/10 s.</summary>
         public void Punch()
         {
@@ -238,6 +252,38 @@ namespace PleaseDontDrown.Combat
             }
             return bestDistance < float.MaxValue;
         }
+
+        /// <summary>
+        /// Host: no punching for <paramref name="seconds"/>: a fighter blocked our blow (the arm bounces off) or landed one
+        /// on us (rocked). Mashing the button into a raised guard, or straight back through a hit, gets you nowhere
+        /// (Story.StoryNpc.Combat).
+        /// </summary>
+        [Server]
+        public void ServerStun(float seconds, bool blocked = false) => StunTarget(Owner, seconds, blocked);
+
+        [TargetRpc]
+        private void StunTarget(NetworkConnection conn, float seconds, bool blocked)
+        {
+            _recoverUntil = Mathf.Max(_recoverUntil, Time.time + seconds);
+            _queued = false;
+            if (_hub.Look != null) _hub.Look.Shake(0.45f, Random.value < 0.5f ? -1f : 1f);
+            if (!blocked) return;
+            // A few blocked in a row: once, how to get through a guard.
+            _blockedInRow = Time.time - _lastBlocked < 4f ? _blockedInRow + 1 : 1;
+            _lastBlocked = Time.time;
+            if (_blockedInRow >= 3 && !_guardHintShown)
+            {
+                _guardHintShown = true;
+                PlayerHud.ShowToast("<b>Blocked!</b> Jabs bounce off a raised guard. Step back from their swing and hit them right after it, or throw a hook [RMB].", 6f);
+            }
+        }
+
+        private int _blockedInRow;
+        private float _lastBlocked = -10f;
+        private static bool _guardHintShown; // (once a session)
+
+        /// <summary>After a blocked blow, this long until the next punch; after being hit, <see cref="HitStun"/>.</summary>
+        public const float BlockedRecoil = 0.45f, HitStun = 0.4f;
 
         [ServerRpc]
         private void HitServer(NetworkObject target, Vector3 point, Vector3 dir, int damage, bool blade)

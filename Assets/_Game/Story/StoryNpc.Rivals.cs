@@ -189,11 +189,12 @@ namespace PleaseDontDrown.Story
             float distance = to.magnitude;
             Vector3 dir = distance > 0.01f ? to / distance : transform.forward;
             SetGunState(NpcGunState.Lowered, Vector3.zero); // up close: the gun is a club
+            _guardUp = distance < 3.5f && _fight != FightState.Recover; // squared up (down again after a swing)
 
             if (_gestureAt >= 0f && Time.time >= _gestureAt)
             {
                 _gestureAt = -1f;
-                GestureObservers(AvatarGesture.Punch, _rival.HeadPosition);
+                GestureObservers(AvatarGesture.Punch, FacePoint(_rival.transform, _rival.HeadPosition, _rival.transform.forward));
             }
             switch (_fight)
             {
@@ -204,7 +205,9 @@ namespace PleaseDontDrown.Story
                     return true;
                 case FightState.Recover:
                     Goal(p - dir * 0.6f, BackOffSpeed);
-                    if (Time.time >= _fightUntil) SetFight(FightState.Idle, 0f);
+                    if (Time.time < _fightUntil) return true;
+                    SetFight(FightState.Idle, 0f);
+                    _nextSwingAt = Time.time + GuardPause();
                     return true;
                 case FightState.Reload:
                     if (Time.time < _fightUntil) return true;
@@ -212,6 +215,13 @@ namespace PleaseDontDrown.Story
                     break;
             }
             float reach = w.Reach * (drunk ? 0.9f : 1f);
+            if (Time.time < _nextSwingAt)
+            {
+                // A moment in the guard between blows, at arm's length.
+                _fight = FightState.Close;
+                Goal(_rival.transform.position - dir * reach * 1.05f, StrafeSpeed);
+                return true;
+            }
             if (distance <= reach * 0.95f && Vector3.Angle(transform.forward, dir) < 35f)
             {
                 StartWindUp(w);

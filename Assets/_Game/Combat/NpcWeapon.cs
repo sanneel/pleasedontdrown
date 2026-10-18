@@ -48,7 +48,8 @@ namespace PleaseDontDrown.Combat
             },
             _ => new NpcWeapon
             {
-                Kind = NpcWeaponKind.Fists, MeleeDamage = 12, Reach = 1.35f, WindUp = 0.42f, Recover = 0.5f, Knock = 5f
+                // (The wind-up is the fist drawn back past the cheek: long enough to see and step out of.)
+                Kind = NpcWeaponKind.Fists, MeleeDamage = 15, Reach = 1.35f, WindUp = 0.5f, Recover = 0.5f, Knock = 5f
             }
         };
 
@@ -72,12 +73,15 @@ namespace PleaseDontDrown.Combat
         public FightStyle Style;
         public float Skill;     // aim, reaction, how often a combo follows
         public int Poise;       // damage taken within a moment that knocks them over
+        public float Guard;     // with the fists up, how often a blow from the front is blocked (a heavy one a third as often)
 
+        // (Poise: two jabs used to floor a pirate, so mashing the button kept them all on the ground. Now it takes a
+        // combo: jab, jab, hook is 25 + 25 + 50.)
         public static FighterProfile Pirate(NpcWeaponKind weapon, float skill = 0.5f) =>
-            new() { Weapon = NpcWeapon.Of(weapon), Style = FightStyle.Pirate, Skill = skill, Poise = 45 };
+            new() { Weapon = NpcWeapon.Of(weapon), Style = FightStyle.Pirate, Skill = skill, Poise = 90, Guard = 0.75f };
 
         public static FighterProfile Drunk() =>
-            new() { Weapon = NpcWeapon.Of(NpcWeaponKind.Fists), Style = FightStyle.Drunk, Skill = 0.15f, Poise = 30 };
+            new() { Weapon = NpcWeapon.Of(NpcWeaponKind.Fists), Style = FightStyle.Drunk, Skill = 0.15f, Poise = 55, Guard = 0.2f };
 
         public static FighterProfile Brawler(float skill = 0.7f)
         {
@@ -85,7 +89,7 @@ namespace PleaseDontDrown.Combat
             fists.MeleeDamage = 15;
             fists.WindUp = 0.36f;
             fists.Recover = 0.4f;
-            return new FighterProfile { Weapon = fists, Style = FightStyle.Brawler, Skill = skill, Poise = 70 };
+            return new FighterProfile { Weapon = fists, Style = FightStyle.Brawler, Skill = skill, Poise = 120, Guard = 0.85f };
         }
     }
 }
