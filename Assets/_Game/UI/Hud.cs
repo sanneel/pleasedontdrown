@@ -74,6 +74,7 @@ namespace PleaseDontDrown.UI
             _heavy = _bold = null;
             _hoverId = 0;
             _hoverFrame = -10;
+            _eased.Clear();
         }
 
         private static Font HudFont(bool heavy)
@@ -112,8 +113,10 @@ namespace PleaseDontDrown.UI
             if (!Painting || string.IsNullOrEmpty(text) || color.a <= 0.005f) return;
             Rect r = Px(sheet);
             // Text sits straight on the game (no dark boxes behind it): a dark outline keeps it readable on bright sand
-            // and sky. (`shadow` only makes it a little heavier now.)
-            float d = Mathf.Max(1f, size * (shadow ? 0.07f : 0.055f) * Scale);
+            // and sky. (`shadow` only makes it a little heavier now.) Dark letters, on a coral button or a key chip, get
+            // none: a black outline round black letters turned them into a blob.
+            bool dark = color.r * 0.3f + color.g * 0.59f + color.b * 0.11f < 0.35f;
+            float d = dark ? 0f : Mathf.Max(1f, size * (shadow ? 0.07f : 0.055f) * Scale);
             var outline = new Color(0.02f, 0.04f, 0.06f, 0.85f * color.a);
             if (Retained)
             {
@@ -123,8 +126,9 @@ namespace PleaseDontDrown.UI
             GUIStyle style = Style(size, anchor, heavy, wrap, richText);
             string plain = WithoutColorTags(text);
             style.normal.textColor = outline;
-            foreach (Vector2 o in Outline)
-                GUI.Label(new Rect(r.x + o.x * d, r.y + o.y * d, r.width, r.height), plain, style);
+            if (d > 0f)
+                foreach (Vector2 o in Outline)
+                    GUI.Label(new Rect(r.x + o.x * d, r.y + o.y * d, r.width, r.height), plain, style);
             style.normal.textColor = color;
             GUI.Label(r, text, style);
         }
@@ -395,8 +399,9 @@ namespace PleaseDontDrown.UI
         public static void Dim(float alpha = 0.66f) => Fill(new Rect(0f, 0f, Width, Height), new Color(Ink.r, Ink.g, Ink.b, alpha));
 
         /// <summary>
-        /// A wide dark button with heavy white lettering. Under the mouse it gets a white frame and nudges right
-        /// (hover and click sounds included); <paramref name="primary"/> is the coral one you'd press first,
+        /// A wide dark button with heavy white lettering. Under the mouse it eases into its hover look: a teal bar grows
+        /// up its left edge, the words slide right and turn sand (hover and click sounds included);
+        /// <paramref name="primary"/> is the coral one you'd press first (dark letters, no outline),
         /// <paramref name="small"/> the teal one for a row inside a panel.
         /// </summary>
         public static bool Button(Rect r, string label, bool centred = false, bool primary = false, bool selected = false, bool small = false)
@@ -405,25 +410,50 @@ namespace PleaseDontDrown.UI
             bool hover = enabled && Hovered(r);
             if (Event.current.type == EventType.Repaint)
             {
+                int id = System.HashCode.Combine(label, Mathf.RoundToInt(r.x), Mathf.RoundToInt(r.y));
+                float h = Ease(id, hover || selected && !small);
                 Rect box = r;
                 float radius = Mathf.Min(12f, r.height * 0.22f);
-                Color fill = primary ? new Color(Coral.r, Coral.g, Coral.b, hover ? 1f : 0.94f)
-                    : small ? new Color(0.055f, 0.29f, 0.31f, hover ? 1f : 0.96f)
-                    : new Color(0.06f, 0.18f, 0.22f, hover || selected ? 0.98f : 0.88f);
-                if (selected && !primary) fill = new Color(0.10f, 0.37f, 0.38f, 0.98f);
+                Color fill = primary ? Color.Lerp(new Color(Coral.r, Coral.g, Coral.b, 0.94f), new Color(1f, 0.5f, 0.4f, 1f), h)
+                    : small ? Color.Lerp(new Color(0.055f, 0.27f, 0.29f, 0.92f), new Color(0.08f, 0.36f, 0.38f, 1f), h)
+                    : Color.Lerp(new Color(0.04f, 0.13f, 0.17f, 0.82f), new Color(0.07f, 0.23f, 0.27f, 0.97f), h);
+                if (selected && !primary) fill = new Color(0.09f, 0.33f, 0.35f, 0.97f);
                 if (!enabled) fill = new Color(0.08f, 0.15f, 0.18f, 0.7f);
                 Fill(box, fill, radius);
-                Frame(box, hover || selected ? new Color(Teal.r, Teal.g, Teal.b, enabled ? 0.95f : 0.35f)
-                    : new Color(Paper.r, Paper.g, Paper.b, enabled ? 0.26f : 0.12f), hover || selected ? 2f : 1f, radius);
-                if (primary && enabled) Fill(new Rect(box.x + 18f, box.yMax - 5f, box.width - 36f, 2f), new Color(Sand.r, Sand.g, Sand.b, 0.55f), 1f);
-                Color text = !enabled ? new Color(1f, 1f, 1f, 0.45f) : primary ? Ink : hover ? Sand : Paper;
-                Rect words = new Rect(box.x + (centred || small ? 14f : 24f), box.y, box.width - (centred || small ? 28f : 48f), box.height);
+                float lit = primary ? 0f : selected ? 1f : h;
+                Frame(box, Color.Lerp(new Color(Paper.r, Paper.g, Paper.b, enabled ? 0.2f : 0.1f), new Color(Teal.r, Teal.g, Teal.b, 0.95f), lit),
+                    1f + lit, radius);
+                if (!primary && !small && h > 0.01f)
+                {
+                    // The bar up the left edge, growing from the middle.
+                    float bar = (box.height - 18f) * h;
+                    Fill(new Rect(box.x + 7f, box.center.y - bar * 0.5f, 4f, bar), new Color(Teal.r, Teal.g, Teal.b, h), 2f);
+                }
+                Color text = !enabled ? new Color(1f, 1f, 1f, 0.45f) : primary ? Ink : Color.Lerp(Paper, Sand, h);
+                float slide = primary || small ? 0f : 8f * h;
+                Rect words = new Rect(box.x + (centred || small ? 14f : 24f) + slide, box.y, box.width - (centred || small ? 28f : 48f), box.height);
                 FitLabel(words, label, small ? 21f : 27f, text, centred || small ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, heavy: true);
-                if (hover) HoverSound(System.HashCode.Combine(label, Mathf.RoundToInt(r.x), Mathf.RoundToInt(r.y)));
+                if (hover) HoverSound(id);
             }
             bool pressed = GUI.Button(Px(r), GUIContent.none, GUIStyle.none);
             if (pressed) Core.BeachAudio.PlayLocal(Core.BeachAudio.MenuSelect, 0.7f);
             return pressed;
+        }
+
+        private static readonly Dictionary<int, (float value, int frame)> _eased = new();
+
+        /// <summary>
+        /// 0..1 easing toward <paramref name="on"/> for the control <paramref name="id"/> (a hover, a highlight),
+        /// about a tenth of a second each way. Controls not drawn for a while start again from 0.
+        /// </summary>
+        public static float Ease(int id, bool on)
+        {
+            float v = _eased.TryGetValue(id, out var e) && Time.frameCount - e.frame < 30 ? e.value : 0f;
+            if (e.frame != Time.frameCount)
+                v = Mathf.MoveTowards(v, on ? 1f : 0f, Mathf.Min(0.1f, Time.unscaledDeltaTime) * 9f);
+            if (_eased.Count > 512) _eased.Clear();
+            _eased[id] = (v, Time.frameCount);
+            return Mathf.SmoothStep(0f, 1f, v);
         }
 
         /// <summary>A colour to pick: a rounded chip, framed in white when it's the chosen one.</summary>
@@ -545,9 +575,12 @@ namespace PleaseDontDrown.UI
         {
             switch (icon)
             {
-                case HudIcon.Food: // a drumstick: the meat top right, the bone down to the left
-                    return Disc(p, new Vector2(0.60f, 0.62f), 0.29f) || Capsule(p, new Vector2(0.44f, 0.46f), new Vector2(0.20f, 0.22f), 0.065f) ||
-                           Disc(p, new Vector2(0.13f, 0.25f), 0.09f) || Disc(p, new Vector2(0.23f, 0.14f), 0.09f);
+                case HudIcon.Food: // an apple: two round halves with a dip at the top, a stalk and a leaf (a drumstick
+                                   // inside the ring read as a magnifying glass)
+                    bool body = (Disc(p, new Vector2(0.37f, 0.45f), 0.27f) || Disc(p, new Vector2(0.63f, 0.45f), 0.27f) ||
+                                 Disc(p, new Vector2(0.5f, 0.3f), 0.22f)) && !Disc(p, new Vector2(0.5f, 0.84f), 0.13f);
+                    return body || Capsule(p, new Vector2(0.5f, 0.66f), new Vector2(0.55f, 0.88f), 0.035f) ||
+                           Capsule(p, new Vector2(0.6f, 0.8f), new Vector2(0.78f, 0.87f), 0.06f);
                 case HudIcon.Stamina:
                     return InPolygon(p, Bolt);
                 case HudIcon.Health: // a heart: two round tops and a point at the bottom

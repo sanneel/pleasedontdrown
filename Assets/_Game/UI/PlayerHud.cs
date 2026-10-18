@@ -48,10 +48,36 @@ namespace PleaseDontDrown.UI
             return numbers;
         }
 
-        // Drawn on the HUD canvas (no IMGUI): see HudCanvas.
-        private void OnEnable() => HudCanvas.Add(this, HudCanvas.OrderPlayer, DrawHud);
+        // Drawn on the HUD canvas (no IMGUI): see HudCanvas. (The arrival fade goes over everything, under the
+        // GameObject's name: one drawer per owner.)
+        private void OnEnable()
+        {
+            HudCanvas.Add(this, HudCanvas.OrderPlayer, DrawHud);
+            HudCanvas.Add(gameObject, HudCanvas.OrderFade, DrawArrival);
+        }
 
-        private void OnDisable() => HudCanvas.Remove(this);
+        private void OnDisable()
+        {
+            HudCanvas.Remove(this);
+            HudCanvas.Remove(gameObject);
+        }
+
+        private PlayerHub _arrived;
+        private float _arrivedAt = -10f;
+
+        /// <summary>Into the game from the menu (or back from a load): the view fades up from dark instead of cutting in.</summary>
+        private void DrawArrival()
+        {
+            PlayerHub local = PlayerHub.Local;
+            if (local != _arrived)
+            {
+                _arrived = local;
+                _arrivedAt = Time.unscaledTime;
+            }
+            if (local == null) return;
+            float a = 1f - Mathf.SmoothStep(0f, 1f, (Time.unscaledTime - _arrivedAt - 0.15f) / 0.9f);
+            if (a > 0.005f) Hud.Fill(new Rect(0f, 0f, Hud.Width, Hud.Height), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, a));
+        }
 
         /// <summary>Shows a short message to the local player only.</summary>
         public static void ShowToast(string text, float seconds = 4f)
@@ -97,18 +123,18 @@ namespace PleaseDontDrown.UI
                     if (primary != _primary)
                     {
                         _primary = primary;
-                        _primaryLine = $"{Key(GameInput.Interact)} {primary}";
+                        _primaryLine = GameInput.KeyLabel(GameInput.Interact);
                     }
-                    y += DrawPrompt(cx, y, _primaryLine);
+                    y += DrawKeyPrompt(cx, y, _primaryLine, primary);
                 }
                 if (!string.IsNullOrEmpty(secondary))
                 {
                     if (secondary != _secondary)
                     {
                         _secondary = secondary;
-                        _secondaryLine = $"{Key(local.Interactor.CurrentSecondaryAction)} {secondary}";
+                        _secondaryLine = GameInput.KeyLabel(local.Interactor.CurrentSecondaryAction);
                     }
-                    DrawPrompt(cx, y, _secondaryLine);
+                    DrawKeyPrompt(cx, y, _secondaryLine, secondary);
                 }
             }
 
@@ -138,6 +164,25 @@ namespace PleaseDontDrown.UI
                     new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, alpha), TextAnchor.UpperRight, wrap: true);
                 toastY += height + 10f;
             }
+        }
+
+        /// <summary>
+        /// A prompt under the crosshair: the key as a little keycap (light, dark letter) and what it does beside it,
+        /// the pair centred. Returns the height used.
+        /// </summary>
+        private static float DrawKeyPrompt(float center, float y, string key, string text)
+        {
+            const float size = 22f, capHeight = 32f, gap = 10f;
+            float capWidth = Mathf.Max(capHeight, Hud.TextWidth(key, 17f, heavy: true) + 16f);
+            float textWidth = Mathf.Min(640f, Hud.TextWidth(text, size));
+            float total = capWidth + gap + textWidth, x = center - total * 0.5f;
+            var cap = new Rect(x, y + 2f, capWidth, capHeight);
+            Hud.Fill(new Rect(cap.x, cap.y + 3f, cap.width, cap.height), new Color(0f, 0f, 0f, 0.45f), 7f); // (its edge, below)
+            Hud.Fill(cap, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.96f), 7f);
+            Hud.Label(cap, key, 17f, Hud.Ink, heavy: true, shadow: false);
+            float height = Mathf.Max(capHeight + 6f, Hud.TextHeight(text, textWidth, size) + 10f);
+            Hud.Label(new Rect(cap.xMax + gap, y + 4f, textWidth + 4f, height), text, size, Hud.Paper, TextAnchor.UpperLeft, wrap: true, shadow: false);
+            return height + 6f;
         }
 
         private static float DrawPrompt(float center, float y, string text)
@@ -174,8 +219,11 @@ namespace PleaseDontDrown.UI
                 float lift = active ? Hud.EaseOutBack(_lift[i]) : _lift[i] * _lift[i];
 
                 var r = new Rect(x0 + i * (size + gap), y0 - lift * Hud.SlotLift, size, size);
-                Hud.Fill(r, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, active ? 0.55f : 0.35f), 14f); // (see-through, not black blocks)
-                Hud.Frame(r, active ? Hud.Teal : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.34f), active ? 3f : 1.5f, 14f);
+                // Light glass, not dark blocks: an empty slot is little more than its thin frame; the one in your hands
+                // is lifted, framed in teal and a little darker so its picture stands out.
+                bool empty = item == null;
+                Hud.Fill(r, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, active ? 0.42f : empty ? 0.12f : 0.24f), 14f);
+                Hud.Frame(r, active ? Hud.Teal : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, empty ? 0.2f : 0.36f), active ? 3f : 1.5f, 14f);
                 if (active) Hud.Fill(new Rect(r.x + 18f, r.yMax - 5f, r.width - 36f, 3f), Hud.Teal, 1.5f);
 
                 if (item != null)
@@ -187,9 +235,10 @@ namespace PleaseDontDrown.UI
                     if (picture != null) Hud.Picture(inner, picture, active ? Color.white : new Color(1f, 1f, 1f, 0.8f));
                     else Hud.Label(new Rect(r.x + 6f, r.y + 24f, size - 12f, size - 30f), item.DisplayName, 15f, Color.white, TextAnchor.MiddleCenter, wrap: true);
                 }
+                // The slot's number in its corner: a teal chip on the one in your hands, plain outlined digits elsewhere.
                 var number = new Rect(r.x + 7f, r.y + 7f, 24f, 24f);
-                Hud.Fill(number, active ? Hud.Teal : new Color(0f, 0f, 0f, 0.5f), 5f);
-                Hud.Label(number, SlotNumbers[i], 15f, active ? Hud.Ink : Hud.Muted, heavy: true, shadow: false);
+                if (active) Hud.Fill(number, Hud.Teal, 5f);
+                Hud.Label(number, SlotNumbers[i], 15f, active ? Hud.Ink : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, empty ? 0.55f : 0.85f), heavy: true, shadow: false);
             }
         }
 

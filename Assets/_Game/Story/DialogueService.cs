@@ -72,7 +72,7 @@ namespace PleaseDontDrown.Story
             if (_history.Count > 30) _history.RemoveAt(0);
             if (npc != null)
             {
-                FloatingText.SpawnSpeech(npc, text, duration);
+                FloatingText.SpawnSpeech(npc, text, duration, subtitled: true);
                 npc.OnSpeak(duration, text);
             }
             else

@@ -7,13 +7,16 @@ namespace PleaseDontDrown.UI
 {
     /// <summary>
     /// "Customize your lifeguard": body, skin, hair, clothes, hat, glasses and extras, with a live 3D preview that
-    /// you can spin by dragging. The look is saved locally and worn in every session (synced by PlayerHub).
-    /// Drawn with <see cref="Hud"/> on its 1080-high sheet, like the other menus.
+    /// you can spin by dragging (on a sand disc in a deep-sea studio, his shadow under him). The options come in
+    /// groups (shape, colours, things to wear). The look is saved locally and worn in every session (synced by
+    /// PlayerHub). Drawn with <see cref="Hud"/> on its 1080-high sheet, like the other menus.
     /// </summary>
     [DefaultExecutionOrder(210)] // frame the preview after funny head scaling and avatar animation
     public class AvatarCustomizer : MonoBehaviour
     {
         private const string PrefsKey = "pdd.avatar.look";
+        // The preview's studio: deep sea blue behind, a sand disc to stand on.
+        private static readonly Color StudioColor = new(0.07f, 0.2f, 0.27f), FloorColor = new(0.93f, 0.82f, 0.6f);
         private const string GoofyKey = "pdd.avatar.goofy"; // set once a saved classic look has been moved onto the goofy body
         private static readonly Vector3 StagePosition = new(0f, -300f, 0f);
 
@@ -145,13 +148,29 @@ namespace PleaseDontDrown.UI
             _animator.Rig = _rig;
             _animator.Motion = new AvatarMotion { FacingYaw = 0f, Grounded = true };
 
+            // The disc he stands on (it takes his shadow: the sun lights the stage too).
+            var floor = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            floor.name = "PreviewFloor";
+            Destroy(floor.GetComponent<Collider>());
+            floor.transform.SetParent(_stage.transform, false);
+            floor.transform.localPosition = new Vector3(0f, -0.02f, 0f);
+            floor.transform.localScale = new Vector3(1.5f, 0.02f, 1.5f);
+            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (lit != null)
+            {
+                var sand = new Material(lit) { name = "PreviewFloor" };
+                sand.SetColor("_BaseColor", FloorColor);
+                sand.SetFloat("_Smoothness", 0.15f);
+                floor.GetComponent<MeshRenderer>().sharedMaterial = sand;
+            }
+
             _texture = new RenderTexture(800, 1040, 24) { name = "AvatarPreview", antiAliasing = 4 }; // sharp at 4K too
             var camGo = new GameObject("PreviewCamera");
             camGo.transform.SetParent(_stage.transform, false);
             _camera = camGo.AddComponent<Camera>();
             _camera.targetTexture = _texture;
             _camera.clearFlags = CameraClearFlags.SolidColor;
-            _camera.backgroundColor = new Color(0.55f, 0.8f, 0.95f);
+            _camera.backgroundColor = StudioColor;
             _camera.fieldOfView = 30f;
             _camera.nearClipPlane = 0.1f;
             _camera.farClipPlane = 12f;
@@ -187,24 +206,27 @@ namespace PleaseDontDrown.UI
         // ------------------------------------------------------------------ panel
 
         private const float PanelWidth = 1300f, PanelHeight = 880f;
-        private const float RowHeight = 37f, LabelWidth = 196f, ChipSize = 28f, ChipGap = 5f;
+        private const float RowHeight = 38f, LabelWidth = 196f, ChipSize = 28f, ChipGap = 5f;
 
         private void OnGUI()
         {
             if (!_open) return;
-            Hud.Dim();
+            DevConnectMenu.DrawMenuBackdrop(); // (from the main menu: the island picture behind it)
+            Hud.Dim(0.6f);
             // On a narrow window the whole panel shrinks to fit rather than running off the side.
             float fit = Mathf.Min(1f, (Hud.Width - 40f) / PanelWidth);
             Matrix4x4 before = GUI.matrix;
             if (fit < 1f) GUIUtility.ScaleAroundPivot(new Vector2(fit, fit), new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
             var panel = new Rect((Hud.Width - PanelWidth) * 0.5f, (Hud.Height - PanelHeight) * 0.5f, PanelWidth, PanelHeight);
             Hud.Panel(panel, 0.92f);
-            Hud.Label(new Rect(panel.x + 36f, panel.y + 18f, 900f, 56f), "YOUR LIFEGUARD", 44f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Label(new Rect(panel.x + 36f, panel.y + 14f, 900f, 56f), "YOUR LIFEGUARD", 44f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Label(new Rect(panel.x + 38f, panel.y + 62f, 900f, 26f), "Everyone in your game sees you like this.", 19f, Hud.Muted, TextAnchor.MiddleLeft, shadow: false);
 
-            // Preview (drag to spin).
-            var preview = new Rect(panel.x + 36f, panel.y + 96f, 470f, 611f);
-            Hud.Fill(preview, new Color(0.55f, 0.8f, 0.95f), 16f);
+            // Preview (drag to spin): the studio picture, framed.
+            var preview = new Rect(panel.x + 36f, panel.y + 100f, 470f, 611f);
+            Hud.Fill(preview, StudioColor, 16f);
             if (_texture != null) Hud.Picture(preview, _texture, Color.white);
+            Hud.Frame(preview, new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, 0.35f), 2f, 16f);
             Hud.Label(new Rect(preview.x, preview.yMax + 6f, preview.width, 28f), "Drag to turn", 18f, new Color(1f, 1f, 1f, 0.6f), shadow: false);
             Event e = Event.current;
             if (e.type == EventType.MouseDrag && Hud.Hovered(preview))
@@ -216,7 +238,7 @@ namespace PleaseDontDrown.UI
             AvatarLook look = LocalLook;
             bool changed = false;
             bool presetApplied = false;
-            float x = panel.x + 540f, y = panel.y + 92f;
+            float x = panel.x + 540f, y = panel.y + 96f;
             // Always the goofy lifeguard: the code-built "Classic" body is gone (the team, 2026-10-12).
             if (!look.IsGoofy)
             {
@@ -235,6 +257,7 @@ namespace PleaseDontDrown.UI
                     changed = presetApplied = true;
                 }
                 // The goofy lifeguard: shape and face first (that's the fun), then colours and things to wear.
+                Group(x, ref y, "SHAPE");
                 if (Arrows(x, ref y, "HEAD", AvatarLook.HeadSizeName(look.HeadSize)) != 0)
                 {
                     look.HeadSize = look.HeadSize == AvatarLook.SmallHead ? (byte)0 : AvatarLook.SmallHead;
@@ -244,10 +267,12 @@ namespace PleaseDontDrown.UI
                 changed |= Row(x, ref y, "NOSE", AvatarLook.NoseNames[look.Nose & 3], ref look.Nose, 4);
                 changed |= Row(x, ref y, "EYES", AvatarLook.EyeNames[look.Eyes & 3], ref look.Eyes, 4);
                 changed |= Row(x, ref y, "TEETH", AvatarLook.TeethNames[look.Teeth & 3], ref look.Teeth, 4);
+                Group(x, ref y, "COLOURS");
                 changed |= ColorRow(x, ref y, "SKIN", ref look.Skin, AvatarLook.SkinTones);
-                changed |= ColorRow(x, ref y, "HAIR COLOUR", ref look.HairColor, AvatarLook.HairColors);
-                changed |= ColorRow(x, ref y, "TOP COLOUR", ref look.TopColor, AvatarLook.ClothColors);
-                changed |= ColorRow(x, ref y, "SHORTS COLOUR", ref look.BottomColor, AvatarLook.ClothColors);
+                changed |= ColorRow(x, ref y, "HAIR", ref look.HairColor, AvatarLook.HairColors);
+                changed |= ColorRow(x, ref y, "TOP", ref look.TopColor, AvatarLook.ClothColors);
+                changed |= ColorRow(x, ref y, "SHORTS", ref look.BottomColor, AvatarLook.ClothColors);
+                Group(x, ref y, "THINGS TO WEAR");
                 changed |= HatRow(x, ref y, ref look.Hat);
                 changed |= ColorRow(x, ref y, "HAT COLOUR", ref look.HatColor, AvatarLook.ClothColors);
                 changed |= EnumRow(x, ref y, "GLASSES", ref look.Glasses);
@@ -296,6 +321,16 @@ namespace PleaseDontDrown.UI
 
             if (changed) { if (!presetApplied) _preset = -1; Set(look); }
             if (done) SetOpen(false);
+        }
+
+        /// <summary>A small heading over a group of rows, with a thin line out to the right.</summary>
+        private static void Group(float x, ref float y, string title)
+        {
+            y += 6f;
+            Hud.Label(new Rect(x, y, 300f, 22f), title, 15f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, 0.9f), TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            float w = Hud.TextWidth(title, 15f, heavy: true);
+            Hud.Fill(new Rect(x + w + 12f, y + 10f, 700f - w - 12f, 1.5f), new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, 0.25f));
+            y += 24f;
         }
 
         private static bool Row(float x, ref float y, string label, string value, ref byte field, int count)

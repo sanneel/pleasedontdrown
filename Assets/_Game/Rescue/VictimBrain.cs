@@ -586,12 +586,12 @@ namespace PleaseDontDrown.Rescue
         public string GetSecondaryPrompt(PlayerHub player)
         {
             if (_flatline.Value) return $"<color=#ff7060>No pulse!</color> Use the defibrillator on {Name}";
-            string progress = $"{_cpr.Value * 100f:F0}%";
+            // Just the step: the CPR panel on the right (UI.RescueHud) counts them and shows how far along it is.
             return _cprStep.Value switch
             {
-                CprStep.Breath => $"Mouth-to-mouth ({_cprCount.Value + 1}/{_breathsPerSet})  {progress}",
-                CprStep.Punch => $"Slap {Name} awake!  {progress}",
-                _ => $"Chest compressions ({_cprCount.Value + 1}/{_compressionsPerSet})  {progress}"
+                CprStep.Breath => "Mouth-to-mouth",
+                CprStep.Punch => $"Slap {Name} awake!",
+                _ => "Chest compressions"
             };
         }
 

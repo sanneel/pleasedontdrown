@@ -148,12 +148,12 @@ namespace PleaseDontDrown.UI
             string text = $"{v.Name}  ·  {distance:F0} m";
             // Label and bar above the dot (clear of the tourist), or below it when pinned to the top edge.
             bool below = y < 100f;
-            float infoHeight = Hud.TextHeight(info, 280f, 16f);
-            float labelHeight = 38f + infoHeight;
+            float infoHeight = Hud.TextHeight(info, 280f, 17f, heavy: true);
+            float labelHeight = 40f + infoHeight;
             var rect = new Rect(Mathf.Clamp(x - 156f, 12f, Hud.Width - 324f), below ? y + 18f : y - labelHeight - 30f, 312f, labelHeight);
             Hud.Surface(rect, 0.8f, color);
-            Hud.FitLabel(new Rect(rect.x + 16f, rect.y + 8f, 280f, 23f), text, 19f, Hud.Paper, TextAnchor.MiddleCenter, heavy: true);
-            Hud.Label(new Rect(rect.x + 16f, rect.y + 32f, 280f, infoHeight), info, 16f, color, TextAnchor.UpperCenter, wrap: true, shadow: false);
+            Hud.FitLabel(new Rect(rect.x + 16f, rect.y + 6f, 280f, 27f), text, 21f, Hud.Paper, TextAnchor.MiddleCenter, heavy: true);
+            Hud.Label(new Rect(rect.x + 16f, rect.y + 34f, 280f, infoHeight), info, 17f, color, TextAnchor.UpperCenter, heavy: true, wrap: true, shadow: false);
 
             // Air (awake) or CPR progress (unconscious on land).
             float bar = state == VictimState.Unconscious ? v.Cpr01 : v.Air01;

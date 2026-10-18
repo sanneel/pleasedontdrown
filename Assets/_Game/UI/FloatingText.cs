@@ -5,9 +5,18 @@ using UnityEngine;
 
 namespace PleaseDontDrown.UI
 {
-    /// <summary>World-space popups and speaker-following dialogue bubbles.</summary>
+    /// <summary>
+    /// World-space popups and speaker-following dialogue bubbles. A bubble keeps a readable size on screen whatever the
+    /// distance (it used to be world-sized: right next to you it covered half the screen, cut off at the edges, over the
+    /// objective). A line that is also a subtitle fades out when the speaker is right next to you: the subtitle carries it.
+    /// </summary>
     public class FloatingText : MonoBehaviour
     {
+        // A bubble's height on screen, a share of the screen's height: never bigger, never smaller.
+        private const float MaxScreenShare = 0.1f, MinScreenShare = 0.04f;
+        // A subtitled line's bubble fades out from this far in (metres from the camera).
+        private const float SubtitledFadeFrom = 4.6f, SubtitledGoneAt = 3.1f;
+
         private TextMesh _text;
         private SpriteRenderer _bubble;
         private SpriteRenderer _tail;
@@ -15,7 +24,12 @@ namespace PleaseDontDrown.UI
         private float _bubbleHeight;
         private Color _color;
         private float _age, _lifetime, _rise;
+        private bool _subtitled;
         private static readonly Dictionary<int, FloatingText> ActiveSpeech = new();
+
+        /// <summary>This character has a bubble up now (their name tag stays down meanwhile).</summary>
+        public static bool IsSpeaking(StoryNpc speaker) =>
+            speaker != null && ActiveSpeech.TryGetValue(speaker.GetInstanceID(), out FloatingText ft) && ft != null;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetSpeech() => ActiveSpeech.Clear();
@@ -35,19 +49,23 @@ namespace PleaseDontDrown.UI
             ft._rise = 0.9f;
         }
 
-        /// <summary>A readable bubble that remains over this speaker for its full line.</summary>
-        public static void SpawnSpeech(StoryNpc speaker, string text, float lifetime, float scale = 1f)
+        /// <summary>
+        /// A readable bubble that remains over this speaker for its full line. <paramref name="subtitled"/>: the line is
+        /// also shown as a subtitle (story dialogue), so the bubble steps aside when the speaker is right next to you.
+        /// </summary>
+        public static void SpawnSpeech(StoryNpc speaker, string text, float lifetime, float scale = 1f, bool subtitled = false)
         {
             if (speaker == null) return;
             int id = speaker.GetInstanceID();
             if (ActiveSpeech.TryGetValue(id, out FloatingText previous) && previous != null)
                 Destroy(previous.gameObject);
-            SpawnBubble(speaker.HeadPosition, speaker, text, scale, lifetime);
+            FloatingText ft = SpawnBubble(speaker.HeadPosition, speaker, text, scale, lifetime);
+            if (ft != null) ft._subtitled = subtitled;
         }
 
-        private static void SpawnBubble(Vector3 position, StoryNpc speaker, string text, float scale, float lifetime)
+        private static FloatingText SpawnBubble(Vector3 position, StoryNpc speaker, string text, float scale, float lifetime)
         {
-            if (string.IsNullOrWhiteSpace(text)) return;
+            if (string.IsNullOrWhiteSpace(text)) return null;
             var go = new GameObject("SpeechBubble");
             go.transform.position = position;
             string wrapped = Wrap(text, 30);
@@ -89,6 +107,7 @@ namespace PleaseDontDrown.UI
                 ActiveSpeech[speaker.GetInstanceID()] = ft;
                 go.transform.position = speaker.HeadPosition + Vector3.up * (height * 0.5f + 0.28f);
             }
+            return ft;
         }
 
         private static TextMesh AddText(GameObject go, string text, Color color, float characterSize)
@@ -170,13 +189,31 @@ namespace PleaseDontDrown.UI
             if (_speaker != null) transform.position = _speaker.HeadPosition + Vector3.up * (_bubbleHeight * 0.5f + 0.28f);
             else transform.position += Vector3.up * (_rise * (1f - t) * Time.deltaTime);
             float pop = t < 0.12f ? Mathf.SmoothStep(0.4f, 1.08f, t / 0.12f) : Mathf.Lerp(1.08f, 1f, Mathf.Clamp01((t - 0.12f) / 0.2f));
-            transform.localScale = Vector3.one * pop;
             float fade = Mathf.Clamp01((1f - t) * 4f);
+            float fit = 1f;
+            Camera cam = Camera.main;
+            if (cam != null)
+            {
+                transform.rotation = cam.transform.rotation;
+                if (_bubble != null)
+                {
+                    // Keep the bubble a readable size on screen (between a twenty-fifth and a tenth of its height).
+                    float distance = Mathf.Max(0.3f, Vector3.Dot(transform.position - cam.transform.position, cam.transform.forward));
+                    float share = _bubbleHeight / (2f * distance * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad));
+                    fit = Mathf.Clamp(share, MinScreenShare, MaxScreenShare) / Mathf.Max(1e-4f, share);
+                    if (_subtitled) fade *= Mathf.Clamp01((distance - SubtitledGoneAt) / (SubtitledFadeFrom - SubtitledGoneAt));
+                    // Not under the HUD: it fades toward the screen's edges, and over the objective in the top left.
+                    Vector3 v = cam.WorldToViewportPoint(transform.position);
+                    float edge = Mathf.Min(v.x, 1f - v.x, (1f - v.y) * 1.4f, v.y);
+                    fade *= Mathf.Clamp01((edge - 0.04f) / 0.08f);
+                    if (v.x < 0.34f && v.y > 0.72f) fade *= Mathf.Clamp01(Mathf.Max((v.x - 0.26f) / 0.08f, (0.8f - v.y) / 0.08f));
+                }
+            }
+            transform.localScale = Vector3.one * (pop * fit);
+            if (_speaker != null) transform.position = _speaker.HeadPosition + Vector3.up * (_bubbleHeight * 0.5f * fit + 0.28f);
             _text.color = new Color(_color.r, _color.g, _color.b, _color.a * fade);
             if (_bubble != null) _bubble.color = new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.97f * fade);
             if (_tail != null) _tail.color = new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.97f * fade);
-            Camera cam = Camera.main;
-            if (cam != null) transform.rotation = cam.transform.rotation;
         }
 
         private void OnDestroy()

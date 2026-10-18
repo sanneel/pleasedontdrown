@@ -658,7 +658,8 @@ namespace PleaseDontDrown.Story
             if (_nameTag == null) return;
             PlayerHub local = PlayerHub.Local;
             Camera cam = Camera.main;
-            bool show = local != null && cam != null && (local.transform.position - transform.position).sqrMagnitude < 9f * 9f && !string.IsNullOrEmpty(_name.Value);
+            bool show = local != null && cam != null && (local.transform.position - transform.position).sqrMagnitude < 9f * 9f && !string.IsNullOrEmpty(_name.Value) &&
+                        !FloatingText.IsSpeaking(this); // (the name sat on top of the bubble's words)
             if (_nameTag.gameObject.activeSelf != show) _nameTag.gameObject.SetActive(show);
             if (!show) return;
             Vector3 at = HeadPosition + Vector3.up * 0.45f;

@@ -138,7 +138,7 @@ namespace PleaseDontDrown.UI
             Rect card = BossCard(StoryDirector.BossBarTitle, status, _missionBarShown, hurry ? Hud.Danger : Hud.Coral);
             if (total > 0f)
             {
-                var ring = new Rect(card.xMax - 166f, card.y + 12f, 20f, 20f);
+                var ring = new Rect(card.xMax - 20f - Hud.TextWidth(status, 16f, heavy: true) - 28f, card.y + 73f, 20f, 20f); // (left of the time)
                 Hud.Arc(ring, 0f, 1f, 0.12f, new Color(1f, 1f, 1f, 0.15f));
                 Hud.Arc(ring, 0f, Mathf.Clamp01(left / total), 0.12f, hurry ? Hud.Danger : Hud.Sand);
             }
@@ -146,13 +146,12 @@ namespace PleaseDontDrown.UI
 
         private static Rect BossCard(string title, string status, float fraction, Color accent)
         {
-            const float width = 620f;
-            var card = new Rect((Hud.Width - width) * 0.5f, Hud.BossTop, width, 104f);
-            Hud.Surface(card, 0.92f, accent);
-            Hud.Label(new Rect(card.x + 22f, card.y + 12f, 230f, 22f), "BOSS ENCOUNTER", 15f, Hud.Muted, TextAnchor.MiddleLeft, shadow: false);
-            Hud.Label(new Rect(card.xMax - 142f, card.y + 12f, 120f, 22f), status, 16f, accent, TextAnchor.MiddleRight, heavy: true, shadow: false);
-            Hud.FitLabel(new Rect(card.x + 22f, card.y + 35f, width - 44f, 34f), title.ToUpperInvariant(), 27f, Hud.Paper, heavy: true);
-            Hud.Bar(new Rect(card.x + 22f, card.y + 79f, width - 44f, 12f), fraction, accent);
+            // The boss's name big over a thick bar, its phase small at the bar's right end (no box: outlined words).
+            const float width = 640f;
+            var card = new Rect((Hud.Width - width) * 0.5f, Hud.BossTop, width, 96f);
+            Hud.FitLabel(new Rect(card.x, card.y + 4f, width, 44f), title.ToUpperInvariant(), 36f, Hud.Paper, TextAnchor.MiddleCenter, heavy: true);
+            Hud.Bar(new Rect(card.x + 20f, card.y + 52f, width - 40f, 18f), fraction, accent);
+            Hud.Label(new Rect(card.x + 20f, card.y + 72f, width - 40f, 22f), status, 16f, accent, TextAnchor.MiddleRight, heavy: true, shadow: false);
             return card;
         }
     }

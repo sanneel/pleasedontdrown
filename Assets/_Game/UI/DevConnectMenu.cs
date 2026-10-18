@@ -113,41 +113,114 @@ namespace PleaseDontDrown.UI
 
         // ------------------------------------------------------------------ start screen
 
+        private float _startShownAt = -1f;
+        private int _startFrame = -10;
+        private const int PageDimId = 0x5ade0001, PauseDimId = 0x5ade0002; // (Hud.Ease ids)
+        private static Texture2D _backdrop;
+
+        /// <summary>
+        /// The menus' picture of island 1's village (Resources/UI/MenuBackdrop, filmed in the game: the island itself
+        /// only exists once a session runs, so the menu camera saw empty sea). It covers the screen and drifts slowly
+        /// in and across. Out of a session only (the character screen draws it too).
+        /// </summary>
+        public static void DrawMenuBackdrop()
+        {
+            if (Event.current.type != EventType.Repaint || _instance == null || _instance._connection.IsActive) return;
+            if (_backdrop == null) _backdrop = Resources.Load<Texture2D>("UI/MenuBackdrop");
+            if (_backdrop == null) return;
+            float t = Time.unscaledTime;
+            float zoom = 1.06f + 0.03f * Mathf.Sin(t * 0.045f);
+            float screenAspect = Screen.width / (float)Mathf.Max(1, Screen.height), pictureAspect = _backdrop.width / (float)_backdrop.height;
+            float w = 1f, h = 1f;
+            if (screenAspect > pictureAspect) h = pictureAspect / screenAspect;
+            else w = screenAspect / pictureAspect;
+            w /= zoom;
+            h /= zoom;
+            float x = (1f - w) * (0.5f + 0.45f * Mathf.Sin(t * 0.031f)), y = (1f - h) * (0.5f + 0.35f * Mathf.Cos(t * 0.023f));
+            GUI.DrawTextureWithTexCoords(new Rect(0f, 0f, Screen.width, Screen.height), _backdrop, new Rect(x, y, w, h));
+        }
+
+        /// <summary>
+        /// The start screen over the island 1 shot (SceneCameras): the title top left with a lifebuoy bobbing beside
+        /// DROWN, the buttons bottom left. Everything slides in the first moment the screen shows.
+        /// </summary>
         private void DrawStartMenu()
         {
             float width = Hud.Width, height = Hud.Height;
-            // The island stays in view: only the left, where the words are, is shaded.
+            if (Time.frameCount - _startFrame > 2) _startShownAt = Time.unscaledTime;
+            _startFrame = Time.frameCount;
+            float since = Time.unscaledTime - _startShownAt;
+            float In(float delay, float length = 0.45f) => Mathf.SmoothStep(0f, 1f, (since - delay) / length);
+
+            // The island stays in view: only the left, where the words are, is shaded; with a page open beside the
+            // buttons (options, keys, join) the whole picture dims so the page reads cleanly.
+            DrawMenuBackdrop();
             if (Event.current.type == EventType.Repaint)
-                GUI.DrawTexture(Hud.Px(new Rect(0f, 0f, Mathf.Min(width, 1250f), height)), Fade(), ScaleMode.StretchToFill, true, 0f, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.82f), 0f, 0f);
+                GUI.DrawTexture(Hud.Px(new Rect(0f, 0f, Mathf.Min(width, 1150f), height)), Fade(), ScaleMode.StretchToFill, true, 0f, new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.78f), 0f, 0f);
+            float paged = Hud.Ease(PageDimId, _page != Page.Main);
+            if (paged > 0.01f) Hud.Fill(new Rect(0f, 0f, width, height), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.55f * paged));
 
-            Hud.Label(new Rect(56f, 30f, 900f, 150f), "PLEASE", 136f, Color.white, TextAnchor.MiddleLeft, heavy: true);
-            Hud.Label(new Rect(56f, 156f, 900f, 150f), "DON'T", 136f, Color.white, TextAnchor.MiddleLeft, heavy: true);
-            Hud.Label(new Rect(56f, 282f, 900f, 150f), "DROWN", 136f, Hud.Coral, TextAnchor.MiddleLeft, heavy: true);
-            Hud.Label(new Rect(62f, 436f, 640f, 70f), "Rescue tourists. Return lost items.\nFind out what is happening on the beach.", 24f, Hud.Sand, TextAnchor.UpperLeft);
+            // The title: PLEASE DON'T over a big coral DROWN, a lifebuoy bobbing on the water beside it.
+            float title = In(0.05f, 0.6f), slide = (1f - title) * -60f;
+            Hud.Label(new Rect(58f + slide, 46f, 900f, 100f), "PLEASE DON'T", 92f, new Color(1f, 1f, 1f, title), TextAnchor.MiddleLeft, heavy: true);
+            Hud.Label(new Rect(52f + slide, 128f, 900f, 190f), "DROWN", 176f, new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, title), TextAnchor.MiddleLeft, heavy: true);
+            float drownWidth = Hud.TextWidth("DROWN", 176f, heavy: true);
+            float bob = Mathf.Sin(Time.unscaledTime * 1.6f);
+            Lifebuoy(new Rect(52f + slide + drownWidth + 26f, 150f + bob * 6f, 132f, 132f), bob * 0.025f, In(0.35f, 0.5f));
+            Hud.Label(new Rect(62f + slide, 318f, 700f, 70f), "A co-op lifeguard game. Save the tourists, find what they lose,\nand find out what's really going on at the beach.",
+                24f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, title), TextAnchor.UpperLeft);
 
-            // Buttons, stacked up from the bottom left.
-            const int count = 6;
-            float x = 40f, y = height - 40f - count * ButtonHeight - (count - 1) * ButtonGap;
+            // Buttons, stacked up from the bottom left, sliding in one after another.
+            const int count = 5;
+            float x = 48f, y = height - 52f - count * ButtonHeight - (count - 1) * ButtonGap;
             if (!string.IsNullOrEmpty(_connection.LastError))
                 Hud.Label(new Rect(x, y - 74f, 900f, 60f), _connection.LastError, 22f, Hud.Coral, TextAnchor.LowerLeft, wrap: true);
 
-            if (Hud.Button(Row(x, ref y), "PLAY", primary: true)) _connection.Play();
-            if (Hud.Button(Row(x, ref y), "JOIN GAME", selected: _page == Page.Join)) _page = _page == Page.Join ? Page.Main : Page.Join;
-            if (Hud.Button(Row(x, ref y), "CHARACTER")) AvatarCustomizer.Open();
             bool options = _page is Page.Options or Page.Controls;
-            if (Hud.Button(Row(x, ref y), "OPTIONS", selected: options)) _page = options ? Page.Main : Page.Options;
-            if (Hud.Button(Row(x, ref y), GameDisplay.IsFullscreen ? "WINDOWED" : "FULLSCREEN")) GameDisplay.Toggle();
-            if (Hud.Button(Row(x, ref y), "QUIT")) Application.Quit();
+            Rect Next(int i)
+            {
+                Rect r = Row(x, ref y);
+                r.x -= (1f - In(0.2f + i * 0.06f, 0.35f)) * (ButtonWidth + 60f);
+                return r;
+            }
+            if (Hud.Button(Next(0), "PLAY", primary: true)) _connection.Play();
+            if (Hud.Button(Next(1), "JOIN GAME", selected: _page == Page.Join)) _page = _page == Page.Join ? Page.Main : Page.Join;
+            if (Hud.Button(Next(2), "CHARACTER")) AvatarCustomizer.Open();
+            if (Hud.Button(Next(3), "OPTIONS", selected: options)) _page = options ? Page.Main : Page.Options;
+            if (Hud.Button(Next(4), "QUIT")) Application.Quit();
 
-            if (_page == Page.Join) DrawJoinPanel(x + ButtonWidth + 30f, height - 40f);
-            else if (_page == Page.Options) DrawOptionsPanel(new Rect(x + ButtonWidth + 30f, height - 40f - OptionsHeight, OptionsWidth, OptionsHeight));
-            else if (_page == Page.Controls) DrawControlsPanel(new Rect(x + ButtonWidth + 30f, height - 40f - ControlsHeight, ControlsWidth, ControlsHeight));
+            if (_page == Page.Join) DrawJoinPanel(x + ButtonWidth + 30f, height - 52f);
+            else if (_page == Page.Options) DrawOptionsPanel(new Rect(x + ButtonWidth + 30f, height - 52f - OptionsHeight, OptionsWidth, OptionsHeight));
+            else if (_page == Page.Controls) DrawControlsPanel(new Rect(x + ButtonWidth + 30f, height - 52f - ControlsHeight, ControlsWidth, ControlsHeight));
 
-            string steam = SteamBootstrap.IsReady
-                ? "Steam: " + SteamBootstrap.LocalName + "   Your Steam friends can join you."
-                : "Steam isn't running: offline only. Start Steam to play with friends.";
-            Hud.Label(new Rect(width - 915f, 14f, 900f, 30f), steam, 20f, new Color(1f, 1f, 1f, 0.85f), TextAnchor.UpperRight);
-            Hud.Label(new Rect(width - 615f, height - 40f, 600f, 30f), NetVersion.Current, 18f, new Color(1f, 1f, 1f, 0.6f), TextAnchor.LowerRight);
+            // Top right: whether friends can join (a green dot with Steam, grey without); the build, small, above it.
+            float status = In(0.5f, 0.6f);
+            bool steamUp = SteamBootstrap.IsReady;
+            string steam = steamUp ? SteamBootstrap.LocalName + "  ·  friends can join you" : "Steam isn't running: offline only";
+            float steamWidth = Hud.TextWidth(steam, 19f);
+            Hud.Fill(new Rect(width - 34f - steamWidth - 20f, 25f, 10f, 10f), steamUp ? new Color(0.35f, 0.9f, 0.5f, status) : new Color(1f, 1f, 1f, 0.45f * status), 5f);
+            Hud.Label(new Rect(width - 934f, 14f, 900f, 30f), steam, 19f, new Color(1f, 1f, 1f, 0.85f * status), TextAnchor.MiddleRight);
+            Hud.Label(new Rect(width - 934f, 42f, 900f, 24f), "v" + NetVersion.Current, 15f, new Color(1f, 1f, 1f, 0.45f * status), TextAnchor.MiddleRight, shadow: false);
+        }
+
+        /// <summary>A red and white lifebuoy (eight bands round a thick ring), turned <paramref name="turn"/> of the way round.</summary>
+        private static void Lifebuoy(Rect r, float turn, float alpha)
+        {
+            if (alpha <= 0.01f) return;
+            const float thick = 0.27f;
+            Hud.Arc(new Rect(r.x + 3f, r.y + 5f, r.width, r.height), 0f, 1f, thick + 0.02f, new Color(0f, 0f, 0f, 0.35f * alpha)); // (its shadow)
+            for (int i = 0; i < 8; i++)
+            {
+                float from = Mathf.Repeat(turn + i / 8f, 1f), to = from + 1f / 8f;
+                Color band = i % 2 == 0 ? new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, alpha) : new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, alpha);
+                if (to <= 1f) Hud.Arc(r, from, to, thick, band);
+                else
+                {
+                    Hud.Arc(r, from, 1f, thick, band);
+                    Hud.Arc(r, 0f, to - 1f, thick, band);
+                }
+            }
+            Hud.Arc(r, 0f, 1f, 0.025f, new Color(0f, 0f, 0f, 0.25f * alpha));
         }
 
         /// <summary>Friends with a session to join, and a box for a local / LAN address, beside the buttons.</summary>
@@ -203,7 +276,7 @@ namespace PleaseDontDrown.UI
         private void DrawPauseMenu()
         {
             float width = Hud.Width, height = Hud.Height;
-            Hud.Fill(new Rect(0f, 0f, width, height), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.66f));
+            Hud.Fill(new Rect(0f, 0f, width, height), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.66f * Hud.Ease(PauseDimId, true))); // (fades in)
             var nm = _connection.NetworkManager;
             bool host = nm.IsServerStarted;
             float x = (width - ButtonWidth) * 0.5f;
@@ -257,43 +330,68 @@ namespace PleaseDontDrown.UI
                 }
             }
 
-            bool travel = Dev.DevIsland.Instance != null;
-            bool story = host && Story.StoryDirector.Instance != null;
             int players = host ? nm.ServerManager.Clients.Count : nm.ClientManager.Clients.Count;
-            string info = (host ? "Host" : "Client") + "   " + _connection.Mode + "   " + players + (players == 1 ? " player" : " players");
+            string info = (host ? "Hosting" : "Joined") + "  ·  " + _connection.Mode.ToString().ToLowerInvariant() + "  ·  " + players + (players == 1 ? " player" : " players");
             if (!SteamLobbyService.InLobby && SteamBootstrap.IsReady)
                 info += "\nOffline session: friends can't join it. Leave and press PLAY to host through Steam.";
-            int rows = 8 + (SteamLobbyService.InLobby ? 1 : 0) + (travel ? 1 : 0) + (story ? 1 : 0);
-            float top = Header("PAUSED", info, rows, ButtonWidth, out _);
+            // The player's menu is short; the testing switches only exist in development builds, in a small row below.
+            bool dev = DevCommands.CheatsAllowed;
+            int rows = 5 + (SteamLobbyService.InLobby ? 1 : 0);
+            float top = Header("PAUSED", info, rows + (dev ? 1 : 0), ButtonWidth, out _);
 
             if (Hud.Button(Row(x, ref top), "RESUME", centred: true, primary: true)) SetPause(false);
             if (SteamLobbyService.InLobby && Hud.Button(Row(x, ref top), "INVITE FRIENDS", centred: true)) _page = Page.Invite;
             if (Hud.Button(Row(x, ref top), "CHARACTER", centred: true)) AvatarCustomizer.Open();
             if (Hud.Button(Row(x, ref top), "OPTIONS", centred: true)) _page = Page.Options;
-            if (Hud.Button(Row(x, ref top), GameDisplay.IsFullscreen ? "WINDOWED" : "FULLSCREEN", centred: true)) GameDisplay.Toggle();
-            if (Hud.Button(Row(x, ref top), Player.GodMode.On ? "GOD MODE: ON" : "GOD MODE: OFF", centred: true, selected: Player.GodMode.On)) Player.GodMode.Toggle();
-            if (Hud.Button(Row(x, ref top), Player.GodMode.Flying ? "FLY: ON" : "FLY: OFF", centred: true, selected: Player.GodMode.Flying)) Player.GodMode.ToggleFly();
-            if (travel && Hud.Button(Row(x, ref top), "TRAVEL", centred: true)) _page = Page.Travel;
-            if (story && Hud.Button(Row(x, ref top), "RESTART STORY", centred: true))
+            if (Hud.Button(Row(x, ref top), "MAIN MENU", centred: true)) _page = Page.ConfirmLeave;
+            if (Hud.Button(Row(x, ref top), "QUIT", centred: true)) _page = Page.ConfirmQuit;
+            if (dev) DrawDevRow(top + 14f, host);
+        }
+
+        /// <summary>Development builds: god mode, flying, travel and a story restart, small, under the menu.</summary>
+        private void DrawDevRow(float y, bool host)
+        {
+            bool travel = Dev.DevIsland.Instance != null;
+            bool story = host && Story.StoryDirector.Instance != null;
+            int count = 2 + (travel ? 1 : 0) + (story ? 1 : 0);
+            const float w = 170f, gap = 8f;
+            float total = count * w + (count - 1) * gap, x = (Hud.Width - total) * 0.5f;
+            Hud.Label(new Rect(x, y - 26f, total, 22f), "DEV", 15f, new Color(1f, 1f, 1f, 0.45f), TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Rect Next()
+            {
+                var r = new Rect(x, y, w, 42f);
+                x += w + gap;
+                return r;
+            }
+            if (Hud.Button(Next(), Player.GodMode.On ? "GOD: ON" : "GOD: OFF", small: true, selected: Player.GodMode.On)) Player.GodMode.Toggle();
+            if (Hud.Button(Next(), Player.GodMode.Flying ? "FLY: ON" : "FLY: OFF", small: true, selected: Player.GodMode.Flying)) Player.GodMode.ToggleFly();
+            if (travel && Hud.Button(Next(), "TRAVEL", small: true)) _page = Page.Travel;
+            if (story && Hud.Button(Next(), "RESTART STORY", small: true))
             {
                 SetPause(false);
                 DevCommands.Execute("story reset");
-                return;
             }
-            if (Hud.Button(Row(x, ref top), "MAIN MENU", centred: true)) _page = Page.ConfirmLeave;
-            if (Hud.Button(Row(x, ref top), "QUIT", centred: true)) _page = Page.ConfirmQuit;
         }
 
         // ------------------------------------------------------------------ options
 
-        private const float OptionsWidth = 620f, OptionsHeight = 506f;
+        private const float OptionsWidth = 620f, OptionsHeight = 630f;
 
-        /// <summary>Mouse sensitivity, field of view and the volumes, each a slider with its number; they apply as you drag.</summary>
+        /// <summary>
+        /// Graphics quality and the display first (picked from a row), then mouse sensitivity, field of view and the
+        /// volumes, each a slider with its number; they apply as you drag.
+        /// </summary>
         private void DrawOptionsPanel(Rect panel)
         {
             Hud.Panel(panel);
             Hud.Label(new Rect(panel.x + 28f, panel.y + 16f, panel.width - 56f, 44f), "OPTIONS", 36f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            float y = panel.y + 78f;
+            float y = panel.y + 72f;
+
+            int tier = (int)GraphicsQuality.Current;
+            int picked = ChoiceRow(panel, ref y, "GRAPHICS", new[] { "LOW", "MEDIUM", "HIGH" }, tier);
+            if (picked != tier) GraphicsQuality.Set((GraphicsQuality.Tier)picked, true);
+            int display = GameDisplay.IsFullscreen ? 1 : 0;
+            if (ChoiceRow(panel, ref y, "DISPLAY", new[] { "WINDOWED", "FULLSCREEN" }, display) != display) GameDisplay.Toggle();
 
             // Shown as a plain number, 1.0 = the default.
             float sensitivity = LookSettings.Sensitivity / LookSettings.DefaultSensitivity;
@@ -302,7 +400,7 @@ namespace PleaseDontDrown.UI
             if (!Mathf.Approximately(changed, sensitivity)) LookSettings.Sensitivity = Mathf.Round(changed * 20f) / 20f * LookSettings.DefaultSensitivity;
 
             float fov = LookSettings.Fov;
-            changed = OptionRow(panel, ref y, "FIELD OF VIEW", fov, LookSettings.MinFov, LookSettings.MaxFov, Mathf.RoundToInt(fov).ToString());
+            changed = OptionRow(panel, ref y, "FIELD OF VIEW", fov, LookSettings.MinFov, LookSettings.MaxFov, Mathf.RoundToInt(fov) + "°");
             if (!Mathf.Approximately(changed, fov)) LookSettings.Fov = Mathf.Round(changed);
 
             // Everything the game plays, as a percentage.
@@ -387,10 +485,23 @@ namespace PleaseDontDrown.UI
         private float OptionRow(Rect panel, ref float y, string label, float value, float min, float max, string number)
         {
             Hud.Label(new Rect(panel.x + 28f, y, 280f, 30f), label, 21f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            Hud.Label(new Rect(panel.xMax - 108f, y + 28f, 80f, 36f), number, 26f, Color.white, TextAnchor.MiddleRight, heavy: true, shadow: false);
-            value = Hud.Slider(new Rect(panel.x + 28f, y + 28f, panel.width - 160f, 36f), value, min, max);
-            y += 70f;
+            Hud.Label(new Rect(panel.xMax - 108f, y + 26f, 80f, 36f), number, 26f, Color.white, TextAnchor.MiddleRight, heavy: true, shadow: false);
+            value = Hud.Slider(new Rect(panel.x + 28f, y + 26f, panel.width - 160f, 36f), value, min, max);
+            y += 64f;
             return value;
+        }
+
+        /// <summary>A label and a row of choices (the picked one lit); returns the one picked now.</summary>
+        private static int ChoiceRow(Rect panel, ref float y, string label, string[] choices, int current)
+        {
+            Hud.Label(new Rect(panel.x + 28f, y, 280f, 30f), label, 21f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            const float gap = 8f;
+            float w = (panel.width - 56f - gap * (choices.Length - 1)) / choices.Length;
+            for (int i = 0; i < choices.Length; i++)
+                if (Hud.Button(new Rect(panel.x + 28f + i * (w + gap), y + 30f, w, 40f), choices[i], small: true, selected: i == current) && i != current)
+                    current = i;
+            y += 82f;
+            return current;
         }
 
         /// <summary>Online Steam friends to invite: Steam sends them the invite, no overlay needed.</summary>
@@ -534,6 +645,7 @@ namespace PleaseDontDrown.UI
         private void OnDestroy()
         {
             if (_fade != null) Destroy(_fade);
+            if (_instance == this) _instance = null;
         }
     }
 }
