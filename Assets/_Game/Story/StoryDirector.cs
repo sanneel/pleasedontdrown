@@ -506,8 +506,28 @@ namespace PleaseDontDrown.Story
             _talks.Clear();
         }
 
+        private static readonly string[] WomenPirates = { "Olga", "Tess", "Bess", "Rita", "Anne", "Mary", "Grace", "Peg", "Sally", "Meg", "Molly", "Nell", "Kate", "Rosie" };
+
+        /// <summary>
+        /// The crew is dealt out round the four Tripo pirates, so a man's name could get the pirate girl's body ("Wobbly
+        /// Will" in a corset): a pirate whose name isn't a woman's gets the next man's body instead.
+        /// </summary>
+        private static AvatarLook MatchPirateBody(string name, NpcRole role, AvatarLook look)
+        {
+            if (role != NpcRole.Pirate || look.Body != AvatarLook.Bodies.PirateGirl || string.IsNullOrEmpty(name)) return look;
+            foreach (string w in WomenPirates)
+                if (name.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0) return look;
+            byte[] men = { AvatarLook.Bodies.PirateMarksman, AvatarLook.Bodies.PirateFat, AvatarLook.Bodies.PirateQuartermaster };
+            int sum = 0;
+            foreach (char c in name) sum += c;
+            int pick = sum % men.Length; // (the same body every time for the same name)
+            AvatarLook man = PirateLookOf(men[pick]);
+            return man;
+        }
+
         private StoryNpc SpawnNpc(string displayName, NpcRole role, AvatarLook look, Vector3 position, float yaw, int health = 0)
         {
+            look = MatchPirateBody(displayName, role, look);
             position = StoryNpc.OnNavMesh(position); // not inside a palm, a counter or a wall
             float ground = Shore.GroundHeightAt(position + Vector3.up * 3f);
             if (!float.IsNaN(ground) && Shore.WaterDepthAt(position + Vector3.up * 3f) < 1f) position.y = ground;

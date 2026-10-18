@@ -167,15 +167,18 @@ namespace PleaseDontDrown.UI
             _age += Time.deltaTime;
             float t = _age / _lifetime;
             if (t >= 1f || (_speaker != null && !_speaker.isActiveAndEnabled)) { Destroy(gameObject); return; }
-            if (_speaker != null) transform.position = _speaker.HeadPosition + Vector3.up * (_bubbleHeight * 0.5f + 0.28f);
+            Camera cam = Camera.main;
+            // A bubble over someone right in front of you shrinks with the distance (from about 3.5 m in): up close it
+            // covered the whole screen.
+            float near = _speaker != null && cam != null ? Mathf.Clamp(Vector3.Distance(cam.transform.position, _speaker.HeadPosition) / 3.5f, 0.32f, 1f) : 1f;
+            if (_speaker != null) transform.position = _speaker.HeadPosition + Vector3.up * ((_bubbleHeight * 0.5f) * near + 0.28f);
             else transform.position += Vector3.up * (_rise * (1f - t) * Time.deltaTime);
             float pop = t < 0.12f ? Mathf.SmoothStep(0.4f, 1.08f, t / 0.12f) : Mathf.Lerp(1.08f, 1f, Mathf.Clamp01((t - 0.12f) / 0.2f));
-            transform.localScale = Vector3.one * pop;
+            transform.localScale = Vector3.one * (pop * near);
             float fade = Mathf.Clamp01((1f - t) * 4f);
             _text.color = new Color(_color.r, _color.g, _color.b, _color.a * fade);
             if (_bubble != null) _bubble.color = new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.97f * fade);
             if (_tail != null) _tail.color = new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.97f * fade);
-            Camera cam = Camera.main;
             if (cam != null) transform.rotation = cam.transform.rotation;
         }
 
