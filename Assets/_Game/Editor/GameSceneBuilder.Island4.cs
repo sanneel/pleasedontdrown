@@ -482,7 +482,7 @@ namespace PleaseDontDrown.Editor
             // Five Lost & Found tags lie about (4.3's evidence), and the guards' beats.
             Vector3[] tags = { new(-14f, 0.2f, -6.4f), new(7f, 0.2f, 1.6f), new(14f, 0.2f, 9.5f), new(-7f, 0.2f, 9.6f), new(16.5f, 0.2f, -9f) };
             for (int i = 0; i < tags.Length; i++) I4Point($"Evidence_{i}", hangar.TransformPoint(tags[i]) + Vector3.up * 0.15f, 0f);
-            (Vector3 a, Vector3 b)[] beats = { (new(-17f, 0.3f, -8f), new(-17f, 0.3f, 9f)), (new(-3.5f, 0.3f, -8f), new(-3.5f, 0.3f, 10f)), (new(3.5f, 0.3f, 10f), new(3.5f, 0.3f, -8f)), (new(17f, 0.3f, 9f), new(17f, 0.3f, -8f)) };
+            (Vector3 a, Vector3 b)[] beats = { (new(-17f, 0.3f, -8f), new(-17f, 0.3f, 9f)), (new(-3.5f, 0.3f, -1f), new(-3.5f, 0.3f, 10f)), (new(3.5f, 0.3f, 10f), new(3.5f, 0.3f, -1f)), (new(17f, 0.3f, 9f), new(17f, 0.3f, -8f)) };
             for (int i = 0; i < beats.Length; i++)
             {
                 I4Point($"WarehouseGuard_{i}_0", hangar.TransformPoint(beats[i].a), 0f);

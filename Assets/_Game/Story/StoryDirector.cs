@@ -275,7 +275,7 @@ namespace PleaseDontDrown.Story
             ResetTsunamiActors();
             ClearSacks(); // chapter 3's money sacks and the boat's cargo (3.9, 3.10)
             if (_cargo.Value != 0) SetCargo(0);
-            SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2.") || _beats[index].Id.StartsWith("3."));
+            SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2.") || _beats[index].Id.StartsWith("3.") || _beats[index].Id.StartsWith("4."));
             _hints = null;
             _waitingForTalk = false;
             foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
@@ -293,7 +293,7 @@ namespace PleaseDontDrown.Story
                 Beat beat = _beats[i];
                 _beat.Value = beat.Id;
                 GalaStateFor(beat.Id);
-                SetChapter(beat.Id.StartsWith("3.") ? "Chapter 3: Skull Cove" : beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
+                SetChapter(beat.Id.StartsWith("4.") ? "Chapter 4: Finders Keepers" : beat.Id.StartsWith("3.") ? "Chapter 3: Skull Cove" : beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
                 Debug.Log($"[Story] beat {beat.Id}: {beat.Title}");
                 ClearWaits();
                 Save();
@@ -710,7 +710,7 @@ namespace PleaseDontDrown.Story
             bool second = beat.Id.StartsWith("2.");
             string chapterNo = beat.Id.Substring(0, beat.Id.IndexOf('.'));
             // Next to a teammate who's standing on land; if they're all at sea, the island's own landing.
-            Vector3 at = second && _island2Spawn != null ? Island2SpawnPoint : chapterNo == "3" ? Island3Arrival : player.transform.position;
+            Vector3 at = second && _island2Spawn != null ? Island2SpawnPoint : chapterNo == "3" ? Island3Arrival : chapterNo == "4" ? Island4Arrival : player.transform.position;
             foreach (PlayerHub mate in PlayerHub.All)
             {
                 if (mate == player || mate == null || !Shore.IsAshore(mate.transform.position)) continue;
@@ -872,12 +872,14 @@ namespace PleaseDontDrown.Story
             RegisterThreatCommands();
             RegisterKillCommands();
             RegisterGalaCommands();
+            DevCommands.Register("chapter4check", "", "Host: plays chapter 4 through with your lifeguard and checks each beat (log: [Check]).", _ =>
+                CheatServer("chapter4check", 0), cheat: true, owner: this);
         }
 
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat" })
+            foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat", "chapter4check" })
                 DevCommands.Unregister(c, this);
             UnregisterMissionCommands();
             UnregisterThreatCommands();
@@ -911,7 +913,7 @@ namespace PleaseDontDrown.Story
             {
                 DevCommands.Print("1.1 meet Sandy, 1.2 five rescues, 1.3 thief, 1.4 return loot, 1.5 three men, 1.6 silent one, 1.7 drugs, 1.8 one more, " +
                                   "1.9 thief again, 1.10 jet ski; 2.1 check in, 2.2 buy pistol, 2.3 three guests, 2.4 shark, 2.5 two more, 2.5b the Kleptopus, 2.5c the gala fund, 2.6 gala night (pirates), 2.7 the yacht; " +
-                                  "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.7b the Pirate King, 3.8 gold vault, 3.9 load the gold, 3.10 back to the hotel");
+                                  "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.7b the Pirate King, 3.8 gold vault, 3.9 load the gold, 3.10 back to the hotel; 4.1 Finders Keepers, 4.2 rescue race, 4.3 warehouse, 4.4 Blackout Berry, 4.5 the THIEF talks");
                 return;
             }
             if (!DevCommands.CheatsAllowed && args[0] != "reset") throw new InvalidOperationException("cheats are off");
@@ -972,6 +974,11 @@ namespace PleaseDontDrown.Story
             if (ServerThreatCheat(what, value, by)) return;
             if (ServerKillCheat(what, by)) return;
             if (ServerGalaCheat(what, value, by)) return;
+            if (what == "chapter4check")
+            {
+                if (by != null) by.StartCoroutine(Chapter4Check(by)); // not ours: jumping to 4.1 stops all of ours
+                return;
+            }
             // 6 m ahead on the level (looking down must not put things underground).
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")

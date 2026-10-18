@@ -97,6 +97,11 @@ namespace PleaseDontDrown.Story
             Add("3.8", "The gold vault", MoneyCave);
             Add("3.9", "Load the gold", LoadTheGold);
             Add("3.10", "Back to the hotel", BackToTheHotel);
+            Add("4.1", "Finders Keepers", FindersArrival);
+            Add("4.2", "The rescue race", RescueRace);
+            Add("4.3", "The warehouse", Warehouse);
+            Add("4.4", "Blackout Berry", BlackoutBerry);
+            Add("4.5", "The THIEF talks", ThiefTalks);
         }
 
         // ================================================================== chapter 1
