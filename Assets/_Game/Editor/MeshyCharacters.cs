@@ -232,10 +232,32 @@ namespace PleaseDontDrown.Editor
             mat.SetColor("_BaseColor", Color.white);
             mat.SetFloat("_Metallic", 0f);
             mat.SetFloat("_Smoothness", 0.28f);
+            // A normal map baked for this very mesh, where there is one (polish_tripo_character.py: the full-detail
+            // model's shape, its hair strands, lids and lips, on the reduced body).
+            Texture normal = BakedNormal(file);
+            mat.SetTexture("_BumpMap", normal);
+            mat.SetFloat("_BumpScale", 1f);
+            if (normal != null) mat.EnableKeyword("_NORMALMAP");
+            else mat.DisableKeyword("_NORMALMAP");
             mat.enableInstancing = true;
             EditorUtility.SetDirty(mat);
             if (baseColor == null) Debug.LogWarning($"[Build] body {file}: no colour texture found on {imported.name}");
             return mat;
+        }
+
+        /// <summary>Textures/&lt;file&gt;_baked_normal.png beside the model, imported as a normal map; null if none.</summary>
+        private static Texture BakedNormal(string file)
+        {
+            string path = $"{SourceDir}/Textures/{file}_baked_normal.png";
+            if (!File.Exists(path)) return null;
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer &&
+                (importer.textureType != TextureImporterType.NormalMap || importer.maxTextureSize != 2048))
+            {
+                importer.textureType = TextureImporterType.NormalMap;
+                importer.maxTextureSize = 2048;
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
         // ------------------------------------------------------------------ hands
