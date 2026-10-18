@@ -7,20 +7,20 @@ outlined); no giant world text over faces; minimal down screen; the gala bar pla
 Scores are mine, judged from real screenshots of the dev build (1280x720). Each area lists what drags it down; the fix
 list at the bottom is the order of work. The "after" column is filled in as the work lands.
 
-| Area | Before | Pass 2 | Pass 3-4 | Pass 5 | Main problems (before) |
+| Area | Before | Pass 2 | Pass 3-4 | Pass 5-6 | Main problems (before) |
 |---|---|---|---|---|---|
 | Main menu | 4.5 | 8 | 9 | 9 | Empty sky/sea behind it (the menu camera looks at nothing), PLAY's dark text with a black outline on coral is mud, FULLSCREEN is a main-menu button, "Development Build" sits on the version number, plain stacked boxes |
 | Options | 6 | 8.5 | 9 | 9.5 | No graphics quality (Low/Medium/High exists only in the console), no fullscreen toggle here, FOV slider shows 60 at its very left with no units |
 | Character screen | 5.5 | 8 | 8.5 | 9.3 | Flat light-blue box behind the lifeguard, long flat list with tiny `<` `>` buttons, DONE button mud like PLAY |
 | Pause menu | 5 | 8.5 | 9 | 9.5 | RESUME unreadable (dark on coral with a black outline), cheats (GOD MODE, FLY, TRAVEL, RESTART STORY) shown to players, 10 buttons in one column |
-| Story dialogue | 3.5 | 8 | 8.5 | 8.5 | NPC speech bubbles are world-sized: next to you they cover half the screen, cut off at the edges, over the objective; the same line is also a subtitle at the bottom; the name tag sits on the bubble text |
+| Story dialogue | 3.5 | 8 | 8.5 | 9.3 | NPC speech bubbles are world-sized: next to you they cover half the screen, cut off at the edges, over the objective; the same line is also a subtitle at the bottom; the name tag sits on the bubble text |
 | Objective and chapter | 6 | 8.5 | 9 | 9 | Small, no entrance when the objective changes, the chapter title is a small label in the middle |
 | Hotbar and vitals | 5.5 | 7.5 | 8.5 | 8.5 | Six dark boxes always on screen even when empty; the air ring (looks like a magnifier) always shown on land; TEAM FUNDS label tiny |
 | Prompts and CPR | 5.5 | 9 | 9 | 9 | `[RMB]` key chips are mud (same outline bug); CPR steps shown twice (middle and right panel); long one-line instructions |
 | Toasts and alerts | 6.5 | 7.5 | 8.5 | 9.2 | Fine but small, no motion, top-right alerts and the victim list crowd the same corner |
-| Report card | 6 | 7.5 | 8.5 | 8.5 | Plain list, no panel, no build-up |
+| Report card | 6 | 7.5 | 8.5 | 9.2 | Plain list, no panel, no build-up |
 | UI motion | 4 | 7.5 | 8 | 8.7 | Almost nothing moves: no page transitions, no HUD entrances, no money tick-up feel |
-| **Overall** | **5.2** | **8.2** | **8.7** | **9.0** | |
+| **Overall** | **5.2** | **8.2** | **8.7** | **9.2** | |
 
 ## Fix list (in this order)
 
@@ -127,9 +127,21 @@ Sandro, 2026-10-18: "change the interface, not only colors and fonts". Pictures 
   the bar's name goes, and the bar fills in under it.
 - Dev commands for looking at these: `menu options|sound|keys`, `customize face|body|clothes`, `toast good|warn|money|info <text>`.
 
+## Pass 6: who's talking, and the report as tiles
+
+Pictures: `Docs/UI-2026-10-18/34_pass6_*` to `36_pass6_*`.
+
+- **Dialogue name plate:** above the hotbar, a live picture of the speaker's face (UI/SpeakerPortrait: a small camera
+  in front of their face, on only while their line is up, at half the frame rate, speech bubbles hidden from it), cut
+  round (Resources/HudRound.shader) in a ring of their colour that beats while they talk. A voice with no body (or the
+  player) gets their initial in a disc instead. Their name in the title face, what they do beside it (LOST & FOUND,
+  HOTEL RECEPTION, PIRATE...), the words typed out under the name.
+- **Report card:** the chapter's numbers as tiles (Hud.StatTile, the same as the pause screen's log), each popping in
+  and counting up in turn, the team's wallet big under them.
+
 ## Still between here and 9.9
 
-1. Story dialogue: a portrait or name plate for who's talking (still a plain subtitle line).
-2. The report card could use the logbook's tiles (same numbers, same look).
-3. Main menu: PLAY straight into hosting; a small "play / host / continue" card would explain what happens.
-4. Sandro's own rating, on his screen in fullscreen.
+1. Main menu: PLAY goes straight into hosting; a small "play / host / continue" card would say what happens.
+2. The portrait camera is a second render while someone talks: watch the frame time on low-end PCs (it runs at half
+   rate, 256x256, no shadows or post-processing).
+3. Sandro's own rating, on his screen in fullscreen.
