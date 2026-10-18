@@ -7,7 +7,7 @@ outlined); no giant world text over faces; minimal down screen; the gala bar pla
 Scores are mine, judged from real screenshots of the dev build (1280x720). Each area lists what drags it down; the fix
 list at the bottom is the order of work. The "after" column is filled in as the work lands.
 
-| Area | Before | Pass 2 | Pass 3 | Main problems (before) |
+| Area | Before | Pass 2 | Pass 3-4 | Main problems (before) |
 |---|---|---|---|---|
 | Main menu | 4.5 | 8 | 9 | Empty sky/sea behind it (the menu camera looks at nothing), PLAY's dark text with a black outline on coral is mud, FULLSCREEN is a main-menu button, "Development Build" sits on the version number, plain stacked boxes |
 | Options | 6 | 8.5 | 9 | No graphics quality (Low/Medium/High exists only in the console), no fullscreen toggle here, FOV slider shows 60 at its very left with no units |
@@ -15,12 +15,12 @@ list at the bottom is the order of work. The "after" column is filled in as the 
 | Pause menu | 5 | 8.5 | 9 | RESUME unreadable (dark on coral with a black outline), cheats (GOD MODE, FLY, TRAVEL, RESTART STORY) shown to players, 10 buttons in one column |
 | Story dialogue | 3.5 | 8 | 8.5 | NPC speech bubbles are world-sized: next to you they cover half the screen, cut off at the edges, over the objective; the same line is also a subtitle at the bottom; the name tag sits on the bubble text |
 | Objective and chapter | 6 | 8.5 | 9 | Small, no entrance when the objective changes, the chapter title is a small label in the middle |
-| Hotbar and vitals | 5.5 | 7.5 | 8 | Six dark boxes always on screen even when empty; the air ring (looks like a magnifier) always shown on land; TEAM FUNDS label tiny |
+| Hotbar and vitals | 5.5 | 7.5 | 8.5 | Six dark boxes always on screen even when empty; the air ring (looks like a magnifier) always shown on land; TEAM FUNDS label tiny |
 | Prompts and CPR | 5.5 | 9 | 9 | `[RMB]` key chips are mud (same outline bug); CPR steps shown twice (middle and right panel); long one-line instructions |
 | Toasts and alerts | 6.5 | 7.5 | 8.5 | Fine but small, no motion, top-right alerts and the victim list crowd the same corner |
 | Report card | 6 | 7.5 | 8.5 | Plain list, no panel, no build-up |
 | UI motion | 4 | 7.5 | 8 | Almost nothing moves: no page transitions, no HUD entrances, no money tick-up feel |
-| **Overall** | **5.2** | **8.2** | **8.6** | |
+| **Overall** | **5.2** | **8.2** | **8.7** | |
 
 ## Fix list (in this order)
 
@@ -96,9 +96,18 @@ Pictures: `Docs/UI-2026-10-18/13_after3_*` to `18_after3_*`.
   of the toasts, and the patient at your feet gets no pin on the screen's edge (the CPR card says it all).
 - The menu's tagline fades out while a page (Options, Keys, Join) is open.
 
+## Pass 4
+
+Pictures at 1920x1080: `Docs/UI-2026-10-18/19_final_*` to `24_final_*`.
+
+- The hotbar eases back to half see-through after 7 seconds with nothing changed, and comes straight back when a slot
+  is picked or filled.
+- Bar menu (MENU), shop and travel windows: headings in Lilita One; a deeper screen dim behind them (0.6) so the beach
+  doesn't show through busy.
+- A saved tourist in view gets no SAVED label: the green SAVED! pop and the message in the top right already say it.
+
 ## Still between here and 9.9
 
-1. Hotbar: an empty bar could fade back when nothing has changed for a while; the slot numbers could be keycaps.
-2. Toasts carry no type: 62 call sites pass plain text, so icons (coin, check, warning) need a small `ToastKind`.
-3. The world "SAVED!" pop and the marker's SAVED say the same thing at the same spot for a moment.
-4. Sandro's own rating, on his screen (1920x1080 and fullscreen): the shots here are 1280x720 and 1600x900.
+1. Toasts carry no type: 62 call sites pass plain text, so icons (coin, check, warning) need a small `ToastKind`.
+2. The boss intro: the boss's name shows twice for a few seconds (the title card and the bar).
+3. Sandro's own rating, on his screen in fullscreen.
