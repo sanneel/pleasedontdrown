@@ -273,6 +273,8 @@ namespace PleaseDontDrown.Story
             EndMission(); // a mission it was in is gone with it
             _freePlay = false;
             ResetTsunamiActors();
+            ClearSacks(); // chapter 3's money sacks and the boat's cargo (3.9, 3.10)
+            if (_cargo.Value != 0) SetCargo(0);
             SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2.") || _beats[index].Id.StartsWith("3."));
             _hints = null;
             _waitingForTalk = false;
@@ -909,7 +911,7 @@ namespace PleaseDontDrown.Story
             {
                 DevCommands.Print("1.1 meet Sandy, 1.2 five rescues, 1.3 thief, 1.4 return loot, 1.5 three men, 1.6 silent one, 1.7 drugs, 1.8 one more, " +
                                   "1.9 thief again, 1.10 jet ski; 2.1 check in, 2.2 buy pistol, 2.3 three guests, 2.4 shark, 2.5 two more, 2.5b the Kleptopus, 2.5c the gala fund, 2.6 gala night (pirates), 2.7 the yacht; " +
-                                  "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.8 gold vault");
+                                  "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.7b the Pirate King, 3.8 gold vault, 3.9 load the gold, 3.10 back to the hotel");
                 return;
             }
             if (!DevCommands.CheatsAllowed && args[0] != "reset") throw new InvalidOperationException("cheats are off");

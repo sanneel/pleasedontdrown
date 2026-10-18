@@ -95,6 +95,8 @@ namespace PleaseDontDrown.Story
             Add("3.7", "Old Snapper", SnapperBeat);
             Add("3.7b", "The Pirate King", PirateKingBeat);
             Add("3.8", "The gold vault", MoneyCave);
+            Add("3.9", "Load the gold", LoadTheGold);
+            Add("3.10", "Back to the hotel", BackToTheHotel);
         }
 
         // ================================================================== chapter 1
