@@ -7,20 +7,20 @@ outlined); no giant world text over faces; minimal down screen; the gala bar pla
 Scores are mine, judged from real screenshots of the dev build (1280x720). Each area lists what drags it down; the fix
 list at the bottom is the order of work. The "after" column is filled in as the work lands.
 
-| Area | Before | After | Main problems |
-|---|---|---|---|
-| Main menu | 4.5 | 8 | Empty sky/sea behind it (the menu camera looks at nothing), PLAY's dark text with a black outline on coral is mud, FULLSCREEN is a main-menu button, "Development Build" sits on the version number, plain stacked boxes |
-| Options | 6 | 8.5 | No graphics quality (Low/Medium/High exists only in the console), no fullscreen toggle here, FOV slider shows 60 at its very left with no units |
-| Character screen | 5.5 | 8 | Flat light-blue box behind the lifeguard, long flat list with tiny `<` `>` buttons, DONE button mud like PLAY |
-| Pause menu | 5 | 8.5 | RESUME unreadable (dark on coral with a black outline), cheats (GOD MODE, FLY, TRAVEL, RESTART STORY) shown to players, 10 buttons in one column |
-| Story dialogue | 3.5 | 8 | NPC speech bubbles are world-sized: next to you they cover half the screen, cut off at the edges, over the objective; the same line is also a subtitle at the bottom; the name tag sits on the bubble text |
-| Objective and chapter | 6 | 8.5 | Small, no entrance when the objective changes, the chapter title is a small label in the middle |
-| Hotbar and vitals | 5.5 | 7.5 | Six dark boxes always on screen even when empty; the air ring (looks like a magnifier) always shown on land; TEAM FUNDS label tiny |
-| Prompts and CPR | 5.5 | 9 | `[RMB]` key chips are mud (same outline bug); CPR steps shown twice (middle and right panel); long one-line instructions |
-| Toasts and alerts | 6.5 | 7.5 | Fine but small, no motion, top-right alerts and the victim list crowd the same corner |
-| Report card | 6 | 7.5 | Plain list, no panel, no build-up |
-| UI motion | 4 | 7.5 | Almost nothing moves: no page transitions, no HUD entrances, no money tick-up feel |
-| **Overall** | **5.2** | **8.2** | |
+| Area | Before | Pass 2 | Pass 3 | Main problems (before) |
+|---|---|---|---|---|
+| Main menu | 4.5 | 8 | 9 | Empty sky/sea behind it (the menu camera looks at nothing), PLAY's dark text with a black outline on coral is mud, FULLSCREEN is a main-menu button, "Development Build" sits on the version number, plain stacked boxes |
+| Options | 6 | 8.5 | 9 | No graphics quality (Low/Medium/High exists only in the console), no fullscreen toggle here, FOV slider shows 60 at its very left with no units |
+| Character screen | 5.5 | 8 | 8.5 | Flat light-blue box behind the lifeguard, long flat list with tiny `<` `>` buttons, DONE button mud like PLAY |
+| Pause menu | 5 | 8.5 | 9 | RESUME unreadable (dark on coral with a black outline), cheats (GOD MODE, FLY, TRAVEL, RESTART STORY) shown to players, 10 buttons in one column |
+| Story dialogue | 3.5 | 8 | 8.5 | NPC speech bubbles are world-sized: next to you they cover half the screen, cut off at the edges, over the objective; the same line is also a subtitle at the bottom; the name tag sits on the bubble text |
+| Objective and chapter | 6 | 8.5 | 9 | Small, no entrance when the objective changes, the chapter title is a small label in the middle |
+| Hotbar and vitals | 5.5 | 7.5 | 8 | Six dark boxes always on screen even when empty; the air ring (looks like a magnifier) always shown on land; TEAM FUNDS label tiny |
+| Prompts and CPR | 5.5 | 9 | 9 | `[RMB]` key chips are mud (same outline bug); CPR steps shown twice (middle and right panel); long one-line instructions |
+| Toasts and alerts | 6.5 | 7.5 | 8.5 | Fine but small, no motion, top-right alerts and the victim list crowd the same corner |
+| Report card | 6 | 7.5 | 8.5 | Plain list, no panel, no build-up |
+| UI motion | 4 | 7.5 | 8 | Almost nothing moves: no page transitions, no HUD entrances, no money tick-up feel |
+| **Overall** | **5.2** | **8.2** | **8.6** | |
 
 ## Fix list (in this order)
 
@@ -78,8 +78,27 @@ Pictures: `Docs/UI-2026-10-18/` (before/after).
   moment).
 - Weapons: no ammo counter on purpose (How to Fish shows none; the gun tells you), left as it is.
 
+## Pass 3
+
+Pictures: `Docs/UI-2026-10-18/13_after3_*` to `18_after3_*`.
+
+- **Display font:** Lilita One (SIL Open Font License, licence file beside it in `Resources/Fonts`) for the logo, menu
+  headings (OPTIONS, KEYS, PAUSED, YOUR LIFEGUARD, BEACH GUIDE, INVITE A FRIEND), chapter title cards, the report title
+  and boss names (`Hud.Title`, `Hud.FitTitle`, `Hud.TitleWidth`). Everything you read stays Roboto.
+- **Options:** HUD SIZE 85% to 130%. It scales only the in-game HUD (the menus would run off a small screen) and is
+  capped so the HUD never gets narrower than a 4:3 screen allows. `hudsize <x>` in the console does the same.
+- **Beach guide (Tab):** two columns of keycaps with what each does, the player's own keys.
+- **Report card:** the game dims a little behind it (a screen dim, not a box); it's drawn under the subtitles, so what
+  Sandy says isn't dimmed; speech bubbles step aside while a chapter card is up (one floated over the numbers).
+- **Toasts:** bigger (21), glide in from the right, drift up as they fade; the bar on the right turns coral for a
+  warning. `toast <text>` in the console shows one.
+- **Rescue markers:** labels stack instead of piling on each other when several tourists are the same way, keep clear
+  of the toasts, and the patient at your feet gets no pin on the screen's edge (the CPR card says it all).
+- The menu's tagline fades out while a page (Options, Keys, Join) is open.
+
 ## Still between here and 9.9
 
-1. A display font for titles and the logo (Roboto everywhere is clean but generic): needs a free (OFL) font downloaded.
-2. The guide (Tab) and the chapter report card laid out as cards with a little more structure.
-3. The alerts in the top right sorted against the victim list when many tourists are in trouble at once.
+1. Hotbar: an empty bar could fade back when nothing has changed for a while; the slot numbers could be keycaps.
+2. Toasts carry no type: 62 call sites pass plain text, so icons (coin, check, warning) need a small `ToastKind`.
+3. The world "SAVED!" pop and the marker's SAVED say the same thing at the same spot for a moment.
+4. Sandro's own rating, on his screen (1920x1080 and fullscreen): the shots here are 1280x720 and 1600x900.
