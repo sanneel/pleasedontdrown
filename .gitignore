@@ -42,3 +42,8 @@ crashlytics-build.properties
 
 # A stray scratch Unity project (not part of the game)
 /My project/
+
+# Decoded copies of Sandro's full-detail Tripo downloads (~65 MB each). The compact originals in
+# ArtSource/Tripo/Latest/raw are committed; decode them back with gltfpack/gltf-transform to re-run the prep scripts.
+/ArtSource/Tripo/Latest/*.glb
+/ArtSource/Tripo/island3/treasure_table.glb

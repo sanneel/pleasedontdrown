@@ -125,3 +125,21 @@ Before showing the user any picture of the result in the game, follow the `pdd-v
 - **Props:** `tripo_prepare_island3.py -- <names>` (island=2 entries go to `Art/Tripo/Island2`); `shiny=True` keeps
   metal/gloss for gold, chrome and crystal. Fit by the axis that matters (the slot machine came out squat: fit its
   width). Running it for a few names used to empty `shack_rooms.json`: it only writes that file when shacks ran now.
+
+## Lessons (2026-10-18, the user's own Oct-12 models: pirate king, black-tee tourist, 2 attendants, treasure table, 2 apes)
+
+- Models the user made by hand have **no polycount limit (~2 M triangles)**. A single Decimate pass stops at 40-70k:
+  Tripo splits vertices along every UV seam. Weld first (`bmesh.ops.remove_doubles`, dist 1e-5; UVs live on the
+  loops so they survive), then collapse: `tripo_prepare_creatures.py` and `tripo_prepare_island3.py` now do this.
+- `prepare_character.py`: arms held out almost level sent the shoulder off the body (the armpit-height line meets a
+  near-horizontal arm axis far away). It now falls back to the chest's edge (`shoulderx`) and logs "level arms".
+- Placed: pirate_king (body 9, the Pirate King in 3.7b), tourist_blacktee (body 26, one man in four on the beaches),
+  hotel_attendant_a (27, Marisol), hotel_attendant_b (28, meant for Shako's hotel staff after the merge),
+  monkey_blue / monkey_ape (Resources/CreatureModels: monkeys pick capuchin/blue/ape by ObjectId), treasure_table
+  (the tavern: `TavernTreasureTablesBatch`, one per side with six stools). Sources in `ArtSource/Tripo/Latest/`.
+- **Characters from million-triangle models came out crumpled** (creased faces, hair like screwed-up paper) when
+  reduced with their UV seams protected. `prepare_character.py` now reduces such models freely (over 8x the budget),
+  gives them new UVs and bakes the colour back from a full-detail copy (Cycles, cage 0.006 H, ray 0.012 H: more and
+  thin hair took the colour of the head under it). Use `--tris 30000`. Check with a clay render, not only textured.
+- Mouths the bake can't find are measured by hand (`MeshyCharacters.MouthHints`; ortho head render with a 2 cm grid);
+  eyes behind sunglasses go in `EyesHidden`, a single eye (eye patch) is mirrored.

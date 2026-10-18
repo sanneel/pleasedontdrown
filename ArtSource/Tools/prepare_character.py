@@ -237,6 +237,14 @@ for side, run in (('R', arm_runs[0]), ('L', arm_runs[-1])):  # -X is the charact
     if min_x and abs(shoulder[0]) < min_x and abs(axis[0]) > 1e-3:
         shoulder = shoulder + axis * ((np.sign(mean[0]) * min_x - shoulder[0]) / axis[0])  # slide out along the arm
     tip = pts[np.argmax(((pts - shoulder) ** 2).sum(axis=1))]
+    side_sign = np.sign(mean[0])
+    if shoulder[0] * side_sign <= 0 or abs(shoulder[0]) > 0.7 * abs(tip[0]):
+        # Arms held out almost level (the axis is near horizontal, so the armpit-height intersection runs off
+        # somewhere silly): the shoulder at the armpit height, at the chest's edge (or shoulderx), and the
+        # tip the far end of the arm from there.
+        shoulder = np.array([side_sign * max(min_x, 0.11 * H), sz])
+        tip = pts[np.argmax(((pts - shoulder) ** 2).sum(axis=1))]
+        log(f'arm {side}: level arms, shoulder put at x {shoulder[0]:.3f}')
     length = float(np.linalg.norm(tip - shoulder))
     along = (tip - shoulder) / length
     elbow, wrist = shoulder + along * length * 0.40, shoulder + along * length * 0.74
@@ -588,16 +596,88 @@ bpy.context.view_layer.objects.active = body
 bpy.ops.object.select_all(action='DESELECT')
 body.select_set(True)
 tris_now = sum(len(p.vertices) - 2 for p in body.data.polygons)
-dec = body.modifiers.new('Decimate', 'DECIMATE')
-dec.ratio = min(1.0, opts['tris'] / max(1, tris_now))
-dec.use_collapse_triangulate = True
-dec.vertex_group = keep.name
-dec.invert_vertex_group = True  # weight 0 = keep: the seams
-dec.vertex_group_factor = 1.0
-body.modifiers.move(body.modifiers.find('Decimate'), 0)  # before the armature modifier
-bpy.ops.object.modifier_apply(modifier='Decimate')
-body.vertex_groups.remove(body.vertex_groups['_KeepSeams'])
-log(f'triangles {tris_now} -> {sum(len(p.vertices) - 2 for p in body.data.polygons)}')
+# Models of millions of triangles (Tripo made without a polycount) can't be reduced with their seams kept: the seam
+# vertices are so many that the collapse folds everything between them (faces creased, hair like screwed-up paper).
+# Those are reduced freely, given new UVs, and their colour is baked back from a full-detail copy.
+rebake = tris_now > opts['tris'] * 8
+detail = None
+if rebake:
+    detail = bpy.data.objects.new('_Detail', body.data.copy())
+    bpy.context.scene.collection.objects.link(detail)
+    detail.matrix_world = body.matrix_world.copy()
+    body.vertex_groups.remove(body.vertex_groups['_KeepSeams'])
+    have = tris_now
+    for _ in range(4):
+        dec = body.modifiers.new('Decimate', 'DECIMATE')
+        dec.ratio = min(1.0, opts['tris'] / max(1, have))
+        dec.use_collapse_triangulate = True
+        body.modifiers.move(body.modifiers.find('Decimate'), 0)  # before the armature modifier
+        bpy.ops.object.modifier_apply(modifier='Decimate')
+        have = sum(len(p.vertices) - 2 for p in body.data.polygons)
+        if have <= opts['tris'] * 1.1:
+            break
+    for poly in body.data.polygons:
+        poly.use_smooth = True
+    log(f'triangles {tris_now} -> {have} (free collapse, colour to be baked back)')
+    # New UVs and the colour baked from the detail copy onto them.
+    scene = bpy.context.scene
+    scene.render.engine = 'CYCLES'
+    scene.cycles.samples = 1
+    scene.cycles.device = 'CPU'
+    for uv in list(body.data.uv_layers):
+        body.data.uv_layers.remove(uv)
+    body.data.uv_layers.new(name='UVMap')
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=1.15, island_margin=0.002)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    size = opts['texture']
+    baked = bpy.data.images.new('Baked_color', size, size)
+    mat = bpy.data.materials.new('Baked')
+    mat.use_nodes = True
+    tex = mat.node_tree.nodes.new('ShaderNodeTexImage')
+    tex.image = baked
+    bsdf = mat.node_tree.nodes['Principled BSDF']
+    mat.node_tree.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+    bsdf.inputs['Roughness'].default_value = 0.8
+    mat.node_tree.nodes.active = tex
+    body.data.materials.clear()
+    body.data.materials.append(mat)
+    for poly in body.data.polygons:
+        poly.material_index = 0
+    bpy.ops.object.select_all(action='DESELECT')
+    detail.select_set(True)
+    body.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bk = scene.render.bake
+    bk.use_pass_direct = False
+    bk.use_pass_indirect = False
+    bk.use_pass_color = True
+    bk.use_selected_to_active = True
+    bk.cage_extrusion = 0.006 * H  # (more and thin hair took the colour of the head under it)
+    bk.max_ray_distance = 0.012 * H
+    bk.margin = 12
+    bpy.ops.object.bake(type='DIFFUSE')
+    path = bpy.path.abspath(bpy.app.tempdir + 'baked_color.png')  # (not next to the GLB: Unity would import it)
+    baked.filepath_raw = path
+    baked.file_format = 'PNG'
+    baked.save()
+    baked.reload()
+    bpy.data.objects.remove(detail, do_unlink=True)
+    bpy.ops.object.select_all(action='DESELECT')
+    body.select_set(True)
+    log(f'colour baked back onto new UVs ({size}x{size})')
+else:
+    dec = body.modifiers.new('Decimate', 'DECIMATE')
+    dec.ratio = min(1.0, opts['tris'] / max(1, tris_now))
+    dec.use_collapse_triangulate = True
+    dec.vertex_group = keep.name
+    dec.invert_vertex_group = True  # weight 0 = keep: the seams
+    dec.vertex_group_factor = 1.0
+    body.modifiers.move(body.modifiers.find('Decimate'), 0)  # before the armature modifier
+    bpy.ops.object.modifier_apply(modifier='Decimate')
+    body.vertex_groups.remove(body.vertex_groups['_KeepSeams'])
+    log(f'triangles {tris_now} -> {sum(len(p.vertices) - 2 for p in body.data.polygons)}')
 
 for img in bpy.data.images:
     if img.size[0] > opts['texture']:

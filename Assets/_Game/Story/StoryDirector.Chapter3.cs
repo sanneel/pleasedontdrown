@@ -623,7 +623,7 @@ namespace PleaseDontDrown.Story
 
         private StoryNpc PirateKing(Transform throne)
         {
-            StoryNpc king = SpawnNpc("The Pirate King", NpcRole.Pirate, PirateLookOf(AvatarLook.Bodies.PirateQuartermaster), throne.position, throne.eulerAngles.y, 300);
+            StoryNpc king = SpawnNpc("The Pirate King", NpcRole.Pirate, PirateLookOf(AvatarLook.Bodies.PirateKing), throne.position, throne.eulerAngles.y, 300);
             king.ServerSetMood(AvatarMood.Angry);
             return king;
         }

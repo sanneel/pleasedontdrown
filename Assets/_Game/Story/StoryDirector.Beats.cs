@@ -28,7 +28,7 @@ namespace PleaseDontDrown.Story
         {
             Figure = 1, Build = 1, Height = 1, Skin = 4, Hair = HairStyle.Long, HairColor = 0,
             Top = TopStyle.TShirt, TopColor = 7, Bottom = BottomStyle.Trousers, BottomColor = 14,
-            Body = AvatarLook.Bodies.GirlBlonde // generated model (own model later)
+            Body = AvatarLook.Bodies.HotelAttendantA // her own Tripo model: the hotel's flight-attendant style uniform
         };
 
         // The robber has his own model (sunglasses, headband, striped shirt); the pirates are the Tripo crew (Pete the

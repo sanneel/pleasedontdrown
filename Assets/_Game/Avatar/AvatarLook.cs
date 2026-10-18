@@ -90,6 +90,11 @@ namespace PleaseDontDrown.Avatars
             public const byte PirateQuartermaster = 13;
             /// <summary>The hotel director (island 2: the gala, the yacht keys).</summary>
             public const byte HotelDirector = 25;
+            /// <summary>Tripo (ArtSource/Tripo/Latest, 2026-10-12): a beach tourist in a black tee, red shorts and sunglasses.</summary>
+            public const byte TouristTee = 26;
+            /// <summary>Tripo hotel staff in flight-attendant uniforms: A is Marisol at reception, B the hotel's other staff.</summary>
+            public const byte HotelAttendantA = 27;
+            public const byte HotelAttendantB = 28;
 
             /// <summary>
             /// The tourist women (Tripo, ArtSource/Tripo/Tourists): Lola, and four girls sharing one Smart Mesh body with
@@ -123,7 +128,7 @@ namespace PleaseDontDrown.Avatars
             /// <summary>The base tourist or one of its look-alikes (a missing body falls back to the code-built one).</summary>
             /// <summary>Women's bodies (the look's Figure should say feminine: bust jiggle, CPR lines).</summary>
             public static bool IsFeminine(byte body) =>
-                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender or PirateGirl || body >= VariantFirst && body < VariantFirst + 48;
+                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender or PirateGirl or HotelAttendantA or HotelAttendantB || body >= VariantFirst && body < VariantFirst + 48;
 
             public static byte PickVariant(System.Random rng, byte baseBody) => Variant(baseBody, rng.Next(VariantsPerBase + 1));
 
@@ -233,7 +238,7 @@ namespace PleaseDontDrown.Avatars
             // the fallback if the model library is missing.
             look.Body = feminine
                 ? Bodies.TouristWomen[rng.Next(Bodies.TouristWomen.Length)]
-                : Bodies.PickVariant(rng, Bodies.TouristBuddy);
+                : rng.Next(4) == 0 ? Bodies.TouristTee : Bodies.PickVariant(rng, Bodies.TouristBuddy); // one man in four in the black tee
             return look;
         }
 

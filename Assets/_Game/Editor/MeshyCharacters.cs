@@ -45,10 +45,30 @@ namespace PleaseDontDrown.Editor
             (AvatarLook.Bodies.PirateMarksman, "Pirate (marksman)", "pirate_marksman"),
             (AvatarLook.Bodies.PirateQuartermaster, "Pirate (quartermaster)", "pirate_quartermaster"),
             (AvatarLook.Bodies.HotelDirector, "Hotel director", "hotel_director"),
+            (AvatarLook.Bodies.PirateKing, "The Pirate King", "pirate_king"),
+            (AvatarLook.Bodies.TouristTee, "Tourist (black tee)", "tourist_blacktee"),
+            (AvatarLook.Bodies.HotelAttendantA, "Hotel attendant (Marisol)", "hotel_attendant_a"),
+            (AvatarLook.Bodies.HotelAttendantB, "Hotel attendant", "hotel_attendant_b"),
         };
 
         /// <summary>Bodies that keep their painted face as it is: the robber's eyes are behind sunglasses (lids would blink on the lenses).</summary>
         private static readonly HashSet<string> PaintedFaceOnly = new() { "robber" };
+
+        /// <summary>Faces whose eyes are behind sunglasses: placed by the face's proportions (they talk, never blink).</summary>
+        private static readonly HashSet<string> EyesHidden = new() { "tourist_blacktee" };
+
+        /// <summary>
+        /// Mouths the lip search can't find, measured on the model (x, y of the middle, width; metres, Unity space): the
+        /// Pirate King's white grin in his black beard, and the black tee's painted smile line (no lip colour).
+        /// </summary>
+        private static readonly Dictionary<string, Vector3> MouthHints = new()
+        {
+            ["pirate_king"] = new Vector3(0f, 1.535f, 0.08f),
+            ["tourist_blacktee"] = new Vector3(-0.022f, 1.54f, 0.05f),
+            // (the search found the attendants' chins: pale pink lips on pale skin)
+            ["hotel_attendant_a"] = new Vector3(0.005f, 1.486f, 0.045f),
+            ["hotel_attendant_b"] = new Vector3(0.0025f, 1.487f, 0.045f),
+        };
 
         /// <summary>
         /// The Tripo women keep their eyes as Tripo painted them, never shut: their eyes are modelled (bulging or sunk
@@ -58,7 +78,8 @@ namespace PleaseDontDrown.Editor
         private static readonly HashSet<string> OpenEyesOnly = new()
             { "tourist_lola", "tourist_girl_red", "tourist_girl_blonde", "tourist_girl_redhead", "tourist_girl_black",
               "tourist_girl_pink", "tourist_girl_lavender", "tourist_girl_barista", "tourist_girl_bartender",
-              "pirate_fat", "pirate_girl", "pirate_marksman", "pirate_quartermaster", "hotel_director" };
+              "pirate_fat", "pirate_girl", "pirate_marksman", "pirate_quartermaster", "hotel_director",
+              "pirate_king", "hotel_attendant_a", "hotel_attendant_b", "tourist_blacktee" };
 
         private static readonly int BoneTotal = (int)Bone.Count + 2 * HandBones.BoneCount;
 
@@ -91,6 +112,38 @@ namespace PleaseDontDrown.Editor
                 }
             }
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// -executeMethod ...BakeOnlyBatch -pdd-bodies a,b: bakes just those GLBs (file names) and puts them into the
+        /// library beside the bodies already there (a new model added without re-baking everyone).
+        /// </summary>
+        public static void BakeOnlyBatch()
+        {
+            if (!CanBake("the listed bodies")) { EditorApplication.Exit(1); return; }
+            try
+            {
+                string[] args = Environment.GetCommandLineArgs();
+                int at = Array.IndexOf(args, "-pdd-bodies");
+                var files = new HashSet<string>(at >= 0 && at + 1 < args.Length ? args[at + 1].Split(',') : Array.Empty<string>());
+                var library = AssetDatabase.LoadAssetAtPath<AvatarBodyLibrary>(LibraryPath);
+                var bodies = new List<AvatarBody>(library.Bodies ?? Array.Empty<AvatarBody>());
+                foreach (var (id, name, file) in Bodies.Where(b => files.Contains(b.file)))
+                {
+                    AvatarBody body = Bake($"{SourceDir}/{file}.glb", id, name, file);
+                    bodies.RemoveAll(b => b == null || b.Id == id);
+                    bodies.Add(body);
+                }
+                library.Bodies = bodies.ToArray();
+                EditorUtility.SetDirty(library);
+                AssetDatabase.SaveAssets();
+                Debug.Log($"[Build] baked {string.Join(", ", files)}; library has {bodies.Count} bodies");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Build] body bake FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
         }
 
         /// <summary>Re-bake only the players' goofy lifeguard (its hands, say), keeping every other body as it is.</summary>
@@ -860,7 +913,23 @@ namespace PleaseDontDrown.Editor
                         Mathf.Max(box.xMax, painted.Max(s => s.P.x)), Mathf.Max(box.yMax, painted.Max(s => s.P.y)));
                 return true;
             }
-            bool found = Eye(-1f, out Rect eyeL) & Eye(1f, out Rect eyeR);
+            bool foundL = Eye(-1f, out Rect eyeL), foundR = Eye(1f, out Rect eyeR), found = foundL && foundR;
+            // One eye under a patch (the Pirate King): the other one mirrored.
+            if (foundL != foundR)
+            {
+                Rect seen = foundL ? eyeL : eyeR;
+                Rect mirrored = Rect.MinMaxRect(-seen.xMax, seen.yMin, -seen.xMin, seen.yMax);
+                if (foundL) eyeR = mirrored; else eyeL = mirrored;
+                found = true;
+            }
+            // Eyes behind sunglasses: where a face's eyes sit, for the mouth and the talking (the eyes are never shut).
+            if (!found && EyesHidden.Contains(file))
+            {
+                float y = bottom + 0.62f * height, x = 0.42f * half;
+                eyeL = new Rect(-x - 0.015f, y - 0.008f, 0.03f, 0.016f);
+                eyeR = new Rect(x - 0.015f, y - 0.008f, 0.03f, 0.016f);
+                found = true;
+            }
             // A pair of eyes is the same size: where one was only half found (little white showing), the other tells.
             var eyeSize = new Vector2(Mathf.Min(0.065f, Mathf.Max(eyeL.width, eyeR.width)), Mathf.Min(0.05f, Mathf.Max(eyeL.height, eyeR.height)));
             eyeL = new Rect(eyeL.center - eyeSize * 0.5f, eyeSize);
@@ -1082,6 +1151,15 @@ namespace PleaseDontDrown.Editor
                     mouthAt = new Vector3(box.center.x, box.center.y, SurfaceZ(box.center));
                     mouthNote = "mouth where the base model's is";
                 }
+            }
+            if (basis == null && MouthHints.TryGetValue(file, out Vector3 hint))
+            {
+                lips.Clear(); // measured beats found
+                var center = new Vector2(hint.x, hint.y);
+                mouthAt = new Vector3(center.x, center.y, SurfaceZ(center));
+                mouthNote = $"mouth {hint.z * 100f:0.0} cm wide at y {center.y:0.000} (measured by hand)";
+                fit.HasMouth = true;
+                fit.Mouth = Spot.At(new Rect(center.x - hint.z * 0.5f, center.y - 0.01f, hint.z, 0.02f), vertices, normals, faceFloor);
             }
             if (lips.Count >= 15)
             {

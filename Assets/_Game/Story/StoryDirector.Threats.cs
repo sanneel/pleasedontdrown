@@ -188,6 +188,12 @@ namespace PleaseDontDrown.Story
                 };
                 for (int i = 0; i < Mathf.Clamp(value, 1, 8); i++)
                 {
+                    // Monkeys live in island 3's jungle only: the test spawns them at their homes there, wherever you are.
+                    if (kind == CreatureKind.Monkey && Island3Point($"MonkeyHome_{i % 3}") is { } monkeyHome)
+                    {
+                        SpawnCreature(kind, Ground(monkeyHome.position + Quaternion.Euler(0f, i * 97f, 0f) * Vector3.forward * (i / 3) * 2f), yaw);
+                        continue;
+                    }
                     Vector3 at = by.transform.position + Quaternion.Euler(0f, (i - (value - 1) * 0.5f) * 20f, 0f) * flat * (kind == CreatureKind.OldSnapper ? 14f : 7f);
                     at = kind == CreatureKind.Parrot ? Ground(at) + Vector3.up * 3f : Ground(at);
                     if (kind == CreatureKind.Alligator && WaterSurface.Exists) at.y = Mathf.Max(at.y, WaterSurface.HeightAt(at) - 0.45f);

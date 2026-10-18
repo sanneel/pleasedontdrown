@@ -21,6 +21,8 @@ SRC = os.path.join(ROOT, "ArtSource", "Tripo", "island3")
 OUT = os.path.join(ROOT, "Assets", "_Game", "Art", "Tripo", "Island3")
 SRC2 = os.path.join(ROOT, "ArtSource", "Tripo", "Island2")
 OUT2 = os.path.join(ROOT, "Assets", "_Game", "Art", "Tripo", "Island2")
+SRC1 = os.path.join(ROOT, "ArtSource", "Tripo", "Island1")
+OUT1 = os.path.join(ROOT, "Assets", "_Game", "Art", "Tripo", "Island1")
 
 # The shacks are walk-in: the game builds a plank room inside each one. The room is measured on the sized model (before
 # any cut): its floor from below, each wall by many rays at standing height, taking the wall itself, not the porch
@@ -185,6 +187,10 @@ MODELS = {
     "velvet_rope_stanchions": dict(island=2, turn=0, fit=("z", 1.0), shiny=True),
     "inflatable_cushion": dict(island=2, turn=0, fit=("x", 2.4)),
     "sea_rock_pinnacle": dict(turn=0, fit=("z", 20.0)),
+    # Island 1's landmark at the back of the beach; Tripo made it stout, so it is slimmed a little (slim: x and y).
+    # The tavern's round tables (Tripo, made 2026-10-12): coins, dice, candles, bottles and mugs on a barrel-legged top.
+    "treasure_table": dict(turn=0, fit=("x", 1.7), decimate=14000),
+    "lighthouse": dict(island=1, turn=0, fit=("z", 16.0), slim=0.85),
     # The jungle (hundreds of copies): fewer triangles, and the leaves drawn from both sides.
     "jungle_tree": dict(turn=0, fit=("z", 10.0), decimate=6000, two_sided=True),
     "jungle_bush": dict(turn=0, fit=("z", 1.8), decimate=2500, two_sided=True),
@@ -197,7 +203,7 @@ for name, spec in MODELS.items():
     if ONLY and name not in ONLY:
         continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    src, out = (SRC2, OUT2) if spec.get("island") == 2 else (SRC, OUT)
+    src, out = {1: (SRC1, OUT1), 2: (SRC2, OUT2)}.get(spec.get("island"), (SRC, OUT))
     os.makedirs(out, exist_ok=True)
     bpy.ops.import_scene.gltf(filepath=os.path.join(src, name + ".glb"), merge_vertices=True)
     meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
@@ -222,7 +228,8 @@ for name, spec in MODELS.items():
     else:
         axis, metres = spec["fit"]
         s = metres / dims["xyz".index(axis)]
-        scale = Vector((s, s, s))
+        slim = spec.get("slim", 1.0)
+        scale = Vector((s * slim, s * slim, s))
     centre = Vector(((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, lo.z))
     for v in me.vertices:
         v.co = Vector(((v.co.x - centre.x) * scale.x, (v.co.y - centre.y) * scale.y, (v.co.z - centre.z) * scale.z))
@@ -270,6 +277,13 @@ for name, spec in MODELS.items():
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
     if "decimate" in spec:
+        # Weld the seams first (Tripo splits vertices along them; UVs stay on the face corners) or the collapse
+        # stops far over budget on a model of millions.
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+        bm.to_mesh(me)
+        bm.free()
         decimate = obj.modifiers.new("Decimate", "DECIMATE")
         decimate.ratio = min(1.0, spec["decimate"] / sum(len(p.vertices) - 2 for p in me.polygons))
     bpy.ops.object.shade_auto_smooth(angle=math.radians(35))

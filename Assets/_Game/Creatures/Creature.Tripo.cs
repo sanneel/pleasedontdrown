@@ -11,23 +11,28 @@ namespace PleaseDontDrown.Creatures
     /// </summary>
     public partial class Creature
     {
-        private static readonly Dictionary<CreatureKind, GameObject> TripoBodies = new();
+        private static readonly Dictionary<string, GameObject> TripoBodies = new();
+        /// <summary>The jungle's monkeys come in three looks (the same size and moves): the capuchin, a blue monkey and a
+        /// big blue ape, picked by the creature's network id so every machine shows the same one.</summary>
+        private static readonly string[] MonkeyModels = { "monkey", "monkey_blue", "monkey_ape" };
         private bool _tripo;
         private Transform _shadesAt;
 
-        private static GameObject TripoBody(CreatureKind kind)
+        private GameObject TripoBody(CreatureKind kind)
         {
-            if (TripoBodies.TryGetValue(kind, out GameObject prefab)) return prefab;
             string file = kind switch
             {
-                CreatureKind.Monkey => "monkey",
+                CreatureKind.Monkey => MonkeyModels[Mathf.Abs(ObjectId) % MonkeyModels.Length],
                 CreatureKind.Alligator => "alligator",
                 CreatureKind.OldSnapper => "old_snapper",
                 CreatureKind.Kleptopus => "kleptopus",
                 _ => null
             };
-            prefab = file != null ? Resources.Load<GameObject>("CreatureModels/" + file) : null;
-            TripoBodies[kind] = prefab;
+            if (file == null) return null;
+            if (TripoBodies.TryGetValue(file, out GameObject prefab)) return prefab;
+            prefab = Resources.Load<GameObject>("CreatureModels/" + file);
+            if (prefab == null && kind == CreatureKind.Monkey) prefab = Resources.Load<GameObject>("CreatureModels/monkey");
+            TripoBodies[file] = prefab;
             return prefab;
         }
 

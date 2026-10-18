@@ -23,6 +23,9 @@ OUT = os.path.join(ROOT, "Assets", "_Game", "Resources", "CreatureModels")
 # the head's own height at each slice (faces under it go with the jaw); tail: ends this far from the back.
 CREATURES = {
     "monkey": dict(src="island3/jungle_monkey.glb", front="+Y", size=("height", 0.78), tris=12000, hat=True),
+    # Two more of the jungle's monkeys (Tripo, ArtSource/Tripo/Latest, 2026-10-12): a blue one on all fours and a big blue ape.
+    "monkey_blue": dict(src="Latest/blue_monkey.glb", front="+X", size=("height", 0.82), tris=12000, hat=True),
+    "monkey_ape": dict(src="Latest/blue_baboon.glb", front="+X", size=("height", 0.95), tris=12000, hat=True),
     "alligator": dict(src="island3/alligator.glb", front="+X", size=("length", 3.6), tris=15000, align=True,
                       head=0.17, jaw=0.42, tail=0.4, tail_below=1.0, tail_half=0.24),
     "old_snapper": dict(src="island3/old_snapper.glb", front="-Y", size=("length", 7.4), tris=25000, align=True,
@@ -89,12 +92,24 @@ def decimate(obj, tris):
     have = sum(len(p.vertices) - 2 for p in obj.data.polygons)
     if have <= tris:
         return
-    mod = obj.modifiers.new("dec", "DECIMATE")
-    mod.ratio = tris / have
-    mod.use_collapse_triangulate = True
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    log(obj.name, "triangles", have, "->", sum(len(p.vertices) - 2 for p in obj.data.polygons))
+    start = have
+    # Tripo splits the vertices along every texture seam: welded (UVs live on the face corners, so they stay),
+    # the collapse can reach the budget instead of stopping where the seams are.
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+    bm.to_mesh(obj.data)
+    bm.free()
+    for _ in range(4):  # (one pass from millions stops far over budget: collapsing keeps the seams; go again)
+        mod = obj.modifiers.new("dec", "DECIMATE")
+        mod.ratio = tris / have
+        mod.use_collapse_triangulate = True
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+        have = sum(len(p.vertices) - 2 for p in obj.data.polygons)
+        if have <= tris * 1.15:
+            break
+    log(obj.name, "triangles", start, "->", have)
 
 
 def slice_heights(me, u):
