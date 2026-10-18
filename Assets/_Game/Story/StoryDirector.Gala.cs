@@ -77,10 +77,49 @@ namespace PleaseDontDrown.Story
                 _director.ServerSetTalkable(false);
                 return _director.gameObject;
             });
-            // (No staff yet: the only staff-like bodies, the bartender and the barista, are bikini models. A bellhop in a
-            // bikini looked wrong; they wait for a uniformed model.)
+            // The staff, in the hotel's uniform (Sandro's Tripo flight-attendant model, like Marisol at the desk): a
+            // bellhop at the door, a waitress going between the bar and the pool, a pool attendant on the deck.
+            AddResident("I2Hotel", () => Staff("Bellhop Bella", BellboySpot, 0f).gameObject);
+            AddResident("I2Hotel", () => Staff("Pool attendant Ines", PoolAttendantSpot, 0f).gameObject);
+            AddResident("I2Hotel", () =>
+            {
+                StoryNpc waiter = Staff("Waitress Paola", WaiterRoute[0], 90f);
+                StartCoroutine(WaiterRounds(waiter));
+                return waiter.gameObject;
+            });
             SlotResidents();
             LoungerResidents();
+        }
+
+        private static readonly Vector3 BellboySpot = new(22.4f, 1.85f, -241.2f), PoolAttendantSpot = new(50.5f, 1.7f, -241.5f);
+        // Along the front of the hotel, from the Coral Bar's deck to the pool deck and back (clear of the carpet's ropes,
+        // and on the sea side of the forecourt fountain at (2.5, -238.5)).
+        private static readonly Vector3[] WaiterRoute =
+            { new(-40f, 1.8f, -243f), new(-12f, 1.8f, -238.5f), new(2.5f, 1.8f, -235.2f), new(8f, 1.8f, -235.5f), new(32f, 1.8f, -235.5f), new(50f, 1.8f, -240.5f) };
+
+        private StoryNpc Staff(string displayName, Vector3 at, float yaw)
+        {
+            AvatarLook look = GuestLook(4242, 1);
+            look.Body = AvatarLook.Bodies.HotelAttendantB;
+            StoryNpc npc = SpawnNpc(displayName, NpcRole.Bystander, look, at, yaw);
+            npc.ServerSetTalkable(false);
+            return npc;
+        }
+
+        /// <summary>Host: the waitress walks the hotel front from the bar to the pool and back, stopping at each end.</summary>
+        private IEnumerator WaiterRounds(StoryNpc waiter)
+        {
+            int i = 0, step = 1;
+            while (waiter != null && waiter.IsSpawned)
+            {
+                yield return new WaitForSeconds(i == 0 || i == WaiterRoute.Length - 1 ? Random.Range(6f, 12f) : 0.2f);
+                if (waiter == null || !waiter.IsSpawned) yield break;
+                if (i + step < 0 || i + step >= WaiterRoute.Length) step = -step;
+                i += step;
+                waiter.ServerMoveTo(WaiterRoute[i]);
+                float started = Time.time;
+                while (waiter != null && waiter.IsMoving && Time.time - started < 30f) yield return new WaitForSeconds(0.3f);
+            }
         }
 
         // Guests at the casino's slot machines (GameSceneBuilder.HotelInterior: six along the outer wall, a low stool in
