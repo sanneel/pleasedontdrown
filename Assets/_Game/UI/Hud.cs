@@ -31,8 +31,36 @@ namespace PleaseDontDrown.UI
         /// <summary>The top of the hotbar (a lifted slot included), in sheet units.</summary>
         public static float HotbarTop => Height - SlotBottom - SlotSize - SlotLift;
 
-        // Keep the full layout visible on 4:3 and narrow windows as well as 16:9.
-        public static float Scale => Mathf.Max(0.1f, Mathf.Min(Screen.height / Sheet, Screen.width / 1440f));
+        // Keep the full layout visible on 4:3 and narrow windows as well as 16:9. The in-game HUD also takes the
+        // player's HUD SIZE (Options), but never so big that it's narrower than 1240 units (a 4:3 screen); the menus
+        // don't take it (they'd run off a small screen).
+        public static float Scale
+        {
+            get
+            {
+                float fit = Mathf.Max(0.1f, Mathf.Min(Screen.height / Sheet, Screen.width / 1440f));
+                return Retained ? fit * Mathf.Min(HudSize, Mathf.Max(1f, Screen.width / (fit * 1240f))) : fit;
+            }
+        }
+
+        private const string HudSizeKey = "pdd.ui.hudsize";
+        public const float MinHudSize = 0.85f, MaxHudSize = 1.3f;
+        private static float _hudSize = -1f;
+
+        /// <summary>How big the in-game HUD is drawn (Options: HUD SIZE), 1 = as designed. Kept in PlayerPrefs.</summary>
+        public static float HudSize
+        {
+            get
+            {
+                if (_hudSize < 0f) _hudSize = Mathf.Clamp(PlayerPrefs.GetFloat(HudSizeKey, 1f), MinHudSize, MaxHudSize);
+                return _hudSize;
+            }
+            set
+            {
+                _hudSize = Mathf.Clamp(value, MinHudSize, MaxHudSize);
+                PlayerPrefs.SetFloat(HudSizeKey, _hudSize);
+            }
+        }
         public static float Width => Screen.width / Scale;
         public static float Height => Screen.height / Scale;
         public static Vector2 Mouse
@@ -55,7 +83,10 @@ namespace PleaseDontDrown.UI
         /// <summary>Drawing now: the HUD canvas pass, or IMGUI's repaint event.</summary>
         private static bool Painting => Retained || Event.current != null && Event.current.type == EventType.Repaint;
 
-        private static Font _heavy, _bold;
+        private static Font _heavy, _bold, _display;
+
+        /// <summary>The faces: Roboto Bold and Black for everything you read, Lilita One for the logo and titles.</summary>
+        private enum Face : byte { Bold, Heavy, Display }
         private static readonly Dictionary<long, GUIStyle> _styles = new();
         private static readonly Dictionary<HudIcon, Texture2D> _icons = new();
         private static readonly Dictionary<int, Texture2D> _arcs = new();
@@ -71,18 +102,32 @@ namespace PleaseDontDrown.UI
             _plainText.Clear();
             _icons.Clear();
             _arcs.Clear();
-            _heavy = _bold = null;
+            _heavy = _bold = _display = null;
+            _hudSize = -1f;
             _hoverId = 0;
             _hoverFrame = -10;
             _eased.Clear();
         }
 
-        private static Font HudFont(bool heavy)
+        private static Font HudFont(bool heavy) => FontOf(heavy ? Face.Heavy : Face.Bold);
+
+        private static Font FontOf(Face face)
         {
-            if (_heavy == null) _heavy = Resources.Load<Font>("Fonts/Roboto-Black");
-            if (_bold == null) _bold = Resources.Load<Font>("Fonts/Roboto-Bold");
-            return heavy ? _heavy : _bold;
+            switch (face)
+            {
+                case Face.Display:
+                    if (_display == null) _display = Resources.Load<Font>("Fonts/LilitaOne-Regular"); // (OFL: Fonts/LilitaOne-OFL.txt)
+                    return _display != null ? _display : FontOf(Face.Heavy);
+                case Face.Heavy:
+                    if (_heavy == null) _heavy = Resources.Load<Font>("Fonts/Roboto-Black");
+                    return _heavy;
+                default:
+                    if (_bold == null) _bold = Resources.Load<Font>("Fonts/Roboto-Bold");
+                    return _bold;
+            }
         }
+
+        private static Face FaceOf(bool heavy) => heavy ? Face.Heavy : Face.Bold;
 
         private static int PixelSize(float size) => Mathf.Max(8, Mathf.RoundToInt(size * Scale));
 
@@ -91,14 +136,17 @@ namespace PleaseDontDrown.UI
         public static bool Hovered(Rect sheet) => sheet.Contains(Mouse);
 
         /// <summary>A text style at <paramref name="size"/> sheet units (cached per pixel size).</summary>
-        public static GUIStyle Style(float size, TextAnchor anchor = TextAnchor.MiddleCenter, bool heavy = false, bool wrap = false, bool richText = true)
+        public static GUIStyle Style(float size, TextAnchor anchor = TextAnchor.MiddleCenter, bool heavy = false, bool wrap = false, bool richText = true) =>
+            StyleOf(size, anchor, FaceOf(heavy), wrap, richText);
+
+        private static GUIStyle StyleOf(float size, TextAnchor anchor, Face face, bool wrap, bool richText)
         {
             int px = PixelSize(size);
-            long key = (uint)px | ((long)anchor << 12) | (heavy ? 1L << 20 : 0L) | (wrap ? 1L << 21 : 0L) | (richText ? 1L << 22 : 0L);
+            long key = (uint)px | ((long)anchor << 12) | ((long)face << 20) | (wrap ? 1L << 22 : 0L) | (richText ? 1L << 23 : 0L);
             if (_styles.TryGetValue(key, out GUIStyle style)) return style;
             style = new GUIStyle
             {
-                font = HudFont(heavy), fontSize = px, alignment = anchor, richText = richText, wordWrap = wrap,
+                font = FontOf(face), fontSize = px, alignment = anchor, richText = richText, wordWrap = wrap,
                 clipping = TextClipping.Clip
             };
             style.normal.textColor = Color.white;
@@ -108,7 +156,25 @@ namespace PleaseDontDrown.UI
 
         /// <summary>Text with a soft drop shadow (the shadow is what keeps it readable over sand and sky).</summary>
         public static void Label(Rect sheet, string text, float size, Color color, TextAnchor anchor = TextAnchor.MiddleCenter,
-            bool heavy = false, bool wrap = false, bool shadow = true, bool richText = true)
+            bool heavy = false, bool wrap = false, bool shadow = true, bool richText = true) =>
+            Text(sheet, text, size, color, anchor, FaceOf(heavy), wrap, shadow, richText);
+
+        /// <summary>A title in the display face (Lilita One: the logo, menu headings, chapter and boss cards), outlined.</summary>
+        public static void Title(Rect sheet, string text, float size, Color color, TextAnchor anchor = TextAnchor.MiddleCenter, bool wrap = false) =>
+            Text(sheet, text, size, color, anchor, Face.Display, wrap, true, false);
+
+        /// <summary>A one-line title shrunk to fit <paramref name="rect"/> if it's too long.</summary>
+        public static void FitTitle(Rect rect, string text, float size, Color color, TextAnchor anchor = TextAnchor.MiddleCenter, float minimum = 20f)
+        {
+            if (!Painting || string.IsNullOrEmpty(text)) return;
+            float width = TitleWidth(text, size);
+            if (width > rect.width) size = Mathf.Max(minimum, size * rect.width / width);
+            Title(rect, text, size, color, anchor);
+        }
+
+        public static float TitleWidth(string text, float size) => WidthOf(text, size, Face.Display);
+
+        private static void Text(Rect sheet, string text, float size, Color color, TextAnchor anchor, Face face, bool wrap, bool shadow, bool richText)
         {
             if (!Painting || string.IsNullOrEmpty(text) || color.a <= 0.005f) return;
             Rect r = Px(sheet);
@@ -120,10 +186,10 @@ namespace PleaseDontDrown.UI
             var outline = new Color(0.02f, 0.04f, 0.06f, 0.85f * color.a);
             if (Retained)
             {
-                HudCanvas.Text(r, text, HudFont(heavy), PixelSize(size), anchor, wrap, richText, color, d, outline);
+                HudCanvas.Text(r, text, FontOf(face), PixelSize(size), anchor, wrap, richText, color, d, outline);
                 return;
             }
-            GUIStyle style = Style(size, anchor, heavy, wrap, richText);
+            GUIStyle style = StyleOf(size, anchor, face, wrap, richText);
             string plain = WithoutColorTags(text);
             style.normal.textColor = outline;
             if (d > 0f)
@@ -152,24 +218,26 @@ namespace PleaseDontDrown.UI
         private static readonly GUIContent Measured = new();
         private static readonly TextGenerator Measure = new();
 
-        public static float TextWidth(string text, float size, bool heavy = false)
+        public static float TextWidth(string text, float size, bool heavy = false) => WidthOf(text, size, FaceOf(heavy));
+
+        private static float WidthOf(string text, float size, Face face)
         {
-            if (Retained) return Measure.GetPreferredWidth(text, Generation(size, heavy, true, 0f)) / Scale;
+            if (Retained) return Measure.GetPreferredWidth(text, Generation(size, face, true, 0f)) / Scale;
             Measured.text = text;
-            return Style(size, TextAnchor.MiddleLeft, heavy).CalcSize(Measured).x / Scale;
+            return StyleOf(size, TextAnchor.MiddleLeft, face, false, true).CalcSize(Measured).x / Scale;
         }
 
         public static float TextHeight(string text, float width, float size, bool heavy = false, bool richText = true)
         {
-            if (Retained) return Measure.GetPreferredHeight(text, Generation(size, heavy, richText, Mathf.Max(1f, width * Scale))) / Scale;
+            if (Retained) return Measure.GetPreferredHeight(text, Generation(size, FaceOf(heavy), richText, Mathf.Max(1f, width * Scale))) / Scale;
             Measured.text = text;
             return Style(size, TextAnchor.UpperLeft, heavy, true, richText).CalcHeight(Measured, Mathf.Max(1f, width * Scale)) / Scale;
         }
 
         /// <summary>How the HUD canvas lays text out (the same font and pixel size as the IMGUI styles).</summary>
-        private static TextGenerationSettings Generation(float size, bool heavy, bool richText, float wrapWidth) => new()
+        private static TextGenerationSettings Generation(float size, Face face, bool richText, float wrapWidth) => new()
         {
-            font = HudFont(heavy), fontSize = PixelSize(size), richText = richText, scaleFactor = 1f, lineSpacing = 1f,
+            font = FontOf(face), fontSize = PixelSize(size), richText = richText, scaleFactor = 1f, lineSpacing = 1f,
             textAnchor = TextAnchor.UpperLeft, color = Color.white, pivot = new Vector2(0.5f, 0.5f), updateBounds = true,
             horizontalOverflow = wrapWidth > 0f ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow,
             verticalOverflow = VerticalWrapMode.Overflow, generationExtents = new Vector2(wrapWidth, 0f), generateOutOfBounds = true,

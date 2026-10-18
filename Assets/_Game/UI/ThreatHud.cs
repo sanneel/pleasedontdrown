@@ -149,7 +149,7 @@ namespace PleaseDontDrown.UI
             // The boss's name big over a thick bar, its phase small at the bar's right end (no box: outlined words).
             const float width = 640f;
             var card = new Rect((Hud.Width - width) * 0.5f, Hud.BossTop, width, 96f);
-            Hud.FitLabel(new Rect(card.x, card.y + 4f, width, 44f), title.ToUpperInvariant(), 36f, Hud.Paper, TextAnchor.MiddleCenter, heavy: true);
+            Hud.FitTitle(new Rect(card.x, card.y + 2f, width, 48f), title.ToUpperInvariant(), 40f, Hud.Paper);
             Hud.Bar(new Rect(card.x + 20f, card.y + 52f, width - 40f, 18f), fraction, accent);
             Hud.Label(new Rect(card.x + 20f, card.y + 72f, width - 40f, 22f), status, 16f, accent, TextAnchor.MiddleRight, heavy: true, shadow: false);
             return card;

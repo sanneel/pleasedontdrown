@@ -41,6 +41,11 @@ namespace PleaseDontDrown.UI
                 if (_connection.IsActive) SetPause(page is "pause" or "options" or "keys");
                 _page = page == "options" ? Page.Options : page == "keys" ? Page.Controls : Page.Main;
             }, owner: this);
+            DevCommands.Register("hudsize", "<0.85-1.3>", "How big the in-game HUD is drawn (Options: HUD SIZE, default 1).", args =>
+            {
+                Hud.HudSize = DevCommands.ParseFloat(args, 0);
+                DevCommands.Print($"hud size = {Hud.HudSize:0.00}");
+            }, owner: this);
         }
 
         private void OnDisable()
@@ -48,6 +53,7 @@ namespace PleaseDontDrown.UI
             GameInput.ToggleMenu.performed -= OnToggleMenu;
             GameInput.ToggleOverlay.performed -= OnToggleOverlay;
             DevCommands.Unregister("menu", this);
+            DevCommands.Unregister("hudsize", this);
             SetPause(false);
         }
 
@@ -164,13 +170,14 @@ namespace PleaseDontDrown.UI
 
             // The title: PLEASE DON'T over a big coral DROWN, a lifebuoy bobbing on the water beside it.
             float title = In(0.05f, 0.6f), slide = (1f - title) * -60f;
-            Hud.Label(new Rect(58f + slide, 46f, 900f, 100f), "PLEASE DON'T", 92f, new Color(1f, 1f, 1f, title), TextAnchor.MiddleLeft, heavy: true);
-            Hud.Label(new Rect(52f + slide, 128f, 900f, 190f), "DROWN", 176f, new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, title), TextAnchor.MiddleLeft, heavy: true);
-            float drownWidth = Hud.TextWidth("DROWN", 176f, heavy: true);
+            Hud.Title(new Rect(58f + slide, 40f, 900f, 110f), "PLEASE DON'T", 98f, new Color(1f, 1f, 1f, title), TextAnchor.MiddleLeft);
+            Hud.Title(new Rect(52f + slide, 124f, 900f, 200f), "DROWN", 190f, new Color(Hud.Coral.r, Hud.Coral.g, Hud.Coral.b, title), TextAnchor.MiddleLeft);
+            float drownWidth = Hud.TitleWidth("DROWN", 190f);
             float bob = Mathf.Sin(Time.unscaledTime * 1.6f);
-            Lifebuoy(new Rect(52f + slide + drownWidth + 26f, 150f + bob * 6f, 132f, 132f), bob * 0.025f, In(0.35f, 0.5f));
+            Lifebuoy(new Rect(52f + slide + drownWidth + 36f, 152f + bob * 6f, 132f, 132f), bob * 0.025f, In(0.35f, 0.5f));
+            float tagline = title * (1f - paged); // (out of the way of an open page)
             Hud.Label(new Rect(62f + slide, 318f, 700f, 70f), "A co-op lifeguard game. Save the tourists, find what they lose,\nand find out what's really going on at the beach.",
-                24f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, title), TextAnchor.UpperLeft);
+                24f, new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, tagline), TextAnchor.UpperLeft);
 
             // Buttons, stacked up from the bottom left, sliding in one after another.
             const int count = 5;
@@ -386,7 +393,7 @@ namespace PleaseDontDrown.UI
 
         // ------------------------------------------------------------------ options
 
-        private const float OptionsWidth = 620f, OptionsHeight = 630f;
+        private const float OptionsWidth = 620f, OptionsHeight = 694f;
 
         /// <summary>
         /// Graphics quality and the display first (picked from a row), then mouse sensitivity, field of view and the
@@ -395,7 +402,7 @@ namespace PleaseDontDrown.UI
         private void DrawOptionsPanel(Rect panel)
         {
             Hud.Panel(panel);
-            Hud.Label(new Rect(panel.x + 28f, panel.y + 16f, panel.width - 56f, 44f), "OPTIONS", 36f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Title(new Rect(panel.x + 28f, panel.y + 12f, panel.width - 56f, 50f), "OPTIONS", 42f, Color.white, TextAnchor.MiddleLeft);
             float y = panel.y + 72f;
 
             int tier = (int)GraphicsQuality.Current;
@@ -413,6 +420,11 @@ namespace PleaseDontDrown.UI
             float fov = LookSettings.Fov;
             changed = OptionRow(panel, ref y, "FIELD OF VIEW", fov, LookSettings.MinFov, LookSettings.MaxFov, Mathf.RoundToInt(fov) + "°");
             if (!Mathf.Approximately(changed, fov)) LookSettings.Fov = Mathf.Round(changed);
+
+            // How big the in-game HUD is drawn (the menus stay as they are).
+            float hud = Hud.HudSize;
+            changed = OptionRow(panel, ref y, "HUD SIZE", hud, Hud.MinHudSize, Hud.MaxHudSize, Mathf.RoundToInt(hud * 100f) + "%");
+            if (!Mathf.Approximately(changed, hud)) Hud.HudSize = Mathf.Round(changed * 20f) / 20f;
 
             // Everything the game plays, as a percentage.
             float volume = SoundSettings.Volume;
@@ -434,6 +446,7 @@ namespace PleaseDontDrown.UI
                 SoundSettings.Volume = SoundSettings.DefaultVolume;
                 SoundSettings.Music = SoundSettings.DefaultMusic;
                 SoundSettings.Voice = SoundSettings.DefaultVoice;
+                Hud.HudSize = 1f;
                 PlayerPrefs.Save();
             }
             if (Hud.Button(new Rect(panel.xMax - 248f, panel.yMax - 66f, 220f, 46f), "KEYS", small: true)) _page = Page.Controls;
@@ -450,7 +463,7 @@ namespace PleaseDontDrown.UI
         private void DrawControlsPanel(Rect panel)
         {
             Hud.Panel(panel);
-            Hud.Label(new Rect(panel.x + 28f, panel.y + 16f, panel.width - 56f, 44f), "KEYS", 36f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Title(new Rect(panel.x + 28f, panel.y + 12f, panel.width - 56f, 50f), "KEYS", 42f, Color.white, TextAnchor.MiddleLeft);
             GameInput.Rebind[] keys = GameInput.Rebindable;
             if (_keyLabels == null || _keyLabelsVersion != GameInput.BindingsVersion)
             {
@@ -526,7 +539,7 @@ namespace PleaseDontDrown.UI
             float panelHeight = 96f + Mathf.Max(1, shown) * row + 150f;
             var panel = new Rect((width - panelWidth) * 0.5f, (height - panelHeight) * 0.5f, panelWidth, panelHeight);
             Hud.Panel(panel, 0.94f);
-            Hud.Label(new Rect(panel.x, panel.y + 16f, panelWidth, 50f), "INVITE A FRIEND", 40f, Color.white, heavy: true, shadow: false);
+            Hud.Title(new Rect(panel.x, panel.y + 14f, panelWidth, 54f), "INVITE A FRIEND", 44f, Color.white);
             float y = panel.y + 84f;
             if (shown == 0)
             {
@@ -565,7 +578,7 @@ namespace PleaseDontDrown.UI
             float column = rows * ButtonHeight + (rows - 1) * ButtonGap;
             float noteHeight = string.IsNullOrEmpty(note) ? 0f : 70f;
             float top = Mathf.Max(20f, (height - column - 110f - noteHeight) * 0.5f);
-            Hud.Label(new Rect(0f, top, width, 90f), title, 76f, Color.white, heavy: true);
+            Hud.Title(new Rect(0f, top, width, 96f), title, 86f, Color.white);
             if (noteHeight > 0f)
                 Hud.Label(new Rect(width * 0.5f - 500f, top + 92f, 1000f, 60f), note, 20f, new Color(1f, 1f, 1f, 0.8f), TextAnchor.UpperCenter, wrap: true);
             x = (width - columnWidth) * 0.5f;
@@ -574,15 +587,16 @@ namespace PleaseDontDrown.UI
 
         // ------------------------------------------------------------------ guide
 
-        private string[] _guide;
+        private (string key, string what)[] _guide;
         private int _guideVersion = -1;
 
+        /// <summary>The quick guide (Tab), top right: two columns of keycaps with what each does.</summary>
         private void DrawGuide()
         {
-            const float width = 500f, height = 366f;
+            const float width = 540f, height = 380f, row = 38f;
             var panel = new Rect(Hud.Width - width - 24f, 24f, width, height);
             Hud.Panel(panel);
-            Hud.Label(new Rect(panel.x + 24f, panel.y + 14f, width - 48f, 40f), "BEACH GUIDE", 30f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Title(new Rect(panel.x + 24f, panel.y + 10f, width - 48f, 44f), "BEACH GUIDE", 34f, Hud.Teal, TextAnchor.MiddleLeft);
             if (_guide == null || _guideVersion != GameInput.BindingsVersion)
             {
                 // The player's own keys (OPTIONS, KEYS), written out once until one changes.
@@ -592,28 +606,27 @@ namespace PleaseDontDrown.UI
                               GameInput.KeyLabel(k[1].Action, k[1].Binding) + GameInput.KeyLabel(k[3].Action, k[3].Binding);
                 _guide = new[]
                 {
-                    GuideText(move.Length <= 4 ? move : "Keys", "Move"), GuideText(GameInput.KeyLabel(GameInput.Sprint), "Sprint"),
-                    GuideText(GameInput.KeyLabel(GameInput.Interact), "Rescue / use"), GuideText(GameInput.KeyLabel(GameInput.Jump), "Jump"),
-                    GuideText(GameInput.KeyLabel(GameInput.Primary), "Punch / fire"), GuideText(GameInput.KeyLabel(GameInput.Secondary), "CPR / aim"),
-                    GuideText(GameInput.KeyLabel(GameInput.Reload), "Reload"), GuideText("1-6", "Inventory"),
-                    GuideText(GameInput.KeyLabel(GameInput.Drop), "Drop (hold: throw)"), GuideText(GameInput.KeyLabel(GameInput.Emote), "Wave"),
-                    GuideText("Tab", "Close guide"), GuideText("Esc", "Pause"),
-                    GuideText("F11", "Fullscreen"), GuideText("Shift+Tab", "Steam")
+                    (move.Length <= 4 ? move : "Keys", "Move"), (GameInput.KeyLabel(GameInput.Sprint), "Sprint"),
+                    (GameInput.KeyLabel(GameInput.Interact), "Rescue / use"), (GameInput.KeyLabel(GameInput.Jump), "Jump"),
+                    (GameInput.KeyLabel(GameInput.Primary), "Punch / fire"), (GameInput.KeyLabel(GameInput.Secondary), "CPR / aim"),
+                    (GameInput.KeyLabel(GameInput.Reload), "Reload"), ("1-6", "Inventory"),
+                    (GameInput.KeyLabel(GameInput.Drop), "Drop (hold: throw)"), (GameInput.KeyLabel(GameInput.Emote), "Wave"),
+                    ("Tab", "Close guide"), ("Esc", "Pause"),
+                    ("F11", "Fullscreen"), ("Shift+Tab", "Steam")
                 };
             }
             float y = panel.y + 64f, half = (width - 48f) * 0.5f;
-            var white = new Color(1f, 1f, 1f, 0.92f);
-            for (int i = 0; i < _guide.Length; i += 2)
+            var white = new Color(1f, 1f, 1f, 0.94f);
+            for (int i = 0; i < _guide.Length; i++)
             {
-                if (i == 10) y += 10f;
-                Hud.FitLabel(new Rect(panel.x + 24f, y, half - 8f, 32f), _guide[i], 19f, white, minimum: 15f);
-                Hud.FitLabel(new Rect(panel.x + 24f + half + 10f, y, half - 8f, 32f), _guide[i + 1], 19f, white, minimum: 15f);
-                y += 34f;
+                if (i == 10 && i % 2 == 0) y += 8f; // (the menu keys a little apart)
+                float x = panel.x + 24f + (i % 2) * (half + 10f);
+                float cap = Hud.KeyCap(x, y + 3f, _guide[i].key, 28f);
+                Hud.FitLabel(new Rect(x + cap + 10f, y, half - cap - 18f, 34f), _guide[i].what, 19f, white, minimum: 14f);
+                if (i % 2 == 1) y += row;
             }
             Hud.Label(new Rect(panel.x + 24f, panel.yMax - 40f, width - 48f, 28f), "Keys, mouse and sound: Esc, then OPTIONS", 18f, new Color(1f, 1f, 1f, 0.65f), TextAnchor.MiddleLeft, shadow: false);
         }
-
-        private static string GuideText(string key, string what) => $"<color=#ffd24a>{key}</color>  {what}";
 
         // ------------------------------------------------------------------ parts
 

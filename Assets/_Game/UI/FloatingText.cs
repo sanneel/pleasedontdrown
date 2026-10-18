@@ -207,6 +207,7 @@ namespace PleaseDontDrown.UI
                     float edge = Mathf.Min(v.x, 1f - v.x, (1f - v.y) * 1.4f, v.y);
                     fade *= Mathf.Clamp01((edge - 0.04f) / 0.08f);
                     if (v.x < 0.34f && v.y > 0.72f) fade *= Mathf.Clamp01(Mathf.Max((v.x - 0.26f) / 0.08f, (0.8f - v.y) / 0.08f));
+                    fade *= 1f - StoryHud.CardCover(v.y); // (and out of the way of a chapter card)
                 }
             }
             transform.localScale = Vector3.one * (pop * fit);

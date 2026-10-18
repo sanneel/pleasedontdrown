@@ -219,7 +219,7 @@ namespace PleaseDontDrown.UI
             if (fit < 1f) GUIUtility.ScaleAroundPivot(new Vector2(fit, fit), new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
             var panel = new Rect((Hud.Width - PanelWidth) * 0.5f, (Hud.Height - PanelHeight) * 0.5f, PanelWidth, PanelHeight);
             Hud.Panel(panel, 0.92f);
-            Hud.Label(new Rect(panel.x + 36f, panel.y + 14f, 900f, 56f), "YOUR LIFEGUARD", 44f, Color.white, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            Hud.Title(new Rect(panel.x + 36f, panel.y + 10f, 900f, 60f), "YOUR LIFEGUARD", 50f, Color.white, TextAnchor.MiddleLeft);
             Hud.Label(new Rect(panel.x + 38f, panel.y + 62f, 900f, 26f), "Everyone in your game sees you like this.", 19f, Hud.Muted, TextAnchor.MiddleLeft, shadow: false);
 
             // Preview (drag to spin): the studio picture, framed.

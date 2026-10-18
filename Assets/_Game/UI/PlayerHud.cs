@@ -21,6 +21,9 @@ namespace PleaseDontDrown.UI
         private const float HintSeconds = 8f;   // the key hints fade once you've had time to read them
 
         private static readonly List<Toast> _toasts = new();
+
+        /// <summary>Where the messages in the top right were last drawn (sheet units; empty when none): markers keep clear.</summary>
+        public static Rect ToastArea { get; private set; }
         private readonly float[] _lift = new float[PlayerHands.SlotCount];
         private readonly float[] _filledAt = new float[PlayerHands.SlotCount];
         private readonly Items.Item[] _slotItems = new Items.Item[PlayerHands.SlotCount];
@@ -40,7 +43,11 @@ namespace PleaseDontDrown.UI
         private int _bindingsVersion = -1;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => _toasts.Clear();
+        private static void ResetStatics()
+        {
+            _toasts.Clear();
+            ToastArea = Rect.zero;
+        }
 
         private static string[] BuildSlotNumbers()
         {
@@ -55,12 +62,14 @@ namespace PleaseDontDrown.UI
         {
             HudCanvas.Add(this, HudCanvas.OrderPlayer, DrawHud);
             HudCanvas.Add(gameObject, HudCanvas.OrderFade, DrawArrival);
+            DevCommands.Register("toast", "<text>", "Show a message in the top right (to look at it).", args => ShowToast(string.Join(" ", args)), owner: this);
         }
 
         private void OnDisable()
         {
             HudCanvas.Remove(this);
             HudCanvas.Remove(gameObject);
+            DevCommands.Unregister("toast", this);
         }
 
         private PlayerHub _arrived;
@@ -151,23 +160,28 @@ namespace PleaseDontDrown.UI
             DrawHurt(local, cx, cy);
 
             _toasts.RemoveAll(t => t.Until < Time.unscaledTime);
-            // Each message on its own dark pill under the top of the screen (the team, 2026-10-12: words floating in the
-            // sky read as a log), sliding in and fading out.
-            float toastY = DevConnectMenu.GuideOpen ? 414f : Hud.Margin;
+            // Messages under the top right of the screen, the newest on top: outlined words (no box) with a bar on
+            // their right edge, so they read as a message and not words floating in the sky (the team, 2026-10-12).
+            // Each one glides in from the right, and drifts up a little as it fades.
+            float toastY = DevConnectMenu.GuideOpen ? 414f : Hud.Margin, toastTop = toastY;
             for (int i = _toasts.Count - 1; i >= 0; i--)
             {
                 Toast toast = _toasts[i];
-                float alpha = Mathf.Clamp01((Time.unscaledTime - toast.From) / 0.15f) * Mathf.Clamp01((toast.Until - Time.unscaledTime) / 0.4f);
-                float slide = (1f - Mathf.Clamp01((Time.unscaledTime - toast.From) / 0.2f)) * 12f;
-                // (A thin teal bar on its right edge makes it read as a message, not words floating in the sky.)
-                const float size = 19f, width = 360f;
+                float age = Time.unscaledTime - toast.From, left = toast.Until - Time.unscaledTime;
+                float alpha = Mathf.Clamp01(age / 0.18f) * Mathf.Clamp01(left / 0.45f);
+                float slide = Mathf.Pow(1f - Mathf.Clamp01(age / 0.32f), 3f) * 44f;
+                float drift = (1f - Mathf.Clamp01(left / 0.45f)) * 10f;
+                const float size = 21f, width = 420f;
                 float height = Hud.TextHeight(toast.Text, width, size) + 8f;
-                var pill = new Rect(Hud.Width - Hud.Margin - width - 12f + slide, toastY, width, height);
-                Hud.Fill(new Rect(pill.xMax + 8f, pill.y + 3f, 4f, height - 8f), new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, alpha), 2f);
-                Hud.Label(new Rect(pill.x, pill.y, width, height), toast.Text, size,
-                    new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, alpha), TextAnchor.UpperRight, wrap: true);
-                toastY += height + 10f;
+                var line = new Rect(Hud.Width - Hud.Margin - width - 14f + slide, toastY - drift, width, height);
+                // (The bar turns coral for a warning: a message written in red.)
+                Color bar = toast.Text.Contains("#ff") ? Hud.Coral : Hud.Teal;
+                float grow = Hud.EaseOutBack(Mathf.Clamp01(age / 0.3f));
+                Hud.Fill(new Rect(line.xMax + 9f, line.y + 3f + (height - 8f) * 0.5f * (1f - grow), 5f, (height - 8f) * grow), new Color(bar.r, bar.g, bar.b, alpha), 2.5f);
+                Hud.Label(line, toast.Text, size, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, alpha), TextAnchor.UpperRight, wrap: true);
+                toastY += height + 12f;
             }
+            ToastArea = _toasts.Count > 0 ? new Rect(Hud.Width - Hud.Margin - 440f, toastTop, 440f + Hud.Margin, toastY - toastTop) : Rect.zero;
         }
 
         /// <summary>

@@ -61,6 +61,19 @@ namespace PleaseDontDrown.Story
             Audio.GameMusic.Play(Audio.Jingle.Chapter);
         }
 
+        /// <summary>
+        /// How much a card is up now, 0 to 1: the report (whole screen) or the chapter title (the top half). Speech
+        /// bubbles step aside meanwhile, so nothing floats over the card.
+        /// </summary>
+        public static float CardCover(float viewportY)
+        {
+            float report = Time.unscaledTime - _reportAt, title = Time.unscaledTime - _titleAt;
+            float cover = 0f;
+            if (_reportTitle != null && report <= ReportSeconds) cover = Mathf.Clamp01(report / 0.3f) * Mathf.Clamp01((ReportSeconds - report) / 0.8f);
+            if (_title != null && title <= 4.5f && viewportY > 0.45f) cover = Mathf.Max(cover, Mathf.Clamp01(title / 0.3f) * Mathf.Clamp01((4.5f - title) / 0.8f));
+            return cover;
+        }
+
         /// <summary>A big centred card for a few seconds ("CHAPTER 2").</summary>
         public static void ShowTitle(string title, string subtitle)
         {
@@ -86,9 +99,9 @@ namespace PleaseDontDrown.Story
                 DrawMarker(cam, local);
                 DrawLostSparkles(cam, local);
             }
+            DrawReport(); // (under the subtitles: its dim mustn't darken what's being said)
             DrawDialogue();
             DrawTitle();
-            DrawReport();
         }
 
         private void DrawObjective()
@@ -264,8 +277,10 @@ namespace PleaseDontDrown.Story
             float height = 120f + ReportLabels.Length * row + 26f;
             var panel = new Rect((Hud.Width - width) * 0.5f, (Hud.Height - height) * 0.5f - 40f, width, height);
             // (No Hud.Panel: its little teal accent floated alone over the title; the line under the title is enough.)
+            // The game dims a little behind it while it's up (a screen dim, not a box), so the lines read on any view.
+            Hud.Fill(new Rect(0f, 0f, Hud.Width, Hud.Height), new Color(Hud.Ink.r, Hud.Ink.g, Hud.Ink.b, 0.42f * a));
             float grow = Hud.EaseOutBack(Mathf.Clamp01(t / 0.45f));
-            Hud.FitLabel(new Rect(panel.x + 20f, panel.y + 18f, width - 40f, 70f), _reportTitle, 48f * Mathf.Lerp(0.85f, 1f, grow), new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, a), TextAnchor.MiddleCenter, heavy: true);
+            Hud.FitTitle(new Rect(panel.x + 20f, panel.y + 16f, width - 40f, 74f), _reportTitle, 54f * Mathf.Lerp(0.85f, 1f, grow), new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, a));
             Hud.Fill(new Rect(panel.center.x - 120f * grow, panel.y + 92f, 240f * grow, 4f), new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, a), 2f);
             float y = panel.y + 110f;
             for (int i = 0; i < ReportLabels.Length; i++)
@@ -279,7 +294,7 @@ namespace PleaseDontDrown.Story
                 Color value = bad ? Hud.Danger : i >= 3 ? Hud.Teal : Hud.Paper;
                 value.a = shown;
                 Hud.Fill(new Rect(panel.x + 36f, y + row - 1f, width - 72f, 1f), new Color(1f, 1f, 1f, 0.08f * shown));
-                Hud.Label(new Rect(panel.x + 36f, y, width - 190f, row), ReportLabels[i], 22f, new Color(Hud.Muted.r, Hud.Muted.g, Hud.Muted.b, shown), TextAnchor.MiddleLeft, shadow: false);
+                Hud.Label(new Rect(panel.x + 36f, y, width - 190f, row), ReportLabels[i], 23f, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, 0.88f * shown), TextAnchor.MiddleLeft, shadow: false);
                 Hud.Label(new Rect(panel.x + 48f, y, width - 96f, row), _reportValues[i], 30f, value, TextAnchor.MiddleRight, heavy: true, shadow: false);
                 y += row;
             }
@@ -294,7 +309,7 @@ namespace PleaseDontDrown.Story
             // (No dark band behind it: text sits straight on the game, outlined. The user, 2026-10-13 and again 2026-10-17.)
             // The words grow in, the teal line opens out under them, the subtitle follows.
             float grow = Hud.EaseOutBack(Mathf.Clamp01(t / 0.5f)), line = Mathf.SmoothStep(0f, 1f, (t - 0.15f) / 0.5f);
-            Hud.FitLabel(new Rect(80f, y, Hud.Width - 160f, 130f), _title, 104f * Mathf.Lerp(0.8f, 1f, grow), new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, a), TextAnchor.MiddleCenter, heavy: true);
+            Hud.FitTitle(new Rect(80f, y, Hud.Width - 160f, 130f), _title, 112f * Mathf.Lerp(0.8f, 1f, grow), new Color(Hud.Sand.r, Hud.Sand.g, Hud.Sand.b, a));
             Hud.Fill(new Rect(Hud.Width * 0.5f - 160f * line, y + 134f, 320f * line, 5f), new Color(Hud.Teal.r, Hud.Teal.g, Hud.Teal.b, a), 2.5f);
             float sub = Mathf.Clamp01((t - 0.35f) / 0.4f) * a;
             Hud.Label(new Rect(80f, y + 148f, Hud.Width - 160f, 60f), _subtitle, 32f, new Color(Hud.Paper.r, Hud.Paper.g, Hud.Paper.b, sub), wrap: true, heavy: true);

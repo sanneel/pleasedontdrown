@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Interaction;
 using PleaseDontDrown.Player;
@@ -24,6 +25,7 @@ namespace PleaseDontDrown.UI
             if (cam == null || !GameInput.GameplayActive)
                 return;
             var victims = VictimBrain.All;
+            _placed.Clear();
             for (int i = 0; i < victims.Count; i++)
             {
                 VictimBrain v = victims[i];
@@ -102,6 +104,17 @@ namespace PleaseDontDrown.UI
             Hud.Label(new Rect(bar.x, bar.yMax + 4f, bar.width, 30f), _cprPercent, 17f, Hud.Teal, heavy: true, shadow: false);
         }
 
+        // The labels drawn so far this frame: the next one steps aside rather than land on them.
+        private readonly List<Rect> _placed = new();
+
+        private bool Crowded(Rect label)
+        {
+            if (label.Overlaps(PlayerHud.ToastArea)) return true;
+            foreach (Rect r in _placed)
+                if (label.Overlaps(r)) return true;
+            return false;
+        }
+
         private void DrawMarker(Camera cam, PlayerHub local, VictimBrain v, VictimState state)
         {
             Vector3 world = v.Body.HeadPosition + Vector3.up * 0.7f;
@@ -112,7 +125,9 @@ namespace PleaseDontDrown.UI
 
             float margin = 70f * Hud.Scale;
             bool offscreen = behind || screen.x < margin || screen.x > Screen.width - margin || screen.y < margin || screen.y > Screen.height - margin;
-            if (!offscreen && distance < 2.6f) return; // right in front of you: the prompts under the crosshair say it all
+            // Right in front of you, or out cold at your feet: the prompts under the crosshair (and the CPR card) say it
+            // all, a pin on the screen's edge would only repeat it.
+            if (distance < 2.6f && (!offscreen || state == VictimState.Unconscious)) return;
             if (offscreen)
             {
                 // Pin to the edge in the target's direction.
@@ -151,6 +166,10 @@ namespace PleaseDontDrown.UI
             float infoHeight = Hud.TextHeight(info, 280f, 17f, heavy: true);
             float labelHeight = 40f + infoHeight;
             var rect = new Rect(Mathf.Clamp(x - 156f, 12f, Hud.Width - 324f), below ? y + 18f : y - labelHeight - 30f, 312f, labelHeight);
+            // Several tourists the same way (or a message in the top right): stack the label clear of them, away from
+            // the edge it's pinned to.
+            for (int tries = 0; tries < 6 && Crowded(rect); tries++) rect.y += below ? rect.height + 16f : -(rect.height + 16f);
+            _placed.Add(new Rect(rect.x, rect.y, rect.width, rect.height + 16f));
             Hud.Surface(rect, 0.8f, color);
             Hud.FitLabel(new Rect(rect.x + 16f, rect.y + 6f, 280f, 27f), text, 21f, Hud.Paper, TextAnchor.MiddleCenter, heavy: true);
             Hud.Label(new Rect(rect.x + 16f, rect.y + 34f, 280f, infoHeight), info, 17f, color, TextAnchor.UpperCenter, heavy: true, wrap: true, shadow: false);
@@ -158,7 +177,7 @@ namespace PleaseDontDrown.UI
             // Air (awake) or CPR progress (unconscious on land).
             float bar = state == VictimState.Unconscious ? v.Cpr01 : v.Air01;
             if (state.NeedsHelp() && (state != VictimState.Unconscious || bar > 0f))
-                Hud.Bar(new Rect(rect.center.x - 45f, below ? rect.yMax + 6f : y - 24f, 90f, 8f), bar,
+                Hud.Bar(new Rect(rect.center.x - 45f, rect.yMax + 6f, 90f, 8f), bar,
                     state == VictimState.Unconscious ? new Color(0.5f, 1f, 0.5f) : bar < 0.35f ? new Color(1f, 0.35f, 0.3f) : new Color(0.45f, 0.8f, 1f));
         }
 
