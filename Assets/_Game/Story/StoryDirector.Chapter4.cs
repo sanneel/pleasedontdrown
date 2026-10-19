@@ -26,10 +26,14 @@ namespace PleaseDontDrown.Story
         private const int LandingFee = 50, RaceGoal = 3, WarehouseTags = 5;
         private static readonly string[] RivalNames = { "FK Chad", "FK Brad", "FK Tad", "FK Kyle", "FK Troy", "FK Brent", "FK Lance", "FK Duke" };
 
-        /// <summary>The company's lifeguards: the players' own goofy lifeguard in orange and white, an orange visor.</summary>
+        /// <summary>
+        /// The company's lifeguards: their own body (Bodies.FkRival, Tripo: orange shirt with a white stripe, white
+        /// shorts, an orange visor). The goofy fields below are what security's black uniform is made from.
+        /// </summary>
         public static AvatarLook RivalLook(int i)
         {
             AvatarLook look = AvatarLook.Lifeguard;
+            look.Body = AvatarLook.Bodies.FkRival;
             look.TopColor = 3;      // orange
             look.BottomColor = 1;   // white
             look.Hat = HatStyle.Visor;
@@ -40,10 +44,11 @@ namespace PleaseDontDrown.Story
             return look;
         }
 
-        /// <summary>The company's warehouse security: the same lifeguards in black.</summary>
+        /// <summary>The company's warehouse security: the players' goofy lifeguard in black.</summary>
         public static AvatarLook SecurityLook(int i)
         {
             AvatarLook look = RivalLook(i + 3);
+            look.Body = AvatarLook.Bodies.Goofy;
             look.TopColor = 14;     // black
             look.BottomColor = 14;
             look.Hat = HatStyle.Cap;

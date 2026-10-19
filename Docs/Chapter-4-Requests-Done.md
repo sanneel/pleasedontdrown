@@ -9,7 +9,7 @@ Answers to the table at the end of `Docs/Report-Shako-Chapter-4.md`. Branch `san
 | 3 | "Taken by a rival" | `VictimEvent.TakenByRival` and `VictimBrain.ServerTakenByRival(rivalName)`: lost, "LOST TO COMPETITION" over them, the toast "FK Kyle grabbed Linda: lost to the competition.", the report's LOST TO RIVALS count, the company's $30 bill (Economy, as for the airlift: "rescue bill"), towed off in 1.2 s. The race and the airlift call it; their own counting, billing and despawning are gone (the race's feed line is just the score now: "THEIRS! You 0 - 1 Finders Keepers") | `Rescue/VictimBrain.cs`, `Story/Economy.cs`, `Story/StoryDirector.cs`, `Story/StoryDirector.Chapter4.cs` |
 | 4 | StoryHud under the credits | While `CreditsRoll.Rolling`: no objective, no team funds, no marker (they come back with the open shift) | `Story/StoryHud.cs` |
 | 5 | A POLICE caption | `NpcRole.Police` (caption POLICE, blue speech colour). Officer Gill is now a character: the goofy lifeguard in navy with a cap and a moustache, out on the launch's bow by the dock once it ties up, so his plate has his face; he rides out behind Sandy and the THIEF | `Story/StoryNpc.cs`, `Story/StoryHud.cs`, `Story/StoryDirector.Chapter4End.cs` |
-| 6 | A rival lifeguard body | Not made: Tripo isn't approved yet (art pass item 1), and nothing was generated or downloaded. The rivals stay the recoloured goofy lifeguard. A no-Tripo fallback (the black-tee tourist repainted orange and white with `paint_outfit.py`) is planned, not started | |
+| 6 | A rival lifeguard body | `Bodies.FkRival` (29): one Tripo generation, approved by Sandro (25 credits): a cartoon lifeguard in an orange shirt with a white chest stripe, white shorts and an orange visor, the tourists' style. All the company's lifeguards wear it (`RivalLook`); warehouse security stays the goofy lifeguard in black. Tripo gave him a T-pose: `ArtSource/Tools/apose_from_tpose.py` lowered the arms and turned the palms in before `prepare_character.py` (new `--ankle 1`) rigged him | `ArtSource/Tripo/Latest/raw/fk_rival_meshopt.glb`, `Art/Characters/fk_rival.glb`, `Avatar/Bodies/fk_rival*`, `Editor/MeshyCharacters.cs`, `Avatar/AvatarLook.cs`, `Story/StoryDirector.Chapter4.cs` |
 
 ## Found on the way, fixed
 
@@ -20,6 +20,13 @@ Answers to the table at the end of `Docs/Report-Shako-Chapter-4.md`. Branch `san
 - **The name plate's portrait of a goofy body showed only its nose** (the FK rivals, the officer): the portrait camera
   stood a person's distance from the face; it now stands off by the head's own size (`UI/SpeakerPortrait.cs`; people
   look as before).
+
+## The rival body, notes
+
+- His head is about a quarter of his height, between a tourist's and the players' goofy lifeguard (the prompt asked for
+  a seventh; Tripo drew it bigger). Snug visor, no big hat.
+- Running, his swinging foot stays flat and hooks forward under the shin. The goofy players' run does exactly the same
+  (the game keeps feet flat through the swing); flip-flops hide it on the black-tee tourist. Not changed here.
 
 ## Why the claw is in one hand
 

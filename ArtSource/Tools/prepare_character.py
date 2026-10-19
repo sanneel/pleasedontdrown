@@ -14,6 +14,8 @@ blender -b --factory-startup -P ArtSource/Tools/prepare_character.py -- <in.glb>
   --shoulderx 0.1          shoulders at least this far from the middle (fraction of the height): a long coat with a
                            high collar hides the armpit and the arm's line runs up to the collar
   --symlegs 1              mirror the leg joints (mean of both sides): a sash or a scabbard on one hip skews that leg's fit
+  --ankle 1                above the ankle only the shin moves the leg (the foot's weight fades out over 3.5 cm): heat
+                           weighting let the foot reach up the shin, and the game's flat feet bent it into a hook in a run
 
 What it does: keeps one figure (drops other figures and floating text), stands it on the origin facing -Y
 (glTF +Z), finds the joints from the front silhouette, builds a skeleton named like AvatarRig.Bone
@@ -35,7 +37,7 @@ from mathutils.kdtree import KDTree
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, DST = argv[0], argv[1]
-opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'armsmooth': 40, 'preview': '', 'turn': 0.0, 'symlegs': 0, 'shoulderx': 0.0}
+opts = {'pick': 'only', 'height': 1.72, 'tris': 22000, 'texture': 2048, 'bust': 0, 'armclamp': 1, 'armband': 0.045, 'armin': 0.0, 'helpers': 1, 'armsmooth': 40, 'preview': '', 'turn': 0.0, 'symlegs': 0, 'shoulderx': 0.0, 'ankle': 0}
 i = 2
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -380,6 +382,33 @@ for vert in body.data.vertices:
     body.vertex_groups[best].add([vert.index], 1.0, 'REPLACE')
     empty += 1
 log(f'{empty} vertices had no weight (given to the nearest bone)')
+
+# Ankles (--ankle 1): above the ankle joint the foot bone gives its weight back to the shin, fading in over a few
+# centimetres; the heel's bottom and the toes stay the foot's. (The game holds the feet flat while a shin swings back in
+# a run: a foot weighted up the shin bent it into a hook.)
+if opts['ankle']:
+    moved = 0
+    for side in 'LR':
+        foot_g, shin_g = body.vertex_groups['Foot' + side], body.vertex_groups['Shin' + side]
+        ankle, tip = np.array(joints['Foot' + side]), np.array(joints['FootTip' + side])
+        toward_toes = np.sign(tip[1] - ankle[1]) or -1.0
+        for vert in body.data.vertices:
+            x, y, z = vert.co
+            if (x > 0) != (ankle[0] > 0):
+                continue
+            if (y - ankle[1]) * toward_toes > 0.03:
+                continue  # the front of the foot
+            u = min(1.0, max(0.0, (ankle[2] + 0.02 - z) / 0.035))
+            keep = u * u * (3 - 2 * u)
+            share = next((g.weight for g in vert.groups if g.group == foot_g.index), 0.0)
+            if share <= 1e-4 or keep >= 0.999:
+                continue
+            gone = share * (1 - keep)
+            foot_g.add([vert.index], share - gone, 'REPLACE')
+            shin = next((g.weight for g in vert.groups if g.group == shin_g.index), 0.0)
+            shin_g.add([vert.index], shin + gone, 'REPLACE')
+            moved += 1
+    log(f'ankles: {moved} vertices above the ankle given back to the shins')
 
 # Heat weighting lets the arm bones reach onto the chest and flanks (the arms start out close to the body), so
 # lowering or raising the arms dragged the chest, bust and bikini along. Below the armpits, only what is really arm
