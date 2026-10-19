@@ -23,3 +23,9 @@ The GLBs carry their colours directly; no texture downloads are required. `GameS
 The prefab is also placed in Game under `Environment/Hotel/ResortBeachLife/LargeBeachBar/ColouredTripoBar`. It replaces the earlier placeholder pavilion. The surrounding bar root adds deck, U-shaped counter, chair and post collisions; bartender interactions; four serving spots; and beer/coconut racks. The deck is about 26cm high and serving spots sit just above the counter. The rear staff aisle stays open.
 
 `Finish one hotel and open reception` rebuilds this beach setup and checks the customer approaches, staff aisle and bartender interaction distance. The live scene update reports PASS in `Logs/hotel-finish-result.txt`. A visual Unity review is saved at `Screenshots/Review/Resort/beach-club.png`.
+
+## Textures and the inside (2026-10-19)
+
+The flat colours left the inside one brown (floor, shelves, the jars on them, work counters). `ArtSource/Tools/retexture_tripo_bar.py` (Blender) takes the flat LODs kept in `ArtSource/Resort/TripoBar/flat/`, gives them UVs in metres (projected along each face's main axis) and new `resort_barhut_*` materials: wood grain, plank floor and deck, straw thatch (tileable pictures from `ArtSource/Tools/make_bar_textures.py`, linked from `Art/Props/Textures/bar_*.jpg`), coloured glass jars on the back shelves against dark wood, dark varnished tops on every counter. The stools and tables keep `resort_bar_*`. Then `GameSceneBuilder.ImportColouredTripoBar` rebuilds the prefab (`PropPaint` keeps a `resort_barhut_` material's texture).
+
+The hotel bar's colliders follow the model as measured with `SceneProbeMaps.HeightMapBatch` (counter z 3.55-4.85, staff floor 0.45, work counters, back shelves), and its bartender stands on the staff floor behind the counter: `GameSceneBuilder.HotelBarFixBatch` applies both to the saved scene.
