@@ -15,6 +15,8 @@ namespace PleaseDontDrown.UI
     {
         private const int Size = 256;
         private const float Distance = 0.85f, Fov = 26f;
+        /// <summary>The camera stands this many head-heights out in front of the face (a person's head: 0.85 m from it).</summary>
+        private const float HeadsAway = 1.5f;
         private static SpeakerPortrait _instance;
 
         private Camera _camera;
@@ -83,13 +85,16 @@ namespace PleaseDontDrown.UI
             if (!render) return;
 
             // In front of their face, looking at it a touch from above: the face fills the picture, shoulders under it.
+            // (Out by the head's own size: at a person's distance the goofy lifeguard's big head showed only his nose.)
             AvatarRig rig = _target.Rig;
-            Vector3 head = rig != null && rig.IsBuilt ? rig[AvatarRig.Bone.Head].position + Vector3.up * (rig.HeadTop * 0.4f) : _target.HeadPosition;
+            bool built = rig != null && rig.IsBuilt && rig.HeadTop > 0f;
+            Vector3 head = built ? rig[AvatarRig.Bone.Head].position + Vector3.up * (rig.HeadTop * 0.4f) : _target.HeadPosition;
+            float distance = built ? Mathf.Max(Distance * 0.8f, rig.HeadFront + rig.HeadTop * HeadsAway) : Distance;
             Vector3 facing = _target.transform.forward;
             facing.y = 0f;
             if (facing.sqrMagnitude < 0.001f) facing = Vector3.forward;
             facing.Normalize();
-            Vector3 eye = head + facing * Distance + Vector3.up * 0.06f;
+            Vector3 eye = head + facing * distance + Vector3.up * 0.06f;
             _camera.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(head - Vector3.up * 0.05f - eye));
             _ready = true;
         }

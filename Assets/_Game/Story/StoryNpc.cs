@@ -18,7 +18,7 @@ using Random = UnityEngine.Random;
 
 namespace PleaseDontDrown.Story
 {
-    public enum NpcRole : byte { Guide, Receptionist, Robber, Pirate, Bystander, Guest, Rival } // Rival: Finders Keepers Rescue Co. (island 4)
+    public enum NpcRole : byte { Guide, Receptionist, Robber, Pirate, Bystander, Guest, Rival, Police } // Rival: Finders Keepers Rescue Co. (island 4); Police: the ending's officer
 
     /// <summary>What a beach tourist is up to (host bookkeeping, used by BeachCrowd and NpcWatch).</summary>
     public enum NpcActivity : byte { None, Sunbathe, Stroll, Wade, Swim, Chat, GoSwim, Return }
@@ -169,6 +169,7 @@ namespace PleaseDontDrown.Story
             NpcRole.Robber => new Color(0.85f, 0.85f, 0.85f),
             NpcRole.Pirate => new Color(1f, 0.5f, 0.4f),
             NpcRole.Rival => new Color(1f, 0.66f, 0.3f),
+            NpcRole.Police => new Color(0.6f, 0.75f, 1f),
             _ => new Color(1f, 1f, 0.75f)
         };
 
@@ -598,6 +599,8 @@ namespace PleaseDontDrown.Story
             // Everyone: animate from how the body moved.
             Vector3 position = transform.position;
             Vector3 raw = (position - _lastPosition) / dt;
+            _deckVelocity = raw.sqrMagnitude > 4f || _deck != null ? DeckVelocity(position, dt) : Vector3.zero;
+            raw -= _deckVelocity;
             if (raw.sqrMagnitude > 900f) raw = Vector3.zero;
             _velocity = Vector3.Lerp(_velocity, raw, 1f - Mathf.Exp(-10f * dt));
             _lastPosition = position;
@@ -605,6 +608,34 @@ namespace PleaseDontDrown.Story
             UpdateAnimation();
             UpdateHitFlash();
             UpdateNameTag();
+        }
+
+        // The sailing boat this character stands on, if any (see DeckVelocity), and where it was last frame.
+        private Transform _deck;
+        private Vector3 _deckLast, _deckVelocity;
+        private static readonly RaycastHit[] _deckHits = new RaycastHit[6];
+
+        /// <summary>
+        /// Every machine: how fast the boat under this character's feet is going (a story boat: the police launch takes
+        /// Sandy, the THIEF and the officer away). Their legs walk only what they do on its deck, and their planted feet
+        /// ride along with it (AvatarMotion.GroundVelocity); carried at the launch's speed they ran on the spot.
+        /// </summary>
+        private Vector3 DeckVelocity(Vector3 feet, float dt)
+        {
+            Transform deck = null;
+            int count = Physics.RaycastNonAlloc(feet + Vector3.up * 0.4f, Vector3.down, _deckHits, 0.9f, ~0, QueryTriggerInteraction.Ignore);
+            float nearest = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit h = _deckHits[i];
+                if (h.distance >= nearest || h.collider.attachedRigidbody != null && h.collider.attachedRigidbody == _rigidbody) continue;
+                nearest = h.distance;
+                deck = h.collider.GetComponentInParent<World.ScriptedBoat>() is { } boat ? boat.transform : null;
+            }
+            Vector3 velocity = deck != null && deck == _deck ? (deck.position - _deckLast) / dt : Vector3.zero;
+            _deck = deck;
+            if (deck != null) _deckLast = deck.position;
+            return velocity;
         }
 
         private void UpdateAnimation()
@@ -634,6 +665,7 @@ namespace PleaseDontDrown.Story
             _animator.Motion = new AvatarMotion
             {
                 Velocity = _pose.Value == AvatarPose.Normal || _pose.Value == AvatarPose.Scared ? _velocity : Vector3.zero,
+                GroundVelocity = _deckVelocity,
                 FacingYaw = _lookYaw,
                 Grounded = true,
                 Swimming = swimming && _ride == null,

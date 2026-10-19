@@ -27,7 +27,8 @@ namespace PleaseDontDrown.Avatars
     /// <summary>What the body is doing this frame. Filled in by a driver (e.g. PlayerAvatar) before LateUpdate.</summary>
     public struct AvatarMotion
     {
-        public Vector3 Velocity;      // world
+        public Vector3 Velocity;      // world (relative to what they stand on)
+        public Vector3 GroundVelocity; // world: what they stand on is moving (a sailing boat's deck); planted feet go with it
         public float FacingYaw;       // where the head looks, degrees
         public float LookPitch;       // degrees, positive = looking down
         public bool Grounded;
@@ -1224,6 +1225,14 @@ namespace PleaseDontDrown.Avatars
         private Vector3 LockFoot(int i, Vector3 cycle, float q)
         {
             float s = _rig.Scale, dt = Mathf.Max(_dt, 1e-4f);
+            if (Motion.GroundVelocity.sqrMagnitude > 1e-4f)
+            {
+                // Standing on a moving deck: the planted foot rides along with it (left behind in the world, the legs
+                // stretched out after the boat and snapped back every few frames).
+                Vector3 ride = Motion.GroundVelocity * dt;
+                _footDrawn[i] += ride;
+                _footLift[i] += ride;
+            }
             Vector3 drawn = _footDrawn[i];
             if (!_footKnown[i] || (new Vector2(drawn.x - cycle.x, drawn.z - cycle.z)).sqrMagnitude > 0.6f * 0.6f * s * s)
             {

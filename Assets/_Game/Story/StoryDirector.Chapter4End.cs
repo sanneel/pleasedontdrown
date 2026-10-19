@@ -18,8 +18,29 @@ namespace PleaseDontDrown.Story
     public partial class StoryDirector
     {
         private const int ReturnedReward = 1000, ThingsReturned = 120;
-        private static readonly Color PoliceVoice = new(0.6f, 0.75f, 1f);
         private IslandSetup _island3Free;
+        private StoryNpc _officer;
+
+        // Where the officer stands on the launch's deck (its own space): by the dock side while it's tied up, behind
+        // Sandy and the THIEF on the way out.
+        private static readonly Vector3 OfficerAtBerth = new(-0.7f, 0.78f, 3.3f), OfficerAway = new(0f, 0.78f, 0.45f);
+
+        /// <summary>The officer who makes the arrests: the lifeguard body in navy, a cap, a moustache (aviators hid his eyes in the name plate's portrait).</summary>
+        public static AvatarLook PoliceLook
+        {
+            get
+            {
+                AvatarLook look = AvatarLook.Lifeguard;
+                look.TopColor = 7;      // navy
+                look.BottomColor = 7;
+                look.Hat = HatStyle.Cap;
+                look.HatColor = 7;
+                look.Glasses = GlassesStyle.None;
+                look.Face = FacialHair.Mustache;
+                look.Skin = 1;
+                return look;
+            }
+        }
 
         /// <summary>Skull Cove's sea for the open shift: off the east beach by the pirates' dock. Island 2's rules.</summary>
         private IslandSetup Island3FreeSetup => _island3Free ??= new IslandSetup
@@ -62,6 +83,7 @@ namespace PleaseDontDrown.Story
         {
             EnsureOnIsland4();
             ClearFinaleLeftovers();
+            if (_officer != null) { Remove(_officer); _officer = null; }
             Transform dock = Island4Point("PoliceDock"), berth = Island4Point("PoliceBoatBerth"), far = Island4Point("PoliceBoatStart"), cast = Island4Point("CastWave");
             ScriptedBoat boat = PoliceBoat;
             if (dock == null || berth == null || far == null || cast == null || boat == null || _sandy == null) yield break;
@@ -89,11 +111,17 @@ namespace PleaseDontDrown.Story
                 if (n != null && (n.transform.position - dock.position).sqrMagnitude > 5f * 5f)
                     n.ServerTeleport(dock.position + Vector3.back * 2f + (n == _sandy ? Vector3.left : Vector3.right) * 0.8f, 180f);
             NoMarker();
-            yield return Say("Officer Gill", "Sandy, of Finders Keepers Rescue Co.? You're nicked. Theft, fraud, pills in the smoothies, and seven hundred airlift bills.", PoliceVoice);
+            // The officer comes out of the cabin onto the deck by the dock, facing Sandy.
+            Vector3 aboard = boat.Deck(OfficerAtBerth), toSandy = _sandy.transform.position - aboard;
+            toSandy.y = 0f;
+            _officer = SpawnNpc("Officer Gill", NpcRole.Police, PoliceLook, aboard, 0f);
+            _officer.ServerSetTalkable(false);
+            _officer.ServerTeleport(aboard, toSandy.sqrMagnitude > 0.01f ? Quaternion.LookRotation(toSandy).eulerAngles.y : boat.transform.eulerAngles.y, keepExact: true);
+            yield return Say(_officer, "Sandy, of Finders Keepers Rescue Co.? You're nicked. Theft, fraud, pills in the smoothies, and seven hundred airlift bills.");
             yield return Say(_sandy, "Seven hundred and TWELVE, officer. I kept records. Very good records.");
             yield return ThiefSays("Can I just say, officer: I was never here.");
-            yield return Say("Officer Gill", "You're nicked too. Hands where I can see them.", PoliceVoice);
-            yield return Say("Officer Gill", "And you lot: good work. Every tourist home safe, and their things too.", PoliceVoice);
+            yield return Say(_officer, "You're nicked too. Hands where I can see them.");
+            yield return Say(_officer, "And you lot: good work. Every tourist home safe, and their things too.");
             // Aboard, and away.
             Coroutine ride = StartCoroutine(RideAway(boat, far));
             yield return new WaitForSeconds(1f);
@@ -139,11 +167,12 @@ namespace PleaseDontDrown.Story
             foreach (StoryNpc n in castNpcs) if (n != null) Remove(n);
             // Sandy: community service at her old kiosk (the open shift's Sandy), the THIEF gone with the police.
             if (_thief != null) { Remove(_thief); _thief = null; }
+            if (_officer != null) { Remove(_officer); _officer = null; }
             _sandy.ServerSetup("Sandy", NpcRole.Guide, SandyLook);
             Debug.Log("[Story] the end: credits seen");
         }
 
-        /// <summary>Sandy and the THIEF stand on the launch's deck while it sails out to sea.</summary>
+        /// <summary>Sandy and the THIEF stand on the launch's deck while it sails out to sea, the officer behind them.</summary>
         private IEnumerator RideAway(ScriptedBoat boat, Transform far)
         {
             boat.ServerSailTo(far.position, far.eulerAngles.y, 7f);
@@ -151,6 +180,7 @@ namespace PleaseDontDrown.Story
             {
                 if (_sandy != null) _sandy.ServerTeleport(boat.Deck(new Vector3(-0.5f, 0.78f, 1.6f)), boat.transform.eulerAngles.y, keepExact: true);
                 if (_thief != null && _thief.IsSpawned) _thief.ServerTeleport(boat.Deck(new Vector3(0.5f, 0.78f, 1.6f)), boat.transform.eulerAngles.y, keepExact: true);
+                if (_officer != null && _officer.IsSpawned) _officer.ServerTeleport(boat.Deck(OfficerAway), boat.transform.eulerAngles.y, keepExact: true);
                 if (boat.Arrived) yield break;
                 yield return null;
             }
