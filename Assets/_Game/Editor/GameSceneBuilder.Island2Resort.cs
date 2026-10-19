@@ -42,6 +42,7 @@ namespace PleaseDontDrown.Editor
             DressGolfCarts(root, log);
             BuildHelipad(root, log);
             BuildSecondYacht(root, log);
+            BuildTennisCourt(root, log);
 
             Physics.SyncTransforms();
             BakeNavMeshes(only: "Island2");
@@ -258,6 +259,38 @@ namespace PleaseDontDrown.Editor
             GameObject heli = ResortModel("resort_helicopter", pad, best.at + Vector3.up * 0.08f, 35f, 0.9f);
             if (heli != null) BoxAround(heli, 0.5f);
             log.Add($"helipad on the lawn at {best.at}");
+        }
+
+        // ------------------------------------------------------------------ a tennis court
+
+        /// <summary>A hard tennis court on the lawn east of the helipad: teal court in a green surround, white lines, the net.</summary>
+        private static void BuildTennisCourt(Transform parent, List<string> log)
+        {
+            var centre = new Vector3(36f, 0f, -287f);
+            centre.y = GroundUnder(centre);
+            var root = new GameObject("TennisCourt").transform;
+            root.SetParent(parent, false);
+            root.position = centre;
+            Material surround = GetMaterial("TennisSurround", new Color(0.22f, 0.5f, 0.36f), smoothness: 0.15f);
+            Material court = GetMaterial("TennisCourt", new Color(0.12f, 0.45f, 0.55f), smoothness: 0.2f);
+            Material line = GetMaterial("TennisLine", new Color(0.97f, 0.97f, 0.95f), smoothness: 0.25f);
+            Material netMat = GetMaterial("TennisNet", new Color(0.08f, 0.08f, 0.09f), smoothness: 0.1f);
+            Material post = GetMaterial("TennisPost", new Color(0.2f, 0.32f, 0.26f), metallic: 0.4f, smoothness: 0.4f);
+            const float L = 23.77f, W = 10.97f, singles = 8.23f, service = 6.4f;
+            Primitive(PrimitiveType.Cube, "Surround", root, new Vector3(0f, 0.02f, 0f), new Vector3(L + 7f, 0.1f, W + 5f), surround);
+            Primitive(PrimitiveType.Cube, "Court", root, new Vector3(0f, 0.075f, 0f), new Vector3(L, 0.01f, W), court, keepCollider: false);
+            void Line(Vector3 at, Vector3 size) => Primitive(PrimitiveType.Cube, "Line", root, at + Vector3.up * 0.082f, size, line, keepCollider: false);
+            const float t = 0.06f;
+            foreach (float z in new[] { -W / 2f, W / 2f, -singles / 2f, singles / 2f }) Line(new Vector3(0f, 0f, z), new Vector3(L, 0.005f, t));
+            foreach (float x in new[] { -L / 2f, L / 2f }) Line(new Vector3(x, 0f, 0f), new Vector3(t, 0.005f, W));
+            foreach (float x in new[] { -service, service }) Line(new Vector3(x, 0f, 0f), new Vector3(t, 0.005f, singles));
+            Line(Vector3.zero, new Vector3(service * 2f, 0.005f, t));
+            // The net across the middle, on two posts, its white band along the top.
+            Primitive(PrimitiveType.Cube, "Net", root, new Vector3(0f, 0.55f, 0f), new Vector3(0.03f, 0.9f, W + 0.9f), netMat);
+            Primitive(PrimitiveType.Cube, "NetBand", root, new Vector3(0f, 1.0f, 0f), new Vector3(0.05f, 0.06f, W + 0.9f), line, keepCollider: false);
+            foreach (float z in new[] { -(W / 2f + 0.45f), W / 2f + 0.45f })
+                Primitive(PrimitiveType.Cylinder, "NetPost", root, new Vector3(0f, 0.55f, z), new Vector3(0.1f, 0.55f, 0.1f), post, keepCollider: false);
+            log.Add($"tennis court at {centre}");
         }
 
         // ------------------------------------------------------------------ a second yacht at the marina
