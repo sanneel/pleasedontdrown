@@ -75,7 +75,7 @@ namespace PleaseDontDrown.Story
             Add("1.3", "The rental dock", RentalTheft);
             Add("1.4", "Tsunami!", IncomingTsunami);
             Add("1.5", "Rescue the beach", TsunamiRescue);
-            Add("1.9", "Recover the fleet keys", RecoverFleetKeys);
+            Add("1.9", "Buy the jet skis", BuyJetSki);
             Add("1.10", "The crew heads south", FleetDeparture);
             Add("2.1", "Check in", CheckIn);
             Add("2.2", "Buy a weapon", BuyWeapon);

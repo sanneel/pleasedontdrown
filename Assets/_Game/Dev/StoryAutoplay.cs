@@ -213,13 +213,7 @@ namespace PleaseDontDrown.Dev
                 yield return new WaitForSeconds(1f);
                 yield break;
             }
-            if (beat == "1.9")
-            {
-                if (Carries(me, "Fleet Key Case")) yield return TalkRental(me);
-                else foreach (Item item in Item.All)
-                    if (item.DisplayName == "Fleet Key Case" && !item.IsHeld) { yield return PickUp(me, item); break; }
-                yield break;
-            }
+            if (beat == "1.9") { yield return TalkRental(me); yield break; }
             if (me.Motor.Seat != null && beat.StartsWith("2.") && beat != "2.7")
             {
                 Exec("getoff"); // arrived on the jet ski: on foot from here
