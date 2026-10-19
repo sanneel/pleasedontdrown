@@ -170,21 +170,12 @@ namespace PleaseDontDrown.Editor
                 foreach (var renderer in emblem.GetComponentsInChildren<Renderer>())
                     renderer.sharedMaterial = GetMaterial("ResortBrass", new Color(.75f, .57f, .25f), metallic: .65f, smoothness: .65f);
             }
-            // These collisions follow the supplied U-shaped bar, including the open rear aisle.
-            Collider(root, "ClubDeck", new Vector3(0, .13f, 0), new Vector3(24.3f, .26f, 14.8f));
-            Collider(root, "ClubCounter", new Vector3(0, .90f, 4.6f), new Vector3(10.6f, 1.28f, .95f));
-            foreach (float x in new[] { -4.7f, 4.7f })
-                Collider(root, "ClubSideCounter", new Vector3(x, .90f, .4f), new Vector3(1.2f, 1.28f, 7.45f));
-            foreach (float x in new[] { -10.36f, 10.36f }) foreach (float z in new[] { -4.55f, -1.7f, 2.47f, 5.58f })
-                Collider(root, "ClubChair", new Vector3(x, .65f, z), new Vector3(1.7f, .78f, 1.7f));
-            foreach (float x in new[] { -10.74f, 10.74f }) foreach (float z in new[] { -6.65f, 0, 6.65f })
-                Collider(root, "ClubPost", new Vector3(x, 2.0f, z), new Vector3(.35f, 3.5f, .35f));
+            // These collisions follow the supplied U-shaped bar, including the open rear aisle (GameSceneBuilder.HotelBar.cs).
+            TripoBarColliders(root);
             root.gameObject.AddComponent<NetworkObject>();
             BuildBarista(root);
-            root.Find("Barista").localPosition = new Vector3(.25f, .26f, 3.72f);
+            PlaceHotelBarista(root);
             for (int i = 0; i < 4; i++) root.Find("ServeSpot" + i).localPosition = new Vector3(-2.4f + i * 1.6f, 1.58f, 4.88f);
-            root.Find("WipeFrom").localPosition = new Vector3(-.25f, 1.56f, 4.35f);
-            root.Find("WipeTo").localPosition = new Vector3(.75f, 1.56f, 4.35f);
             foreach (string item in new[] { "Beer", "Coconut" })
             {
                 var rack = root.gameObject.AddComponent<ItemRack>(); var spots = new List<Object>();

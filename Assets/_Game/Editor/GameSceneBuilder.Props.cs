@@ -63,7 +63,9 @@ namespace PleaseDontDrown.Editor
                 Material resort = GetMaterial("Prop_" + paint, colour, metallic: brass ? .7f : 0,
                     smoothness: brass ? .65f : paint == "resort_glass" ? .8f : paint.EndsWith("_glass") ? .38f : paint.EndsWith("_countertop") ? .45f : .26f,
                     emission: lantern ? new Color(1, .45f, .12f) * 2 : null);
-                if (paint.StartsWith("resort_hotel_"))
+                // The hotel's and the beach bar's textured parts (retexture_tripo_bar.py: wood, planks, straw) keep their
+                // picture, its colour the material's tint.
+                if (paint.StartsWith("resort_hotel_") || paint.StartsWith("resort_barhut_"))
                 {
                     Texture texture = null;
                     foreach (string property in new[] { "baseColorTexture", "_BaseMap", "_MainTex" })

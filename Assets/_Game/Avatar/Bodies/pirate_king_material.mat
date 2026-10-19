@@ -130,13 +130,13 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FaceEyeL: {r: -0.04097499, g: 1.6259251, b: 0.021825, a: 0.018380105}
+    - _FaceEyeL: {r: -0.04097499, g: 1.6259346, b: 0.021825, a: 0.018370688}
     - _FaceEyeR: {r: 0, g: 0, b: 0, a: 0}
     - _FaceGaze: {r: 0, g: 0, b: 0, a: 0}
-    - _FaceLash: {r: 0.03845284, g: 0.044323467, b: 0.043209925, a: 1}
+    - _FaceLash: {r: 0.038762204, g: 0.04459041, b: 0.043563113, a: 1}
     - _FaceLids: {r: 0, g: 0, b: 0, a: 0}
     - _FaceRect: {r: -0.06579999, g: 1.6044501, b: 20.140985, a: 23.310022}
-    - _FaceSclera: {r: 0.91205674, g: 0.87483704, b: 0.84061915, a: 1}
+    - _FaceSclera: {r: 0.90628934, g: 0.88012266, b: 0.8464132, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

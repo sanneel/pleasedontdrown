@@ -50,11 +50,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _FaceLid:
-        m_Texture: {fileID: 2800000, guid: 3b131bef951b2844aa8e3a73c5c98e5a, type: 3}
+        m_Texture: {fileID: 2800000, guid: 7c1830ee36aa12a44a51ae1ea42d3fb9, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _FaceOpen:
-        m_Texture: {fileID: 2800000, guid: 88a99b6a5a752274d9d06e0fbf6abda3, type: 3}
+        m_Texture: {fileID: 2800000, guid: bc19a1aac5e74d345b20996ae8e0dd73, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -130,10 +130,10 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FaceEyeL: {r: -0.0481771, g: 1.5388112, b: 0.024, a: 0.012414038}
-    - _FaceEyeR: {r: 0.033572905, g: 1.5441481, b: 0.018150002, a: 0.0066843033}
+    - _FaceEyeL: {r: -0.0481771, g: 1.5388278, b: 0.024, a: 0.012397528}
+    - _FaceEyeR: {r: 0.033572905, g: 1.5441496, b: 0.018150002, a: 0.006682694}
     - _FaceGaze: {r: 0, g: 0, b: 0, a: 0}
-    - _FaceLash: {r: 0.0066666673, g: 0.030346505, b: 0.040107243, a: 1}
+    - _FaceLash: {r: 0.0066666673, g: 0.030477539, b: 0.04016227, a: 1}
     - _FaceLids: {r: 0, g: 0, b: 0, a: 0}
     - _FaceRect: {r: -0.075177096, g: 1.5233787, b: 7.698229, a: 32.362457}
     - _FaceSclera: {r: 0.814481, g: 0.72537917, b: 0.6736866, a: 1}

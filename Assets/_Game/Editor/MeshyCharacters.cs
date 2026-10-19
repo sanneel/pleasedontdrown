@@ -110,8 +110,8 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>
-        /// -executeMethod ...BakeOnlyBatch -pdd-bodies a,b: bakes just those GLBs (file names) and puts them into the
-        /// library beside the bodies already there (a new model added without re-baking everyone).
+        /// -executeMethod ...BakeOnlyBatch -pdd-bodies a,b: bakes just those GLBs (file names) and their look-alikes and
+        /// puts them into the library beside the bodies already there (a new model added without re-baking everyone).
         /// </summary>
         public static void BakeOnlyBatch()
         {
@@ -128,6 +128,16 @@ namespace PleaseDontDrown.Editor
                     AvatarBody body = Bake($"{SourceDir}/{file}.glb", id, name, file);
                     bodies.RemoveAll(b => b == null || b.Id == id);
                     bodies.Add(body);
+                    // ...and its look-alikes (the same mesh repainted: they share its normal map).
+                    for (int n = 1; n <= 16; n++)
+                    {
+                        string variant = $"{file}_v{n:00}";
+                        if (!File.Exists($"{SourceDir}/{variant}.glb")) continue;
+                        byte variantId = AvatarLook.Bodies.Variant(id, n);
+                        AvatarBody look = Bake($"{SourceDir}/{variant}.glb", variantId, $"{name} #{n}", variant);
+                        bodies.RemoveAll(b => b == null || b.Id == variantId);
+                        bodies.Add(look);
+                    }
                 }
                 library.Bodies = bodies.ToArray();
                 EditorUtility.SetDirty(library);
@@ -224,6 +234,7 @@ namespace PleaseDontDrown.Editor
             mat.shader = lit;
             mat.SetTexture("_BaseMap", baseColor);
             mat.mainTexture = baseColor;
+            mat.SetTexture("_MainTex", baseColor); // (URP keeps the old slot too: a stale one drags its texture into builds)
             mat.SetColor("_BaseColor", Color.white);
             mat.SetFloat("_Metallic", 0f);
             mat.SetFloat("_Smoothness", 0.28f);
@@ -240,10 +251,14 @@ namespace PleaseDontDrown.Editor
             return mat;
         }
 
-        /// <summary>Textures/&lt;file&gt;_baked_normal.png beside the model, imported as a normal map; null if none.</summary>
+        /// <summary>
+        /// Textures/&lt;file&gt;_baked_normal.png beside the model, imported as a normal map; a look-alike (same mesh and
+        /// UVs, repainted) takes its base's. Null if none.
+        /// </summary>
         private static Texture BakedNormal(string file)
         {
             string path = $"{SourceDir}/Textures/{file}_baked_normal.png";
+            if (!File.Exists(path)) path = $"{SourceDir}/Textures/{BaseOf(file)}_baked_normal.png";
             if (!File.Exists(path)) return null;
             if (AssetImporter.GetAtPath(path) is TextureImporter importer &&
                 (importer.textureType != TextureImporterType.NormalMap || importer.maxTextureSize != 2048))

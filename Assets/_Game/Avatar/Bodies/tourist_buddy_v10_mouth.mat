@@ -11,7 +11,8 @@ Material:
   m_Shader: {fileID: 4800000, guid: bf1d7f4f955d0ac4c9922af792891945, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _NORMALMAP
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
@@ -25,11 +26,11 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 00dec39f191b4ad448c2394aad30c232, type: 3}
+        m_Texture: {fileID: 2800000, guid: 6d8aa48e619a7f047ae7eb32a08faf3f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 4e41f5c0302717e48b71c33d0f8fb47f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
@@ -57,7 +58,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 00dec39f191b4ad448c2394aad30c232, type: 3}
+        m_Texture: {fileID: 2800000, guid: 6d8aa48e619a7f047ae7eb32a08faf3f, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -105,7 +106,7 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
-    - _FaceMidX: 0.00048724003
+    - _FaceMidX: 0.00042424537
     - _FaceOn: 1
     - _FaceShutAt: 0.3
     - _GlossMapScale: 0
@@ -129,13 +130,13 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FaceEyeL: {r: -0.03662891, g: 1.6342683, b: 0.02205, a: 0.025748312}
-    - _FaceEyeR: {r: 0.035896096, g: 1.6336818, b: 0.023475, a: 0.024575174}
+    - _FaceEyeL: {r: -0.036275156, g: 1.6339474, b: 0.023025, a: 0.025901794}
+    - _FaceEyeR: {r: 0.035874847, g: 1.6328957, b: 0.023475, a: 0.025290132}
     - _FaceGaze: {r: 0, g: 0, b: 0, a: 0}
-    - _FaceLash: {r: 0.07015582, g: 0.04508423, b: 0.029970605, a: 1}
+    - _FaceLash: {r: 0.06960622, g: 0.044038285, b: 0.029080294, a: 1}
     - _FaceLids: {r: 0, g: 0, b: 0, a: 0}
-    - _FaceRect: {r: -0.06167891, g: 1.6054318, b: 8.061265, a: 17.36111}
-    - _FaceSclera: {r: 0.97769606, g: 0.9630702, b: 0.9320352, a: 1}
+    - _FaceRect: {r: -0.06230016, g: 1.6045808, b: 8.022463, a: 17.13796}
+    - _FaceSclera: {r: 0.9758407, g: 0.9578997, b: 0.9277604, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

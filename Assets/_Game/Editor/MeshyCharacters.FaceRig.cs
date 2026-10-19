@@ -211,6 +211,17 @@ namespace PleaseDontDrown.Editor
             bool alike = SameMeshAs.ContainsKey(file) && baseEyes.l != null && baseEyes.r != null; // (the same mesh repainted: reshaped look-alikes cut their own)
             rig.L = seeL ? FitEye(rig.Image, whitesL, found.Skin, $"{file} left", alike ? baseEyes.l : null) : null;
             rig.R = seeR ? FitEye(rig.Image, whitesR, found.Skin, $"{file} right", alike ? baseEyes.r : null) : null;
+            // One eye cut out, the other only an oval: the good one mirrored onto the other's whites (a pair matches).
+            if (rig.L != null && rig.R != null && rig.L.Fallback != rig.R.Fallback)
+            {
+                EyeFit good = rig.L.Fallback ? rig.R : rig.L, bad = rig.L.Fallback ? rig.L : rig.R;
+                Rect goodWhites = rig.L.Fallback ? whitesR : whitesL, badWhites = rig.L.Fallback ? whitesL : whitesR;
+                var shape = new EyeShape { Img = rig.Image, Fit = MirroredEye(rig.Image, good), Whites = Rect.MinMaxRect(-goodWhites.xMax, goodWhites.yMin, -goodWhites.xMin, goodWhites.yMax) };
+                // (mirrored about x = 0: the shape's whites are mirrored the same way, so ShapeLike moves it onto the bad eye's)
+                EyeFit fixedEye = FitEye(rig.Image, badWhites, found.Skin, $"{file} {(rig.L.Fallback ? "left" : "right")} (mirrored)", shape);
+                if (rig.L.Fallback) rig.L = fixedEye; else rig.R = fixedEye;
+                Debug.Log($"[Build] face {file}: the {(bad == rig.L ? "left" : "right")} eye takes the other's outline, mirrored");
+            }
             if (baseFile == file && rig.L != null && rig.R != null)
                 BaseEyes[file] = (new EyeShape { Img = rig.Image, Fit = rig.L, Whites = whitesL }, new EyeShape { Img = rig.Image, Fit = rig.R, Whites = whitesR });
             if (rig.L != null || rig.R != null) MakeEyeTextures(rig);
@@ -551,6 +562,11 @@ namespace PleaseDontDrown.Editor
                 for (int c = 0; c < n; c++) { t[c] = Mathf.Min(t[c], Mathf.Min(midTop + spread, roof)); b[c] = Mathf.Max(b[c], Mathf.Max(midBottom - spread, floor)); }
                 t = Smooth(Median(t, 5), 7);
                 b = Smooth(Median(b, 5), 7);
+                // An eye's lower edge bows down: no bumps up into it (the iris dipping to it cut the corners' whites off).
+                int dip = Mathf.Max(2, n / 6);
+                var lowest = new float[n];
+                for (int c = 0; c < n; c++) { lowest[c] = b[c]; for (int k = Mathf.Max(0, c - dip); k <= Mathf.Min(n - 1, c + dip); k++) lowest[c] = Mathf.Min(lowest[c], b[k] + Mathf.Abs(k - c) * px * 0.35f); }
+                b = Smooth(lowest, 4);
                 // Grown a little all round (the soft edge of the paint), the ends coming to a point.
                 const int grow = 4; // (0.6 mm: the soft rim of the paint)
                 fit.I0 = wi0 + first - grow;
@@ -620,6 +636,21 @@ namespace PleaseDontDrown.Editor
 
         private static readonly Dictionary<string, (EyeShape l, EyeShape r)> BaseEyes = new();
 
+
+        /// <summary>An eye's outline mirrored about x = 0 (same face image).</summary>
+        private static EyeFit MirroredEye(FaceImage img, EyeFit e)
+        {
+            var m = new EyeFit { I0 = img.I(-img.X(e.I1)), I1 = img.I(-img.X(e.I0)) };
+            m.Top = new float[m.I1 - m.I0 + 1];
+            m.Bottom = new float[m.Top.Length];
+            for (int c = 0; c < m.Top.Length; c++)
+            {
+                int at = img.I(-img.X(m.I0 + c));
+                m.Top[c] = e.TopAt(at);
+                m.Bottom[c] = e.BottomAt(at);
+            }
+            return m;
+        }
         /// <summary>The base model's eye outline, moved and scaled from its whites onto these whites.</summary>
         private static void ShapeLike(FaceImage img, Rect eye, EyeShape shape, EyeFit fit)
         {

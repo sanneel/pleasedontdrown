@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: sandy_boss_mouth
+  m_Name: tourist_buddy_v03_eyes_closed
   m_Shader: {fileID: 4800000, guid: bf1d7f4f955d0ac4c9922af792891945, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -129,13 +129,26 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FaceEyeL: {r: -0.04913338, g: 1.5248349, b: 0.04605, a: 0.023748279}
-    - _FaceEyeR: {r: 0.07424163, g: 1.5240378, b: 0.032175, a: 0.022298396}
+    - _FaceEyeL: {r: -0.04913338, g: 1.5248392, b: 0.04605, a: 0.023743927}
+    - _FaceEyeR: {r: 0.07424163, g: 1.524046, b: 0.032175, a: 0.022290349}
     - _FaceGaze: {r: 0, g: 0, b: 0, a: 0}
-    - _FaceLash: {r: 0.016473096, g: 0.01642812, b: 0.0188678, a: 1}
+    - _FaceLash: {r: 0.016666668, g: 0.016666668, b: 0.019453844, a: 1}
     - _FaceLids: {r: 0, g: 0, b: 0, a: 0}
     - _FaceRect: {r: -0.09818338, g: 1.4979614, b: 4.8169556, a: 18.621973}
-    - _FaceSclera: {r: 0.98454386, g: 0.9801139, b: 0.9651042, a: 1}
+    - _FaceSclera: {r: 0.9843984, g: 0.9709264, b: 0.94986403, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+--- !u!114 &8832504832538672878
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
+  version: 10
