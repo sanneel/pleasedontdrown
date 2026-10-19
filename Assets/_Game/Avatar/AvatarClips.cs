@@ -17,8 +17,10 @@ namespace PleaseDontDrown.Avatars
     /// </summary>
     public sealed class AvatarClips
     {
-        /// <summary>Clips for everyone (off until they're proven: <c>clips on</c> in the console turns them on).</summary>
-        public static bool Enabled;
+        /// <summary>Clips for everyone in the game (<c>clips off</c> in the console turns them off). Editor tools keep
+        /// the hand-made animation unless they ask for clips (<see cref="AvatarAnimator.UseClips"/>): outside play the
+        /// graph isn't evaluated and the skin isn't redrawn.</summary>
+        public static bool Enabled = true;
 
         // The clips, by what they're for (Resources/Mixamo/<file>.fbx, imported as humanoid by Editor/MixamoImport).
         private const string IdleFile = "Breathing Idle", WalkFile = "Walking", RunFile = "Running";

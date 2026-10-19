@@ -371,7 +371,7 @@ namespace PleaseDontDrown.Avatars
         /// </summary>
         private bool WantsClips()
         {
-            if (!UseClips && !AvatarClips.Enabled) return false;
+            if (!UseClips && !(AvatarClips.Enabled && Application.isPlaying)) return false;
             AvatarMotion m = Motion;
             if (!m.Grounded || m.Swimming || m.Underwater || m.Climbing || m.Pose != AvatarPose.Normal || m.Seated || m.Cpr ||
                 m.Defib || m.CarryingPerson || m.Holding || m.Stance != FightStance.None || m.Flying || m.StarJump ||
@@ -605,6 +605,14 @@ namespace PleaseDontDrown.Avatars
             if (_turningInPlace && Mathf.Abs(delta) < 4f) _turningInPlace = false;
             if (moving || _turningInPlace)
                 _bodyYaw += delta * k(moving ? _turnSpeed : _turnSpeed * 0.6f);
+            // Held facing one way (a seat, kneeling for CPR, the cannon): that is the body's yaw, so looking about turns
+            // the head alone (LookYaw), up to its limit. (It had gone on following the view behind the held body, so the
+            // head stayed straight on a chair and the rider swung round on a jet ski.)
+            if (RootOverride is Quaternion held)
+            {
+                Vector3 f = held * Vector3.forward;
+                if (f.x * f.x + f.z * f.z > 0.01f) _bodyYaw = yawBefore = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+            }
             transform.rotation = RootOverride ?? Quaternion.Euler(0f, _bodyYaw, 0f);
 
             _move = Mathf.MoveTowards(_move, Mathf.InverseLerp(0.15f, 1.4f, speed) + (_turningInPlace ? 0.35f : 0f), dt * 4f);

@@ -205,6 +205,7 @@ namespace PleaseDontDrown.Player
             if (hands != null)
             {
                 m.Basketball = hands.HeldItem != null && hands.HeldItem.GetComponent<Fun.BasketballDribble>() != null;
+                if (m.Basketball) m.LookPitch = Mathf.Min(m.LookPitch, Fun.BasketballDribble.MaxLookDown);
                 m.Defib = Combat.DefibPaddles.ActiveFor(_hub) != null; // (a shock from a defibrillator on the ground)
                 PlayerHands.GripKind grip = hands.GetGrip(out m.GripLeft, out m.GripRight);
                 m.Holding = grip != PlayerHands.GripKind.None;
@@ -265,9 +266,9 @@ namespace PleaseDontDrown.Player
                 m.ChairSeat = seat.IsChair || seat.IsLand; // a chair, a stool, the golf cart's bench
                 m.HighSeat = seat.IsStool;
                 m.SeatEdge = seat.SeatEdge;
-                // Sat on a chair the body faces the way it does (looking about turns the head, not the legs through
-                // the table or the counter).
-                if (seat.IsChair || seat.IsLand) _seatFacing = Quaternion.Euler(0f, seat.transform.eulerAngles.y, 0f);
+                // Sat on anything the body faces the way its seat does: looking about turns the head, not the legs
+                // through the table or the counter, nor the rider round in the jet ski's saddle.
+                _seatFacing = seat.SeatFacing(_hub);
                 if (!m.Holding && seat.GetGrips(_hub, out HandGrip left, out HandGrip right))
                 {
                     m.GripLeft = left;
