@@ -63,17 +63,28 @@ namespace PleaseDontDrown.Editor
         private static readonly Vector3 StationSpot = new(12f, 0f, 8.8f);
         private static readonly Vector2 LighthouseWish = new(22f, 47.5f);
 
-        /// <summary>The boardwalks (straight runs, end to end): the docks to a promenade behind the station, up to the
-        /// toilets, the bar's terrace and the lighthouse.</summary>
+        /// <summary>The boardwalks (straight runs): the docks to a promenade behind the station, and from it straight up to
+        /// the toilets, the bar's terrace (in line with Milo's pier) and the lighthouse's door (Island1LighthouseRun). A run
+        /// that meets another stops at its edge, and the west dock's covers the corner, so no boards lie on boards
+        /// (they flickered). The lighthouse had been reached by a zigzag round the sunbeds, and the bar's walk stood a
+        /// metre aside from the pier it continues.</summary>
         private static readonly Vector2[][] Island1Boardwalks =
         {
-            new[] { new Vector2(-8f, 6.2f), new Vector2(-8f, 18f) },
-            new[] { new Vector2(-8f, 18f), new Vector2(38f, 18f) },
-            new[] { new Vector2(32f, 7.6f), new Vector2(32f, 18f) },
-            new[] { new Vector2(14f, 18f), new Vector2(14f, 32.4f) },
-            new[] { new Vector2(31f, 18f), new Vector2(31f, 28f) },
-            new[] { new Vector2(14f, 30f), new Vector2(21f, 30f) },
+            new[] { new Vector2(-8f, 6.2f), new Vector2(-8f, 18f + BoardwalkHalf) },
+            new[] { new Vector2(-8f + BoardwalkHalf, 18f), new Vector2(38f, 18f) },
+            new[] { new Vector2(32f, 7.6f), new Vector2(32f, 18f - BoardwalkHalf) },
+            new[] { new Vector2(32f, 18f + BoardwalkHalf), new Vector2(32f, 28f) },
+            new[] { new Vector2(14f, 18f + BoardwalkHalf), new Vector2(14f, 32.4f) },
         };
+        private const float BoardwalkHalf = 0.9f, Island1LighthouseX = 22f;
+
+        /// <summary>The walk to the lighthouse: off the promenade, straight to its door (on the tower's beach side).</summary>
+        private static Vector2[] Island1LighthouseRun(Vector2 lighthouse) =>
+            new[] { new Vector2(Island1LighthouseX, 18f + BoardwalkHalf), new Vector2(Island1LighthouseX, lighthouse.y - 4f) };
+
+        /// <summary>The sunbed pairs (an umbrella beside each) in two rows facing the sea, either side of the lighthouse
+        /// walk; and one row on the west side.</summary>
+        private static readonly float[] Island1SunbedRows = { 22.5f, 26f }, Island1SunbedPairs = { 15.7f, 23.7f, 27.1f }, Island1WestPairs = { -20.4f, -17f, -13.6f };
 
         /// <summary>Batch: island 1's village (see the class summary). Logs to Logs/island1-town.txt.</summary>
         public static void Island1TownBatch()
@@ -97,34 +108,10 @@ namespace PleaseDontDrown.Editor
             var town = new GameObject("Island1Town").transform;
             town.SetParent(env, false);
 
-            // Boardwalks.
+            // Boardwalks (the lighthouse's once the tower stands).
             var walks = new GameObject("Boardwalks").transform;
             walks.SetParent(town, false);
-            int pieces = 0;
-            foreach (Vector2[] run in Island1Boardwalks)
-            {
-                Vector2 a = run[0], b = run[1];
-                float length = Vector2.Distance(a, b);
-                int n = Mathf.CeilToInt(length / 1.96f);
-                Vector2 dir = (b - a) / length;
-                float yaw = Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg;
-                for (int i = 0; i < n; i++)
-                {
-                    Vector2 p0 = a + dir * (length * i / n), p1 = a + dir * (length * (i + 1) / n), mid = (p0 + p1) * 0.5f;
-                    float y0 = GroundAt(p0.x, p0.y), y1 = GroundAt(p1.x, p1.y), ym = GroundAt(mid.x, mid.y);
-                    float pitch = -Mathf.Atan2(y1 - y0, Vector2.Distance(p0, p1)) * Mathf.Rad2Deg;
-                    var piece = new GameObject("Boardwalk").transform;
-                    piece.SetParent(walks, false);
-                    piece.SetPositionAndRotation(new Vector3(mid.x, Mathf.Max(ym, (y0 + y1) * 0.5f) - 0.01f, mid.y), Quaternion.Euler(pitch, yaw, 0f));
-                    PropModel("boardwalk", piece, scale: 1f).transform.localScale = new Vector3(1f, 1f, length / n / 2f + 0.03f);
-                    var box = piece.gameObject.AddComponent<BoxCollider>();
-                    box.center = new Vector3(0f, 0.04f, 0f);
-                    box.size = new Vector3(1.8f, 0.08f, length / n + 0.06f);
-                    TagSurface(piece.gameObject, SurfaceKind.Wood);
-                    pieces++;
-                }
-                keepClear.Add(Rect.MinMaxRect(Mathf.Min(a.x, b.x) - 0.9f, Mathf.Min(a.y, b.y) - 0.9f, Mathf.Max(a.x, b.x) + 0.9f, Mathf.Max(a.y, b.y) + 0.9f));
-            }
+            int pieces = Island1Boardwalks.Sum(run => BoardwalkRun(walks, run[0], run[1], GroundAt, keepClear));
             log.Add($"boardwalk: {pieces} pieces on {Island1Boardwalks.Length} runs");
 
             // The welcome arches where the docks land (Milo's pier: a little further in, clear of his spot and the cannon).
@@ -145,41 +132,7 @@ namespace PleaseDontDrown.Editor
                 log.Add($"{name} at {arch.position}");
             }
 
-            // Sunbeds in rows facing the sea, an umbrella between each pair; one row on the west side.
-            var beds = new GameObject("Sunbeds").transform;
-            beds.SetParent(town, false);
-            int bedCount = 0;
-            void Pair(float x, float z, int k)
-            {
-                foreach (float dx in new[] { 0f, 0.95f })
-                {
-                    var bed = new GameObject("Sunbed").transform;
-                    bed.SetParent(beds, false);
-                    bed.SetPositionAndRotation(new Vector3(x + dx, GroundAt(x + dx, z), z), Quaternion.Euler(0f, 180f, 0f)); // the head end inland
-                    PropModel(k % 2 == 0 ? "sunbed" : "sunbed_orange", bed);
-                    var box = bed.gameObject.AddComponent<BoxCollider>();
-                    box.center = new Vector3(0f, 0.25f, 0.1f);
-                    box.size = new Vector3(0.72f, 0.5f, 1.85f);
-                    bedCount++;
-                }
-                var umbrella = new GameObject("Umbrella").transform;
-                umbrella.SetParent(beds, false);
-                umbrella.SetPositionAndRotation(new Vector3(x + 2.05f, GroundAt(x + 2.05f, z - 0.3f), z - 0.3f), Quaternion.Euler(0f, k * 37f, 0f));
-                PropModel(k % 2 == 0 ? "parasol_red" : "parasol_teal", umbrella);
-                var pole = umbrella.gameObject.AddComponent<CapsuleCollider>();
-                pole.center = new Vector3(0f, 1.1f, 0f);
-                pole.radius = 0.06f;
-                pole.height = 2.2f;
-            }
-            int group = 0;
-            foreach (float z in new[] { 22.5f, 26f })
-                foreach (float x in new[] { 17f, 20.4f, 23.8f })
-                    Pair(x, z, group++);
-            foreach (float x in new[] { -20.4f, -17f, -13.6f })
-                Pair(x, 18f, group++);
-            keepClear.Add(Rect.MinMaxRect(16.6f, 21.2f, 26.3f, 27.3f));
-            keepClear.Add(Rect.MinMaxRect(-20.8f, 16.8f, -11.2f, 19.3f));
-            log.Add($"sunbeds: {bedCount}, umbrellas: {group}");
+            BuildIsland1Sunbeds(town, GroundAt, keepClear, log);
 
             // The volleyball court, east of the bar.
             var court = new GameObject("VolleyballCourt").transform;
@@ -230,22 +183,9 @@ namespace PleaseDontDrown.Editor
             }
             else log.Add("NO LIGHTHOUSE MODEL (Assets/_Game/Art/Tripo/Island1/lighthouse.glb)");
             keepClear.Add(new Rect(lightAt.x - 4f, lightAt.y - 4f, 8f, 8f));
-            // A path to its door and rocks round its foot.
-            Vector2 from = new(21f, 30f), to = new(21f, lightAt.y - 4f);
-            for (int i = 0, n = Mathf.CeilToInt((to.y - from.y) / 1.96f); i < n; i++)
-            {
-                float z0 = from.y + (to.y - from.y) * i / n, z1 = from.y + (to.y - from.y) * (i + 1) / n;
-                var piece = new GameObject("Boardwalk").transform;
-                piece.SetParent(walks, false);
-                float y0 = GroundAt(21f, z0), y1 = GroundAt(21f, z1);
-                piece.SetPositionAndRotation(new Vector3(21f, (y0 + y1) * 0.5f - 0.01f, (z0 + z1) * 0.5f), Quaternion.Euler(-Mathf.Atan2(y1 - y0, z1 - z0) * Mathf.Rad2Deg, 0f, 0f));
-                PropModel("boardwalk", piece).transform.localScale = new Vector3(1f, 1f, (z1 - z0) / 2f + 0.03f);
-                var box = piece.gameObject.AddComponent<BoxCollider>();
-                box.center = new Vector3(0f, 0.04f, 0f);
-                box.size = new Vector3(1.8f, 0.08f, z1 - z0 + 0.06f);
-                TagSurface(piece.gameObject, SurfaceKind.Wood);
-            }
-            keepClear.Add(Rect.MinMaxRect(20.1f, 30f, 21.9f, lightAt.y - 4f));
+            // A walk to its door, and rocks round its foot.
+            Vector2[] toLight = Island1LighthouseRun(lightAt);
+            BoardwalkRun(walks, toLight[0], toLight[1], GroundAt, keepClear);
             log.Add($"lighthouse at {lighthouse.position}");
 
             var rng = new System.Random(18);
@@ -296,7 +236,7 @@ namespace PleaseDontDrown.Editor
             {
                 float t = R(0f, Mathf.PI * 2f);
                 float x = lightAt.x + Mathf.Cos(t) * R(3.6f, 6f), z = lightAt.y + Mathf.Sin(t) * R(3.6f, 6f);
-                if (Mathf.Abs(x - 21f) < 1.2f && z < lightAt.y) continue;
+                if (Mathf.Abs(x - Island1LighthouseX) < 1.2f && z < lightAt.y) continue;
                 var tuft = new GameObject("Grass").transform;
                 tuft.SetParent(grass, false);
                 tuft.SetPositionAndRotation(new Vector3(x, GroundAt(x, z) - 0.03f, z), Quaternion.Euler(0f, R(0f, 360f), 0f));
@@ -519,6 +459,124 @@ namespace PleaseDontDrown.Editor
             Vector3 p = bar.position;
             keepClear.Add(Rect.MinMaxRect(p.x - BbW - 1f, p.z - BbD - BbTerrace - 0.4f, p.x + BbW + 1f, p.z + BbD + 1f)); // (turned 180: the terrace is toward -z)
             log.Add($"beach bar enlarged at {p}");
+        }
+
+        /// <summary>One straight boardwalk run of ~2 m pieces following the sand; its strip goes into keepClear.</summary>
+        private static int BoardwalkRun(Transform walks, Vector2 a, Vector2 b, Func<float, float, float> groundAt, List<Rect> keepClear)
+        {
+            float length = Vector2.Distance(a, b);
+            int n = Mathf.CeilToInt(length / 1.96f);
+            Vector2 dir = (b - a) / length;
+            float yaw = Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg;
+            for (int i = 0; i < n; i++)
+            {
+                Vector2 p0 = a + dir * (length * i / n), p1 = a + dir * (length * (i + 1) / n), mid = (p0 + p1) * 0.5f;
+                float y0 = groundAt(p0.x, p0.y), y1 = groundAt(p1.x, p1.y), ym = groundAt(mid.x, mid.y);
+                float pitch = -Mathf.Atan2(y1 - y0, Vector2.Distance(p0, p1)) * Mathf.Rad2Deg;
+                var piece = new GameObject("Boardwalk").transform;
+                piece.SetParent(walks, false);
+                piece.SetPositionAndRotation(new Vector3(mid.x, Mathf.Max(ym, (y0 + y1) * 0.5f) - 0.01f, mid.y), Quaternion.Euler(pitch, yaw, 0f));
+                PropModel("boardwalk", piece, scale: 1f).transform.localScale = new Vector3(1f, 1f, length / n / 2f + 0.03f);
+                var box = piece.gameObject.AddComponent<BoxCollider>();
+                box.center = new Vector3(0f, 0.04f, 0f);
+                box.size = new Vector3(BoardwalkHalf * 2f, 0.08f, length / n + 0.06f);
+                TagSurface(piece.gameObject, SurfaceKind.Wood);
+            }
+            keepClear.Add(Rect.MinMaxRect(Mathf.Min(a.x, b.x) - BoardwalkHalf, Mathf.Min(a.y, b.y) - BoardwalkHalf,
+                Mathf.Max(a.x, b.x) + BoardwalkHalf, Mathf.Max(a.y, b.y) + BoardwalkHalf));
+            return n;
+        }
+
+        /// <summary>The sunbeds (Island1SunbedRows/Pairs) under Island1Town/Sunbeds; their ground into keepClear.</summary>
+        private static void BuildIsland1Sunbeds(Transform town, Func<float, float, float> groundAt, List<Rect> keepClear, List<string> log)
+        {
+            var beds = new GameObject("Sunbeds").transform;
+            beds.SetParent(town, false);
+            int bedCount = 0;
+            void Pair(float x, float z, int k)
+            {
+                foreach (float dx in new[] { 0f, 0.95f })
+                {
+                    var bed = new GameObject("Sunbed").transform;
+                    bed.SetParent(beds, false);
+                    bed.SetPositionAndRotation(new Vector3(x + dx, groundAt(x + dx, z), z), Quaternion.Euler(0f, 180f, 0f)); // the head end inland
+                    PropModel(k % 2 == 0 ? "sunbed" : "sunbed_orange", bed);
+                    var box = bed.gameObject.AddComponent<BoxCollider>();
+                    box.center = new Vector3(0f, 0.25f, 0.1f);
+                    box.size = new Vector3(0.72f, 0.5f, 1.85f);
+                    bedCount++;
+                }
+                var umbrella = new GameObject("Umbrella").transform;
+                umbrella.SetParent(beds, false);
+                umbrella.SetPositionAndRotation(new Vector3(x + 2.05f, groundAt(x + 2.05f, z - 0.3f), z - 0.3f), Quaternion.Euler(0f, k * 37f, 0f));
+                PropModel(k % 2 == 0 ? "parasol_red" : "parasol_teal", umbrella);
+                var pole = umbrella.gameObject.AddComponent<CapsuleCollider>();
+                pole.center = new Vector3(0f, 1.1f, 0f);
+                pole.radius = 0.06f;
+                pole.height = 2.2f;
+            }
+            int group = 0;
+            foreach (float z in Island1SunbedRows)
+                foreach (float x in Island1SunbedPairs)
+                {
+                    Pair(x, z, group++);
+                    keepClear.Add(Rect.MinMaxRect(x - 0.4f, z - 1.3f, x + 3.3f, z + 1.3f)); // (the umbrella's shade reaches x + 3.2)
+                }
+            foreach (float x in Island1WestPairs)
+                Pair(x, 18f, group++);
+            keepClear.Add(Rect.MinMaxRect(-20.8f, 16.8f, -11.2f, 19.3f));
+            log.Add($"sunbeds: {bedCount}, umbrellas: {group}");
+        }
+
+        /// <summary>
+        /// Batch: island 1's walks laid again (Island1Boardwalks, the lighthouse's) and the sunbeds round them, in the
+        /// saved scene; palms, towels and loose items on the new strips move to free sand, grass on them goes, and the
+        /// island's navmesh is baked again. The rest of the village stays as it is.
+        /// </summary>
+        public static void Island1RouteBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var log = new List<string>();
+            Transform env = GameObject.Find("Environment").transform;
+            Transform town = env.Find("Island1Town") ?? throw new InvalidOperationException("No Island1Town: run Island1TownBatch");
+            Transform lighthouse = town.Find("Lighthouse") ?? throw new InvalidOperationException("No lighthouse");
+            var collider = GameObject.Find("Environment/BeachTerrain").GetComponent<MeshCollider>();
+            float GroundAt(float x, float z) =>
+                collider.Raycast(new Ray(new Vector3(x, 80f, z), Vector3.down), out RaycastHit hit, 200f) ? hit.point.y : 0f;
+            foreach (string old in new[] { "Boardwalks", "Sunbeds" })
+                if (town.Find(old) is { } t) Object.DestroyImmediate(t.gameObject);
+
+            var keepClear = new List<Rect>();
+            var walks = new GameObject("Boardwalks").transform;
+            walks.SetParent(town, false);
+            walks.SetSiblingIndex(0);
+            int pieces = Island1Boardwalks.Sum(run => BoardwalkRun(walks, run[0], run[1], GroundAt, keepClear));
+            Vector2[] toLight = Island1LighthouseRun(new Vector2(lighthouse.position.x, lighthouse.position.z));
+            pieces += BoardwalkRun(walks, toLight[0], toLight[1], GroundAt, keepClear);
+            log.Add($"boardwalk: {pieces} pieces on {Island1Boardwalks.Length + 1} runs");
+            int strips = keepClear.Count;
+            BuildIsland1Sunbeds(town, GroundAt, keepClear, log);
+            town.Find("Sunbeds").SetSiblingIndex(1);
+
+            // Grass standing on a walk goes.
+            int pulled = 0;
+            if (town.Find("BeachGrass") is { } grass)
+                foreach (Transform tuft in grass.Cast<Transform>().ToArray())
+                    if (keepClear.Take(strips).Any(r => r.Contains(new Vector2(tuft.position.x, tuft.position.z))))
+                    {
+                        Object.DestroyImmediate(tuft.gameObject);
+                        pulled++;
+                    }
+            log.Add($"grass pulled off the walks: {pulled}");
+            ClearIsland1Spots(env, keepClear, GroundAt, log);
+
+            Physics.SyncTransforms();
+            BakeNavMeshes(only: "Island1");
+            Directory.CreateDirectory("Logs");
+            File.WriteAllLines("Logs/island1-route.txt", log);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("[Island1Route] PASS\n" + string.Join("\n", log));
         }
 
         /// <summary>Palms, towels and loose items standing where the village went move to the nearest free sand.</summary>
