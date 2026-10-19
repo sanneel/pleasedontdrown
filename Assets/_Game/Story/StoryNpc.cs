@@ -18,7 +18,7 @@ using Random = UnityEngine.Random;
 
 namespace PleaseDontDrown.Story
 {
-    public enum NpcRole : byte { Guide, Receptionist, Robber, Pirate, Bystander, Guest }
+    public enum NpcRole : byte { Guide, Receptionist, Robber, Pirate, Bystander, Guest, Rival } // Rival: Finders Keepers Rescue Co. (island 4)
 
     /// <summary>What a beach tourist is up to (host bookkeeping, used by BeachCrowd and NpcWatch).</summary>
     public enum NpcActivity : byte { None, Sunbathe, Stroll, Wade, Swim, Chat, GoSwim, Return }
@@ -168,6 +168,7 @@ namespace PleaseDontDrown.Story
             NpcRole.Receptionist => new Color(0.7f, 0.85f, 1f),
             NpcRole.Robber => new Color(0.85f, 0.85f, 0.85f),
             NpcRole.Pirate => new Color(1f, 0.5f, 0.4f),
+            NpcRole.Rival => new Color(1f, 0.66f, 0.3f),
             _ => new Color(1f, 1f, 0.75f)
         };
 

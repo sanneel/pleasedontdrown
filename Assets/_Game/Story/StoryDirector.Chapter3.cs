@@ -237,9 +237,67 @@ namespace PleaseDontDrown.Story
             if (mouth != null) Stand(mouth.position);
             yield return new WaitForSeconds(1.5f);
             if (ledge != null) Stand(ledge.position);
+            yield return WaitBeat("3.9", 20f);
+            Check("3.8 reaching the gold moves on", _beat.Value == "3.9");
+
+            // 3.9: the four sacks in the vault, carried to the boat (here: carried by the test, put on the deck).
+            yield return new WaitForSeconds(1f);
+            Check("3.9 four money sacks in the vault", _sacks.Count == GoldSacks && ledge != null &&
+                _sacks.TrueForAll(s => s != null && (s.transform.position - ledge.position).magnitude < 6f), $"{_sacks.Count}");
+            Check("3.9 the pirate boat waits at the night dock", _pirateBoat != null && (_pirateBoat.transform.position - NightBerth).magnitude < 4f);
+            Check("3.9 the THIEF minds the boat", _thief != null && _thief.IsSpawned && (_thief.transform.position - NightDock).magnitude < 6f);
+            if (_sacks.Count > 0 && _sacks[0] != null)
+            {
+                Item first = _sacks[0];
+                Stand(first.transform.position + Vector3.back * 0.8f);
+                yield return new WaitForSeconds(0.5f);
+                DevCommands.Execute("grab Money Sack"); // (as a player would: the nearest one)
+                t = Time.time;
+                while (!_sacks.Exists(s => s != null && s.IsHeld) && Time.time - t < 3f) yield return null;
+                yield return new WaitForSeconds(0.5f); // (the host confirms the pickup before we run off with it)
+                Check("3.9 a sack can be picked up", _sacks.Exists(s => s != null && s.IsHeld));
+                Stand(NightDock);
+                yield return new WaitForSeconds(1.2f);
+                Check("3.9 carrying one, the marker shows the boat", _markerLabel.Value == "Boat", _markerLabel.Value);
+                me.Hands.Drop();
+                yield return new WaitForSeconds(0.5f);
+            }
+            int before = _cargo.Value;
+            foreach (Item sack in _sacks.ToArray())
+            {
+                if (sack == null || sack.IsHeld) continue;
+                Vector3 deck = _pirateBoat.transform.TransformPoint(new Vector3(0f, 1.6f, 1.2f));
+                sack.Sync.Body.position = deck;
+                sack.transform.position = deck;
+                sack.Sync.Body.linearVelocity = Vector3.zero;
+                yield return new WaitForSeconds(0.7f);
+            }
+            yield return WaitBeat("3.10", 25f);
+            Check("3.9 sacks on the deck are stowed, four moves on", _beat.Value == "3.10" && before < GoldSacks, $"cargo {_cargo.Value}");
+
+            // 3.10: sail home (the test puts the boat off the hotel beach), the THIEF and a sack are gone, Marisol counts.
+            yield return new WaitForSeconds(1f);
+            Check("3.10 the THIEF rides on the boat", _thief != null && _thief.IsSpawned && (_thief.transform.position - _pirateBoat.transform.position).magnitude < 4f);
+            Vector3 stop = _pirateLanding.position + _pirateLanding.forward * 13f;
+            int money = Economy.Money;
+            _pirateBoat.ServerPlace(stop + _pirateLanding.forward * 30f, _pirateLanding.eulerAngles.y + 180f);
+            yield return new WaitForSeconds(0.5f);
+            _pirateBoat.ServerPlace(stop, _pirateLanding.eulerAngles.y);
+            Stand(_pirateLanding.position);
             t = Time.time;
-            while (_chapter.Value != "End of chapter 3" && Time.time - t < 20f) yield return null;
-            Check("3.8 the gold vault ends the chapter", _chapter.Value == "End of chapter 3");
+            while (_markerLabel.Value != "Marisol" && _markerLabel.Value != "On the deck" && Time.time - t < 40f) yield return null;
+            Check("3.10 the THIEF slipped away with one sack", (_thief == null || !_thief.IsSpawned) && _cargo.Value == GoldSacks - 1, $"cargo {_cargo.Value}");
+            Check("3.10 Marisol comes down to count it", _receptionist != null && (_receptionist.transform.position - _pirateLanding.position).magnitude < 8f);
+            t = Time.time;
+            while (_markerLabel.Value != "On the deck" && Time.time - t < 60f) yield return null;
+            Check("3.10 the team gets a finder's fee", Economy.Money >= money + FindersFee, $"${Economy.Money - money}");
+            Item tag = null;
+            foreach (Item i in Item.All) if (i.DisplayName == "Lost & Found Tag") tag = i;
+            Check("3.10 Sandy's tag lies on the deck", tag != null && (tag.transform.position - _pirateBoat.transform.position).magnitude < 4f);
+            if (tag != null) Stand(tag.transform.position + Vector3.back * 0.5f);
+            t = Time.time;
+            while (_chapter.Value != "End of chapter 3" && Time.time - t < 60f) yield return null;
+            Check("3.10 finding the tag ends the chapter", _chapter.Value == "End of chapter 3");
             Debug.Log($"[Check] DONE: {(_checkFails == 0 ? "ALL PASS" : _checkFails + " FAILED")}");
         }
 
@@ -671,9 +729,7 @@ namespace PleaseDontDrown.Story
             TitleObservers("THE PIRATES' GOLD", "A mountain of it. And the casino's money: every dollar.");
             yield return new WaitForSeconds(2f);
             yield return ThiefSays("You found it?! ...I mean: well done. Leave a sack for the THIEF?");
-            SetChapter("End of chapter 3");
-            SetObjective("To be continued...");
-            yield return ChapterReport("CHAPTER 3 COMPLETE");
+            // On to 3.9: the casino's money sacks down to the pirate boat.
         }
     }
 }

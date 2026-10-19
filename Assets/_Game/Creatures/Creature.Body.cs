@@ -38,6 +38,7 @@ namespace PleaseDontDrown.Creatures
                 case CreatureKind.Kleptopus: BuildKleptopus(); break;
             }
             DressTripo(kind);
+            ApplyCousinLook(); // (the Kleptopus's big orange cousin: Creature.Cousin.cs)
         }
 
         // ------------------------------------------------------------------ shapes

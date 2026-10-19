@@ -70,7 +70,7 @@ namespace PleaseDontDrown.Story
         {
             IslandSetup best = null;
             float bestSq = FreePlayNearSea * FreePlayNearSea;
-            foreach (IslandSetup island in new[] { _island1, _island2 })
+            foreach (IslandSetup island in new[] { _island1, _island2, Island3FreeSetup, Island4Setup }) // (the open shift: all four islands)
             {
                 if (island == null) continue;
                 var centre = new Vector3((island.SeaX.x + island.SeaX.y) * 0.5f, 0f, (island.SeaZ.x + island.SeaZ.y) * 0.5f);

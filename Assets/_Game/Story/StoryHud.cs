@@ -353,6 +353,7 @@ namespace PleaseDontDrown.Story
             NpcRole.Robber => "ROBBER",
             NpcRole.Pirate => "PIRATE",
             NpcRole.Guest => "HOTEL GUEST",
+            NpcRole.Rival => "FINDERS KEEPERS",
             _ => "TOURIST"
         };
 

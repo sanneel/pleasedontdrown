@@ -95,6 +95,17 @@ namespace PleaseDontDrown.Story
             Add("3.7", "Old Snapper", SnapperBeat);
             Add("3.7b", "The Pirate King", PirateKingBeat);
             Add("3.8", "The gold vault", MoneyCave);
+            Add("3.9", "Load the gold", LoadTheGold);
+            Add("3.10", "Back to the hotel", BackToTheHotel);
+            Add("4.1", "Finders Keepers", FindersArrival);
+            Add("4.2", "The rescue race", RescueRace);
+            Add("4.3", "The warehouse", Warehouse);
+            Add("4.4", "Blackout Berry", BlackoutBerry);
+            Add("4.5", "The THIEF talks", ThiefTalks);
+            Add("4.6", "Sandy", SandyReveal);
+            Add("4.7", "The owner", FinalBoss);
+            Add("4.8", "Please don't drown", SandyCantSwim);
+            Add("4.9", "The ending", TheEnding);
         }
 
         // ================================================================== chapter 1

@@ -447,6 +447,7 @@ namespace PleaseDontDrown.Editor
             items.AddRange(BuildStoryItems(torus));
             items.AddRange(BuildFunItems()); // basketball (GameSceneBuilder.Fun.cs)
             items.AddRange(BuildBarFoodItems()); // fries, cola, cocktail for the bars (GameSceneBuilder.BarFood.cs)
+            items.AddRange(BuildChapter4Items()); // the money sack and Sandy's Lost & Found tag (GameSceneBuilder.Chapter4Items.cs)
             SetRefs(catalog, "_items", items.ToArray());
             EditorUtility.SetDirty(catalog);
             return catalog;
@@ -1375,7 +1376,7 @@ namespace PleaseDontDrown.Editor
         /// Scene NetworkObjects need unique scene ids. FishNet makes them on validate with a throttle, which a
         /// script that creates several objects at once can outrun, so force a full pass before saving.
         /// </summary>
-        private static void AssignSceneIds(UnityEngine.SceneManagement.Scene scene)
+        private static void AssignSceneIds(UnityEngine.SceneManagement.Scene scene, bool force = true)
         {
             MethodInfo create = typeof(NetworkObject).GetMethod("CreateSceneId", BindingFlags.NonPublic | BindingFlags.Static, null,
                 new[] { typeof(UnityEngine.SceneManagement.Scene), typeof(bool), typeof(int).MakeByRefType() }, null);
@@ -1384,7 +1385,7 @@ namespace PleaseDontDrown.Editor
                 Debug.LogWarning("[Build] NetworkObject.CreateSceneId not found; scene ids rely on FishNet's automatic pass.");
                 return;
             }
-            object[] args = { scene, true, 0 };
+            object[] args = { scene, force, 0 }; // (not forced: only new or clashing ids, the rest keep theirs)
             create.Invoke(null, args);
             Debug.Log($"[Build] Scene ids assigned ({args[2]} changed).");
         }

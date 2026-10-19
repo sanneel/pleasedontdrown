@@ -273,11 +273,14 @@ namespace PleaseDontDrown.Story
             EndMission(); // a mission it was in is gone with it
             _freePlay = false;
             ResetTsunamiActors();
-            SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2.") || _beats[index].Id.StartsWith("3."));
+            ClearSacks(); // chapter 3's money sacks and the boat's cargo (3.9, 3.10)
+            if (_cargo.Value != 0) SetCargo(0);
+            SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2.") || _beats[index].Id.StartsWith("3.") || _beats[index].Id.StartsWith("4."));
             _hints = null;
             _waitingForTalk = false;
             foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
-            if (_sandy != null && index > 0) StartCoroutine(SandyGoesHome()); // interrupted mid-walk: back to the kiosk
+            // Interrupted mid-walk: back to the kiosk (not once she has been found out on her island, 4.6 on).
+            if (_sandy != null && index > 0 && (index < _beats.FindIndex(b => b.Id == "4.6") || _beats.FindIndex(b => b.Id == "4.6") < 0)) StartCoroutine(SandyGoesHome());
             CleanupActors();
             _running = true;
             _runner = StartCoroutine(RunFrom(index));
@@ -291,7 +294,7 @@ namespace PleaseDontDrown.Story
                 Beat beat = _beats[i];
                 _beat.Value = beat.Id;
                 GalaStateFor(beat.Id);
-                SetChapter(beat.Id.StartsWith("3.") ? "Chapter 3: Skull Cove" : beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
+                SetChapter(beat.Id.StartsWith("4.") ? "Chapter 4: Finders Keepers" : beat.Id.StartsWith("3.") ? "Chapter 3: Skull Cove" : beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
                 Debug.Log($"[Story] beat {beat.Id}: {beat.Title}");
                 ClearWaits();
                 Save();
@@ -422,6 +425,14 @@ namespace PleaseDontDrown.Story
             if (npc == _sandy && !_waitingForTalk && _running) StartCoroutine(SandyChats(by));
         }
 
+        private static readonly string[] SandyReformedLines =
+        {
+            "Community service, dear. I hand things BACK now. It's horrible.",
+            "Found something? I'll give it to its owner. For free. *twitch*",
+            "Don't look at me like that. I'm taking swimming lessons.",
+            "The kiss of life. I still think about it. Don't make it weird."
+        };
+
         private static readonly string[] SandyLines =
         {
             "Found something? Put it on the counter out front, I'll pay you.",
@@ -439,7 +450,9 @@ namespace PleaseDontDrown.Story
                 yield return Say(_sandy, "Ooh, lovely. Somebody will be very happy. Here you go.");
                 yield break;
             }
-            yield return Say(_sandy, SandyLines[Random.Range(0, SandyLines.Length)]);
+            // After the story (chapter 4 done): community service at her old kiosk, honest at last. Mostly.
+            string[] lines = _freePlay ? SandyReformedLines : SandyLines;
+            yield return Say(_sandy, lines[Random.Range(0, lines.Length)]);
         }
         private void OnDefeated(StoryNpc npc, PlayerHub by) { if (!_freePlay) _defeated.Add(npc); }
         private void OnPurchased(ShopCounter shop, PlayerHub by, string item) { if (!_freePlay) _purchases.Add(item); }
@@ -708,7 +721,7 @@ namespace PleaseDontDrown.Story
             bool second = beat.Id.StartsWith("2.");
             string chapterNo = beat.Id.Substring(0, beat.Id.IndexOf('.'));
             // Next to a teammate who's standing on land; if they're all at sea, the island's own landing.
-            Vector3 at = second && _island2Spawn != null ? Island2SpawnPoint : chapterNo == "3" ? Island3Arrival : player.transform.position;
+            Vector3 at = second && _island2Spawn != null ? Island2SpawnPoint : chapterNo == "3" ? Island3Arrival : chapterNo == "4" ? Island4Arrival : player.transform.position;
             foreach (PlayerHub mate in PlayerHub.All)
             {
                 if (mate == player || mate == null || !Shore.IsAshore(mate.transform.position)) continue;
@@ -870,12 +883,16 @@ namespace PleaseDontDrown.Story
             RegisterThreatCommands();
             RegisterKillCommands();
             RegisterGalaCommands();
+            DevCommands.Register("finalboss", "<2|3>", "Skip the final boss ahead: 2 = the airlift won, 3 = Grabby beaten (tests, pictures).", args =>
+                CheatServer("finalboss", args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 2), cheat: true, owner: this);
+            DevCommands.Register("chapter4check", "", "Host: plays chapter 4 through with your lifeguard and checks each beat (log: [Check]).", _ =>
+                CheatServer("chapter4check", 0), cheat: true, owner: this);
         }
 
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat" })
+            foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat", "chapter4check", "finalboss" })
                 DevCommands.Unregister(c, this);
             UnregisterMissionCommands();
             UnregisterThreatCommands();
@@ -909,7 +926,7 @@ namespace PleaseDontDrown.Story
             {
                 DevCommands.Print("1.1 meet Sandy, 1.2 five rescues, 1.3 thief, 1.4 return loot, 1.5 three men, 1.6 silent one, 1.7 drugs, 1.8 one more, " +
                                   "1.9 thief again, 1.10 jet ski; 2.1 check in, 2.2 buy pistol, 2.3 three guests, 2.4 shark, 2.5 two more, 2.5b the Kleptopus, 2.5c the gala fund, 2.6 gala night (pirates), 2.7 the yacht; " +
-                                  "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.8 gold vault");
+                                  "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.7b the Pirate King, 3.8 gold vault, 3.9 load the gold, 3.10 back to the hotel; 4.1 Finders Keepers, 4.2 rescue race, 4.3 warehouse, 4.4 Blackout Berry, 4.5 the THIEF talks");
                 return;
             }
             if (!DevCommands.CheatsAllowed && args[0] != "reset") throw new InvalidOperationException("cheats are off");
@@ -970,6 +987,19 @@ namespace PleaseDontDrown.Story
             if (ServerThreatCheat(what, value, by)) return;
             if (ServerKillCheat(what, by)) return;
             if (ServerGalaCheat(what, value, by)) return;
+            if (what == "finalboss")
+            {
+                // Tests and pictures: skip the final boss ahead (2: the airlift won, 3: Grabby beaten).
+                if (value >= 2 && _bossPhase == 1) _raceYours = AirliftGoal;
+                if (value >= 3 && _grabby != null && !_grabby.IsDead && by != null)
+                    ((Combat.IDamageable)_grabby).ServerTakeHit(_grabby.Health + 1, Combat.DamageKind.Bullet, by, _grabby.TopPosition, Vector3.down);
+                return;
+            }
+            if (what == "chapter4check")
+            {
+                if (by != null) by.StartCoroutine(Chapter4Check(by)); // not ours: jumping to 4.1 stops all of ours
+                return;
+            }
             // 6 m ahead on the level (looking down must not put things underground).
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")

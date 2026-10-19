@@ -36,7 +36,7 @@ namespace PleaseDontDrown.Dev
         private static readonly string[] Beats =
         {
             "1.1", "1.2", "1.3", "1.4", "1.5", "1.9", "1.10", "2.1", "2.2", "2.3", "2.4", "2.5", "2.5b", "2.5c", "2.6", "2.7",
-            "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.7b", "3.8", "end"
+            "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.7b", "3.8", "3.9", "3.10", "4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7", "4.8", "4.9", "end"
         };
 
         private readonly List<string> _errors = new();
@@ -227,6 +227,7 @@ namespace PleaseDontDrown.Dev
                 yield break;
             }
             if (beat.StartsWith("3.")) { yield return Chapter3(me, beat); yield break; }
+            if (beat.StartsWith("4.")) { yield return Chapter4(me, beat); yield break; }
             if (beat == "2.1") { yield return TalkToMarked(me); yield break; }
             if (beat == "2.2" && !Carries(me, "Pistol")) { yield return BuyAt(me, "Pistol"); yield break; }
             if (beat == "2.7") { yield return Beat27(me); yield break; }
@@ -436,7 +437,7 @@ namespace PleaseDontDrown.Dev
             yield return new WaitForSeconds(0.8f);
         }
 
-        private static Vector3 Shoreward(Vector3 at) => at.z < -120f ? Vector3.back : Vector3.forward;
+        private static Vector3 Shoreward(Vector3 at) => at.x > 640f ? Vector3.left : at.x > 380f ? Vector3.right : at.z < -120f ? Vector3.back : Vector3.forward; // (island 4: its lagoon is to the east)
 
         /// <summary>Out to them, grab, tow to the beach in short hops, lay them down, CPR.</summary>
         private IEnumerator Rescue(PlayerHub me, VictimBrain v)
@@ -686,6 +687,7 @@ namespace PleaseDontDrown.Dev
         /// <summary>Skull Cove, beat by beat (what chapter3check does, as a player would).</summary>
         private IEnumerator Chapter3(PlayerHub me, string beat)
         {
+            if (beat == "3.10") { yield return Beat310(me); yield break; }
             if (me.Motor.Seat != null) Exec("getoff");
             PlayerCombat combat = me.GetComponent<PlayerCombat>();
             if (combat != null && combat.IsDowned) combat.ServerStandUp(PlayerCombat.MaxHealth, 0f);
@@ -801,7 +803,225 @@ namespace PleaseDontDrown.Dev
                     if (ledge != null) Stand(me, ledge.position);
                     yield return new WaitForSeconds(2f);
                     break;
+                case "3.9":
+                    yield return CarrySack(me);
+                    break;
             }
+        }
+
+        /// <summary>3.9: a money sack from the vault onto the pirate boat's deck (picked up, stood on the deck, put down).</summary>
+        private IEnumerator CarrySack(PlayerHub me)
+        {
+            Vehicle boat = null;
+            foreach (Vehicle v in Vehicle.All) if (v.DisplayName == "Pirate Boat") boat = v;
+            if (boat == null) yield break;
+            Item held = me.Hands.HeldItem;
+            if (held == null || held.DisplayName != "Money Sack")
+            {
+                Item sack = null;
+                foreach (Item i in Item.All)
+                    if (i.DisplayName == "Money Sack" && !i.IsHeld) sack = i;
+                if (sack == null) { yield return new WaitForSeconds(0.5f); yield break; }
+                yield return PickUp(me, sack);
+                yield break;
+            }
+            // On the deck behind the mast, facing the bow: put it down in front of you.
+            Stand(me, boat.transform.TransformPoint(new Vector3(-0.3f, 1.0f, -0.6f)));
+            me.Look.LookAt(boat.transform.TransformPoint(new Vector3(-0.3f, 0.9f, 1.4f)));
+            yield return new WaitForSeconds(0.6f);
+            Exec("drop");
+            yield return new WaitForSeconds(1.2f);
+            Tagged("sack", me, 2);
+        }
+
+        /// <summary>3.10: drive the pirate boat home round the hotel island's west end, then the tag on its deck.</summary>
+        private IEnumerator Beat310(PlayerHub me)
+        {
+            StoryDirector story = StoryDirector.Instance;
+            Vehicle boat = null;
+            foreach (Vehicle v in Vehicle.All) if (v.DisplayName == "Pirate Boat") boat = v;
+            if (boat == null) yield break;
+            if (story.MarkerLabel == "Hotel beach" && story.MarkerPosition is { } stop)
+            {
+                if (me.Motor.Seat == null)
+                {
+                    if (boat.IsLocked) { yield return new WaitForSeconds(0.5f); yield break; }
+                    Vector3 boarding = boat.transform.position + boat.transform.right * 2.5f;
+                    boarding.y = WaterSurface.Exists ? WaterSurface.HeightAt(boarding) - 1.0f : boarding.y;
+                    me.Motor.Teleport(boarding);
+                    me.Look.LookAt(boat.transform.position + Vector3.up * 0.8f);
+                    yield return new WaitForSeconds(0.6f);
+                    Exec("use");
+                    yield return new WaitForSeconds(1f);
+                    if (me.Motor.Seat == null) boat.OnInteract(me);
+                    yield return new WaitForSeconds(1f);
+                    yield break;
+                }
+                // Skull Cove lies south of the hotel island (x -160 .. 200, z -220 .. -480), the beach on its north side.
+                Vector3 p = me.Motor.Seat.transform.position, target = stop;
+                if (p.z < -235f && p.x > -205f) target = new Vector3(-228f, 0f, p.z < -490f ? -470f : p.z + 25f);
+                else if (p.z < -235f) target = new Vector3(-228f, 0f, -150f);
+                Vector3 to = target - p;
+                to.y = 0f;
+                float angle = Vector3.SignedAngle(me.Motor.Seat.transform.forward, to, Vector3.up);
+                DevCommands.Execute(string.Format(CultureInfo.InvariantCulture, "drive 0.7 {0:0.00} {1:0.00}",
+                    Mathf.Clamp(angle / 35f, -1f, 1f), Mathf.Abs(angle) > 100f || to.magnitude < 50f ? 0.5f : 1f));
+                Tagged("sailhome", me, 3);
+                yield break;
+            }
+            if (me.Motor.Seat != null) { Exec("getoff"); yield return new WaitForSeconds(0.8f); yield break; }
+            if (story.MarkerLabel == "Marisol" && story.MarkerPosition is { } marisol)
+            {
+                Stand(me, marisol - Vector3.up * 2f + Vector3.right * 2f);
+                yield return new WaitForSeconds(1f);
+                yield break;
+            }
+            if (story.MarkerLabel == "On the deck")
+            {
+                foreach (Item i in Item.All)
+                    if (i.DisplayName == "Lost & Found Tag" && !i.IsHeld)
+                    {
+                        Stand(me, i.transform.position + Vector3.back * 0.6f);
+                        yield return new WaitForSeconds(0.5f);
+                        me.Hands.TryPickUp(i);
+                        yield return new WaitForSeconds(1f);
+                        Tagged("tag", me, 1);
+                        break;
+                    }
+            }
+            yield return new WaitForSeconds(0.5f);
+        }
+
+        private static Transform Island4Point(string name) => GameObject.Find("Environment/Island4/Story/" + name)?.transform;
+
+        /// <summary>Finders Keepers, beat by beat (what chapter4check does, as a player would).</summary>
+        private IEnumerator Chapter4(PlayerHub me, string beat)
+        {
+            StoryDirector story = StoryDirector.Instance;
+            PlayerCombat combat = me.GetComponent<PlayerCombat>();
+            if (combat != null && combat.IsDowned) combat.ServerStandUp(PlayerCombat.MaxHealth, 0f);
+            // The final boss: kept on its feet (a player would dodge the claw and the flying loot; the test just stands there).
+            if (combat != null && beat == "4.7" && StoryDirector.MissionRunning) combat.ServerStandUp(PlayerCombat.MaxHealth, 0f);
+            if (beat == "4.1" && story.MarkerLabel == "Finders Keepers") { yield return SailToIsland4(me); yield break; }
+            if (me.Motor.Seat != null) { Exec("getoff"); yield return new WaitForSeconds(0.8f); yield break; }
+            // Someone in trouble off the lagoon: out to them first.
+            foreach (VictimBrain v in VictimBrain.All)
+                if (v != null && v.IsSpawned && v.State.NeedsHelp() && v.transform.position.x > 380f)
+                {
+                    yield return Rescue(me, v);
+                    yield break;
+                }
+            // Anyone fighting us: knock them down.
+            foreach (StoryNpc n in StoryNpc.All)
+                if (n != null && n.IsFighting && !n.IsDefeated && n.MaxHealth > 0)
+                {
+                    Stand(me, n.transform.position + n.transform.forward * 1.3f); // (names like "FK Security Rex" share their first word)
+                    me.Look.LookAt(n.HeadPosition);
+                    yield return new WaitForSeconds(0.3f);
+                    Exec("whack 2");
+                    yield return new WaitForSeconds(0.5f);
+                    Tagged("barfight", me);
+                    yield break;
+                }
+            switch (beat)
+            {
+                case "4.1":
+                    if (story.MarkerLabel == "Toll") { yield return TalkToMarked(me); Tagged("toll", me, 1); }
+                    else if (story.MarkerLabel == "The beach" && story.MarkerPosition is { } beach) Stand(me, beach - Vector3.up * 2f + Vector3.right * 4f);
+                    yield return new WaitForSeconds(0.6f);
+                    break;
+                case "4.2":
+                    if (!StoryDirector.MissionRunning && Island4Point("RaceBeach") is { } race) Stand(me, race.position);
+                    yield return new WaitForSeconds(0.8f);
+                    break;
+                case "4.3":
+                    if (!StoryDirector.MissionRunning)
+                    {
+                        if (Island4Point("WarehouseDoor") is { } door) Stand(me, door.position);
+                        yield return new WaitForSeconds(1f);
+                        break;
+                    }
+                    // A tag no guard is near or looking at (a careful player waits for the guard to walk on).
+                    foreach (Item i in Item.All)
+                    {
+                        if (i.DisplayName != "Lost & Found Tag" || i.IsHeld || i.transform.position.x < 380f) continue;
+                        bool watched = false;
+                        foreach (StoryNpc n in StoryNpc.All)
+                        {
+                            if (n == null || !n.IsGuarding) continue;
+                            Vector3 to = i.transform.position - n.transform.position;
+                            to.y = 0f;
+                            if (to.magnitude < 5f || to.magnitude < 18f && Vector3.Dot(n.transform.forward, to.normalized) > 0.3f) watched = true;
+                        }
+                        if (watched) continue;
+                        yield return PickUp(me, i);
+                        Tagged("evidence", me, 2);
+                        // Back out of the door between tags.
+                        if (Island4Point("WarehouseDoor") is { } outside) Stand(me, outside.position);
+                        break;
+                    }
+                    yield return new WaitForSeconds(0.4f);
+                    break;
+                case "4.4":
+                    if (Island4Point("SmoothieBar") is { } bar && (me.transform.position - bar.position).sqrMagnitude > 4f * 4f) Stand(me, bar.position);
+                    yield return new WaitForSeconds(0.8f);
+                    break;
+                case "4.5":
+                    yield return TalkToMarked(me);
+                    Tagged("thief", me, 1);
+                    break;
+                case "4.6":
+                    yield return TalkToMarked(me);
+                    Tagged("sandy", me, 1);
+                    break;
+                case "4.7":
+                    if (ActiveBoss() is { } grabby) { yield return HitBoss(me, grabby); Tagged("grabby", me, 2); break; }
+                    if (!StoryDirector.MissionRunning && Island4Point("SandyJetty") is { } sj) Stand(me, sj.position);
+                    yield return new WaitForSeconds(0.8f);
+                    break;
+                case "4.8":
+                    yield return new WaitForSeconds(0.5f);
+                    break;
+                case "4.9":
+                    // Along to wherever the ending is (the police dock, then the beach with everyone on it).
+                    if (StoryDirector.Instance.MarkerPosition is { } m && (me.transform.position - m).sqrMagnitude > 10f * 10f) Stand(me, m - Vector3.up * 2f + Vector3.back * 4f);
+                    Tagged("ending", me, 3);
+                    yield return new WaitForSeconds(1f);
+                    break;
+            }
+        }
+
+        /// <summary>4.1: onto the pirate boat at the hotel beach and east along the orange buoys to the island 4 jetty.</summary>
+        private IEnumerator SailToIsland4(PlayerHub me)
+        {
+            Transform berth = Island4Point("BoatBerth");
+            if (berth == null) yield break;
+            if (me.Motor.Seat == null)
+            {
+                Vehicle boat = null;
+                foreach (Vehicle v in Vehicle.All) if (v.DisplayName == "Pirate Boat" && !v.IsLocked && v.Driver == null) boat = v;
+                if (boat == null) { yield return new WaitForSeconds(0.5f); yield break; }
+                Vector3 boarding = boat.transform.position + boat.transform.right * 2.5f;
+                boarding.y = WaterSurface.Exists ? WaterSurface.HeightAt(boarding) - 1.0f : boarding.y;
+                me.Motor.Teleport(boarding);
+                me.Look.LookAt(boat.transform.position + Vector3.up * 0.8f);
+                yield return new WaitForSeconds(0.6f);
+                Exec("use");
+                yield return new WaitForSeconds(1f);
+                if (me.Motor.Seat == null) boat.OnInteract(me);
+                yield return new WaitForSeconds(1f);
+                yield break;
+            }
+            // The next buoy east of us (the route runs west to east), then the jetty's head.
+            Vector3 p = me.Motor.Seat.transform.position, target = berth.position;
+            for (int i = 0; i < 6; i++)
+                if (Island4Point($"Route_{i}") is { } r && r.position.x > p.x + 12f) { target = r.position; break; }
+            Vector3 to = target - p;
+            to.y = 0f;
+            float angle = Vector3.SignedAngle(me.Motor.Seat.transform.forward, to, Vector3.up);
+            DevCommands.Execute(string.Format(CultureInfo.InvariantCulture, "drive 0.7 {0:0.00} {1:0.00}",
+                Mathf.Clamp(angle / 35f, -1f, 1f), Mathf.Abs(angle) > 100f || to.magnitude < 40f ? 0.5f : 1f));
+            Tagged("sail4", me, 3);
         }
 
         private static int SlotOf(PlayerHub me, Item item)
