@@ -16,7 +16,6 @@ MonoBehaviour:
   DisplayName: The Pirate King
   Mesh: {fileID: 4300000, guid: 285b53b71761c8f4e9a45a2b36fe1133, type: 2}
   Material: {fileID: 2100000, guid: 5c2ff3075fbc2ff408cf2bb1d62494e3, type: 2}
-  ClosedEyesMaterial: {fileID: 0}
   RestPositions:
   - {x: 0, y: 0.9291111, z: 0.002837509}
   - {x: 6.9674093e-16, y: 0.11730003, z: -0.0004177047}
@@ -35,8 +34,8 @@ MonoBehaviour:
   - {x: 0.12836869, y: -0.04111111, z: -0.0035937056}
   - {x: 0, y: -0.4182271, z: 0}
   - {x: 0, y: -0.3981294, z: 0}
-  - {x: -0.04360664, y: 0.05405402, z: 0.15839645}
-  - {x: 0.04360664, y: 0.05405402, z: 0.17870368}
+  - {x: -0.04097499, y: 0.050972223, z: 0.15459634}
+  - {x: 0.04097499, y: 0.050972223, z: 0.18002228}
   - {x: -5.7731597e-15, y: -0.05833304, z: 0.20247284}
   - {x: -0.03077352, y: 0.13848084, z: 0.2768368}
   - {x: 0.03077352, y: 0.13848084, z: 0.2768368}
@@ -113,6 +112,9 @@ MonoBehaviour:
   - {x: 0, y: -0.9918149, z: 0.12768388}
   - {x: 0, y: -0.98584265, z: 0.16767302}
   HasFace: 1
+  FaceEyes: 1
+  FaceMouth: 1
+  MouthMaterial: {fileID: 2100000, guid: de515f6f0d6f8e4489ddf77e6402b1ca, type: 2}
   HeadTop: 0.256446
   HeadHalfWidth: 0.27560863
   HeadFront: 0.30759647

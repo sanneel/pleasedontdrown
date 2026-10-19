@@ -155,40 +155,41 @@ namespace PleaseDontDrown.Avatars
         }
 
         /// <summary>Face: eyes 0 (shut) .. 1 (open) .. 1.5 (wide), mouth 0 (closed) .. 1 (open wide), brows -1 (worried) .. 1 (angry).</summary>
-        public void SetExpression(float eyes, float mouth, float brows = 0f)
+        public void SetExpression(float eyes, float mouth, float brows = 0f) => SetFace(FaceState.From(eyes, mouth, brows));
+
+        /// <summary>The face this frame (a generated body's living face, the funny body's googly lids, or the code-built face).</summary>
+        public void SetFace(in FaceState face)
         {
             if (!_built) return;
             if (GeneratedBody != null)
             {
-                // A painted face: the eyelids come down over the eyes, the open mouth grows over the lips.
-                if (!GeneratedBody.HasFace) return;
-                // These eyes are either open or shut (a blink is two frames).
-                bool shut = eyes < 0.45f;
-                if (GeneratedBody.ClosedEyesMaterial != null && !GeneratedBody.IsFunny)
-                {
-                    // Shut eyes are painted into a second texture: wear it (no lid patches, no mouth hole).
-                    if (_renderer != null)
-                    {
-                        Material want = shut ? GeneratedBody.ClosedEyesMaterial : GeneratedBody.Material;
-                        if (_renderer.sharedMaterial != want) _renderer.sharedMaterial = want;
-                    }
-                    this[Bone.EyeL].localScale = this[Bone.EyeR].localScale = Vector3.zero;
-                    this[Bone.Mouth].localScale = Vector3.zero;
-                    return;
-                }
-                var lid = shut ? Vector3.one : Vector3.zero;
-                this[Bone.EyeL].localScale = lid;
-                this[Bone.EyeR].localScale = lid;
-                float open = Mathf.Clamp01((mouth - 0.1f) * 1.6f);
-                this[Bone.Mouth].localScale = open > 0.02f ? new Vector3(1f, open, 1f) : Vector3.zero; // shut: nothing, not a dark line on the lips
+                _face?.Show(face);
+                if (GeneratedBody.IsFunny && TryGetComponent(out AvatarFunny funny)) funny.SetLids(face.LidL, face.LidR);
                 return;
             }
+            face.ToOld(out float eyes, out float mouth, out float brows);
             Vector3 eyeScale = new Vector3(1f, Mathf.Clamp(eyes, 0.08f, 1.6f), 1f);
             this[Bone.EyeL].localScale = eyeScale;
             this[Bone.EyeR].localScale = eyeScale;
             this[Bone.Mouth].localScale = new Vector3(1f - mouth * 0.25f, 0.5f + mouth * 2.2f, 1f);
             this[Bone.BrowL].localRotation = _restRotation[(int)Bone.BrowL] * Quaternion.Euler(0f, 0f, -brows * 18f);
             this[Bone.BrowR].localRotation = _restRotation[(int)Bone.BrowR] * Quaternion.Euler(0f, 0f, brows * 18f);
+        }
+
+        /// <summary>The living face of the generated body worn (null: none, or a code-built body).</summary>
+        private AvatarFace _face;
+
+        /// <summary>
+        /// A generated body's materials, one per submesh: <paramref name="main"/> for the body, the mouth's own (front
+        /// faces culled) for its inside, the last submesh, when it has one.
+        /// </summary>
+        public static Material[] BodyMaterials(AvatarBody body, Material main)
+        {
+            int count = body.Mesh != null ? Mathf.Max(1, body.Mesh.subMeshCount) : 1;
+            var materials = new Material[count];
+            for (int i = 0; i < count; i++) materials[i] = main;
+            if (body.MouthMaterial != null && count > 1) materials[count - 1] = body.MouthMaterial;
+            return materials;
         }
 
         // ------------------------------------------------------------------ building
@@ -372,7 +373,8 @@ namespace PleaseDontDrown.Avatars
             _renderer.localBounds = new Bounds(Vector3.zero, Vector3.one * 3.2f);
             _renderer.updateWhenOffscreen = false;
             _renderer.quality = SkinQuality.Bone4; // smooth weights, unlike the rigid code-built parts
-            _renderer.sharedMaterial = body.Material;
+            _renderer.sharedMaterials = BodyMaterials(body, body.Material);
+            _face = body.FaceEyes || body.FaceMouth ? new AvatarFace(_renderer, body) : null;
             _renderer.skinnedMotionVectors = false;
             Matrix4x4[] bindposes = body.Mesh.bindposes; // root space, so an arm's rotation is its bind turn undone
             _armUnbindL = bindposes[(int)Bone.UpperArmL].rotation;
@@ -416,6 +418,7 @@ namespace PleaseDontDrown.Avatars
             _renderer.localBounds = new Bounds(Vector3.zero, Vector3.one * 3.2f); // generous: swimming and diving poses
             _renderer.updateWhenOffscreen = false;
             _renderer.quality = SkinQuality.Bone1; // every part rigidly on one bone
+            _face = null;
             _renderer.sharedMaterial = _material != null ? _material : SharedMaterial;
             _renderer.skinnedMotionVectors = false;
         }

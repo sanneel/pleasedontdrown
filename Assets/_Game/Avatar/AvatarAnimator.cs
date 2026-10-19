@@ -68,7 +68,7 @@ namespace PleaseDontDrown.Avatars
     /// throw wind-up and release, CPR, eating, plus a looking head, blinking and gestures. No animation clips.
     /// </summary>
     [DefaultExecutionOrder(50)]
-    public class AvatarAnimator : MonoBehaviour
+    public partial class AvatarAnimator : MonoBehaviour
     {
         [SerializeField] private AvatarRig _rig;
         [SerializeField] private float _turnSpeed = 10f;
@@ -133,10 +133,8 @@ namespace PleaseDontDrown.Avatars
         public AvatarGesture CurrentGesture => Now - _gestureStart < 1.6f ? _gesture : AvatarGesture.None;
         private float _gestureStart;
         private float _lastPump = -10f;
-        private float _nextBlink;
         private float _dt;
         private HandPose _poseL = HandPose.Relaxed, _poseR = HandPose.Relaxed;
-        private float _blinkUntil;
 
         // Reactions (story characters): flinching from a blow, falling when knocked out, glancing back while fleeing.
         private float _flinchStart = -10f;
@@ -2630,41 +2628,6 @@ namespace PleaseDontDrown.Avatars
             // On the clips' body the looking goes on top of the clip's own head movement.
             B(Bone.Neck).localRotation = ClipDriven ? B(Bone.Neck).localRotation * neck : neck;
             B(Bone.Head).localRotation = ClipDriven ? B(Bone.Head).localRotation * head : head;
-        }
-
-        private void PoseFace()
-        {
-            float t = Now;
-            if (t > _nextBlink)
-            {
-                _blinkUntil = t + 0.11f;
-                _nextBlink = t + Random.Range(2.2f, 5f);
-            }
-            float eyes = t < _blinkUntil ? 0.1f : 1f;
-            if (Motion.Underwater) eyes = Mathf.Min(eyes, 0.55f); // squinting
-            float mouth = 0.05f + _run * 0.35f * _move;
-            if (_eat > 0.5f) mouth = Mathf.Abs(Mathf.Sin(t * 9f)) * 0.7f;
-            if (Motion.Underwater) mouth = 0f;
-            float brows = _charge * 0.8f + _cpr * -0.5f;
-            switch (Motion.Mood)
-            {
-                case AvatarMood.Happy: brows = 0.25f; mouth = Mathf.Max(mouth, 0.15f); break;
-                case AvatarMood.Scared: brows = -1f; eyes = Mathf.Max(eyes, 1.4f); mouth = Mathf.Max(mouth, 0.35f); break;
-                case AvatarMood.Angry: brows = 1f; eyes = Mathf.Min(eyes, 0.75f); break;
-                case AvatarMood.Hurt: brows = -0.8f; eyes = Mathf.Min(eyes, 0.35f); mouth = 0.5f; break;
-            }
-            if (Motion.Talking) mouth = 0.12f + 0.5f * Mathf.Abs(Mathf.Sin(t * 13f) * Mathf.Sin(t * 5.3f + 1f));
-            if (_down > 0.5f) { eyes = 0.08f; mouth = 0.45f; }
-            else if (_lie > 0.5f && !Motion.Talking) { eyes = 0.12f; mouth = 0.05f; brows = 0.2f; } // soaking up the sun
-            if (GestureActive(AvatarGesture.Breath, 1.1f)) { mouth = 0.08f; eyes = 0.08f; brows = 0.3f; } // a kiss: lips pressed, eyes shut
-            else if (GestureActive(AvatarGesture.Burp, BurpSeconds))
-            {
-                float b = GestureT(BurpSeconds) * BurpSeconds;
-                if (b < 0.25f) { mouth = 0.05f; brows = 0.6f; } // holding it in, cheeks puffed
-                else if (b < 1.05f) { mouth = 0.8f + 0.15f * Mathf.Sin(t * 37f); eyes = 0.35f; brows = -0.4f; }
-                else { mouth = 0.12f; eyes = 1.15f; brows = 0.35f; } // ...pardon me
-            }
-            _rig.SetExpression(eyes, mouth, brows);
         }
     }
 

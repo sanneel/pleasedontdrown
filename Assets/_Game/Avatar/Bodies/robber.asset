@@ -16,7 +16,6 @@ MonoBehaviour:
   DisplayName: Robber
   Mesh: {fileID: 4300000, guid: 53d8e0627cafc58458494f94cb49ff58, type: 2}
   Material: {fileID: 2100000, guid: 0e7fd4b2aa8a60742ac7eee83fcd9073, type: 2}
-  ClosedEyesMaterial: {fileID: 0}
   RestPositions:
   - {x: 0, y: 0.8939556, z: -0.10127268}
   - {x: 0, y: 0.04745221, z: -0.0025392175}
@@ -35,9 +34,9 @@ MonoBehaviour:
   - {x: 0.12416618, y: -0.03955555, z: -0.01591938}
   - {x: 0, y: -0.4048784, z: 0}
   - {x: 0, y: -0.38086292, z: 0}
-  - {x: -0.04654003, y: 0.1628901, z: 0.22460619}
-  - {x: 0.04654003, y: 0.1628901, z: 0.22460619}
-  - {x: 0, y: 0.07756672, z: 0.22460619}
+  - {x: -0.06301449, y: 0.15150547, z: 0.16411282}
+  - {x: 0.06301449, y: 0.15150547, z: 0.16639374}
+  - {x: 0.00028867795, y: 0.03797424, z: 0.18542658}
   - {x: -0.04654003, y: 0.20943013, z: 0.22460619}
   - {x: 0.04654003, y: 0.20943013, z: 0.22460619}
   - {x: -0.07773527, y: 0.019433817, z: 0.08745218}
@@ -52,7 +51,7 @@ MonoBehaviour:
   ShinLength: 0.38135192
   AnkleHeight: 0.07416654
   HipHeight: 0.8939556
-  EyeHeight: 1.5550566
+  EyeHeight: 1.535672
   HandRestL: {x: 0.009525326, y: 0.9970215, z: -0.058602724, w: -0.04922656}
   HandRestR: {x: 0.02389836, y: 0.9930261, z: -0.10366363, w: 0.050812803}
   HasFingers: 1
@@ -100,7 +99,22 @@ MonoBehaviour:
   - 0.027504107
   - 0.02095551
   - 0.017026352
-  HasFace: 0
+  FingerDirsL:
+  - {x: -0, y: -1, z: 0}
+  - {x: -0, y: -1, z: 0}
+  - {x: -0, y: -1, z: 0}
+  - {x: -0, y: -1, z: 0}
+  - {x: -0, y: -1, z: 0}
+  FingerDirsR:
+  - {x: 0, y: -1, z: 0}
+  - {x: 0, y: -1, z: 0}
+  - {x: 0, y: -1, z: 0}
+  - {x: 0, y: -1, z: 0}
+  - {x: 0, y: -1, z: 0}
+  HasFace: 1
+  FaceEyes: 0
+  FaceMouth: 1
+  MouthMaterial: {fileID: 2100000, guid: 05c49ba4f61e70d46bede70079d16a04, type: 2}
   HeadTop: 0.3878336
   HeadHalfWidth: 0.28567532
   HeadFront: 0.24956243

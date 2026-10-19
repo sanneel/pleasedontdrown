@@ -78,10 +78,44 @@ namespace PleaseDontDrown.Audio
                 return;
             }
             _line = SoundClip.FromMastered("Dialogue", made.Result);
+            MeasureLoudness(made.Result, _line.frequency);
             _audio.clip = _line;
             _audio.pitch = 1f;
             _audio.volume = SoundSettings.Voice * _gain;
             _audio.Play();
+        }
+
+        // How loud the line is, every 10 ms (0..1 of its loud parts): the speaker's mouth opens with it (AvatarAnimator).
+        private float[] _loudness;
+        private int _loudnessHop = 1;
+
+        /// <summary>How loud the line being said is right now, 0..1 (-1: nothing being said out loud here).</summary>
+        public float Loudness
+        {
+            get
+            {
+                if (_loudness == null || _audio == null || !_audio.isPlaying) return -1f;
+                int at = _audio.timeSamples / _loudnessHop;
+                return at < _loudness.Length ? _loudness[at] : 0f;
+            }
+        }
+
+        private void MeasureLoudness(float[] samples, int frequency)
+        {
+            _loudnessHop = Mathf.Max(1, frequency / 100);
+            int count = samples.Length / _loudnessHop + 1;
+            _loudness = new float[count];
+            for (int i = 0; i < count; i++)
+            {
+                double sum = 0;
+                int from = i * _loudnessHop, to = Mathf.Min(samples.Length, from + _loudnessHop);
+                for (int k = from; k < to; k++) sum += samples[k] * samples[k];
+                _loudness[i] = to > from ? Mathf.Sqrt((float)(sum / (to - from))) : 0f;
+            }
+            float[] sorted = (float[])_loudness.Clone();
+            System.Array.Sort(sorted);
+            float loud = Mathf.Max(1e-4f, sorted[Mathf.Clamp((int)(sorted.Length * 0.9f), 0, sorted.Length - 1)]);
+            for (int i = 0; i < count; i++) _loudness[i] = Mathf.Clamp01(_loudness[i] / loud);
         }
 
         private static AudioListener _listener;

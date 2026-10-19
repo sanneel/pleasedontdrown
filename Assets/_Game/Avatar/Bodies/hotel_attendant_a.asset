@@ -16,7 +16,6 @@ MonoBehaviour:
   DisplayName: Hotel attendant (Marisol)
   Mesh: {fileID: 4300000, guid: ef3c3bbf6ec3674438296138a662792d, type: 2}
   Material: {fileID: 2100000, guid: 08f21018c3213924786346468cfca61e, type: 2}
-  ClosedEyesMaterial: {fileID: 0}
   RestPositions:
   - {x: 0, y: 0.8875, z: -0.022422578}
   - {x: 2.0776384e-16, y: 0.08302319, z: -0.0036096796}
@@ -35,8 +34,8 @@ MonoBehaviour:
   - {x: 0.051716104, y: -0.037777722, z: 0.0060911756}
   - {x: 0, y: -0.39942613, z: 0}
   - {x: 0, y: -0.38055015, z: 0}
-  - {x: -0.043684125, y: 0.12935913, z: 0.11887545}
-  - {x: 0.052229922, y: 0.13873732, z: 0.10568249}
+  - {x: -0.0481771, y: 0.1303922, z: 0.117570415}
+  - {x: 0.033572905, y: 0.12999928, z: 0.11378096}
   - {x: 0.005, y: 0.06516683, z: 0.13382788}
   - {x: -0.03350797, y: 0.15078586, z: 0.15537263}
   - {x: 0.03350797, y: 0.15078586, z: 0.15537263}
@@ -113,6 +112,9 @@ MonoBehaviour:
   - {x: 0, y: -0.99984944, z: 0.017351678}
   - {x: 0, y: -0.9943242, z: 0.10639267}
   HasFace: 1
+  FaceEyes: 1
+  FaceMouth: 1
+  MouthMaterial: {fileID: 2100000, guid: b617e8b358cfd59478ccac050c077e15, type: 2}
   HeadTop: 0.2792331
   HeadHalfWidth: 0.15488121
   HeadFront: 0.17263627

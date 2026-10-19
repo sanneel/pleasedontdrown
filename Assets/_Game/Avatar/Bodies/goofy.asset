@@ -16,7 +16,6 @@ MonoBehaviour:
   DisplayName: Goofy lifeguard
   Mesh: {fileID: 4300000, guid: e25ebd6a5c39c604a98e8bf71f6bc797, type: 2}
   Material: {fileID: 2100000, guid: 6e47bd48ca3025545a01395b1929a77b, type: 2}
-  ClosedEyesMaterial: {fileID: 2100000, guid: a9ed664794943ed49a823bd036df77c6, type: 2}
   RestPositions:
   - {x: 0, y: 0.80355555, z: -0.03485979}
   - {x: 0, y: 0.03242898, z: 0.00032695755}
@@ -113,6 +112,9 @@ MonoBehaviour:
   - {x: 0, y: -0.9914668, z: -0.13035913}
   - {x: 0, y: -0.9914668, z: -0.13035913}
   HasFace: 1
+  FaceEyes: 0
+  FaceMouth: 1
+  MouthMaterial: {fileID: 2100000, guid: dcaab394c911b524fbb6775d0c67d95f, type: 2}
   HeadTop: 0.5366572
   HeadHalfWidth: 0.30175206
   HeadFront: 0.3454683
