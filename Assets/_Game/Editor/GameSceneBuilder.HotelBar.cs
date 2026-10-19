@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FishNet.Object;
 using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Fun;
@@ -9,6 +10,7 @@ using PleaseDontDrown.Story;
 using PleaseDontDrown.Vehicles;
 using PleaseDontDrown.World;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -41,6 +43,13 @@ namespace PleaseDontDrown.Editor
         };
         private const float BarDeckTop = 0.266f; // the bar model's deck (measured)
         private const float CounterTop = 1.54f;
+        // Behind the counter (the model measured from above, SceneProbeMaps.HeightMapBatch at 10 cm): the staff floor is
+        // 0.45 up, x -2.2..2.2, z -2.6..3.5; the front counter's top runs from z 3.53 (1.56 high there) to 4.85 over a
+        // cabinet whose inside face is at z 3.6. The bartender stood at z 3.72 with her feet at the deck (0.26): in the
+        // counter to the chest and sunk into the floor.
+        private const float BarStaffFloor = 0.45f;
+        private static readonly Vector3 HotelBaristaAt = new(.25f, BarStaffFloor, 3.25f);
+        private const float BarWipeZ = 3.72f, BarWipeTop = 1.56f;
 
         private static void BuildHotelBar(Transform hotel)
         {
@@ -73,17 +82,7 @@ namespace PleaseDontDrown.Editor
             float drop = high - low + 0.4f;
             Primitive(PrimitiveType.Cube, "DeckSkirt", root, new Vector3(0f, 0.2f - drop * 0.5f, 0f), new Vector3(25.8f, drop, 15.8f), wood);
 
-            // Collision following the model: deck, the U of the counter (the rear aisle stays open), lounge chairs, posts.
-            Collider(root, "ClubDeck", new Vector3(0, .13f, 0), new Vector3(24.3f, .26f, 14.8f));
-            Collider(root, "ClubCounter", new Vector3(0, .90f, 4.6f), new Vector3(10.6f, 1.28f, .95f));
-            foreach (float x in new[] { -4.7f, 4.7f })
-                Collider(root, "ClubSideCounter", new Vector3(x, .90f, .4f), new Vector3(1.2f, 1.28f, 7.45f));
-            foreach (float x in new[] { -10.36f, 10.36f })
-                foreach (float z in new[] { -4.55f, -1.7f, 2.47f, 5.58f })
-                    Collider(root, "ClubChair", new Vector3(x, .65f, z), new Vector3(1.7f, .78f, 1.7f));
-            foreach (float x in new[] { -10.74f, 10.74f })
-                foreach (float z in new[] { -6.65f, 0, 6.65f })
-                    Collider(root, "ClubPost", new Vector3(x, 2.0f, z), new Vector3(.35f, 3.5f, .35f));
+            TripoBarColliders(root);
             Collider(root, "ClubRoof", new Vector3(0f, 6.2f, 0f), new Vector3(25f, .4f, 15.4f));
 
             // The menu board by the counter's front-left corner, facing the beach, on two legs.
@@ -96,11 +95,7 @@ namespace PleaseDontDrown.Editor
             // The bartender behind the counter, facing the front stools.
             root.gameObject.AddComponent<NetworkObject>();
             BuildBarista(root, AvatarLook.Bodies.Bartender);
-            Transform barista = root.Find("Barista");
-            barista.localPosition = new Vector3(.25f, .26f, 3.72f);
-            root.Find("WipeFrom").localPosition = new Vector3(-.25f, CounterTop + .02f, 4.35f);
-            root.Find("WipeTo").localPosition = new Vector3(.75f, CounterTop + .02f, 4.35f);
-            barista.Find("Rag").localPosition = new Vector3(.3f, CounterTop - .25f, .7f);
+            Transform barista = PlaceHotelBarista(root);
 
             // The stools you sit on, two guests on stools of their own (GameSceneBuilder.BarDining.cs), and the armchairs
             // at the four tables: seats too.
@@ -108,6 +103,67 @@ namespace PleaseDontDrown.Editor
             SetRefs(bar, "_seats", BuildBarStools(root, hotel, bar).ToArray());
             AddBarTables(root, hotel, bar);
             SetHotelBarMenu(bar);
+        }
+
+        /// <summary>
+        /// The coloured Tripo bar's solid parts where the model has them (measured from its triangles, 10 cm): the deck,
+        /// the staff floor behind the counter, the U of the counter (the front, each side's tall counter and the lower work
+        /// counter inside it), the shelves along the back either side of the rear aisle, the lounge chairs and the posts.
+        /// The counter's box had stood half a metre too far out: an invisible wall before it, the bartender's half open.
+        /// </summary>
+        private static void TripoBarColliders(Transform root)
+        {
+            Collider(root, "ClubDeck", new Vector3(0, .13f, 0), new Vector3(24.3f, .26f, 14.8f));
+            Collider(root, "ClubStaffFloor", new Vector3(-.1f, (.26f + BarStaffFloor) / 2f, .15f), new Vector3(4.5f, BarStaffFloor - .26f, 6.8f));
+            Collider(root, "ClubCounter", new Vector3(0, .91f, 4.2f), new Vector3(10.1f, 1.3f, 1.3f));                  // z 3.55..4.85
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Collider(root, "ClubSideCounter", new Vector3(side * 4.15f, .91f, .45f), new Vector3(1.8f, 1.3f, 6.3f));  // x 3.25..5.05
+                Collider(root, "ClubWorkCounter", new Vector3(side * 2.75f, .675f, .45f), new Vector3(.95f, .83f, 6.2f)); // 1.09 high
+            }
+            Collider(root, "ClubBackShelves", new Vector3(-3.025f, 1.68f, -2.9f), new Vector3(3.05f, 2.84f, .7f)); // x -4.55..-1.5
+            Collider(root, "ClubBackShelves", new Vector3(2.75f, 1.68f, -2.9f), new Vector3(3.0f, 2.84f, .7f));    // x 1.25..4.25
+            foreach (float x in new[] { -10.36f, 10.36f })
+                foreach (float z in new[] { -4.55f, -1.7f, 2.47f, 5.58f })
+                    Collider(root, "ClubChair", new Vector3(x, .65f, z), new Vector3(1.7f, .78f, 1.7f));
+            foreach (float x in new[] { -10.74f, 10.74f })
+                foreach (float z in new[] { -6.65f, 0, 6.65f })
+                    Collider(root, "ClubPost", new Vector3(x, 2.0f, z), new Vector3(.35f, 3.5f, .35f));
+        }
+
+        /// <summary>The bartender on the staff floor a hand's breadth behind the counter, wiping just inside its edge
+        /// (where her arm reaches), the rag put down there.</summary>
+        private static Transform PlaceHotelBarista(Transform root)
+        {
+            Transform barista = root.Find("Barista");
+            barista.localPosition = HotelBaristaAt;
+            root.Find("WipeFrom").localPosition = new Vector3(.05f, BarWipeTop + .045f, BarWipeZ); // (the rag 3.5 cm under the palm)
+            root.Find("WipeTo").localPosition = new Vector3(.6f, BarWipeTop + .045f, BarWipeZ);
+            barista.Find("Rag").localPosition = new Vector3(.3f, BarWipeTop + .007f - HotelBaristaAt.y, BarWipeZ - HotelBaristaAt.z);
+            return barista;
+        }
+
+        /// <summary>Batch: the saved scene's hotel bar given the colliders and the bartender's place above (the rest of the
+        /// bar as it is). Run again after a merge.</summary>
+        public static void HotelBarFixBatch()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Transform root = FindByPath("Environment/Hotel/HotelBeachBar") ?? throw new InvalidOperationException("No hotel bar");
+            int removed = 0;
+            foreach (Transform t in root.Cast<Transform>().ToArray())
+                if (t.name is "ClubDeck" or "ClubStaffFloor" or "ClubCounter" or "ClubSideCounter" or "ClubWorkCounter" or "ClubBackShelves"
+                        or "ClubChair" or "ClubPost" && t.GetComponents<Component>().Length == 2 && t.GetComponent<BoxCollider>() != null)
+                {
+                    Object.DestroyImmediate(t.gameObject);
+                    removed++;
+                }
+            TripoBarColliders(root);
+            foreach (Transform t in root.Cast<Transform>().Where(t => t.name == "ClubChair").ToArray())
+                Object.DestroyImmediate(t.gameObject); // (the armchairs are seats with boxes of their own: AddBarTables)
+            Transform barista = PlaceHotelBarista(root);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log($"[HotelBar] PASS: {removed} old colliders replaced; bartender at {barista.position:F2} (feet on the staff floor)");
         }
 
         /// <summary>One stool: a chair that never moves, the seat at the cushion, its order put down on the counter in front.</summary>
