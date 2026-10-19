@@ -45,6 +45,8 @@ namespace PleaseDontDrown.Vehicles
         [SerializeField] private float _seatEdge;
         [Tooltip("Drives on land (the golf cart): wheels on the ground push and steer it; it rolls to a stop off the throttle.")]
         [SerializeField] private bool _land;
+        [Tooltip("Riders sit upright on seats, feet on the deck (Milo's boat: a helm seat and a bench), not astride. Seat points are cushion tops.")]
+        [SerializeField] private bool _benchSeats;
         [Tooltip("Needed in the driver's inventory to start it (item display name). Empty = no key.")]
         [SerializeField] private string _keyItem = "";
         [Header("Driving")]
@@ -55,6 +57,11 @@ namespace PleaseDontDrown.Vehicles
         [SerializeField] private float _sideGrip = 2.4f;
         [SerializeField] private float _uprightStrength = 14f;
         [SerializeField] private AudioSource _engineAudio;
+        [Header("Fuel")]
+        [Tooltip("Litres in a full tank. 0: no fuel needed.")]
+        [SerializeField] private float _fuelCapacity;
+        [Tooltip("Litres burnt per second at full throttle.")]
+        [SerializeField] private float _fuelBurn = 1f;
 
         private static readonly List<Vehicle> _all = new();
 
@@ -63,6 +70,9 @@ namespace PleaseDontDrown.Vehicles
         private readonly SyncVar<PlayerHub> _rider2 = new SyncVar<PlayerHub>();
         private readonly SyncVar<bool> _locked = new SyncVar<bool>();
         private readonly SyncVar<string> _lockedReason = new SyncVar<string>();
+        private readonly SyncVar<float> _fuel = new SyncVar<float>(-1f);
+        private float _fuelUnreported, _nextFuelReport;
+        private int _fuelWarned;
 
         private ItemSync _sync;
         private Rigidbody _rb;
@@ -84,8 +94,15 @@ namespace PleaseDontDrown.Vehicles
         public float SeatEdge => _seatEdge;
         /// <summary>A land vehicle (the golf cart): sat on a bench, not astride.</summary>
         public bool IsLand => _land;
+        /// <summary>Riders sit on its seats as on a chair (the golf cart's bench, a boat's helm seat), not astride.</summary>
+        public bool SitsUpright => _chair || _land || _benchSeats;
         public PlayerHub Driver => _driver.Value;
         public bool IsLocked => _locked.Value;
+        public bool UsesFuel => _fuelCapacity > 0f;
+        public float FuelCapacity => _fuelCapacity;
+        /// <summary>Litres left (what the host knows, less what the driver's machine has burnt since it last told it).</summary>
+        public float Fuel => !UsesFuel ? 0f : Mathf.Max(0f, (_fuel.Value < 0f ? _fuelCapacity : _fuel.Value) - _fuelUnreported);
+        public bool OutOfFuel => UsesFuel && Fuel <= 0.01f;
         /// <summary>Host: driving itself to a point (ServerAutopilot).</summary>
         public bool OnAutopilot => _autopilotTarget.HasValue;
         public Rigidbody Body => _rb;
@@ -733,7 +750,8 @@ namespace PleaseDontDrown.Vehicles
 
         private void Drive(float throttle, float steer)
         {
-            _throttle = Mathf.MoveTowards(_throttle, throttle, Time.fixedDeltaTime * 3f);
+            _throttle = Mathf.MoveTowards(_throttle, OutOfFuel ? 0f : throttle, Time.fixedDeltaTime * 3f);
+            BurnFuel();
             Vector3 thrustAt = _thrustPoint != null ? _thrustPoint.position : _rb.position - transform.forward * 1f;
             bool inWater = WaterSurface.Exists && WaterSurface.DepthOf(thrustAt) > -0.15f;
             if (_land)
@@ -841,10 +859,71 @@ namespace PleaseDontDrown.Vehicles
             return v.sqrMagnitude > 1e-6f ? v.normalized : Vector3.forward;
         }
 
+        public override void OnStartServer()
+        {
+            base.OnStartServer();
+            if (UsesFuel && _fuel.Value < 0f) _fuel.Value = _fuelCapacity;
+        }
+
         public override void OnStopServer()
         {
             base.OnStopServer();
             _autopilotTarget = null;
+        }
+
+        /// <summary>Host: pour in up to <paramref name="litres"/>. Returns what went in.</summary>
+        [Server]
+        public float ServerRefuel(float litres)
+        {
+            if (!UsesFuel) return 0f;
+            float have = _fuel.Value < 0f ? _fuelCapacity : _fuel.Value;
+            float added = Mathf.Clamp(litres, 0f, _fuelCapacity - have);
+            _fuel.Value = have + added;
+            return added;
+        }
+
+        private void BurnFuel()
+        {
+            if (!UsesFuel || _driver.Value == null) return;
+            _fuelUnreported += Mathf.Abs(_throttle) * _fuelBurn * Time.fixedDeltaTime;
+            if (_fuelUnreported <= 0f || Time.time < _nextFuelReport) return;
+            _nextFuelReport = Time.time + 0.5f;
+            float burnt = _fuelUnreported;
+            if (IsServerInitialized) ServerBurn(burnt);
+            else ReportFuelServer(burnt);
+            _fuelUnreported = 0f;
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        private void ReportFuelServer(float burnt, NetworkConnection caller = null)
+        {
+            if (_driver.Value == null || _driver.Value.Owner != caller) return;
+            ServerBurn(Mathf.Clamp(burnt, 0f, _fuelBurn * 2f));
+        }
+
+        [Server]
+        private void ServerBurn(float burnt)
+        {
+            float have = _fuel.Value < 0f ? _fuelCapacity : _fuel.Value;
+            _fuel.Value = Mathf.Max(0f, have - burnt);
+        }
+
+        /// <summary>The local driver hears when the tank runs low and when it runs dry.</summary>
+        private void WarnAboutFuel(PlayerHub driver)
+        {
+            if (!UsesFuel || driver == null || driver != PlayerHub.Local) return;
+            float level = Fuel / _fuelCapacity;
+            if (level <= 0.01f && _fuelWarned < 2)
+            {
+                _fuelWarned = 2;
+                PlayerHud.ShowToast($"The {_displayName} is out of fuel! Find a fuel pump on a dock.", 4f, ToastKind.Warning);
+            }
+            else if (level <= 0.25f && _fuelWarned < 1)
+            {
+                _fuelWarned = 1;
+                PlayerHud.ShowToast($"The {_displayName} is low on fuel.", 3f, ToastKind.Warning);
+            }
+            else if (level > 0.3f) _fuelWarned = 0;
         }
 
         public override void OnStartClient()
@@ -906,6 +985,7 @@ namespace PleaseDontDrown.Vehicles
                 _nextEnterRequest = Time.time + 0.5f;
                 ExitNow();
             }
+            WarnAboutFuel(driver);
             ResendExitIfIgnored();
             GlueDriver(true);
         }

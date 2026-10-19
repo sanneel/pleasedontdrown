@@ -72,6 +72,7 @@ namespace PleaseDontDrown.Story
 
         [Header("Tuning")]
         [SerializeField] private int _pistolPrice = 250;
+        [SerializeField] private int _boatPrice = 350;
         [SerializeField] private float _spawnGap = 6f;
 
         private static readonly string[] LostKinds = { "Wallet", "Phone", "Sunglasses", "Watch" };

@@ -213,13 +213,7 @@ namespace PleaseDontDrown.Dev
                 yield return new WaitForSeconds(1f);
                 yield break;
             }
-            if (beat == "1.9")
-            {
-                if (Carries(me, "Fleet Key Case")) yield return TalkRental(me);
-                else foreach (Item item in Item.All)
-                    if (item.DisplayName == "Fleet Key Case" && !item.IsHeld) { yield return PickUp(me, item); break; }
-                yield break;
-            }
+            if (beat == "1.9") { yield return TalkRental(me); yield break; }
             if (me.Motor.Seat != null && beat.StartsWith("2.") && beat != "2.7")
             {
                 Exec("getoff"); // arrived on the jet ski: on foot from here
@@ -508,18 +502,18 @@ namespace PleaseDontDrown.Dev
             }
         }
 
-        /// <summary>Onto the robber's jet ski and south to the hotel island, steering at it.</summary>
+        /// <summary>Onto Milo's boat (the crew bought it in 1.9) and south to the hotel island, steering at it.</summary>
         private IEnumerator RideToIsland2(PlayerHub me)
         {
             if (me.Motor.Seat == null)
             {
                 Vehicle ski = null;
                 foreach (Vehicle v in Vehicle.All)
-                    if (v.DisplayName.StartsWith("Rental Jet Ski") && !v.IsLocked && v.Driver == null && v.transform.position.z > -120f)
+                    if ((v.DisplayName == "Milo's Boat" || v.DisplayName.StartsWith("Rental Jet Ski")) && !v.IsLocked && v.Driver == null && v.transform.position.z > -120f)
                         ski = v;
                 if (ski == null)
                 {
-                    Warn("no jet ski on island 1");
+                    Warn("no boat or jet ski at Milo's dock on island 1");
                     yield break;
                 }
                 Vector3 boarding = ski.transform.position + ski.transform.right * 1.6f;

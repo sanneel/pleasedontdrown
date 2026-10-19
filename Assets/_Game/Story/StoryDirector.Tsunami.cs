@@ -22,7 +22,6 @@ namespace PleaseDontDrown.Story
         private readonly SyncVar<bool> _rentalUnlocked = new(false);
         private StoryNpc _keyThief;
         private Vector3 _rentalHome;
-        private Item _keyCase;
         private int _surgeCrew = 1;
         private readonly List<VictimBrain> _surgeVictims = new();
         public bool RentalUnlocked => _rentalUnlocked.Value;
@@ -42,7 +41,7 @@ namespace PleaseDontDrown.Story
         {
             _rentalUnlocked.Value = unlocked;
             foreach (Vehicle ski in _rentalFleet)
-                if (ski != null) ski.ServerSetLocked(!unlocked, "Milo's fleet - recover the stolen key case");
+                if (ski != null) ski.ServerSetLocked(!unlocked, "Milo's boat - buy it from Milo");
         }
 
         private void ResetTsunamiActors()
@@ -64,20 +63,20 @@ namespace PleaseDontDrown.Story
             _island = _island1;
             StopHints();
             SetRentalAccess(false);
-            SetObjective("Meet Milo at the jet ski rental dock when you're ready");
+            SetObjective("Meet Milo at his boat dock when you're ready");
             Marker("Milo's rentals", _rentalOperator.NetworkObject);
-            yield return WaitTalk(_rentalOperator, "Talk to Milo about the jet skis");
+            yield return WaitTalk(_rentalOperator, "Talk to Milo about the boat");
             _rentalOperator.ServerSetTalkable(false);
-            yield return Say(_rentalOperator, "Milo. Four jet skis, four helmets, and absolutely no refunds for showing off.");
-            yield return Say(_rentalOperator, "Sandy says the hotel might need your crew. I'll get the fleet keys...");
+            yield return Say(_rentalOperator, "Milo. One boat, one wheel, and absolutely no refunds for showing off.");
+            yield return Say(_rentalOperator, $"Sandy says the hotel might need your crew. The boat is yours for ${_boatPrice}. Earn it, then come back. I'll get my price list...");
             _keyThief = SpawnNpc("Robber", NpcRole.Robber, RobberLook, _rentalHome + Vector3.left * 4f, 180f);
             _keyThief.ServerSetBag(true);
             _keyThief.ServerShout("Lovely day for borrowing things!", false);
             _keyThief.ServerMoveTo(new Vector3(45f, 0f, 2f), run: true);
             _rentalOperator.ServerSetMood(AvatarMood.Scared);
-            yield return Say(_rentalOperator, "HEY! My key case! That backpack thief took ALL FOUR KEYS!");
-            SetObjective("The thief has the fleet keys! Follow him toward the shore");
-            Marker("Stolen keys", _keyThief.NetworkObject);
+            yield return Say(_rentalOperator, "HEY! That backpack thief just grabbed my price list!");
+            SetObjective("Milo's price list is gone! Follow the thief toward the shore");
+            Marker("The thief", _keyThief.NetworkObject);
             float until = Time.time + 8f;
             while (Time.time < until && StoryNpc.NearestPlayer(_keyThief.transform.position, 6f) == null) yield return null;
             yield return Say(_sandy, "Wait. Why is the sea pulling back? Everybody, away from the water!");
@@ -118,7 +117,7 @@ namespace PleaseDontDrown.Story
             {
                 Name = name, Look = look.Pack(), Figure = look.Feminine ? 1 : 0,
                 SecondsToUnconscious = seconds, ConditionSeconds = 90f, NeedsCpr = false,
-                Shouts = index == 0 ? "MY SKIS!|A RING! THROW ME A RING!" : index == 1 ? "I CAN'T SWIM!|YOU CAN HAVE THE KEYS!|RESCUE ME FIRST!" : "OVER HERE!|I'M OVER HERE!"
+                Shouts = index == 0 ? "MY BOAT!|A RING! THROW ME A RING!" : index == 1 ? "I CAN'T SWIM!|YOU CAN HAVE THE KEYS!|RESCUE ME FIRST!" : "OVER HERE!|I'M OVER HERE!"
             };
             // Spread the group along the reachable beach; additional players create additional simultaneous work.
             float x = index == 0 ? 27f : index == 1 ? 43f : -20f + (index - 2) * 13f;
@@ -186,67 +185,67 @@ namespace PleaseDontDrown.Story
                 yield return new WaitForSeconds(0.25f);
             }
             NoMarker();
-            // Let the visual recession finish naturally; keys never spawn underwater.
+            // Let the visual recession finish naturally.
             while (TsunamiState.Active) yield return null;
             if (TsunamiState.Instance != null) TsunamiState.Instance.ServerStop();
-            yield return Say("Robber", "You saved ME? ...Fine. The keys are in the orange case. I'm retiring from borrowing.", new Color(1f, 0.85f, 0.5f));
-            _keyCase = SpawnItem("Fleet Key Case", _rentalKeySpot.position);
-            yield return Say(_rentalOperator, "That's my case! Bring it over. We've got a fleet to get back on the water.");
+            yield return Say("Robber", "You saved ME? ...Fine. Tell Milo his price list is in my bag. I'm retiring from borrowing.", new Color(1f, 0.85f, 0.5f));
+            yield return Say(_rentalOperator, $"You brought my customers home. The boat is ${_boatPrice}. Bring me the money and it's yours.");
         }
 
-        private IEnumerator RecoverFleetKeys()
+        private IEnumerator BuyBoat()
         {
             _island = _island1;
             _rentalOperator.ServerTeleport(_rentalHome, 180f, keepExact: true);
             SetRentalAccess(false);
             _talks.Clear();
-            _rentalOperator.ServerSetTalkable(true, "Return the fleet key case to Milo");
+            _rentalOperator.ServerSetTalkable(true, $"Buy the boat (${_boatPrice})");
+            bool turnedAway = false;
             while (true)
             {
-                if (_keyCase == null || !_keyCase.IsSpawned)
-                {
-                    foreach (Item item in Item.All)
-                        if (item.DisplayName == "Fleet Key Case") { _keyCase = item; break; }
-                    if (_keyCase == null || !_keyCase.IsSpawned) _keyCase = SpawnItem("Fleet Key Case", _rentalKeySpot.position);
-                }
-                if (_keyCase != null && !_keyCase.IsHeld &&
-                    (_keyCase.transform.position.y < -3f || Vector3.Distance(_keyCase.transform.position, _rentalKeySpot.position) > 65f))
-                {
-                    Remove(_keyCase);
-                    _keyCase = SpawnItem("Fleet Key Case", _rentalKeySpot.position);
-                    RescueService.Instance.ServerAnnounce("The orange key case washed back beside Milo's dock.");
-                }
-                bool handed = false;
-                foreach (var talk in _talks)
-                    if (talk.npc == _rentalOperator && _keyCase != null && _keyCase.Holder == talk.by) handed = true;
+                int money = Economy.Money;
+                bool asked = _talks.Exists(t => t.npc == _rentalOperator);
                 _talks.Clear();
-                if (handed) break;
-                bool held = _keyCase != null && _keyCase.IsHeld;
-                SetObjective(held ? "Take the orange key case to Milo and talk to him" : "Recover the orange case of jet ski keys");
-                if (held) Marker("Milo", _rentalOperator.NetworkObject);
-                else if (_keyCase != null) Marker("Fleet keys", _keyCase.NetworkObject);
+                if (asked && money >= _boatPrice)
+                {
+                    Economy.Instance.ServerSpend(_boatPrice, "the boat from Milo");
+                    break;
+                }
+                if (asked && !turnedAway)
+                {
+                    turnedAway = true;
+                    yield return Say(_rentalOperator, $"${_boatPrice}. You have ${money}. Rescue a few more people and come back.");
+                }
+                else if (asked)
+                {
+                    // No grinding for a ski: the second time he takes what the team has.
+                    yield return Say(_rentalOperator, "...You saved my customers. Fine. Whatever's in your pocket. Don't tell my wife.");
+                    if (money > 0) Economy.Instance.ServerSpend(money, "the boat from Milo, on credit");
+                    break;
+                }
+                SetObjective(money >= _boatPrice ? $"Buy the boat from Milo (${_boatPrice})" : $"Earn ${_boatPrice} for Milo's boat (${money})");
+                Marker("Milo", _rentalOperator.NetworkObject);
                 yield return new WaitForSeconds(0.2f);
             }
-            Remove(_keyCase);
-            _keyCase = null;
             _rentalOperator.ServerSetTalkable(false);
             NoMarker();
-            yield return Say(_rentalOperator, "Four keys. Four skis. You recovered them, and you brought my customers home. That's a proper rescue crew.");
+            _rentalOperator.ServerSetMood(AvatarMood.Happy);
+            yield return Say(_rentalOperator, "You earned every dollar, and you brought my customers home. That's a proper rescue crew.");
+            _rentalOperator.ServerSetMood(AvatarMood.Neutral);
             yield return Say(_sandy, "(on the radio) The Grand Coral Hotel just called. They need lifeguards - the WHOLE crew. South across the channel!");
-            yield return Say(_rentalOperator, "Take the fleet. One each, or share a seat. You've earned the ride. Bring them back in one piece!");
+            yield return Say(_rentalOperator, "She seats three, and there are lifeguard jet skis for the rest. Fill the tanks at the pump. Bring her back in one piece!");
             for (int i = 0; i < _rentalFleet.Length; i++)
                 if (_rentalFleet[i] != null && i < _rentalBerths.Length)
                     _rentalFleet[i].ServerPlace(_rentalBerths[i].position, 180f);
             SetRentalAccess(true);
             Save();
-            TitleObservers("FLEET UNLOCKED", "Four jet skis. Every lifeguard can drive.");
+            TitleObservers("BOAT BOUGHT", "Milo's boat is yours. Jet skis and the banana need fuel from the pumps.");
         }
 
         private IEnumerator FleetDeparture()
         {
             _island = _island1;
             SetRentalAccess(true); // also restores access for a saved departure and late joiners
-            _rentalOperator.ServerSetTalkable(true, "Recover an unattended jet ski");
+            _rentalOperator.ServerSetTalkable(true, "Bring the boat back to the dock");
             var arrived = new HashSet<PlayerHub>();
             float nextRecovery = 0f;
             bool underway = false;
@@ -263,9 +262,9 @@ namespace PleaseDontDrown.Story
                     if (Vehicle.RideOf(p) != null) underway = true;
                 }
                 if (total > 0 && done == total) break;
-                SetObjective(underway ? "Ride south to the hotel together. Stranded? Esc > Travel." : "Take a jet ski from Milo's dock - one for each lifeguard", done, total);
+                SetObjective(underway ? "Sail south to the hotel together. Stranded? Esc > Travel." : "Take Milo's boat south (seats 3). The rest: a jet ski, or Esc > Travel", done, total);
                 if (underway) Marker("Hotel island", Island2Arrival);
-                else Marker("Rental dock", _rentalFleet[0].NetworkObject);
+                else Marker("Milo's boat", _rentalFleet[0].NetworkObject);
                 if (Time.time >= nextRecovery && _talks.Exists(t => t.npc == _rentalOperator))
                 {
                     for (int i = 0; i < _rentalFleet.Length; i++)
@@ -274,7 +273,7 @@ namespace PleaseDontDrown.Story
                         if (ski != null && ski.Aboard().Count == 0)
                         {
                             ski.ServerPlace(_rentalBerths[i].position, 180f);
-                            RescueService.Instance.ServerAnnounce("Milo has brought an unattended ski back to the rental dock.");
+                            RescueService.Instance.ServerAnnounce("Milo has brought his boat back to the dock.");
                             break;
                         }
                     }

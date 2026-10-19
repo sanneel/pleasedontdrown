@@ -388,7 +388,7 @@ namespace PleaseDontDrown.Editor
                 {
                     // A driver's seat, exactly as PlayerAvatar sets it: chair or astride, and the hands on the
                     // handlebars (Vehicle.GetHandlebars).
-                    m.ChairSeat = seatVehicle.IsChair || seatVehicle.IsLand;
+                    m.ChairSeat = seatVehicle.SitsUpright;
                     m.Straddle = seatVehicle.Straddle;
                     m.FloatSeat = seatVehicle.RestHands;
                     if (seatVehicle.GetHandlebars(out HandGrip bl, out HandGrip br))

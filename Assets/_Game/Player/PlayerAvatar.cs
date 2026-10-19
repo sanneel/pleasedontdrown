@@ -263,7 +263,7 @@ namespace PleaseDontDrown.Player
                 m.Velocity = Vector3.zero; // no walking legs
                 m.Straddle = seat.Straddle;
                 m.FloatSeat = seat.RestHands;
-                m.ChairSeat = seat.IsChair || seat.IsLand; // a chair, a stool, the golf cart's bench
+                m.ChairSeat = seat.SitsUpright; // a chair, a stool, the golf cart's bench, Milo's helm seat
                 m.HighSeat = seat.IsStool;
                 m.SeatEdge = seat.SeatEdge;
                 // Sat on anything the body faces the way its seat does: looking about turns the head, not the legs
