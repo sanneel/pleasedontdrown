@@ -42,6 +42,8 @@ namespace PleaseDontDrown.Avatars
                 {
                     if ((a.transform.position - from).sqrMagnitude > reach * reach) continue;
                     FaceState f = a.Face;
+                    var rr = a._rig != null ? a._rig.Renderer : null;
+                    Core.DevCommands.Print($"[Face] {a.transform.root.name}/{a.name} body {(a._rig != null && a._rig.GeneratedBody != null ? a._rig.GeneratedBody.name : "code")} renderer {(rr != null ? $"{rr.enabled} vis {rr.isVisible} {rr.bounds.center} mesh {(rr.sharedMesh != null ? rr.sharedMesh.name : "none")}" : "none")}");
                     Core.DevCommands.Print($"[Face] {a.name}: mood {a.Motion.Mood} talking {a.Motion.Talking} lids {f.LidL:0.00}/{f.LidR:0.00} low {f.LowL:0.00} " +
                                            $"jaw {f.Jaw:0.00} smile {f.Smile:0.00} brows {f.BrowUp:0.00}/{f.BrowAngry:0.00}/{f.BrowSad:0.00} gaze {f.Gaze} blinks {a.Blinks}");
                 }

@@ -184,8 +184,11 @@ namespace PleaseDontDrown.Editor
             }
             else if ((seeL || seeR) && FindEyeWhites(rig.Image, found, out whitesL, out whitesR, out bool oneL, out bool oneR, out string note))
             {
-                seeL = oneL;
-                seeR = oneR;
+                // A pair found on the face beats the texture search's "one eye hidden" (the bellhop's cap shadow): only the
+                // eye-patched King keeps one.
+                bool pair = !note.StartsWith("one eye");
+                seeL = oneL || (pair && file != "pirate_king");
+                seeR = oneR || (pair && file != "pirate_king");
                 rig.MidX = (whitesL.center.x + whitesR.center.x) * 0.5f;
                 Debug.Log($"[Build] face {file}: eyes {note}");
             }
@@ -328,7 +331,7 @@ namespace PleaseDontDrown.Editor
                         float gapY = Mathf.Max(0f, Mathf.Max(A.yMin, B.yMin) - Mathf.Min(A.yMax, B.yMax));
                         if (gapX > 0.016f || gapY > 0.003f) continue;
                         Rect union = Rect.MinMaxRect(Mathf.Min(A.xMin, B.xMin), Mathf.Min(A.yMin, B.yMin), Mathf.Max(A.xMax, B.xMax), Mathf.Max(A.yMax, B.yMax));
-                        if (union.width > 0.08f || union.height > 0.05f) continue;
+                        if (union.width > 0.1f || union.height > 0.08f) continue; // (cartoon eyes can be 6 cm tall)
                         patches[a] = union;
                         patches.RemoveAt(b);
                         merged = true;
@@ -354,7 +357,7 @@ namespace PleaseDontDrown.Editor
             var eyes = new List<(Rect box, float score)>();
             foreach (Rect p in patches)
             {
-                if (p.width < 0.004f || p.width > 0.08f || p.height < 0.002f || p.height > 0.05f) continue;
+                if (p.width < 0.004f || p.width > 0.1f || p.height < 0.002f || p.height > 0.08f) continue;
                 float dark = Share(Grow(p, 0.3f, 0.3f, 0.001f), c => Luma(c) < 0.3f);
                 float skinRound = Share(Grow(p, 0.5f, 0.5f, 0.004f), c => Distance(c, skin) < 0.22f, Grow(p, 0.2f, 0.2f, 0.001f));
                 if (dark < 0.04f || skinRound < 0.25f) continue;

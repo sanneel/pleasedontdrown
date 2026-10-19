@@ -198,7 +198,9 @@ namespace PleaseDontDrown.Avatars
             }
 
             // Every transform from the root down to the body's bones (the ones the humanoid needs, and their parents).
-            var skeleton = new List<SkeletonBone> { Skeleton(root) };
+            // (The root at its own origin: its local position is relative to its parent, and a character standing on a
+            // raised floor, the hotel porch 1.8 m up, came out with the clips' body that far under its feet.)
+            var skeleton = new List<SkeletonBone> { new() { name = root.name, position = Vector3.zero, rotation = Quaternion.identity, scale = Vector3.one } };
             var seen = new HashSet<Transform> { root };
             foreach (var (bone, _) in HumanBones)
                 for (Transform t = rig[bone]; t != null && t != root; t = t.parent)
