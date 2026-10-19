@@ -192,6 +192,9 @@ MODELS = {
     "golf_cart": dict(island=2, turn=-90, fit=("y", 2.4), shiny=True),
     "resort_helicopter": dict(island=2, turn=-90, fit=("y", 10.0), shiny=True),
     "motor_yacht": dict(island=2, turn=-90, fit=("y", 14.0), shiny=True),
+    # The swim-up bar at the pool (2026-10-19): a thatched palapa on four posts, and the back bar with its bottles.
+    "swimup_palapa": dict(island=2, turn=0, fit=("x", 7.0), two_sided=True, decimate=16000),
+    "tiki_back_bar": dict(island=2, turn=-90, fit=("x", 3.6), shiny=True, decimate=16000),
     # Island 3 east beach (2026-10-19): a net drying on a rack, and a 4 m section of rope fence.
     "fishing_net_rack": dict(turn=90, fit=("x", 3.6), two_sided=True, decimate=9000),
     "rope_fence": dict(turn=90, fit=("x", 4.0), decimate=3000),  # (a dozen of them in a row)

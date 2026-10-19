@@ -43,6 +43,7 @@ namespace PleaseDontDrown.Editor
             BuildHelipad(root, log);
             BuildSecondYacht(root, log);
             BuildTennisCourt(root, log);
+            BuildSwimUpBar(root, log);
 
             Physics.SyncTransforms();
             BakeNavMeshes(only: "Island2");
@@ -259,6 +260,105 @@ namespace PleaseDontDrown.Editor
             GameObject heli = ResortModel("resort_helicopter", pad, best.at + Vector3.up * 0.08f, 35f, 0.9f);
             if (heli != null) BoxAround(heli, 0.5f);
             log.Add($"helipad on the lawn at {best.at}");
+        }
+
+        // ------------------------------------------------------------------ the swim-up bar
+
+        /// <summary>
+        /// A swim-up bar at the pool's east end (TeamB's pool: water x 54..70, z -256..-246): a tiled counter standing in
+        /// the water along the east wall, three stools under the water in front of it, a ledge to stand on, and behind
+        /// it on the deck a back bar with bottles under a thatched canopy. Look and stand only (no orders).
+        /// </summary>
+        private static void BuildSwimUpBar(Transform parent, List<string> log)
+        {
+            Rect w = PoolWater;
+            // The pool's own water (TeamB): the deck is its edge, 0.15 m above it.
+            GameObject poolWater = GameObject.Find("Environment/Island2Pool/PoolWater");
+            if (poolWater == null) { log.Add("swim-up bar: no Island2Pool (run TeamBPoolBatch first)"); return; }
+            float water = poolWater.transform.position.y, deck = water + PoolWaterBelowEdge;
+            var root = new GameObject("SwimUpBar").transform;
+            root.SetParent(parent, false);
+            Material tile = GetMaterial("SwimBarTile", new Color(0.93f, 0.9f, 0.82f), smoothness: 0.5f);
+            Material top = GetMaterial("SwimBarTop", new Color(0.12f, 0.45f, 0.52f), smoothness: 0.6f);
+            Material gold = GetMaterial("HelipadGold", new Color(0.86f, 0.68f, 0.28f), metallic: 0.6f, smoothness: 0.5f);
+            float floorY = PoolFloor;
+            float zc = w.center.y, len = 5f;
+            // The counter in the water along the east wall: from the pool floor up to 1.05 m over the water.
+            float cx = w.xMax - 0.55f, topY = water + 0.55f;
+            Primitive(PrimitiveType.Cube, "Counter", root, new Vector3(cx, (topY + floorY) * 0.5f, zc), new Vector3(1.1f, topY - floorY, len), tile);
+            Primitive(PrimitiveType.Cube, "CounterTop", root, new Vector3(cx - 0.1f, topY + 0.04f, zc), new Vector3(1.4f, 0.08f, len + 0.3f), top, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "GoldTrim", root, new Vector3(cx - 0.81f, topY - 0.03f, zc), new Vector3(0.03f, 0.06f, len + 0.3f), gold, keepCollider: false);
+            // A ledge to stand on (the water is 1.6 m deep), and three stools whose seats are under the water.
+            float ledge = water - 1.15f;
+            Primitive(PrimitiveType.Cube, "Ledge", root, new Vector3(cx - 1.6f, (ledge + floorY) * 0.5f, zc), new Vector3(1.0f, ledge - floorY, len), tile);
+            int stools = 0;
+            for (float z = zc - 2f; z <= zc + 2.01f; z += 2f)
+            {
+                float seat = water - 0.45f;
+                Primitive(PrimitiveType.Cylinder, "StoolLeg", root, new Vector3(cx - 1.25f, (seat + ledge) * 0.5f, z), new Vector3(0.12f, (seat - ledge) * 0.5f, 0.12f), tile, keepCollider: false);
+                Primitive(PrimitiveType.Cylinder, "StoolSeat", root, new Vector3(cx - 1.25f, seat, z), new Vector3(0.5f, 0.05f, 0.5f), top);
+                stools++;
+            }
+            // Behind it on the deck: Tripo's tiki back bar facing the pool, under a Tripo thatched palapa whose four
+            // posts stand on the pool's east wall and the deck (the model's posts are found on its mesh and squared up).
+            float postX = w.xMax + 1f, rows = 0f;
+            GameObject palapa = ResortModel("swimup_palapa", root, new Vector3(postX + 2.3f, deck + 0.06f, zc), 0f);
+            if (palapa != null)
+            {
+                List<Vector3> feet = PostFeet(palapa, 0.3f);
+                if (feet.Count == 4)
+                {
+                    // Turn it so its posts' square lines up with the pool, then move it so the west posts are on the wall.
+                    Vector3 edge = feet[1] - feet[0];
+                    float angle = Mathf.Atan2(edge.z, edge.x) * Mathf.Rad2Deg;
+                    palapa.transform.rotation = Quaternion.Euler(0f, angle, 0f);
+                    feet = PostFeet(palapa, 0.3f);
+                    float west = float.MaxValue;
+                    foreach (Vector3 p in feet) west = Mathf.Min(west, p.x);
+                    palapa.transform.position += new Vector3(postX - west, 0f, 0f);
+                    foreach (Vector3 p in PostFeet(palapa, 0.3f))
+                    {
+                        var post = palapa.AddComponent<BoxCollider>();
+                        post.center = palapa.transform.InverseTransformPoint(p + Vector3.up * 1.4f);
+                        post.size = new Vector3(0.3f, 2.8f, 0.3f);
+                    }
+                    rows = palapa.transform.position.x;
+                }
+                else log.Add($"swim-up bar: palapa posts not found ({feet.Count} feet)");
+            }
+            GameObject backBar = ResortModel("tiki_back_bar", root, new Vector3(w.xMax + 4.0f, deck + 0.06f, zc), -90f);
+            if (backBar != null)
+            {
+                BoxAround(backBar, 0.85f);
+                TagSurface(backBar, SurfaceKind.Wood);
+            }
+            log.Add($"swim-up bar: water {water:F2}, deck {deck:F2}, {stools} stools, counter x {cx:F1}, palapa at x {rows:F2}");
+        }
+
+        /// <summary>Where a model's posts meet the ground: its mesh's vertices within <paramref name="band"/> m of its feet, in clumps.</summary>
+        private static List<Vector3> PostFeet(GameObject model, float band)
+        {
+            var points = new List<Vector3>();
+            foreach (MeshFilter f in model.GetComponentsInChildren<MeshFilter>())
+                foreach (Vector3 v in f.sharedMesh.vertices)
+                    points.Add(f.transform.TransformPoint(v));
+            float lowest = float.MaxValue;
+            foreach (Vector3 p in points) lowest = Mathf.Min(lowest, p.y);
+            var clumps = new List<(Vector3 sum, int n)>();
+            foreach (Vector3 p in points)
+            {
+                if (p.y > lowest + band) continue;
+                int i = clumps.FindIndex(c => Vector2.Distance(new Vector2(c.sum.x / c.n, c.sum.z / c.n), new Vector2(p.x, p.z)) < 0.5f);
+                if (i < 0) clumps.Add((p, 1));
+                else clumps[i] = (clumps[i].sum + p, clumps[i].n + 1);
+            }
+            var feet = clumps.ConvertAll(c => c.sum / c.n);
+            // In order round the square (by angle about the middle), so feet[0] and feet[1] are neighbours.
+            Vector3 mid = Vector3.zero;
+            foreach (Vector3 p in feet) mid += p;
+            if (feet.Count > 0) mid /= feet.Count;
+            feet.Sort((a, b) => Mathf.Atan2(a.z - mid.z, a.x - mid.x).CompareTo(Mathf.Atan2(b.z - mid.z, b.x - mid.x)));
+            return feet;
         }
 
         // ------------------------------------------------------------------ a tennis court

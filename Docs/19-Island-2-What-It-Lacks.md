@@ -43,7 +43,7 @@ Items 4 and 5 need part A first.
 | 8 | **Done: six cabana daybeds** on the south beach |
 | 9 | **Done: a tennis court** on the lawn inside the cart road (no mini-golf) |
 | 10 | **Done, on the lawn instead of the roof**: a helipad with the resort helicopter (the hotel's roofs are railed terraces) |
-| 12 | Not done: the swim-up pool bar |
+| 12 | **Done: a swim-up bar** at the pool's east end: a counter in the water with stools under it, a Tripo tiki back bar with bottles under a Tripo thatched palapa (look and swim only, no orders) |
 | A9 | The drivable golf cart wears the **Tripo golf cart**; a second one is parked in the pool's bay |
 
 Pictures: `Docs/Island-2-Resort-2026-10-19/`. Tripo list: `.claude/skills/pdd-tripo/prompts/island2-resort.md`.

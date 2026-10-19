@@ -17,6 +17,8 @@ boats: "Stylised realistic 3D game asset ... luxury tropical resort, clean and n
 | R4 | resort_helicopter | 30k | 10 × 2.5 × 3.2 | on a helipad on the hotel roof |
 | R5 | motor_yacht | 30k | 14 × 4 × 5 | a second yacht at the marina |
 | R6 | hotel_bellhop | 30k | 1.8 tall | male hotel staff: the doorman / bellhop at the hotel front |
+| R7 | swimup_palapa | 30k | 6 Ã— 7 Ã— 3.2 | the thatched roof over the swim-up pool bar |
+| R8 | tiki_back_bar | 30k | 6 Ã— 0.8 Ã— 1.8 | the back bar with bottles on the pool deck behind the swim-up counter |
 
 ## Prompts
 
@@ -31,3 +33,7 @@ boats: "Stylised realistic 3D game asset ... luxury tropical resort, clean and n
 **R5 motor_yacht** (building): Stylised realistic 3D game asset of a sleek modern luxury motor yacht, long white hull with dark tinted window bands, two decks, a sun deck with cream cushions on the front, a flybridge with a small radar arch, teak swim platform at the stern, chrome railings, clean and new, no water, no text.
 
 **R6 hotel_bellhop** (character block): Young male hotel bellhop of a luxury tropical resort, slim, short neat dark hair, teal uniform jacket with gold buttons and gold trim on the cuffs and collar, matching teal trousers with a gold side stripe, small round teal pillbox hat with a gold band, white gloves, black polished shoes, friendly smile.
+
+**R7 swimup_palapa** (prop block): Square thatched palapa canopy for a tropical resort swim-up pool bar, a thick golden dried palm-leaf thatched pyramid roof with a ragged fringed edge, held up by four straight polished bamboo posts at the corners, open on all sides, no walls, no floor, no furniture under it, clean and new.
+
+**R8 tiki_back_bar** (prop block): Long tropical resort tiki back bar, a low straight teak wood counter with a woven bamboo front, two long wooden shelves above it on bamboo uprights lined with colourful glass bottles, a few coconut cups and a small silver ice bucket on the counter, no roof, clean and new.
