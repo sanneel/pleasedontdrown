@@ -105,13 +105,14 @@ namespace PleaseDontDrown.Story
                     RescueService.Instance.ServerAnnounce($"<color=#ffd24a><b>{victim.Name}</b> tips the team ${tip}!</color>");
                 return;
             }
-            // Lost to the rival company: they send the bill for the airlift.
-            if (e == VictimEvent.Lost && !victim.IsVip && _airliftBill > 0 && _money.Value > 0)
+            // Lost to the rival company (airlifted, or grabbed by one of its lifeguards): they send the bill.
+            if (e is VictimEvent.Lost or VictimEvent.TakenByRival && !victim.IsVip && _airliftBill > 0 && _money.Value > 0)
             {
                 int bill = Mathf.Min(_airliftBill, _money.Value);
-                ServerAdd(-bill, "airlift bill", victim.Body.HeadPosition + Vector3.up);
+                bool grabbed = e == VictimEvent.TakenByRival;
+                ServerAdd(-bill, grabbed ? "rescue bill (rival lifeguard)" : "airlift bill", victim.Body.HeadPosition + Vector3.up);
                 if (RescueService.Instance != null)
-                    RescueService.Instance.ServerAnnounce($"<color=#ff9080>The rival company bills you ${bill} for the airlift.</color>");
+                    RescueService.Instance.ServerAnnounce($"<color=#ff9080>The rival company bills you ${bill} for the {(grabbed ? "rescue" : "airlift")}.</color>");
             }
         }
 

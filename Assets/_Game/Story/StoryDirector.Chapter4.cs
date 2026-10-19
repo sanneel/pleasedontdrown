@@ -23,7 +23,7 @@ namespace PleaseDontDrown.Story
     /// </summary>
     public partial class StoryDirector
     {
-        private const int LandingFee = 50, RaceGoal = 3, RaceBill = 30, WarehouseTags = 5;
+        private const int LandingFee = 50, RaceGoal = 3, WarehouseTags = 5;
         private static readonly string[] RivalNames = { "FK Chad", "FK Brad", "FK Tad", "FK Kyle", "FK Troy", "FK Brent", "FK Lance", "FK Duke" };
 
         /// <summary>The company's lifeguards: the players' own goofy lifeguard in orange and white, an orange visor.</summary>
@@ -295,7 +295,8 @@ namespace PleaseDontDrown.Story
 
         /// <summary>
         /// Host: each rival swims at the nearest tourist in trouble nobody has hold of; one who gets there first takes
-        /// them ("LOST TO COMPETITION", the bill). Returns the rival who took someone this step (or null).
+        /// them (<see cref="VictimBrain.ServerTakenByRival"/>: "LOST TO COMPETITION", the report's count, the company's
+        /// bill, towed off). Returns the rival who took someone this step (or null).
         /// </summary>
         private StoryNpc RivalsSwim(HashSet<VictimBrain> counted)
         {
@@ -314,17 +315,13 @@ namespace PleaseDontDrown.Story
                 }
                 if (best == null) continue;
                 claimed.Add(best);
-                if (bestSq < 1.8f * 1.8f)
+                if (bestSq < 1.8f * 1.8f && best.ServerTakenByRival(rival.Name))
                 {
                     counted.Add(best);
                     _raceTheirs++;
                     took = rival;
                     rival.ServerShout("FINDERS KEEPERS!", false);
-                    _chapterLost++;
-                    if (Economy.Instance != null && Economy.Money > 0)
-                        Economy.Instance.ServerAdd(-Mathf.Min(RaceBill, Economy.Money), "airlift bill (Finders Keepers)", best.transform.position + Vector3.up);
-                    RescueService.Instance?.ServerAnnounce($"<color=#ff9080><b>LOST TO COMPETITION</b></color> {rival.Name} grabbed {best.Name}. They bill you ${RaceBill}. You {_raceYours} - {_raceTheirs} Finders Keepers");
-                    StartCoroutine(Airlifted(best));
+                    RescueService.Instance?.ServerAnnounce($"<color=#ff9080><b>THEIRS!</b></color> You {_raceYours} - {_raceTheirs} Finders Keepers"); // (VictimBrain says who took whom)
                     continue;
                 }
                 // Swim at them (a little slower than a lifeguard sprinting: it's a race, not a rout). A new route only when
@@ -336,13 +333,6 @@ namespace PleaseDontDrown.Story
                 }
             }
             return took;
-        }
-
-        /// <summary>A tourist the company took: towed off to its helicopter (gone).</summary>
-        private IEnumerator Airlifted(VictimBrain v)
-        {
-            yield return new WaitForSeconds(1.2f);
-            if (v != null && v.IsSpawned) Despawn(v.gameObject);
         }
 
         // ------------------------------------------------------------------ 4.3 the warehouse

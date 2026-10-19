@@ -19,7 +19,9 @@ namespace PleaseDontDrown.Rescue
     public enum VictimEvent : byte
     {
         InTrouble, Panicking, GoingUnder, Unconscious, Calmed, Saved, Revived, Lost, SelfRescue,
-        Flatline, Zapped, Bitten, InjuredAshore, Hospitalized, Collapsed
+        Flatline, Zapped, Bitten, InjuredAshore, Hospitalized, Collapsed,
+        /// <summary>A rival company's lifeguard got to them first (island 4): lost, like <see cref="Lost"/>, and billed.</summary>
+        TakenByRival
     }
 
     /// <summary>How a tourist behaves in trouble (story beats and island difficulty set this; drills use the default).</summary>
@@ -153,6 +155,7 @@ namespace PleaseDontDrown.Rescue
         private float _bleedSeconds = 60f;
         private bool _hospitalized;
         private bool _needsCpr;
+        private bool _takenByRival;        // lost to a rival lifeguard (ServerTakenByRival), not to the clock
 
         public static IReadOnlyList<VictimBrain> All => _all;
         /// <summary>Host: a tourist was saved, revived, lost... (with whoever gets the credit, if anyone).</summary>
@@ -390,7 +393,8 @@ namespace PleaseDontDrown.Rescue
                     break;
 
                 case VictimState.Lost:
-                    if (Time.time - _stateSince > 3f)
+                    // (Taken by a rival: towed off at once. Airlifted: a moment to see it.)
+                    if (Time.time - _stateSince > (_takenByRival ? 1.2f : 3f))
                         Despawn(gameObject);
                     break;
             }
@@ -560,11 +564,27 @@ namespace PleaseDontDrown.Rescue
             Debug.Log($"[Victim] {Name} lost (condition ran out)");
         }
 
+        /// <summary>
+        /// Host: a rival lifeguard (<paramref name="rival"/>: their name) grabbed this tourist before the team did. They
+        /// are lost to the competition (<see cref="VictimEvent.TakenByRival"/>: "LOST TO COMPETITION" over them, the
+        /// toast, the chapter report's lost count, the company's bill) and towed off (gone in a moment). False if they
+        /// can't be taken any more (already saved, already lost, being carried in).
+        /// </summary>
+        [Server]
+        public bool ServerTakenByRival(string rival)
+        {
+            if (_state.Value is VictimState.Lost or VictimState.Saved || _item.IsHeld || _ashore.Value) return false;
+            SetState(VictimState.Lost, VictimEvent.TakenByRival, $"{rival} grabbed {Name}: lost to the competition.");
+            Debug.Log($"[Victim] {Name} taken by the rival lifeguard {rival}");
+            return true;
+        }
+
         private void SetState(VictimState next, VictimEvent? announce = null, string text = null, PlayerHub credit = null)
         {
             if (_state.Value == next) return;
             Debug.Log($"[Victim] {Name}: {_state.Value} -> {next} (air {_air.Value:P0}, panic {_panic.Value:F0})");
             _state.Value = next;
+            _takenByRival = announce == VictimEvent.TakenByRival;
             if (next == VictimState.Saved) _rescued.Value = true;
             _stateSince = Time.time;
             if (announce.HasValue)
@@ -833,6 +853,7 @@ namespace PleaseDontDrown.Rescue
                     PlayerHud.ShowToast($"<color=#ffb060>{text}</color>", 6f);
                     break;
                 case VictimEvent.Lost:
+                case VictimEvent.TakenByRival:
                     FloatingText.Spawn(above, "LOST TO COMPETITION", new Color(1f, 0.3f, 0.25f), 1.1f, 2.5f);
                     PlayerHud.ShowToast($"<color=#ff7060>{text}</color>", 5f);
                     Audio.GameMusic.Play(Audio.Jingle.Lost);
