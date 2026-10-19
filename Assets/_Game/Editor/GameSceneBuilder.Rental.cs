@@ -54,27 +54,23 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "StripedCanopy", kiosk, new Vector3(-1.9f + i * 0.54f, 2.85f, 0f), new Vector3(0.55f, 0.14f, 2.4f), i % 2 == 0 ? cream : orange)
                     .transform.localRotation = Quaternion.Euler(8f, 0f, 0f);
             Primitive(PrimitiveType.Cube, "SignPanel", kiosk, new Vector3(0f, 2.30f, -0.62f), new Vector3(3.7f, 0.55f, 0.12f), teal);
-            var sign = WorldText(kiosk, "RentalSign", new Vector3(0f, 2.30f, -0.70f), "MILO'S JET SKIS", 64, 0.042f, cream.color);
+            var sign = WorldText(kiosk, "RentalSign", new Vector3(0f, 2.30f, -0.70f), "MILO'S BOAT", 64, 0.042f, cream.color);
             sign.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-            var notice = WorldText(kiosk, "RentalNotice", new Vector3(0f, 0.70f, -0.65f), "FOUR RIDES. ONE CREW.", 48, 0.024f, cream.color);
+            var notice = WorldText(kiosk, "RentalNotice", new Vector3(0f, 0.70f, -0.65f), "ONE BOAT. ONE CREW.", 48, 0.024f, cream.color);
             notice.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
             operatorNpc = PlaceNpc(npcPrefab, story, "Milo", OnGround(new Vector3(34.4f, 0f, 8.5f)), 180f);
             keySpot = Point(story, "RentalKeyRecovery", OnGround(new Vector3(31f, 0f, 9f)) + Vector3.up * 0.7f, 0f);
 
-            fleet = new Vehicle[4];
-            berths = new Transform[4];
-            for (int i = 0; i < fleet.Length; i++)
-            {
-                Vector3 at = OnWater(new Vector3(23f + i * 6f, 0f, -18.5f));
-                berths[i] = Point(story, "RentalBerth" + (i + 1), at, 180f);
-                fleet[i] = BuildJetSki(env, at, 180f, key: "", displayName: "Rental Jet Ski " + (i + 1));
-                fleet[i].name = "RentalJetSki" + (i + 1);
-                var mooring = fleet[i].gameObject.AddComponent<RentalMooring>();
-                SetRef(mooring, "_vehicle", fleet[i]);
-                SetRef(mooring, "_berth", berths[i]);
-                var number = WorldText(dock, "BayNumber" + i, new Vector3(-9f + i * 6f, 0.38f, -11.5f), (i + 1).ToString(), 64, 0.035f, Color.white);
-                number.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            }
+            BuildFuelPump(dock, new Vector3(-10.5f, 0.36f, -11f));
+            fleet = new Vehicle[1];
+            berths = new Transform[1];
+            Vector3 at = OnWater(new Vector3(32f, 0f, -21f));
+            berths[0] = Point(story, "RentalBerth1", at, 180f);
+            fleet[0] = BuildMiloBoat(env, at, 180f);
+            fleet[0].name = "MilosBoat";
+            var mooring = fleet[0].gameObject.AddComponent<RentalMooring>();
+            SetRef(mooring, "_vehicle", fleet[0]);
+            SetRef(mooring, "_berth", berths[0]);
         }
     }
 }

@@ -725,6 +725,7 @@ namespace PleaseDontDrown.Editor
             for (float z = -length * 0.5f + 1f; z <= length * 0.5f; z += 4f)
                 foreach (float x in new[] { -1.1f, 1.1f })
                     Primitive(PrimitiveType.Cube, "Post", dock, new Vector3(x, -2.2f, z), new Vector3(0.22f, 4.8f, 0.22f), wood);
+            BuildFuelPump(dock, new Vector3(0.8f, 0.3f, 0f));
         }
 
         /// <summary>
@@ -850,7 +851,7 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>The robber's jet ski: hull, seat, handlebars; driven with W/S/A/D (keys needed).</summary>
-        private static Vehicle BuildJetSki(Transform env, Vector3 position, float yaw, string key = "Jet Ski Keys", string displayName = "Jet Ski")
+        private static Vehicle BuildJetSki(Transform env, Vector3 position, float yaw, string key = "Jet Ski Keys", string displayName = "Jet Ski", float fuel = 0f)
         {
             Material red = GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f));
             Material white = GetMaterial("White", new Color(0.95f, 0.95f, 0.95f));
@@ -892,9 +893,87 @@ namespace PleaseDontDrown.Editor
             back.Find("GripRight").SetLocalPositionAndRotation(new Vector3(0.17f, 0.27f, 0.42f), Quaternion.LookRotation(Vector3.forward, Vector3.right));
             DressJetSki(root);
             Vehicle ski = FinishVehicle(root, displayName, key, seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.32f,
-                thrustForce: 11f, maxSpeed: 17f, turnRate: 1.7f);
+                thrustForce: 11f, maxSpeed: 17f, turnRate: 1.7f, fuel: fuel);
             SetRefs(ski, "_backSeats", new Object[] { back });
             return ski;
+        }
+
+        /// <summary>
+        /// Milo's boat (the one the crew buys): the pirate boat's hull and weight, painted white and teal, with a wheel,
+        /// a windshield and a bench behind the driver. Seats the driver and two riders; needs no fuel.
+        /// </summary>
+        private static Vehicle BuildMiloBoat(Transform env, Vector3 position, float yaw)
+        {
+            Material hullMat = GetMaterial("MiloHull", new Color(0.92f, 0.94f, 0.95f));
+            Material teal = GetMaterial("RentalTeal", new Color(0.035f, 0.43f, 0.46f));
+            Material wood = GetMaterial("Wood", new Color(0.55f, 0.36f, 0.22f));
+            Material glass = GetMaterial("HotelGlass", new Color(0.55f, 0.8f, 0.95f), smoothness: 0.9f);
+            Material dark = GetMaterial("DarkMetal", new Color(0.18f, 0.18f, 0.2f));
+            var root = new GameObject("MilosBoat");
+            root.transform.SetParent(env, false);
+            root.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            var body = root.AddComponent<Rigidbody>();
+            body.mass = 1500f;
+            body.linearDamping = 0.1f;
+            body.angularDamping = 1.5f;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            GameObject hull = Primitive(PrimitiveType.Cube, "Hull", root.transform, new Vector3(0f, 0.3f, 0f), new Vector3(2.6f, 0.9f, 7f), hullMat);
+            Primitive(PrimitiveType.Cube, "Stripe", root.transform, new Vector3(0f, 0.55f, 0f), new Vector3(2.64f, 0.18f, 7.04f), teal, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "Bow", root.transform, new Vector3(0f, 0.45f, 3.7f), new Vector3(1.8f, 0.7f, 1.2f), hullMat, keepCollider: false)
+                .transform.localRotation = Quaternion.Euler(0f, 45f, 0f);
+            TagSurface(Primitive(PrimitiveType.Cube, "Deck", root.transform, new Vector3(0f, 0.8f, 0f), new Vector3(2.3f, 0.1f, 6.4f), wood), SurfaceKind.Wood);
+            Primitive(PrimitiveType.Cube, "Console", root.transform, new Vector3(0f, 1.15f, 0.1f), new Vector3(1.4f, 0.6f, 0.6f), teal, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "Windshield", root.transform, new Vector3(0f, 1.6f, 0.35f), new Vector3(1.6f, 0.7f, 0.05f), glass, keepCollider: false)
+                .transform.localRotation = Quaternion.Euler(-20f, 0f, 0f);
+            Primitive(PrimitiveType.Cylinder, "Wheel", root.transform, new Vector3(0f, 1.55f, -0.5f), new Vector3(0.6f, 0.03f, 0.6f), dark, keepCollider: false)
+                .transform.localRotation = Quaternion.Euler(70f, 0f, 0f);
+            Primitive(PrimitiveType.Cube, "Bench", root.transform, new Vector3(0f, 1.0f, -2.4f), new Vector3(1.8f, 0.3f, 1.8f), teal, keepCollider: false);
+            Transform P(string n, Vector3 pos, Quaternion rot)
+            {
+                var tr = new GameObject(n).transform;
+                tr.SetParent(root.transform, false);
+                tr.localPosition = pos;
+                tr.localRotation = rot;
+                return tr;
+            }
+            Transform seat = P("Seat", new Vector3(0f, 1.35f, -1.2f), Quaternion.identity);
+            Transform gripL = P("GripLeft", new Vector3(-0.2f, 1.62f, -0.42f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            Transform gripR = P("GripRight", new Vector3(0.2f, 1.62f, -0.42f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            Transform thrust = P("Thrust", new Vector3(0f, -0.1f, -3.5f), Quaternion.identity);
+            var backSeats = new Object[2];
+            for (int i = 0; i < 2; i++)
+            {
+                Transform back = P("BackSeat" + (i + 1), new Vector3(0f, 1.35f, -2.0f - i * 0.8f), Quaternion.identity);
+                P("GripLeft", Vector3.zero, Quaternion.identity).SetParent(back, false);
+                back.Find("GripLeft").SetLocalPositionAndRotation(new Vector3(-0.17f, 0.27f, 0.42f), Quaternion.LookRotation(Vector3.forward, Vector3.left));
+                P("GripRight", Vector3.zero, Quaternion.identity).SetParent(back, false);
+                back.Find("GripRight").SetLocalPositionAndRotation(new Vector3(0.17f, 0.27f, 0.42f), Quaternion.LookRotation(Vector3.forward, Vector3.right));
+                backSeats[i] = back;
+            }
+            Vehicle boat = FinishVehicle(root, "Milo's Boat", "", seat, gripL, gripR, thrust, hull.GetComponent<Collider>(), 0.3f,
+                thrustForce: 8f, maxSpeed: 13f, turnRate: 1.1f);
+            SetRefs(boat, "_backSeats", backSeats);
+            return boat;
+        }
+
+        /// <summary>A fuel pump standing on a dock (local position on that dock): E fills the tanks nearby for money.</summary>
+        private static void BuildFuelPump(Transform dock, Vector3 localPosition)
+        {
+            Material red = GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f));
+            Material dark = GetMaterial("DarkMetal", new Color(0.18f, 0.18f, 0.2f));
+            Material white = GetMaterial("White", new Color(0.95f, 0.95f, 0.95f));
+            GameObject pump = Primitive(PrimitiveType.Cube, "FuelPump", dock, localPosition + Vector3.up * 0.55f, new Vector3(0.5f, 1.1f, 0.4f), red);
+            Primitive(PrimitiveType.Cube, "PumpScreen", pump.transform, new Vector3(0f, 0.2f, -0.52f), new Vector3(0.7f, 0.25f, 0.06f), dark, keepCollider: false);
+            Primitive(PrimitiveType.Cube, "PumpStripe", pump.transform, new Vector3(0f, -0.25f, -0.51f), new Vector3(0.9f, 0.1f, 0.05f), white, keepCollider: false);
+            TextMesh label = WorldText(pump.transform, "PumpLabel", new Vector3(0f, 0.2f, -0.56f), "FUEL", 48, 0.1f, Color.white);
+            label.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            pump.AddComponent<NetworkObject>();
+            var fuelPump = pump.AddComponent<FuelPump>();
+            var so = new SerializedObject(fuelPump);
+            Require(so, "_pricePerLitre").floatValue = 0.5f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            ConfigureInteractable(pump.AddComponent<Interactable>(), new[] { pump.GetComponent<Collider>() }, pump.GetComponentsInChildren<Renderer>(), 3f);
         }
 
         /// <summary>The pirates' boat (theirs until chapter 2.7): hull, deck, cabin, wheel, mast and a black flag.</summary>
@@ -942,7 +1021,7 @@ namespace PleaseDontDrown.Editor
         }
 
         private static Vehicle FinishVehicle(GameObject root, string displayName, string key, Transform seat, Transform gripL, Transform gripR, Transform thrust,
-            Collider hull, float density, float thrustForce, float maxSpeed, float turnRate)
+            Collider hull, float density, float thrustForce, float maxSpeed, float turnRate, float fuel = 0f)
         {
             root.AddComponent<NetworkObject>();
             var buoyancy = new SerializedObject(root.AddComponent<Buoyancy>());
@@ -963,6 +1042,11 @@ namespace PleaseDontDrown.Editor
             Require(so, "_thrust").floatValue = thrustForce;
             Require(so, "_maxSpeed").floatValue = maxSpeed;
             Require(so, "_turnRate").floatValue = turnRate;
+            if (fuel > 0f)
+            {
+                Require(so, "_fuelCapacity").floatValue = fuel;
+                Require(so, "_fuelBurn").floatValue = 1.5f;
+            }
             Require(so, "_engineAudio").objectReferenceValue = SpatialAudio(root, 3f, 80f);
             so.ApplyModifiedPropertiesWithoutUndo();
             ConfigureInteractable(root.AddComponent<Interactable>(), new[] { hull }, root.GetComponentsInChildren<Renderer>(), 3.5f);

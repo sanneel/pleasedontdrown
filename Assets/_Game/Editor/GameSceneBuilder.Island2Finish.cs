@@ -282,7 +282,7 @@ namespace PleaseDontDrown.Editor
             // The cushion on the west side near the end, nose out to sea; the jet ski that tows it just ahead.
             float end = start + length;
             Vector3 cushionAt = OnWater(new Vector3(CushionJettyX - width * 0.5f - 1.9f, 0f, end - 3f));
-            Vehicle ski = BuildJetSki(root, OnWater(new Vector3(cushionAt.x, 0f, end + 5f)), 0f, key: "", displayName: "Lifeguard Jet Ski");
+            Vehicle ski = BuildJetSki(root, OnWater(new Vector3(cushionAt.x, 0f, end + 5f)), 0f, key: "", displayName: "Lifeguard Jet Ski", fuel: 100f);
             var skiBerth = new GameObject("JetSkiBerth").transform;
             skiBerth.SetParent(root, false);
             skiBerth.SetPositionAndRotation(ski.transform.position, ski.transform.rotation);

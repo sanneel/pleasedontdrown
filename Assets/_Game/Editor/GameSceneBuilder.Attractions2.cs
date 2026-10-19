@@ -31,7 +31,7 @@ namespace PleaseDontDrown.Editor
         {
             // The lifeguards' own jet ski (no keys), parked just in front of the banana's nose: sit on it and the
             // banana hitches on. (The robber's jet ski, with keys, is still the story's way off the island.)
-            BuildJetSki(parent, OnWater(BananaSpot + new Vector3(0f, 0f, -6.3f)), 180f, key: "", displayName: "Lifeguard Jet Ski");
+            BuildJetSki(parent, OnWater(BananaSpot + new Vector3(0f, 0f, -6.3f)), 180f, key: "", displayName: "Lifeguard Jet Ski", fuel: 100f);
 
             Material yellow = GetMaterial("BananaYellow", new Color(1f, 0.85f, 0.2f));
             Material rope = GetMaterial("TowRope", new Color(0.85f, 0.78f, 0.55f));
