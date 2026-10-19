@@ -33,6 +33,24 @@ then copy `<out.glb>` over `Assets/_Game/Art/Characters/<model>.glb`, re-bake wi
 `FixStretchBatch` and `FixStretchBatch -ratio 2 -min 0.03`. `ArtSource/Tools/polish_review.py` renders a GLB with its
 textures (front, back, torso, face) for checking before Unity.
 
+## The men: a normal map on their own UVs (2026-10-19)
+
+The dad (`tourist_buddy`, and his ten look-alikes), the thief (`robber`), the hotel director and the three pirates
+(`pirate_fat`, `pirate_marksman`, `pirate_quartermaster`) keep their UVs and painted colour: their faces are fitted
+by vertex (`MeshyCharacters` BuildFace) and the look-alikes are repaints of the same UVs, so a re-UV would break both.
+They get a normal map baked from their full-detail source onto the existing UVs (cloth folds, buttons, belts, hair,
+beards; the face kept flat), and their own colour with its gutters filled and the front of the head lightly sharpened.
+
+    blender -b --factory-startup -P ArtSource/Tools/polish_tripo_character.py -- Assets/_Game/Art/Characters/<model>.glb <source>.glb <unused.glb> <bake.png> --keep-uvs 1 --turn <-90 for Tripo, 0 for Meshy>
+    python ArtSource/Tools/polish_character_texture.py - <bake.png> Assets/_Game/Art/Characters/Textures/<model>_color.jpg Assets/_Game/Art/Characters/Textures/<model>_baked_normal.png --colour-from ArtSource/Polish/Originals/Textures/<model>_color.jpg --coverage-glb Assets/_Game/Art/Characters/<model>.glb --sharpen 0.35 --normal-size 2048 [--size 4096 for the dad]
+
+Sources: pirates and director in `ArtSource/Tripo/Pirates/` and `ArtSource/Tripo/Island2/`, the dad
+`ArtSource/Meshy/raw/tourist_buddy.glb`, the thief `ArtSource/Meshy/raw/robber_apose.glb`. Always pass
+`--coverage-glb`: Meshy's thief has 770 triangles (a hip, 5% of him) whose UVs are squashed to a point; they show the
+one texel under it, which a gutter fill painted dark (a black wedge down his hip). The coverage keeps those texels and
+the normal map stays flat on them. The dad's colour imports (`tourist_buddy*_color.jpg.meta`) must stay at 4096 or the
+bake drops his compressed 4096 copies.
+
 ## Tourists and guns
 
 Open `Tourists_and_Guns.blend` in Blender. Its scene selector contains the four base tourists and five static gun bodies. Textures are packed. Each asset also has a separate `*_polished.blend` file. The complete guns, including moving parts and attachments, remain assembled in Unity.

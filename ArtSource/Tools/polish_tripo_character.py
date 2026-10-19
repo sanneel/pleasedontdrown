@@ -39,7 +39,7 @@ opts = {'turn': -90.0, 'bake': 4096, 'face': 3.0, 'head': 1.8, 'review': '', 'ma
         'smooth': 20, 'angle': 66.0, 'cages': '0.0012,0.003,0.006', 'reach': 0.004,
         'debug': '', 'probe': '', 'look': '',
         'facing': 0.2, 'iterations': 10, 'slack': 0.0007, 'dark': 0.13,
-        'nostrils': 0.0}
+        'nostrils': 0.0, 'keep-uvs': 0}
 i = 4
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -176,199 +176,206 @@ log(f'regions: face {int((region == 2).sum())}, head {int((region == 1).sum())},
 
 # ------------------------------------------------------------------ new UVs
 
-scene.tool_settings.use_uv_select_sync = True
-for mesh in (me, sme):
-    for uv in list(mesh.uv_layers):
-        mesh.uv_layers.remove(uv)
-    mesh.uv_layers.new(name='UVMap')
+# --keep-uvs 1: the body keeps its UVs and its colour (a model reduced with its source's UVs and texture, as the
+# pirates were: its colour already is the source's; look-alikes painted on the same UVs and fitted by vertex keep
+# working). Only the normals are baked onto them, and nothing is exported.
+if opts['keep-uvs']:
+    bpy.data.objects.remove(smooth, do_unlink=True)
+    log('UVs and colour kept as they are')
+else:
+    scene.tool_settings.use_uv_select_sync = True
+    for mesh in (me, sme):
+        for uv in list(mesh.uv_layers):
+            mesh.uv_layers.remove(uv)
+        mesh.uv_layers.new(name='UVMap')
 
 
-def edit(o):
-    if bpy.context.mode != 'OBJECT':
-        bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.ops.object.select_all(action='DESELECT')
-    o.select_set(True)
-    view_layer.objects.active = o
-    bpy.ops.object.mode_set(mode='EDIT')
-    bm_ = bmesh.from_edit_mesh(o.data)
-    bm_.faces.ensure_lookup_table()
-    return bm_
+    def edit(o):
+        if bpy.context.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        o.select_set(True)
+        view_layer.objects.active = o
+        bpy.ops.object.mode_set(mode='EDIT')
+        bm_ = bmesh.from_edit_mesh(o.data)
+        bm_.faces.ensure_lookup_table()
+        return bm_
 
 
-def pick(bm_, mesh, regions):
-    for f in bm_.faces:
-        f.select_set(False)
-    for f in bm_.faces:
-        if region[f.index] in regions:
-            f.select_set(True)
-    bm_.select_flush_mode()
-    bmesh.update_edit_mesh(mesh)
+    def pick(bm_, mesh, regions):
+        for f in bm_.faces:
+            f.select_set(False)
+        for f in bm_.faces:
+            if region[f.index] in regions:
+                f.select_set(True)
+        bm_.select_flush_mode()
+        bmesh.update_edit_mesh(mesh)
 
 
-def read_uvs(mesh=None):
-    mesh = mesh or me
-    out = np.empty(len(mesh.loops) * 2)
-    mesh.uv_layers.active.data.foreach_get('uv', out)
-    return out.reshape(-1, 2)
+    def read_uvs(mesh=None):
+        mesh = mesh or me
+        out = np.empty(len(mesh.loops) * 2)
+        mesh.uv_layers.active.data.foreach_get('uv', out)
+        return out.reshape(-1, 2)
 
 
-def island_ids(uvs):
-    """Each face's UV island: faces joined through edges whose two sides share their UVs (body and copy alike)."""
-    parent = list(range(len(me.polygons)))
+    def island_ids(uvs):
+        """Each face's UV island: faces joined through edges whose two sides share their UVs (body and copy alike)."""
+        parent = list(range(len(me.polygons)))
 
-    def find(a):
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
+        def find(a):
+            while parent[a] != a:
+                parent[a] = parent[parent[a]]
+                a = parent[a]
+            return a
 
-    corner = {}  # (face, vertex) -> loop
-    sides = {}
-    for p in me.polygons:
-        for li in p.loop_indices:
-            loop = me.loops[li]
-            corner[p.index, loop.vertex_index] = li
-            sides.setdefault(loop.edge_index, []).append(p.index)
-    for e, faces in sides.items():
-        if len(faces) != 2:
-            continue
-        fa, fb = faces
-        if all(np.allclose(uvs[corner[fa, v]], uvs[corner[fb, v]], atol=1e-6) for v in me.edges[e].vertices):
-            parent[find(fa)] = find(fb)
-    return np.array([find(k) for k in range(len(me.polygons))])
-
-
-def choose(mesh, faces):
-    bm_ = bmesh.from_edit_mesh(mesh)
-    bm_.faces.ensure_lookup_table()
-    for f in bm_.faces:
-        f.select_set(False)
-    for k in faces:
-        bm_.faces[k].select_set(True)
-    bm_.select_flush_mode()
-    bmesh.update_edit_mesh(mesh)
-    return bm_
+        corner = {}  # (face, vertex) -> loop
+        sides = {}
+        for p in me.polygons:
+            for li in p.loop_indices:
+                loop = me.loops[li]
+                corner[p.index, loop.vertex_index] = li
+                sides.setdefault(loop.edge_index, []).append(p.index)
+        for e, faces in sides.items():
+            if len(faces) != 2:
+                continue
+            fa, fb = faces
+            if all(np.allclose(uvs[corner[fa, v]], uvs[corner[fb, v]], atol=1e-6) for v in me.edges[e].vertices):
+                parent[find(fa)] = find(fb)
+        return np.array([find(k) for k in range(len(me.polygons))])
 
 
-def lying_over(mesh):
-    """The islands packed apart as they are; the faces then lying over others (folds and overhangs)."""
-    choose(mesh, range(len(mesh.polygons)))
-    bpy.ops.uv.select_all(action='SELECT')  # (Blender 5 keeps the UVs' own selection, even in sync mode)
-    bpy.ops.uv.pack_islands(rotate=False, scale=True, margin_method='FRACTION', margin=0.002)
-    bpy.ops.uv.select_overlap(extend=False)
-    return [f.index for f in bmesh.from_edit_mesh(mesh).faces if f.select]
+    def choose(mesh, faces):
+        bm_ = bmesh.from_edit_mesh(mesh)
+        bm_.faces.ensure_lookup_table()
+        for f in bm_.faces:
+            f.select_set(False)
+        for k in faces:
+            bm_.faces[k].select_set(True)
+        bm_.select_flush_mode()
+        bmesh.update_edit_mesh(mesh)
+        return bm_
 
 
-def cut_out(mesh, faces):
-    """Each of these faces an island of its own (one triangle can't fold)."""
-    bm_ = choose(mesh, faces)
-    for k in faces:
-        for e in bm_.faces[k].edges:
-            e.seam = True
-    bmesh.update_edit_mesh(mesh)
-    bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.0)
+    def lying_over(mesh):
+        """The islands packed apart as they are; the faces then lying over others (folds and overhangs)."""
+        choose(mesh, range(len(mesh.polygons)))
+        bpy.ops.uv.select_all(action='SELECT')  # (Blender 5 keeps the UVs' own selection, even in sync mode)
+        bpy.ops.uv.pack_islands(rotate=False, scale=True, margin_method='FRACTION', margin=0.002)
+        bpy.ops.uv.select_overlap(extend=False)
+        return [f.index for f in bmesh.from_edit_mesh(mesh).faces if f.select]
 
 
-# The islands are cut on the smoothed copy (no piece round every groove): the front of the face in one piece,
-# everything else by Smart UV Project; a projected piece that overhangs itself (an ear, a lid, a curl of hair) is
-# flattened instead, and the odd triangle that still folds over is cut out on its own. Then every island is flattened
-# again on the real surface (Minimum Stretch, no flips) below.
-# Tried and dropped: angle-based flattening (folds and slivers: the shirt's white on a collar ribbon, the pirate
-# king's pupil smeared across his eye white); projecting the face (the lids landed on the eyes); keeping the layout
-# from the smoothed copy (the eyes and nose got the texels of a smoothed-away bump); cutting out every overlapping
-# face (a face came out a smeared mosaic of single triangles).
-FLATTEN = dict(method='MINIMUM_STRETCH', no_flip=True, iterations=opts['iterations'], margin=0.0)
-ebm = edit(smooth)
-pick(ebm, sme, {2})
-bpy.ops.uv.unwrap(**FLATTEN)
-for r in (1, 0):
-    pick(bmesh.from_edit_mesh(sme), sme, {r})
-    bpy.ops.uv.smart_project(angle_limit=math.radians(opts['angle']), island_margin=0.0, area_weight=0.0,
-                             correct_aspect=True, scale_to_bounds=False)
-choose(sme, range(len(sme.polygons)))
-bpy.ops.uv.select_all(action='SELECT')
-bpy.ops.uv.seams_from_islands(mark_seams=True, mark_sharp=False)
-over = lying_over(sme)
-if over:
-    bpy.ops.object.mode_set(mode='OBJECT')
-    island = island_ids(read_uvs(sme))
-    redo = {island[k] for k in over if region[k] != 2}
-    bpy.ops.object.mode_set(mode='EDIT')
-    if redo:
-        choose(sme, [k for k in range(len(sme.polygons)) if island[k] in redo])
-        bpy.ops.uv.unwrap(**FLATTEN)
-    log(f'{len(over)} faces lay over others: {len(redo)} projected islands flattened instead')
+    def cut_out(mesh, faces):
+        """Each of these faces an island of its own (one triangle can't fold)."""
+        bm_ = choose(mesh, faces)
+        for k in faces:
+            for e in bm_.faces[k].edges:
+                e.seam = True
+        bmesh.update_edit_mesh(mesh)
+        bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.0)
+
+
+    # The islands are cut on the smoothed copy (no piece round every groove): the front of the face in one piece,
+    # everything else by Smart UV Project; a projected piece that overhangs itself (an ear, a lid, a curl of hair) is
+    # flattened instead, and the odd triangle that still folds over is cut out on its own. Then every island is flattened
+    # again on the real surface (Minimum Stretch, no flips) below.
+    # Tried and dropped: angle-based flattening (folds and slivers: the shirt's white on a collar ribbon, the pirate
+    # king's pupil smeared across his eye white); projecting the face (the lids landed on the eyes); keeping the layout
+    # from the smoothed copy (the eyes and nose got the texels of a smoothed-away bump); cutting out every overlapping
+    # face (a face came out a smeared mosaic of single triangles).
+    FLATTEN = dict(method='MINIMUM_STRETCH', no_flip=True, iterations=opts['iterations'], margin=0.0)
+    ebm = edit(smooth)
+    pick(ebm, sme, {2})
+    bpy.ops.uv.unwrap(**FLATTEN)
+    for r in (1, 0):
+        pick(bmesh.from_edit_mesh(sme), sme, {r})
+        bpy.ops.uv.smart_project(angle_limit=math.radians(opts['angle']), island_margin=0.0, area_weight=0.0,
+                                 correct_aspect=True, scale_to_bounds=False)
+    choose(sme, range(len(sme.polygons)))
+    bpy.ops.uv.select_all(action='SELECT')
+    bpy.ops.uv.seams_from_islands(mark_seams=True, mark_sharp=False)
     over = lying_over(sme)
     if over:
-        cut_out(sme, over)
-        log(f'{len(over)} faces folded: cut out, each an island of its own')
-bpy.ops.object.mode_set(mode='OBJECT')
-uv = np.empty(len(me.loops) * 2)
-sme.uv_layers.active.data.foreach_get('uv', uv)
-me.uv_layers.active.data.foreach_set('uv', uv)
-bpy.data.objects.remove(smooth, do_unlink=True)
+        bpy.ops.object.mode_set(mode='OBJECT')
+        island = island_ids(read_uvs(sme))
+        redo = {island[k] for k in over if region[k] != 2}
+        bpy.ops.object.mode_set(mode='EDIT')
+        if redo:
+            choose(sme, [k for k in range(len(sme.polygons)) if island[k] in redo])
+            bpy.ops.uv.unwrap(**FLATTEN)
+        log(f'{len(over)} faces lay over others: {len(redo)} projected islands flattened instead')
+        over = lying_over(sme)
+        if over:
+            cut_out(sme, over)
+            log(f'{len(over)} faces folded: cut out, each an island of its own')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    uv = np.empty(len(me.loops) * 2)
+    sme.uv_layers.active.data.foreach_get('uv', uv)
+    me.uv_layers.active.data.foreach_set('uv', uv)
+    bpy.data.objects.remove(smooth, do_unlink=True)
 
-# The islands flattened again on the real surface (Minimum Stretch, no flips): laid out on the smoothed copy, the eyes
-# and the nose got the texels of a smoothed-away bump (the pirate king's pupil at 0.1 texel per mm: smeared).
-ebm = edit(body)
-choose(me, range(len(me.polygons)))
-bpy.ops.uv.select_all(action='SELECT')
-bpy.ops.uv.seams_from_islands(mark_seams=True, mark_sharp=False)
-bpy.ops.uv.unwrap(**FLATTEN)
-bpy.ops.object.mode_set(mode='OBJECT')
-
-
-def pack_all():
-    """Every island at the same texel density, the face and head scaled up, packed; returns the faces overlapping."""
-    bm_ = edit(body)
-    pick(bm_, me, {0, 1, 2})
-    bpy.ops.uv.select_all(action='SELECT')  # (Blender 5 keeps the UVs' own selection, even in sync mode)
-    bpy.ops.uv.average_islands_scale()
-    bm_ = bmesh.from_edit_mesh(me)
-    uvl = bm_.loops.layers.uv.active
-    scale = {2: opts['face'], 1: opts['head']}
-    for f in bm_.faces:
-        k = scale.get(int(region[f.index]))
-        if k:
-            for loop in f.loops:
-                loop[uvl].uv *= k
-    bmesh.update_edit_mesh(me)
+    # The islands flattened again on the real surface (Minimum Stretch, no flips): laid out on the smoothed copy, the eyes
+    # and the nose got the texels of a smoothed-away bump (the pirate king's pupil at 0.1 texel per mm: smeared).
+    ebm = edit(body)
+    choose(me, range(len(me.polygons)))
     bpy.ops.uv.select_all(action='SELECT')
-    pack = dict(rotate=True, scale=True, margin_method='FRACTION', margin=opts['margin'], shape_method='CONCAVE')
-    try:
-        bpy.ops.uv.pack_islands(**pack)
-    except TypeError:
-        pack.pop('shape_method')
-        bpy.ops.uv.pack_islands(**pack)
-    bpy.ops.uv.select_overlap(extend=False)
-    return [f.index for f in bmesh.from_edit_mesh(me).faces if f.select]
+    bpy.ops.uv.seams_from_islands(mark_seams=True, mark_sharp=False)
+    bpy.ops.uv.unwrap(**FLATTEN)
+    bpy.ops.object.mode_set(mode='OBJECT')
 
 
-for attempt in range(3):
-    overlapping = pack_all()
-    if not overlapping:
-        break
-    ebm = bmesh.from_edit_mesh(me)
-    ebm.faces.ensure_lookup_table()
-    for k in overlapping:
-        for e in ebm.faces[k].edges:
-            e.seam = True
-    bmesh.update_edit_mesh(me)
-    bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.004)  # (the overlapping faces, still selected)
-    log(f'{len(overlapping)} faces overlapping after packing: cut out, each an island of its own')
-else:
-    log(f'WARNING: {len(pack_all())} faces still overlap others in the packed UVs')
-bpy.ops.object.mode_set(mode='OBJECT')
+    def pack_all():
+        """Every island at the same texel density, the face and head scaled up, packed; returns the faces overlapping."""
+        bm_ = edit(body)
+        pick(bm_, me, {0, 1, 2})
+        bpy.ops.uv.select_all(action='SELECT')  # (Blender 5 keeps the UVs' own selection, even in sync mode)
+        bpy.ops.uv.average_islands_scale()
+        bm_ = bmesh.from_edit_mesh(me)
+        uvl = bm_.loops.layers.uv.active
+        scale = {2: opts['face'], 1: opts['head']}
+        for f in bm_.faces:
+            k = scale.get(int(region[f.index]))
+            if k:
+                for loop in f.loops:
+                    loop[uvl].uv *= k
+        bmesh.update_edit_mesh(me)
+        bpy.ops.uv.select_all(action='SELECT')
+        pack = dict(rotate=True, scale=True, margin_method='FRACTION', margin=opts['margin'], shape_method='CONCAVE')
+        try:
+            bpy.ops.uv.pack_islands(**pack)
+        except TypeError:
+            pack.pop('shape_method')
+            bpy.ops.uv.pack_islands(**pack)
+        bpy.ops.uv.select_overlap(extend=False)
+        return [f.index for f in bmesh.from_edit_mesh(me).faces if f.select]
 
-# The texture each region got.
-uv = read_uvs()
-islands = len(set(island_ids(uv)))
-area = np.zeros(3)
-for p in me.polygons:
-    t = uv[list(p.loop_indices)]
-    area[region[p.index]] += 0.5 * abs(np.dot(t[:, 0], np.roll(t[:, 1], 1)) - np.dot(t[:, 1], np.roll(t[:, 0], 1)))
-log(f'UVs: {islands} islands; texture used: face {area[2]:.1%}, head {area[1]:.1%}, body {area[0]:.1%} '
-    f'(all {area.sum():.1%})')
+
+    for attempt in range(3):
+        overlapping = pack_all()
+        if not overlapping:
+            break
+        ebm = bmesh.from_edit_mesh(me)
+        ebm.faces.ensure_lookup_table()
+        for k in overlapping:
+            for e in ebm.faces[k].edges:
+                e.seam = True
+        bmesh.update_edit_mesh(me)
+        bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.004)  # (the overlapping faces, still selected)
+        log(f'{len(overlapping)} faces overlapping after packing: cut out, each an island of its own')
+    else:
+        log(f'WARNING: {len(pack_all())} faces still overlap others in the packed UVs')
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    # The texture each region got.
+    uv = read_uvs()
+    islands = len(set(island_ids(uv)))
+    area = np.zeros(3)
+    for p in me.polygons:
+        t = uv[list(p.loop_indices)]
+        area[region[p.index]] += 0.5 * abs(np.dot(t[:, 0], np.roll(t[:, 1], 1)) - np.dot(t[:, 1], np.roll(t[:, 0], 1)))
+    log(f'UVs: {islands} islands; texture used: face {area[2]:.1%}, head {area[1]:.1%}, body {area[0]:.1%} '
+        f'(all {area.sum():.1%})')
 
 # ------------------------------------------------------------------ colour and shape baked from the full-detail model
 
@@ -509,6 +516,9 @@ if opts['debug']:  # which cage each texel took: red, green, blue for the first 
 colour[missing, :3] = last[missing, :3]  # (seen in the review renders until they're painted in; alpha 0 below)
 colour[..., 3] = chosen
 normal[..., 3] = chosen
+if opts['keep-uvs']:  # (no painting in from round about on another model's layout: unmet is flat)
+    normal[missing, :3] = (0.5, 0.5, 1.0)
+    normal[missing, 3] = 1
 
 # The full-detail surface nearest a point, and its colour there.
 dm = detail.data
@@ -585,6 +595,16 @@ lum = colour[..., 0] * 0.2126 + colour[..., 1] * 0.7152 + colour[..., 2] * 0.072
 smooth_face = head_box & (lum > opts['dark'])  # (whichever way it faces: the nostrils face down)
 normal[smooth_face, :3] = (0.5, 0.5, 1.0)
 log(f'face: {smooth_face.sum()} texels smooth (no shape from the normal map)')
+# The front of the head, for the texture step (a light sharpening there).
+face_img = new_image('_face', False)
+shown = np.zeros((size, size, 4), np.float32)
+shown[..., :3] = head_box[..., None]
+shown[..., 3] = 1
+face_img.pixels.foreach_set(shown.ravel())
+face_img.filepath_raw = BAKE.replace('.png', '_face.png')
+face_img.file_format = 'PNG'
+face_img.save()
+del shown
 
 # --nostrils k: the full-detail nose has holes, dark inside and hidden from the side behind the nose's wings; a small
 # reduced nose has only a dent, so their inside painted on it read as a ring (a nose piercing) from the side. Within
@@ -621,9 +641,10 @@ ntex = nodes.new('ShaderNodeTexImage')
 ntex.image = normal_img
 
 bsdf = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
-for link in list(bsdf.inputs['Base Color'].links):
-    mat.node_tree.links.remove(link)
-mat.node_tree.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
+if not opts['keep-uvs']:
+    for link in list(bsdf.inputs['Base Color'].links):
+        mat.node_tree.links.remove(link)
+    mat.node_tree.links.new(tex.outputs['Color'], bsdf.inputs['Base Color'])
 normal_map = nodes.new('ShaderNodeNormalMap')
 mat.node_tree.links.new(ntex.outputs['Color'], normal_map.inputs['Color'])
 mat.node_tree.links.new(normal_map.outputs['Normal'], bsdf.inputs['Normal'])
@@ -673,6 +694,9 @@ if opts['review']:
 
 # ------------------------------------------------------------------ export (the texture is pointed at afterwards)
 
+if opts['keep-uvs']:
+    log('kept UVs: nothing exported (the GLB stays as it is)')
+    raise SystemExit(0)
 bpy.data.objects.remove(detail, do_unlink=True)
 bpy.data.objects.remove(old, do_unlink=True)
 bpy.ops.object.select_all(action='DESELECT')
