@@ -86,6 +86,22 @@ namespace PleaseDontDrown.Editor
                     });
                     continue;
                 }
+                if (p[0] == "bodycam")
+                {
+                    // bodycam <shot> <yaw> <distance> <fov> <height> [w h]: the last posed avatar from <yaw> degrees round its
+                    // front, looking at a point <height> metres up its body (its hips: 1, its chest: 1.25), level.
+                    GameObject last = Spawned.LastOrDefault(g => g != null && g.GetComponent<AvatarRig>() != null);
+                    if (last == null) { Debug.LogWarning("[Review] bodycam: nobody posed"); continue; }
+                    var bodyRig = last.GetComponent<AvatarRig>();
+                    Vector3 hipsAt = bodyRig[AvatarRig.Bone.Hips].position;
+                    Vector3 target = new Vector3(hipsAt.x, last.transform.position.y + F(5), hipsAt.z);
+                    Vector3 round = Quaternion.Euler(0f, F(2), 0f) * last.transform.forward;
+                    camera.transform.position = target + round * F(3);
+                    camera.transform.LookAt(target);
+                    camera.fieldOfView = F(4);
+                    Render(camera, p[1], p.Length > 7 ? int.Parse(p[6]) : 800, p.Length > 7 ? int.Parse(p[7]) : 1000);
+                    continue;
+                }
                 if (p[0] == "facecam")
                 {
                     // facecam <shot> <yaw> <distance> <fov> [size]: the last posed avatar's face, from <yaw> degrees round

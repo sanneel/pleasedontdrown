@@ -24,8 +24,29 @@ namespace PleaseDontDrown.Avatars
         private bool _voiceHeard;
         private float _emphasis, _nextEmphasis;
 
-        /// <summary>The face this frame (tests read it).</summary>
-        public FaceState Face => _face;
+        /// <summary>The face shown last frame, blink and gaze included (tests read it).</summary>
+        public FaceState Face { get; private set; }
+
+        /// <summary>Times this face has blinked (tests: blinking happens on every copy of the game).</summary>
+        public int Blinks { get; private set; }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void RegisterFaceCommand()
+        {
+            Core.DevCommands.Register("faces", "[metres]", "Print the faces of everyone near (lids, jaw, mood, blinks, gaze).", args =>
+            {
+                float reach = args.Length > 0 && float.TryParse(args[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float r) ? r : 8f;
+                Camera view = Camera.main;
+                Vector3 from = view != null ? view.transform.position : Vector3.zero;
+                foreach (AvatarAnimator a in FindObjectsByType<AvatarAnimator>(FindObjectsSortMode.None))
+                {
+                    if ((a.transform.position - from).sqrMagnitude > reach * reach) continue;
+                    FaceState f = a.Face;
+                    Core.DevCommands.Print($"[Face] {a.name}: mood {a.Motion.Mood} talking {a.Motion.Talking} lids {f.LidL:0.00}/{f.LidR:0.00} low {f.LowL:0.00} " +
+                                           $"jaw {f.Jaw:0.00} smile {f.Smile:0.00} brows {f.BrowUp:0.00}/{f.BrowAngry:0.00}/{f.BrowSad:0.00} gaze {f.Gaze} blinks {a.Blinks}");
+                }
+            });
+        }
 
         private void PoseFace()
         {
@@ -37,7 +58,7 @@ namespace PleaseDontDrown.Avatars
             switch (mood)
             {
                 case AvatarMood.Happy:
-                    want.Smile = 1f; want.LowL = want.LowR = 0.4f; want.LidL = want.LidR = 0.1f; want.BrowUp = 0.25f;
+                    want.Smile = 1f; want.LowL = want.LowR = 0.25f; want.LidL = want.LidR = 0.06f; want.BrowUp = 0.25f;
                     break;
                 case AvatarMood.Scared:
                     want.LidL = want.LidR = 0f; want.BrowUp = 1f; want.BrowSad = 0.7f; want.Jaw = 0.35f; want.Frown = 0.3f;
@@ -91,6 +112,7 @@ namespace PleaseDontDrown.Avatars
             if (t >= _nextBlinkAt || _nextBlinkAt - t > 8f)
             {
                 _blinkStart = t;
+                Blinks++;
                 _nextBlinkAt = t + (mood == AvatarMood.Scared ? Random.Range(0.6f, 1.8f) : Random.Range(2f, 5.5f));
                 if (Random.value < 0.12f) _nextBlinkAt = t + 0.25f; // a double blink
             }
@@ -102,6 +124,7 @@ namespace PleaseDontDrown.Avatars
             shown.LowL = Mathf.Max(shown.LowL, blink);
             shown.LowR = Mathf.Max(shown.LowR, blink);
             shown.Gaze = Look(t, dt, mood, shut || Motion.Underwater);
+            Face = shown;
             _rig.SetFace(shown);
         }
 
@@ -181,7 +204,7 @@ namespace PleaseDontDrown.Avatars
                     Vector3 local = head.InverseTransformDirection(to / distance);
                     if (local.z < 0.3f) continue; // behind, or too far round
                     best = distance;
-                    aim = new Vector2(Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg / 30f, Mathf.Asin(Mathf.Clamp(local.y, -1f, 1f)) * Mathf.Rad2Deg / 20f);
+                    aim = new Vector2(Mathf.Atan2(local.x, local.z) * Mathf.Rad2Deg / 30f, Mathf.Clamp(Mathf.Asin(Mathf.Clamp(local.y, -1f, 1f)) * Mathf.Rad2Deg / 35f, -0.4f, 0.4f)); // (up and down only a little: an iris up under the lid read as sleepy)
                     found = true;
                 }
             }

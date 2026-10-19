@@ -463,7 +463,7 @@ namespace PleaseDontDrown.Editor
         {
             float px = img.Px;
             Rect win = Rect.MinMaxRect(eye.xMin - eye.width * 0.2f - 0.0015f, eye.yMin - eye.height * 0.45f - 0.0015f,
-                eye.xMax + eye.width * 0.2f + 0.0015f, eye.yMax + eye.height * 0.45f + 0.0015f);
+                eye.xMax + eye.width * 0.2f + 0.0015f, eye.yMax + eye.height * 0.8f + 0.0015f); // (a big iris shows whites only under it)
             int wi0 = Mathf.Max(0, img.I(win.xMin)), wi1 = Mathf.Min(img.W - 1, img.I(win.xMax));
             int wj0 = Mathf.Max(0, img.J(win.yMin)), wj1 = Mathf.Min(img.H - 1, img.J(win.yMax));
             var fit = new EyeFit();
@@ -558,7 +558,7 @@ namespace PleaseDontDrown.Editor
                 List<float> middleTops = t.Skip(n / 5).Take(Mathf.Max(1, n * 3 / 5)).OrderBy(v => v).ToList(), middleBottoms = b.Skip(n / 5).Take(Mathf.Max(1, n * 3 / 5)).OrderBy(v => v).ToList();
                 float midTop = Percentile(middleTops, 0.35f), midBottom = Percentile(middleBottoms, 0.65f);
                 float spread = Mathf.Max(midTop - midBottom, 0.002f) * 0.3f;
-                float roof = eye.yMax + eye.height * 0.18f + 0.001f, floor = eye.yMin - eye.height * 0.18f - 0.001f; // (lashes, not a brow or a brim)
+                float roof = eye.yMax + eye.height * 0.7f + 0.001f, floor = eye.yMin - eye.height * 0.18f - 0.001f; // (lashes, not a brow or a brim)
                 for (int c = 0; c < n; c++) { t[c] = Mathf.Min(t[c], Mathf.Min(midTop + spread, roof)); b[c] = Mathf.Max(b[c], Mathf.Max(midBottom - spread, floor)); }
                 t = Smooth(Median(t, 5), 7);
                 b = Smooth(Median(b, 5), 7);
@@ -1138,13 +1138,18 @@ namespace PleaseDontDrown.Editor
             rig.Cx = found.Mouth.x;
             int lipsC0 = 0;
             float[] lipTop = null, lipBottom = null;
-            if (!found.MouthHinted && FindLips(img, found, out Rect lips, out lipsC0, out lipTop, out lipBottom))
+            bool hinted = found.MouthHinted;
+            if (FindLips(img, found, out Rect lips, out lipsC0, out lipTop, out lipBottom) &&
+                (!hinted || (Mathf.Abs(lips.center.y - found.Mouth.y) < 0.012f && Mathf.Abs(lips.center.x - found.Mouth.x) < 0.015f)))
             {
+                // (a measured mouth too: the painted lips right there are more exact than the measuring)
+                hinted = false;
                 rig.Cx = lips.center.x;
                 halfWidth = Mathf.Clamp(lips.width * 0.5f, 0.01f, 0.04f);
                 middleY = lips.center.y;
                 Debug.Log($"[Build] face {rig.File}: lips {lips.width * 100f:0.0} x {lips.height * 100f:0.0} cm at ({lips.center.x:0.000}, {lips.center.y:0.000})");
             }
+            else lipTop = lipBottom = null;
             rig.CutHalf = halfWidth * 0.8f;
             if (lipTop != null)
             {
@@ -1160,7 +1165,7 @@ namespace PleaseDontDrown.Editor
             int n = c1 - c0 + 1;
             rig.LineX0 = img.X(c0);
             rig.Line = new float[n];
-            if (found.MouthHinted)
+            if (hinted)
             {
                 for (int c = 0; c < n; c++) rig.Line[c] = found.Mouth.y;
             }
