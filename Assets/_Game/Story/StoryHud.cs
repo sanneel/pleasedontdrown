@@ -120,10 +120,13 @@ namespace PleaseDontDrown.Story
             if (local == null || !GameInput.GameplayActive) return;
             Camera cam = local.Look != null ? local.Look.Camera : null;
 
-            DrawObjective();
+            // The credits roll over a clean screen: no objective, no team funds, no marker under them.
+            bool credits = CreditsRoll.Rolling;
+            if (!credits) DrawObjective();
+            else TopLeftBottom = Hud.Margin;
             if (cam != null)
             {
-                DrawMarker(cam, local);
+                if (!credits) DrawMarker(cam, local);
                 DrawLostSparkles(cam, local);
             }
             DrawReport(); // (under the subtitles: its dim mustn't darken what's being said)
@@ -354,6 +357,7 @@ namespace PleaseDontDrown.Story
             NpcRole.Pirate => "PIRATE",
             NpcRole.Guest => "HOTEL GUEST",
             NpcRole.Rival => "FINDERS KEEPERS",
+            NpcRole.Police => "POLICE",
             _ => "TOURIST"
         };
 

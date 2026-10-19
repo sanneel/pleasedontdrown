@@ -53,7 +53,7 @@ namespace PleaseDontDrown.Story
         /// <summary>Host: what a finished (or skipped) fight leaves behind: the claw in her hand, a drowning Sandy.</summary>
         private void ClearFinaleLeftovers()
         {
-            if (_sandy != null) ClawObservers(_sandy.NetworkObject, false);
+            if (_sandy != null) _sandy.ServerStopFighting(); // (the claw goes with the fight)
             if (_sandyInWater != null && _sandyInWater.IsSpawned) Despawn(_sandyInWater.gameObject);
             _sandyInWater = null;
         }
@@ -125,7 +125,6 @@ namespace PleaseDontDrown.Story
         private void ResetFinalBoss()
         {
             ResetRace();
-            ClawObservers(_sandy != null ? _sandy.NetworkObject : null, false);
             if (_grabby != null && _grabby.IsSpawned) { _grabby.ServerReleaseAll(); Despawn(_grabby.gameObject); }
             _grabby = null;
             ParkHelicopter();
@@ -238,23 +237,20 @@ namespace PleaseDontDrown.Story
             _bossPhase = 3;
             BossBar(0f);
             _sandy.ServerSetHealth(SandyHealth, SandyHealth);
-            ClawObservers(_sandy.NetworkObject, true);
             BossIntroObservers("SANDY", "The giant grabber from the Lost & Found. Knock her off her jetty!");
-            _sandy.ServerFight(FighterProfile.Brawler(0.8f), end.position);
-            float nextClaw = Time.time + 3f;
+            // The claw is her weapon (NpcWeaponKind.Claw, Combat/NpcWeapon): drawn back for the tell, a lunge, and whoever
+            // it catches is flung off the side of the jetty into the sea.
+            FighterProfile claw = FighterProfile.Claw(0.8f);
+            claw.WindUpShout = "MINE!";
+            claw.LandShout = "FINDERS KEEPERS!";
+            _sandy.ServerFight(claw, end.position);
             while (!_sandy.IsDefeated)
             {
-                if (Time.time > nextClaw)
-                {
-                    nextClaw = Time.time + Random.Range(3.5f, 5f);
-                    yield return ClawGrab(end);
-                }
                 BossBar(1f - _sandy.Health / (float)SandyHealth);
                 MissionObjective($"Knock Sandy off her jetty! Dodge the claw: it flings you into the sea (swim back up the ramps).");
                 yield return new WaitForSeconds(0.2f);
             }
             _sandy.ServerStopFighting();
-            ClawObservers(_sandy.NetworkObject, false);
             BossBar(1f);
             _bossPhase = 4;
         }
@@ -286,58 +282,12 @@ namespace PleaseDontDrown.Story
             }
         }
 
-        /// <summary>The claw: a lunge at the nearest lifeguard on the jetty's head; caught, they're flung into the sea.</summary>
-        private IEnumerator ClawGrab(Transform end)
-        {
-            PlayerHub target = StoryNpc.NearestStandingPlayer(_sandy.transform.position, 6.5f);
-            if (target == null) yield break;
-            _sandy.ServerFace(target.transform.position);
-            _sandy.ServerShout("MINE!", false);
-            ClawSwingObservers(_sandy.NetworkObject, true);
-            yield return new WaitForSeconds(0.7f); // (the tell: dodge now)
-            ClawSwingObservers(_sandy.NetworkObject, false);
-            if (target == null || !target.TryGetComponent(out PlayerCombat c) || c.IsDowned) yield break;
-            Vector3 d = target.transform.position - _sandy.transform.position;
-            d.y = 0f;
-            if (d.magnitude > 5.5f) yield break; // dodged
-            // Out over the side of the jetty (whichever side is nearer) and into the water.
-            Vector3 across = Vector3.Cross(Vector3.up, end.forward).normalized;
-            if (Vector3.Dot(across, d) < 0f) across = -across;
-            c.ServerDamage(10, "Sandy's grabber", _sandy.HeadPosition);
-            c.ServerKnockback(across * 9f + Vector3.up * 5f, "Sandy's grabber claw");
-            _sandy.ServerShout("FINDERS KEEPERS!", false);
-        }
-
-        [ObserversRpc(BufferLast = true)]
-        private void ClawObservers(NetworkObject who, bool on)
-        {
-            if (who == null) return;
-            Transform held = who.transform.Find("HeldClaw");
-            if (!on) { if (held != null) Destroy(held.gameObject); return; }
-            if (held != null) return;
-            GameObject template = GameObject.Find("Environment/Island4/SandyPlateau/SandyVilla/ClawStand/GrabberClaw");
-            AvatarRig rig = who.GetComponentInChildren<AvatarRig>();
-            if (template == null || rig == null || rig[AvatarRig.Bone.HandR] == null) return;
-            GameObject copy = Instantiate(template);
-            copy.name = "HeldClaw";
-            copy.transform.SetParent(who.transform, true);
-            var prop = copy.AddComponent<HeldProp>();
-            prop.Hand = rig[AvatarRig.Bone.HandR];
-            prop.Body = who.transform;
-        }
-
-        [ObserversRpc]
-        private void ClawSwingObservers(NetworkObject who, bool out_)
-        {
-            if (who != null && who.transform.Find("HeldClaw") is { } held && held.TryGetComponent(out HeldProp prop)) prop.Swing = out_ ? 1f : 0f;
-        }
-
         // ------------------------------------------------------------------ 4.8 please don't drown
 
         private IEnumerator SandyCantSwim()
         {
             EnsureOnIsland4();
-            if (_sandy != null) ClawObservers(_sandy.NetworkObject, false);
+            if (_sandy != null) _sandy.ServerStopFighting();
             Transform end = Island4Point("SandyJettyEnd"), villa = Island4Point("SandyVilla");
             if (end == null || _sandy == null || RescueService.Instance == null) yield break;
             // Off the end of her jetty, into the deep water: the real Sandy goes; a drowning Sandy is in the sea.
@@ -480,7 +430,7 @@ namespace PleaseDontDrown.Story
             while (_bossPhase != 3 && Time.time - t < 20f) yield return null;
             Check("4.7 beating Grabby brings on phase 3", _bossPhase == 3);
             yield return new WaitForSeconds(1f);
-            Check("4.7 phase 3: Sandy fights on her jetty, the claw in her hand", _sandy.IsFighting && _sandy.MaxHealth > 0 && _sandy.transform.Find("HeldClaw") != null);
+            Check("4.7 phase 3: Sandy fights on her jetty, the claw in her hand", _sandy.IsFighting && _sandy.MaxHealth > 0 && _sandy.IsArmed && _sandy.WeaponKind == NpcWeaponKind.Claw);
             float knocked = combat != null ? combat.LastKnockedTime : 0f;
             Stand(_sandy.transform.position + _sandy.transform.forward * 2f);
             t = Time.time;

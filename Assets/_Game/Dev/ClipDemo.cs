@@ -78,9 +78,15 @@ namespace PleaseDontDrown.Dev
             _target = new RenderTexture(960, 1080, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { antiAliasing = 4 };
             _read = new Texture2D(960, 1080, TextureFormat.RGB24, false);
             Time.captureFramerate = 30; // one frame = 1/30 s of game time, however long the rendering takes
+            // (Clips are on for everyone in the game: off while filming, so side A is the hand-made animation; B asks
+            // for them itself.)
+            _clipsWereOn = AvatarClips.Enabled;
+            AvatarClips.Enabled = false;
             foreach (byte body in bodies) _queue.Enqueue(body);
             NextBody();
         }
+
+        private bool _clipsWereOn;
 
         /// <summary>The next character: the pair put at the start of their lanes, their own folder.</summary>
         private void NextBody()
@@ -183,6 +189,7 @@ namespace PleaseDontDrown.Dev
         private void Finish()
         {
             Time.captureFramerate = 0;
+            AvatarClips.Enabled = _clipsWereOn;
             Debug.Log($"[ClipDemo] done: {_filmed} characters in {_root}");
             Destroy(_cameraA.gameObject);
             Destroy(_cameraB.gameObject);

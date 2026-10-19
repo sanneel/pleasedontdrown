@@ -49,6 +49,7 @@ namespace PleaseDontDrown.Editor
             (AvatarLook.Bodies.TouristTee, "Tourist (black tee)", "tourist_blacktee"),
             (AvatarLook.Bodies.HotelAttendantA, "Hotel attendant (Marisol)", "hotel_attendant_a"),
             (AvatarLook.Bodies.HotelAttendantB, "Hotel attendant", "hotel_attendant_b"),
+            (AvatarLook.Bodies.FkRival, "Finders Keepers lifeguard", "fk_rival"),
         };
 
         /// <summary>

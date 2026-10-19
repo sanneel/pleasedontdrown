@@ -18,12 +18,20 @@ namespace PleaseDontDrown.Story
     /// aiming (<see cref="StoryNpc.GunState"/>, the synced aim point), a little down at the ground ahead otherwise and
     /// while reloading. On top: the gun's kick, and the cutlass raised over the shoulder for the wind-up and slashed
     /// down. Knocked down or swimming, the weapon stays in the hand.
+    ///
+    /// Sandy's giant grabber claw (<see cref="NpcWeaponKind.Claw"/>, the villa's prop: a 2.6 m pole with a handle at
+    /// the near end) is a long prop held low in front (<see cref="AvatarMotion.LongProp"/>) in the right hand, as a
+    /// reach-grabber is: the fist round the handle, the index finger by the trigger, the pole up and ahead. (Two-handed
+    /// it went through her or out of her hands: her arms reach 47 cm.) Its tell draws it back along her right side, the
+    /// body rocked back onto the rear foot and the free hand pointing at the lifeguard (<see cref="AvatarMotion.Brace"/>);
+    /// the lunge (<see cref="AvatarGesture.Lunge"/>, the body's part) thrusts it out level at chest height, the free arm
+    /// flung back like a fencer's.
     /// </summary>
     [DefaultExecutionOrder(195)] // Update: after StoryNpc set the body's motion. LateUpdate: after the arms (AvatarAnimator 50, AvatarRig 190).
     public class NpcWeaponView : MonoBehaviour
     {
-        private static readonly GameObject[] Prefabs = new GameObject[4];
-        private static readonly bool[] Loaded = new bool[4];
+        private static readonly GameObject[] Prefabs = new GameObject[5];
+        private static readonly bool[] Loaded = new bool[5];
 
         // The players' finger poses (WeaponGripAuthoring): the pistol and the rifle hand, the support hand under a
         // fore-end, and the knife's fist.
@@ -34,6 +42,11 @@ namespace PleaseDontDrown.Story
         private static readonly HandPose SupportHand = new(0.52f, 0.68f, 0.04f)
             { Index = 0.46f, Middle = 0.5f, Ring = 0.54f, Pinky = 0.59f, ThumbSwing = 65f };
         private static readonly HandPose BladeHand = new(0.92f, 0.7f, 0f);
+        // The claw's handle (10 cm thick: not as closed as round a hilt), the index finger a little off it, by the trigger.
+        private static readonly HandPose HandleHand = new(0.74f, 0.6f, 0f) { Index = 0.56f };
+
+        /// <summary>The claw, as it lies on the villa's stand (built by GameSceneBuilder.Island4: +Z along the pole from its handle).</summary>
+        private const string ClawInScene = "Environment/Island4/SandyPlateau/SandyVilla/ClawStand/GrabberClaw";
 
         /// <summary>How far down they look with the weapon when they aren't aiming it (degrees).</summary>
         private const float LoweredPitch = 28f;
@@ -55,6 +68,7 @@ namespace PleaseDontDrown.Story
         {
             NpcWeaponKind.Pistol => 1.5f,
             NpcWeaponKind.Musket => 1.1f,
+            NpcWeaponKind.Claw => 1f, // (giant already)
             _ => 1.15f
         };
 
@@ -69,6 +83,7 @@ namespace PleaseDontDrown.Story
         private bool _wasAiming;
         private StoryNpc.NpcGunState _lastState;
         private float _swingAt = -1f, _swingWindUp;
+        private float _brace; // 0..1 the claw drawn back for its lunge (the body rocks back with it)
 
         public bool Shown => _model != null && _model.gameObject.activeSelf;
 
@@ -86,6 +101,17 @@ namespace PleaseDontDrown.Story
         {
             int i = (int)kind;
             if (i <= 0 || i >= Prefabs.Length) return null;
+            if (kind == NpcWeaponKind.Claw)
+            {
+                // A model of its own if one is made (Resources/NpcWeapons/grabber_claw), else the one on the villa's stand.
+                if (!Loaded[i])
+                {
+                    Loaded[i] = true;
+                    Prefabs[i] = Resources.Load<GameObject>("NpcWeapons/grabber_claw");
+                }
+                if (Prefabs[i] == null) Prefabs[i] = GameObject.Find(ClawInScene);
+                return Prefabs[i];
+            }
             if (!Loaded[i])
             {
                 Loaded[i] = true;
@@ -151,6 +177,13 @@ namespace PleaseDontDrown.Story
             }
 
             _gripLeft = null;
+            if (_kind == NpcWeaponKind.Claw)
+            {
+                // The right fist round the handle's right side, fingers down and under it, the pole running on past the thumb.
+                _gripRight = Node("GripRight", new Vector3(0.05f, 0f, 0.1f), Quaternion.LookRotation(Vector3.down, Vector3.right));
+                _rightPose = HandleHand;
+                return;
+            }
             if (_kind == NpcWeaponKind.Cutlass)
             {
                 _gripRight = Node("GripRight", new Vector3(0.017f, 0f, 0f), Quaternion.LookRotation(Vector3.down, Vector3.right));
@@ -188,7 +221,7 @@ namespace PleaseDontDrown.Story
         /// <summary>A blow is being wound up, landing in <paramref name="seconds"/>.</summary>
         public void OnWindUp(float seconds)
         {
-            if (_kind != NpcWeaponKind.Cutlass) return;
+            if (_kind is not (NpcWeaponKind.Cutlass or NpcWeaponKind.Claw)) return;
             _swingAt = Time.time;
             _swingWindUp = Mathf.Max(0.15f, seconds);
         }
@@ -234,7 +267,11 @@ namespace PleaseDontDrown.Story
             Vector3 atTarget = _aim != Vector3.zero ? (_aim - shoulderR).normalized : ahead;
             Vector3 look = Vector3.Slerp(ahead, atTarget, Mathf.SmoothStep(0f, 1f, _raise));
 
-            Hold(look, shoulderR, shoulderL, reach, out Vector3 position, out Quaternion rotation);
+            bool claw = _kind == NpcWeaponKind.Claw;
+            Vector3 position;
+            Quaternion rotation;
+            if (claw) ClawHold(shoulderR, m.FacingYaw, out position, out rotation);
+            else Hold(look, shoulderR, shoulderL, reach, out position, out rotation);
             if (_kind == NpcWeaponKind.Cutlass) Swing(shoulderR, m.FacingYaw, ref position, ref rotation);
             else if (_kick > 0f)
             {
@@ -250,7 +287,9 @@ namespace PleaseDontDrown.Story
             m.Holding = true;
             m.TwoHanded = _gripLeft != null;
             m.Shouldered = _kind == NpcWeaponKind.Musket;
-            m.LookPitch = -Mathf.Asin(Mathf.Clamp(look.y, -1f, 1f)) * Mathf.Rad2Deg;
+            m.LongProp = claw;
+            m.Brace = claw ? _brace : 0f;
+            m.LookPitch = claw ? 8f : -Mathf.Asin(Mathf.Clamp(look.y, -1f, 1f)) * Mathf.Rad2Deg; // (the claw: eyes on the lifeguard, not the sand)
             m.GripRight = new HandGrip(_gripRight.position, _gripRight.forward, -_gripRight.up, _rightPose);
             m.GripLeft = _gripLeft != null
                 ? new HandGrip(PlayerHands.ReachableLeftGrip(_gripLeft.position, _model.forward, shoulderL, reach), _gripLeft.forward, -_gripLeft.up, SupportHand)
@@ -290,6 +329,59 @@ namespace PleaseDontDrown.Story
                 : rightShoulder + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0.08f, -0.44f, 0.22f); // low at the side
             position = held - rotation * gripLocal;
         }
+
+        /// <summary>
+        /// The claw in the right hand (see the class summary): at rest the handle in front of the right hip, the pole up
+        /// at 30 degrees and turned a little in; for the tell drawn back along the right side, outside the hip, the tip
+        /// lower (drawn back behind the hip, it ran up through the chest); in the lunge thrust out level at chest height,
+        /// the arm long; then back to rest.
+        /// </summary>
+        private void ClawHold(Vector3 shoulderR, float yaw, out Vector3 position, out Quaternion rotation)
+        {
+            Quaternion flat = Quaternion.Euler(0f, yaw, 0f);
+            Vector3 readyGrip = shoulderR + flat * ClawReady;
+            Quaternion ready = flat * Quaternion.Euler(-30f, -8f, 0f);
+            Vector3 drawnGrip = shoulderR + flat * ClawDrawn;
+            Quaternion drawn = flat * Quaternion.Euler(-22f, -4f, 0f);
+            Vector3 thrustGrip = shoulderR + flat * ClawThrust;
+            Quaternion thrust = flat * Quaternion.Euler(3f, -3f, 0f);
+            Vector3 grip = readyGrip;
+            rotation = ready;
+            _brace = 0f;
+            if (_swingAt >= 0f)
+            {
+                float since = Time.time - _swingAt;
+                float hold = AvatarAnimator.LungeHold, back = AvatarAnimator.LungeSeconds - AvatarAnimator.LungeHold;
+                if (since < _swingWindUp)
+                {
+                    float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(since / Mathf.Min(_swingWindUp, 0.45f)));
+                    grip = Vector3.Lerp(readyGrip, drawnGrip, t);
+                    rotation = Quaternion.Slerp(ready, drawn, t);
+                    _brace = t;
+                }
+                else if (since < _swingWindUp + hold)
+                {
+                    // Out with the lunge (the body steps in under it), and held there.
+                    float t = Mathf.Clamp01((since - _swingWindUp) / AvatarAnimator.LungeIn);
+                    t = 1f - (1f - t) * (1f - t);
+                    grip = Vector3.Lerp(drawnGrip, thrustGrip, t);
+                    rotation = Quaternion.Slerp(drawn, thrust, t);
+                }
+                else if (since < _swingWindUp + hold + back)
+                {
+                    float t = Mathf.SmoothStep(0f, 1f, (since - _swingWindUp - hold) / back);
+                    grip = Vector3.Lerp(thrustGrip, readyGrip, t);
+                    rotation = Quaternion.Slerp(thrust, ready, t);
+                }
+                else _swingAt = -1f;
+            }
+            _model.rotation = rotation; // (GripLocal reads the model's frame)
+            position = grip - rotation * GripLocal;
+        }
+
+        // Where the claw's handle is held, from the right shoulder in the body's frame: at rest, drawn back, thrust out.
+        // (Within Sandy's reach: 47 cm from the shoulder to the middle of the hand.)
+        private static readonly Vector3 ClawReady = new(0.02f, -0.4f, 0.16f), ClawDrawn = new(0.08f, -0.37f, 0.05f), ClawThrust = new(-0.02f, -0.25f, 0.36f);
 
         /// <summary>The cutlass blow: raised back over the right shoulder for the wind-up, slashed across and down, back.</summary>
         private void Swing(Vector3 shoulderR, float yaw, ref Vector3 position, ref Quaternion rotation)

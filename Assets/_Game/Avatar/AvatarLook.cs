@@ -95,6 +95,8 @@ namespace PleaseDontDrown.Avatars
             /// <summary>Tripo hotel staff in flight-attendant uniforms: A is Marisol at reception, B the hotel's other staff.</summary>
             public const byte HotelAttendantA = 27;
             public const byte HotelAttendantB = 28;
+            /// <summary>Tripo (ArtSource/Tripo/Latest, 2026-10-19): Finders Keepers' lifeguards, orange shirt, white shorts, orange visor.</summary>
+            public const byte FkRival = 29;
 
             /// <summary>
             /// The tourist women (Tripo, ArtSource/Tripo/Tourists): Lola, and four girls sharing one Smart Mesh body with

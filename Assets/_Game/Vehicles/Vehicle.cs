@@ -125,6 +125,11 @@ namespace PleaseDontDrown.Vehicles
         public bool Straddle => _straddle;
         public bool RestHands => _restHands;
 
+        /// <summary>Which way this player's seat faces (yaw only): they sit facing it, and looking about turns their head
+        /// (the mouse doesn't steer: A/D do).</summary>
+        public Quaternion SeatFacing(PlayerHub player) =>
+            Quaternion.Euler(0f, SeatTransform(Mathf.Max(0, SeatIndexOf(player))).eulerAngles.y, 0f);
+
         /// <summary>Who sits on back seat <paramref name="i"/> (0 or 1).</summary>
         public PlayerHub Rider(int i) => i == 0 ? _rider1.Value : i == 1 ? _rider2.Value : null;
 

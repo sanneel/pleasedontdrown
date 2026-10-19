@@ -408,7 +408,7 @@ namespace PleaseDontDrown.Story
             // For the chapter's report card (someone pulled out and then revived is one rescue, not two).
             if (e is VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized or VictimEvent.SelfRescue ||
                 (e == VictimEvent.Saved && victim.State == VictimState.Saved)) _chapterRescued++;
-            if (e == VictimEvent.Lost) _chapterLost++;
+            if (e is VictimEvent.Lost or VictimEvent.TakenByRival) _chapterLost++;
             // Tourists drop things now and then when they're pulled out (their wallet was in their trunks...).
             if (rescued && _island == _island1 && Random.value < 0.35f)
                 StartCoroutine(DropLostItemLater(victim.Name, victim.transform.position));

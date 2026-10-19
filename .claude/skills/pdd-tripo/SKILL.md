@@ -143,3 +143,14 @@ Before showing the user any picture of the result in the game, follow the `pdd-v
   thin hair took the colour of the head under it). Use `--tris 30000`. Check with a clay render, not only textured.
 - Mouths the bake can't find are measured by hand (`MeshyCharacters.MouthHints`; ortho head render with a 2 cm grid);
   eyes behind sunglasses go in `EyesHidden`, a single eye (eye patch) is mirrored.
+
+## Lessons (2026-10-19, the FK rival lifeguard: 1 model, 25 credits)
+
+- Settings for a tourist-style character: Ultra Mesh **off**, Texture 2K, Remove Lighting on, **PBR off**, Triangle,
+  Polycount 30000 = **25 credits** (the page had been left on Ultra Mesh, 4K, PBR, 2,000,000 = 55). The settings box
+  saves itself for next time: check the cost on the Generate button before pressing it.
+- The A-pose style block still came back in a **T-pose** (arms level, palms forward). `prepare_character.py` refuses
+  that ("arms not apart from the body at mid height"). `ArtSource/Tools/apose_from_tpose.py -- in.glb out.glb --down
+  50 --twist 80` lowers the arms and turns the palms in (geometric weights: Blender's heat weights fail on Tripo meshes),
+  then rig as usual. `--ankle 1` keeps the lower shin on the shin (the foot bone had reached up it).
+- The new model isn't in the page's `serverProjects` list until the page is reloaded (the lesson above still holds).

@@ -34,6 +34,9 @@ namespace PleaseDontDrown.Story
     ///  * Gunmen keep their distance, need a clear line, aim with a lag (a moving lifeguard is hard to hit, more so
     ///    far away), fire short bursts, reload, and move to a new spot now and then. Too close, they bash you.
     ///  * Cage fighters guard almost every blow from the front; they throw combos and slip back out.
+    ///  * Sandy's giant grabber claw (<see cref="NpcWeaponKind.Claw"/>): drawn back for a long tell (rocked back, the
+    ///    free hand pointing), then a lunge (front foot in, the body after it) that reaches over four metres; it catches
+    ///    instead of hitting and flings the lifeguard off to the side. After it she stays put a moment, wide open.
     /// Every fighter keeps a tally (swings, hits, misses, shots, blocks) printed when it ends, for tuning.
     /// </summary>
     public partial class StoryNpc
@@ -198,7 +201,7 @@ namespace PleaseDontDrown.Story
             if (_gestureAt >= 0f && Time.time >= _gestureAt)
             {
                 _gestureAt = -1f;
-                GestureObservers(AvatarGesture.Punch, FacePoint(_foe.transform, _foe.Head.position, _foe.Head.forward));
+                GestureObservers(_fighter.Weapon.Lunges ? AvatarGesture.Lunge : AvatarGesture.Punch, FacePoint(_foe.transform, _foe.Head.position, _foe.Head.forward));
             }
 
             NpcWeapon w = _fighter.Weapon;
@@ -217,9 +220,11 @@ namespace PleaseDontDrown.Story
                     if (Time.time >= _fightUntil) Strike();
                     return;
                 case FightState.Recover:
-                    // Step back a little, facing them (a cage fighter slips right out of reach).
+                    // Step back a little, facing them (a cage fighter slips right out of reach). After a lunge the body
+                    // stays out over the front foot a moment first (and that's the opening).
                     float back = _fighter.Style == FightStyle.Brawler ? 1.2f : 0.6f;
-                    Goal(p - dir * back, BackOffSpeed);
+                    if (w.Lunges && Time.time - _fightStart < AvatarAnimator.LungeHold) _fightGoal = null;
+                    else Goal(p - dir * back, BackOffSpeed);
                     if (Time.time < _fightUntil) return;
                     AfterRecover();
                     return;
@@ -240,7 +245,12 @@ namespace PleaseDontDrown.Story
             else ThinkMelee(w, p, dir, distance, see, dt);
         }
 
-        private float WindUpTurnRate => _fighter.Weapon.Kind == NpcWeaponKind.Cutlass ? 140f : _fighter.Style == FightStyle.Brawler ? 260f : 190f;
+        private float WindUpTurnRate => _fighter.Weapon.Kind switch
+        {
+            NpcWeaponKind.Claw => 110f, // (a 2.6 m pole swings round slowly: step aside during the tell)
+            NpcWeaponKind.Cutlass => 140f,
+            _ => _fighter.Style == FightStyle.Brawler ? 260f : 190f
+        };
 
         private void ThinkMelee(NpcWeapon w, Vector3 p, Vector3 dir, float distance, bool see, float dt)
         {
@@ -416,10 +426,12 @@ namespace PleaseDontDrown.Story
             float windUp = w.WindUp * (_fighter.Style == FightStyle.Drunk ? 1.4f : 1f) * (_comboChain > 0 ? 0.75f : 1f);
             SetFight(FightState.WindUp, windUp);
             SetStance(_fighter.Weapon.Kind == NpcWeaponKind.Fists ? FightStance.WindUp : FightStance.None);
-            // The arm goes back now and the jab plays out as the blow lands (the gesture is the punch we have).
-            _gestureAt = Mathf.Max(Time.time, _fightUntil - 0.2f);
+            // The arm goes back now and the jab plays out as the blow lands (the gesture is the punch we have); a lunge
+            // starts so that it's fully in as the blow lands.
+            _gestureAt = Mathf.Max(Time.time, _fightUntil - (w.Lunges ? AvatarAnimator.LungeIn : 0.2f));
             _fightGoal = null;
             WindUpObservers(windUp);
+            if (!string.IsNullOrEmpty(_fighter.WindUpShout) && Random.value < 0.5f) ShoutObservers(_fighter.WindUpShout, false);
         }
 
         private void Strike()
@@ -438,9 +450,21 @@ namespace PleaseDontDrown.Story
                 if (landed)
                 {
                     Vector3 push = to.sqrMagnitude > 0.01f ? to.normalized : transform.forward;
-                    combat.ServerKnockback(push * w.Knock + Vector3.up * 2.5f, Name);
-                    combat.ServerDamage(w.MeleeDamage, Name, p);
-                    combat.ServerStun(PlayerCombat.HitStun); // rocked: no punching straight back through it
+                    if (w.Grabs)
+                    {
+                        // Caught: flung off to whichever side of us they stand (out over the side of a jetty), up and away.
+                        Vector3 across = Vector3.Cross(Vector3.up, transform.forward);
+                        if (Vector3.Dot(across, to) < 0f) across = -across;
+                        combat.ServerDamage(w.MeleeDamage, Name, p);
+                        combat.ServerKnockback(across * w.Knock + push * 2f + Vector3.up * 5f, Name);
+                    }
+                    else
+                    {
+                        combat.ServerKnockback(push * w.Knock + Vector3.up * 2.5f, Name);
+                        combat.ServerDamage(w.MeleeDamage, Name, p);
+                        combat.ServerStun(PlayerCombat.HitStun); // rocked: no punching straight back through it
+                    }
+                    if (!string.IsNullOrEmpty(_fighter.LandShout)) ShoutObservers(_fighter.LandShout, false);
                 }
             }
             if (landed) _landed++;

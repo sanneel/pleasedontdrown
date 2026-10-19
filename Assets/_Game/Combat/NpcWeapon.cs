@@ -2,7 +2,8 @@ using UnityEngine;
 
 namespace PleaseDontDrown.Combat
 {
-    public enum NpcWeaponKind : byte { Fists, Cutlass, Pistol, Musket }
+    /// <summary>Claw: Sandy's giant grabber from the Lost & Found (chapter 4's boss), a 2.6 m pole in both hands.</summary>
+    public enum NpcWeaponKind : byte { Fists, Cutlass, Pistol, Musket, Claw }
 
     /// <summary>
     /// What a fighting character (pirate, drunk, cage fighter) has in hand, as numbers only: the AI in
@@ -13,6 +14,8 @@ namespace PleaseDontDrown.Combat
     /// opening. Guns: <see cref="AimTime"/> to line up the first shot (the aim trails a moving target), a burst, then
     /// a reload; misses grow with distance and with how fast the target moves. The pirates' guns are flintlocks: one
     /// ball, then a long reload by hand (muzzle up, ramrod), which is the lifeguards' moment to rush them.
+    /// A grabbing weapon (<see cref="Grabs"/>, the claw) doesn't hit: it catches and flings whoever it reaches off to the
+    /// side (<see cref="Knock"/>), the fighter lunging in with it (<see cref="Lunges"/>).
     /// </summary>
     public struct NpcWeapon
     {
@@ -20,6 +23,9 @@ namespace PleaseDontDrown.Combat
         // Melee (every weapon has some: a gun is swung at someone too close to shoot).
         public int MeleeDamage;
         public float Reach, WindUp, Recover, Knock;
+        public bool Grabs;
+        /// <summary>The blow is a lunge (front foot in, the body after it: <c>AvatarGesture.Lunge</c>), not an arm's swing.</summary>
+        public bool Lunges;
         // Ranged.
         public bool Ranged;
         public int ShotDamage;
@@ -39,6 +45,12 @@ namespace PleaseDontDrown.Combat
                 Kind = kind, MeleeDamage = 10, Reach = 1.4f, WindUp = 0.5f, Recover = 0.6f, Knock = 4f,
                 Ranged = true, ShotDamage = 22, MinRange = 4f, MaxRange = 22f, AimTime = 0.9f, FollowUpAim = 0.45f,
                 Spread = 2.2f, Burst = 1, Magazine = 1, BurstGap = 0f, Reload = 2.6f, Sound = Combat.GunSound.Pistol
+            },
+            NpcWeaponKind.Claw => new NpcWeapon
+            {
+                // Drawn back for a long tell, then a lunge: the claw reaches over four metres. Whoever it catches
+                // is flung aside (off a jetty into the sea), not hurt much; a miss leaves a long opening.
+                Kind = kind, MeleeDamage = 10, Reach = 4.2f, WindUp = 0.8f, Recover = 1.1f, Knock = 9f, Grabs = true, Lunges = true
             },
             NpcWeaponKind.Musket => new NpcWeapon
             {
@@ -74,6 +86,8 @@ namespace PleaseDontDrown.Combat
         public float Skill;     // aim, reaction, how often a combo follows
         public int Poise;       // damage taken within a moment that knocks them over
         public float Guard;     // with the fists up, how often a blow from the front is blocked (a heavy one a bit less often)
+        // Optional lines: shouted now and then winding a blow up, and when one lands ("MINE!", "FINDERS KEEPERS!").
+        public string WindUpShout, LandShout;
 
         // (Poise: two jabs used to floor a pirate, so mashing the button kept them all on the ground. Now it takes a
         // combo: jab, jab, hook is 25 + 25 + 50.)
@@ -82,6 +96,13 @@ namespace PleaseDontDrown.Combat
 
         public static FighterProfile Drunk() =>
             new() { Weapon = NpcWeapon.Of(NpcWeaponKind.Fists), Style = FightStyle.Drunk, Skill = 0.15f, Poise = 55, Guard = 0.2f };
+
+        /// <summary>
+        /// Sandy with the giant grabber claw (the final boss): steady like a pirate, a long reach and a big tell, wide
+        /// open after a lunge; the pole blocks some blows.
+        /// </summary>
+        public static FighterProfile Claw(float skill = 0.7f) =>
+            new() { Weapon = NpcWeapon.Of(NpcWeaponKind.Claw), Style = FightStyle.Pirate, Skill = skill, Poise = 110, Guard = 0.5f };
 
         public static FighterProfile Brawler(float skill = 0.7f)
         {

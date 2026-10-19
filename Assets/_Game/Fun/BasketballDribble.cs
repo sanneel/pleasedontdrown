@@ -20,6 +20,9 @@ namespace PleaseDontDrown.Fun
         private Vector3 _lastHolderPosition;
         private float _speed, _blend, _phase, _spin;
         public const float Radius = .12f;
+        /// <summary>Holding the ball, the body's head bends no further down than this (PlayerAvatar): the ball is at the
+        /// chest, and a head bent further went into it. The view itself still looks wherever it's pointed.</summary>
+        public const float MaxLookDown = 45f;
 
         private static void State(PlayerHub holder, out bool moving, out bool airborne, out bool shooting)
         {
@@ -58,7 +61,10 @@ namespace PleaseDontDrown.Fun
             return camera.ViewportToWorldPoint(viewport);
         }
 
-        public static Vector3 HoldCentre(AvatarRig rig, Vector3 eye, Quaternion facing, bool moving, bool airborne, bool shooting)
+        /// <param name="lookDown">Degrees the holder looks down: the two-handed hold goes down and out with it, so the
+        /// head bending to look at the ball doesn't go into it (at 25 degrees down the glasses were through it).</param>
+        public static Vector3 HoldCentre(AvatarRig rig, Vector3 eye, Quaternion facing, bool moving, bool airborne, bool shooting,
+            float lookDown = 0f)
         {
             if (rig == null || !rig.IsBuilt) return eye + facing * HoldOffset(moving, airborne, shooting);
             Transform r = rig[AvatarRig.Bone.UpperArmR], l = rig[AvatarRig.Bone.UpperArmL];
@@ -66,14 +72,19 @@ namespace PleaseDontDrown.Fun
             float reach = rig.UpperArmLength + rig.ForearmLength;
             if (moving && !airborne && !shooting)
                 return r.position + ahead * (reach * .6f) + side * .08f - Vector3.up * .04f;
-            return (l.position + r.position) * .5f + ahead * (reach * (airborne || shooting ? 1.14f : 1.08f)) +
-                Vector3.up * (reach * (airborne || shooting ? .40f : .12f));
+            // (No further than MaxLookDown: the head stops bending there too, and further down was out of the arms' reach.)
+            float down = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(Mathf.Min(lookDown, MaxLookDown) / 60f));
+            return (l.position + r.position) * .5f + ahead * (reach * ((airborne || shooting ? 1.14f : 1.08f) + .12f * down)) +
+                Vector3.up * (reach * ((airborne || shooting ? .40f : .12f) - .62f * down));
         }
 
         public void GetHoldTarget(PlayerHub holder, Transform aim, out Vector3 position, out Quaternion rotation)
         {
             State(holder, out bool moving, out bool airborne, out bool shooting);
-            if (holder != null && holder.IsOwner)
+            // Our own first-person view: in front of the eyes, tipping with the view. Seen from outside (somebody else,
+            // or our own third-person view) it stays in the body's hands and turns with them: following the view up put
+            // it over the head, out of the hands, whenever you looked up.
+            if (holder != null && holder.IsOwner && (holder.Look == null || !holder.Look.ThirdPerson))
             {
                 rotation = aim.rotation;
                 position = aim.TransformPoint(HoldOffset(moving, airborne, shooting));
@@ -84,7 +95,7 @@ namespace PleaseDontDrown.Fun
             float pitch = -Mathf.Asin(Mathf.Clamp(f.y, -1f, 1f)) * Mathf.Rad2Deg;
             rotation = Quaternion.Euler(Mathf.Clamp(pitch, -45f, 45f) * .25f, yaw, 0f);
             position = HoldCentre(holder != null && holder.Avatar != null ? holder.Avatar.Rig : null, aim.position,
-                Quaternion.Euler(0f, yaw, 0f), moving, airborne, shooting);
+                Quaternion.Euler(0f, yaw, 0f), moving, airborne, shooting, pitch);
         }
 
         public PlayerHands.GripKind GetGrips(PlayerHub holder, out HandGrip left, out HandGrip right)

@@ -7,7 +7,9 @@ namespace PleaseDontDrown.Avatars
     /// <summary>One-off moves that play over whatever the body is doing. TableBite: seated, a bite off the dish on the
     /// table in front (the point), up to the mouth (Fun.TableMeal).</summary>
     public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot, JumpShot, Burp, TableBite,
-        PunchLeft, Hook, HookLeft, Uppercut, UppercutLeft, Overhand, OverhandLeft }
+        PunchLeft, Hook, HookLeft, Uppercut, UppercutLeft, Overhand, OverhandLeft,
+        /// <summary>A step-in lunge: front foot forward, hips and back in after it (a long weapon's thrust, a grab).</summary>
+        Lunge }
 
     /// <summary>
     /// Whole-body poses held for a while (story characters, knockouts). SitStool: on a bar stool exactly as a player
@@ -25,7 +27,8 @@ namespace PleaseDontDrown.Avatars
     /// <summary>What the body is doing this frame. Filled in by a driver (e.g. PlayerAvatar) before LateUpdate.</summary>
     public struct AvatarMotion
     {
-        public Vector3 Velocity;      // world
+        public Vector3 Velocity;      // world (relative to what they stand on)
+        public Vector3 GroundVelocity; // world: what they stand on is moving (a sailing boat's deck); planted feet go with it
         public float FacingYaw;       // where the head looks, degrees
         public float LookPitch;       // degrees, positive = looking down
         public bool Grounded;
@@ -38,6 +41,8 @@ namespace PleaseDontDrown.Avatars
         public bool TwoHanded;
         public bool Basketball;      // exact palm contact on the ball; keep both grips during shot charging
         public bool Shouldered;       // a long gun up in the shoulder: right elbow out, left elbow under the barrel
+        public bool LongProp;         // a pole held low in front in one or two hands (a giant grabber): palms right on its grips, elbows down
+        public float Brace;           // 0..1 rocked back onto the rear foot (a long weapon drawn back before its lunge: the tell)
         public bool CarryingPerson;
         public HandGrip GripLeft, GripRight; // world palm points, finger/palm directions, finger curls
         public float Charge;          // 0..1 throw wind-up
@@ -112,6 +117,7 @@ namespace PleaseDontDrown.Avatars
         private float _hold;
         private float _shoulder, _shoulderRaw; // a long gun up in the shoulder (bladed stance)
         private float _charge;
+        private float _lunge;         // 0..1 how far into a lunge (AvatarGesture.Lunge) the body is
         private float _eat;
         private float _cpr;
         private float _climb;
@@ -363,11 +369,11 @@ namespace PleaseDontDrown.Avatars
         /// </summary>
         private bool WantsClips()
         {
-            if (!UseClips && !AvatarClips.Enabled) return false;
+            if (!UseClips && !(AvatarClips.Enabled && Application.isPlaying)) return false;
             AvatarMotion m = Motion;
             if (!m.Grounded || m.Swimming || m.Underwater || m.Climbing || m.Pose != AvatarPose.Normal || m.Seated || m.Cpr ||
                 m.Defib || m.CarryingPerson || m.Holding || m.Stance != FightStance.None || m.Flying || m.StarJump ||
-                m.Crouch > 0.05f || m.Eating || m.Drinking || m.Charge > 0.01f) return false;
+                m.Crouch > 0.05f || m.Eating || m.Drinking || m.Charge > 0.01f || GestureActive(AvatarGesture.Lunge, LungeSeconds)) return false;
             _clips ??= new AvatarClips(_rig);
             return true;
         }
@@ -597,6 +603,14 @@ namespace PleaseDontDrown.Avatars
             if (_turningInPlace && Mathf.Abs(delta) < 4f) _turningInPlace = false;
             if (moving || _turningInPlace)
                 _bodyYaw += delta * k(moving ? _turnSpeed : _turnSpeed * 0.6f);
+            // Held facing one way (a seat, kneeling for CPR, the cannon): that is the body's yaw, so looking about turns
+            // the head alone (LookYaw), up to its limit. (It had gone on following the view behind the held body, so the
+            // head stayed straight on a chair and the rider swung round on a jet ski.)
+            if (RootOverride is Quaternion held)
+            {
+                Vector3 f = held * Vector3.forward;
+                if (f.x * f.x + f.z * f.z > 0.01f) _bodyYaw = yawBefore = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+            }
             transform.rotation = RootOverride ?? Quaternion.Euler(0f, _bodyYaw, 0f);
 
             _move = Mathf.MoveTowards(_move, Mathf.InverseLerp(0.15f, 1.4f, speed) + (_turningInPlace ? 0.35f : 0f), dt * 4f);
@@ -643,6 +657,7 @@ namespace PleaseDontDrown.Avatars
             _chair = Eased(ref _chairRaw, m.Pose == AvatarPose.SitChair, 3f, dt);
             _upright = (1f - _cpr) * (1f - _kneel) * (1f - _down) * (1f - _sit) * (1f - _chair) * (1f - _lie) * (1f - _lieFront) * (1f - _seat) * (1f - _carried);
             _talk = Mathf.MoveTowards(_talk, m.Talking ? 1f : 0f, dt * 5f);
+            _lunge = m.Pose == AvatarPose.Normal && !m.Swimming && !m.Seated ? LungeWeight() : 0f;
 
             // Secondary motion. Speeding up tips the body into it and it swings back; a turn drags the chest behind;
             // landing from a jump sinks the hips (the knees give, the feet stay planted) before they come back up.
@@ -859,6 +874,22 @@ namespace PleaseDontDrown.Avatars
         private const float BladeTwist = 15f;
 
         private float GestureT(float duration) => Mathf.Clamp01((Now - _gestureStart) / duration);
+
+        /// <summary>A lunge: in fast (<see cref="LungeIn"/>), held out until <see cref="LungeHold"/>, back by the end.</summary>
+        public const float LungeSeconds = 0.8f, LungeIn = 0.16f, LungeHold = 0.4f;
+
+        /// <summary>0..1 how far into a lunge the body is now (fully in from LungeIn to LungeHold).</summary>
+        private float LungeWeight()
+        {
+            if (!GestureActive(AvatarGesture.Lunge, LungeSeconds)) return 0f;
+            float t = Now - _gestureStart;
+            if (t < LungeIn)
+            {
+                float k = 1f - t / LungeIn;
+                return 1f - k * k; // out of the gate fast, slowing into the reach
+            }
+            return t < LungeHold ? 1f : 1f - Mathf.SmoothStep(0f, 1f, (t - LungeHold) / (LungeSeconds - LungeHold));
+        }
         private const float BurpSeconds = 1.7f;
 
         /// <summary>
@@ -937,6 +968,24 @@ namespace PleaseDontDrown.Avatars
                 float blade = BladeTwist * _shoulder * standing;
                 B(Bone.Spine).localRotation *= Quaternion.Euler(0f, blade * 0.4f, 0f);
                 B(Bone.Chest).localRotation *= Quaternion.Euler(0f, blade * 0.6f, 0f);
+            }
+
+            // Braced for a lunge (the weapon drawn back): rocked back onto the rear foot, the back leaning away a little.
+            float brace = Mathf.Clamp01(Motion.Brace) * standing * (1f - _lunge);
+            if (brace > 0.001f)
+            {
+                hips.position -= transform.forward * (0.07f * s * brace);
+                B(Bone.Spine).localRotation *= Quaternion.Euler(-6f * brace, 0f, 0f);
+                B(Bone.Chest).localRotation *= Quaternion.Euler(-4f * brace, 0f, 0f);
+            }
+            // A lunge: the hips go forward and down over the front foot (FootTarget steps it in) and the back leans into
+            // it, here before the arms, so hands on a held weapon's grips go with the body.
+            if (_lunge > 0.001f)
+            {
+                float l = _lunge * standing;
+                hips.position += transform.forward * (0.26f * s * l) - Vector3.up * (0.08f * s * l);
+                B(Bone.Spine).localRotation *= Quaternion.Euler(10f * l, 0f, 0f);
+                B(Bone.Chest).localRotation *= Quaternion.Euler(8f * l, 0f, 0f);
             }
 
             // Seated: the hips go down onto the seat here, before the arms reach for the handlebars or handles (done
@@ -1182,6 +1231,14 @@ namespace PleaseDontDrown.Avatars
         private Vector3 LockFoot(int i, Vector3 cycle, float q)
         {
             float s = _rig.Scale, dt = Mathf.Max(_dt, 1e-4f);
+            if (Motion.GroundVelocity.sqrMagnitude > 1e-4f)
+            {
+                // Standing on a moving deck: the planted foot rides along with it (left behind in the world, the legs
+                // stretched out after the boat and snapped back every few frames).
+                Vector3 ride = Motion.GroundVelocity * dt;
+                _footDrawn[i] += ride;
+                _footLift[i] += ride;
+            }
             Vector3 drawn = _footDrawn[i];
             if (!_footKnown[i] || (new Vector2(drawn.x - cycle.x, drawn.z - cycle.z)).sqrMagnitude > 0.6f * 0.6f * s * s)
             {
@@ -1190,7 +1247,8 @@ namespace PleaseDontDrown.Avatars
             }
             bool walking = _move > 0.05f && _swim < 0.01f && _air < 0.01f && _climb < 0.01f && _upright > 0.95f &&
                            _cpr < 0.01f && _crouch < 0.5f && Motion.Grounded && !Motion.Seated && _seat < 0.01f;
-            bool posed = _swim > 0.01f || _air > 0.01f || _climb > 0.01f || _upright < 0.95f || _cpr > 0.01f || _seat > 0.01f || Motion.Seated;
+            bool posed = _swim > 0.01f || _air > 0.01f || _climb > 0.01f || _upright < 0.95f || _cpr > 0.01f || _seat > 0.01f || Motion.Seated ||
+                         _lunge > 0.01f; // (a lunge steps the front foot in faster than a planted foot may shuffle)
             if (posed)
             {
                 // Swimming, jumping, kneeling, sitting...: those poses place the feet themselves.
@@ -1254,6 +1312,8 @@ namespace PleaseDontDrown.Avatars
             Vector3 hipRest = _rig.RestPosition(Bone.Hips) + _rig.RestPosition(thighBone);
             float footWidth = Mathf.Abs(hipRest.x) * (1f + 0.15f * _crouch);
             var target = new Vector3(footWidth * side, _rig.AnkleHeight + lift, 0f) + moveDir * along;
+            // Lunging: the left foot steps well in, the right one pushes back a little.
+            if (_lunge > 0f) target.z += (side < 0f ? 0.4f : -0.1f) * s * _lunge;
 
             // Kneeling for CPR: shins flat on the sand behind the knees.
             target = Vector3.Lerp(target, new Vector3(footWidth * side * 1.1f, _rig.AnkleHeight * 0.8f, -0.42f * s), _cpr);
@@ -1428,6 +1488,8 @@ namespace PleaseDontDrown.Avatars
                     pose = HandPose.Lerp(pose, right ? CprLowerHand : CprUpperHand, _cpr);
                 }
                 if (right && _eat > 0.01f && !m.Drinking) pose = HandPose.Lerp(pose, HandPose.Cup, _eat);
+                if (_lunge > 0.01f && !(usesGrip && _hold > 0.01f) && !m.LongProp) pose = HandPose.Lerp(pose, HandPose.Cup, _lunge); // (a grab: hands open to take hold)
+                if (!right && m.LongProp && !usesGrip) pose = HandPose.Lerp(pose, HandPose.Point, Mathf.Clamp01(m.Brace) * (1f - _lunge) * _hold); // (the free hand points at whoever is about to be grabbed)
                 if (right && GestureActive(AvatarGesture.Wave, 1.6f))
                 {
                     rotation = HandBones.Orient(Vector3.up, fwd, side);
@@ -1600,6 +1662,25 @@ namespace PleaseDontDrown.Avatars
                     if (m.GripRight.Active)
                         IK.Solve(upperR, foreR, la, _rig.ForearmLength, WristFor(m.GripRight, true), elbowR, w, false);
                 }
+                else if (m.LongProp)
+                {
+                    // A pole held low in front (a giant grabber): each palm exactly on its grip (the wrist aimed so the
+                    // turned hand lands there, as for a shouldered gun), the elbows hanging down and a little out.
+                    if (m.GripLeft.Active && m.TwoHanded)
+                        IK.Solve(upperL, foreL, la, _rig.ForearmLength, WristFor(m.GripLeft, false), -up - right * 0.35f, w, false);
+                    if (m.GripRight.Active)
+                        IK.Solve(upperR, foreR, la, _rig.ForearmLength, WristFor(m.GripRight, true), -up + right * 0.5f - fwd * 0.2f, w, false);
+                    if (!(m.GripLeft.Active && m.TwoHanded))
+                    {
+                        // In one hand: the free arm balances. Braced to lunge it points ahead at the target (the tell);
+                        // in the lunge it's flung back and out, low, like a fencer's.
+                        float s = _rig.Scale, brace = Mathf.Clamp01(m.Brace) * (1f - _lunge);
+                        if (brace > 0.01f)
+                            IK.Solve(upperL, foreL, la, lb, upperL.position + fwd * ((la + lb) * 0.92f) + up * (0.06f * s) + right * (0.05f * s), -up - right * 0.5f, brace * w, false);
+                        if (_lunge > 0.01f)
+                            IK.Solve(upperL, foreL, la, lb, upperL.position - fwd * (0.22f * s) - right * (0.24f * s) - up * (0.26f * s), -right + fwd * 0.3f, _lunge * w, false);
+                    }
+                }
                 else if (!m.TwoHanded && !m.CarryingPerson)
                 {
                     // One hand under it, the other relaxed.
@@ -1715,6 +1796,16 @@ namespace PleaseDontDrown.Avatars
                 float w = Mathf.Clamp01(Mathf.Min(t / 0.15f, (1f - t) / 0.15f));
                 upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-20f, 0f, 150f), w);
                 foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(0f, 0f, 25f * Mathf.Sin(Now * 14f)), w);
+            }
+            // A lunge with nothing in the hands is a grab: both hands shoot out ahead at chest height, a little apart.
+            if (_lunge > 0.01f && _hold < 0.5f)
+            {
+                Transform upperL = B(Bone.UpperArmL), foreL = B(Bone.ForearmL);
+                float s = _rig.Scale, la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+                Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
+                float w = _lunge * (1f - _hold);
+                IK.Solve(upperL, foreL, la, lb, upperL.position + fwd * ((la + lb) * 0.95f) - right * (0.04f * s) - up * (0.06f * s), -up - right * 0.4f, w, false);
+                IK.Solve(upperR, foreR, la, lb, upperR.position + fwd * ((la + lb) * 0.95f) + right * (0.04f * s) - up * (0.06f * s), -up + right * 0.4f, w, false);
             }
         }
 

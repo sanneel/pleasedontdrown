@@ -36,6 +36,8 @@ namespace PleaseDontDrown.Avatars
         public static readonly HandPose Carry = new(0.5f, 0.18f, 0.06f);
         public static readonly HandPose Swim = new(0.1f, 0.04f, 0f);
         public static readonly HandPose Point = new(0.9f, 0.6f, 0f) { Index = 0.04f };
+        /// <summary>Wrapped round a pole a few centimetres thick (a long prop's shaft): fingers and thumb closed over it.</summary>
+        public static readonly HandPose PoleGrip = new(0.84f, 0.72f, 0f) { Pinky = 0.88f };
 
         public static HandPose Lerp(HandPose a, HandPose b, float t) => new()
         {
