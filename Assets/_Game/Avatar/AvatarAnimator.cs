@@ -98,7 +98,7 @@ namespace PleaseDontDrown.Avatars
         private int _seed;
         // What the clips' action is this frame and how much of the body it has (the hand-made layer for the same thing
         // steps back by as much).
-        private enum ClipAct : byte { None, Down, GetUp, Cpr, Scared, Tread }
+        private enum ClipAct : byte { None, Down, GetUp, Scared, Tread }
         private ClipAct _clipAct;
         private float _clipActShare;
         private readonly Quaternion[] _clipPose = new Quaternion[AvatarClips.PosedBones.Length];
@@ -359,6 +359,7 @@ namespace PleaseDontDrown.Avatars
             if (_clipMix > 0f && (_clips == null || !_clips.Prepare())) _clipMix = 0f;
             _clipAct = ClipAct.None;
             _clipActShare = 0f;
+            _cprHands = 0f;
             float clipMix = _clipMix * _clipMix * (3f - 2f * _clipMix);
             if (_clipMix > 0f)
             {
@@ -399,7 +400,7 @@ namespace PleaseDontDrown.Avatars
 
         /// <summary>
         /// What goes to the clips: standing about (and talking), walking and running; and whole-body actions there are
-        /// good clips for: kneeling over a chest for CPR, knocked out and getting up, terrified, treading water.
+        /// good clips for: knocked out and getting up, terrified, treading water.
         /// Anything with hands on something, a seat, a fight stance, a swimmer making way or a pose of its own stays with
         /// the hand-made animation.
         /// </summary>
@@ -416,7 +417,8 @@ namespace PleaseDontDrown.Avatars
             // Knocked down (and getting up again): whatever was in the hands has gone, the guard is down.
             else if (m.Pose == AvatarPose.Down || Rising) want = !m.Swimming;
             else if (m.Holding || m.Stance != FightStance.None || m.Crouch > 0.05f) want = false;
-            else if (m.Cpr || _cpr > 0.01f) want = !m.Swimming;
+            // CPR kneels tall, hand-made: the CPR clip sits back on its heels, its shoulders too low for the arms to reach.
+            else if (m.Cpr || _cpr > 0.01f) want = false;
             else if (m.Swimming) want = !m.Underwater && !_crawling && _swimMove < 0.05f && _under < 0.01f && AvatarClips.Get(TreadClip) != null;
             else if (m.Pose == AvatarPose.Scared) want = m.Grounded && AvatarClips.Get(ScaredClip) != null;
             else want = m.Grounded && m.Pose == AvatarPose.Normal && _handsUp < 0.01f;
@@ -425,7 +427,7 @@ namespace PleaseDontDrown.Avatars
         }
 
         // The clips for each action (Resources/Mixamo).
-        private const string FallClip = "Knocked Out Back", GetUpClip = "Getting Up From Back", CprClip = "CPR",
+        private const string FallClip = "Knocked Out Back", GetUpClip = "Getting Up From Back",
             ScaredClip = "Terrified", TreadClip = "Treading Water";
         /// <summary>Knocked down, the clip's fall plays this many times its own speed (a story fighter is only down for
         /// 1.6-2.3 s: on the sand in 1.2 s).</summary>
@@ -437,10 +439,6 @@ namespace PleaseDontDrown.Avatars
         /// <summary>Getting up from the clip takes this long (sped up from the clip's 3.2 s: the fighter is back in
         /// the fight soon after, StoryNpc.Combat).</summary>
         private const float ClipGetUpTime = 1.8f;
-        /// <summary>The CPR clip, kneeling over the chest with straight arms, at this moment (seconds) of its
-        /// compressions: the hands come down onto the chest from here with each press.</summary>
-        private const float CprPoseTime = 0.4f;
-
         /// <summary>Getting up after being knocked down (the get-up still playing).</summary>
         private bool Rising => Motion.Pose != AvatarPose.Down && Now >= _upSince && Now - _upSince < ClipGetUpTime;
 
@@ -529,13 +527,6 @@ namespace PleaseDontDrown.Avatars
                 offset = Vector3.Lerp(from, to, k);
                 offset.y = 0f;
             }
-            else if (_cpr > 0.001f && !m.Swimming)
-            {
-                _clipAct = ClipAct.Cpr;
-                file = CprClip;
-                time = CprPoseTime;
-                weight = _cpr;
-            }
             else if (_scared > 0.001f)
             {
                 _clipAct = ClipAct.Scared;
@@ -562,28 +553,11 @@ namespace PleaseDontDrown.Avatars
                 hips.position += Vector3.up * (_swim * 0.18f * s); // as high in the water as the hand-made treading
             if (_clipAct == ClipAct.Scared)
                 KeepFacing(hips, 35f, _scared); // (the clip spins right round in its panic: the scared keep facing the danger)
-            if (_clipAct == ClipAct.Cpr)
-            {
-                // The clip kneels a little turned and off to one side of where it was captured: square on to the chest,
-                // knees where the game kneels the rescuer (the same place the hand-made kneel has the hips), so the
-                // hands reach the chest and the lips reach the mouth for a breath.
-                KeepFacing(hips, 0f, _cpr);
-                Vector3 local = transform.InverseTransformPoint(hips.position);
-                Vector3 want = new Vector3(0f, local.y, -CprKneelBack * s);
-                hips.position += transform.TransformVector(new Vector3(want.x - local.x, 0f, want.z - local.z) * _cpr);
-                // Each press: the body dips onto the straight arms (the hands go down with it, onto the chest).
-                float pumpDip = Mathf.Max(0f, 1f - (Now - _lastPump) / 0.25f) * 0.05f * s * _cpr;
-                hips.position -= Vector3.up * pumpDip;
-                if (!m.Defib) PoseCprArms(_cpr);
-            }
-            KeepLegsAboveGround(hips, s, _clipAct == ClipAct.Cpr ? _cpr : 0f); // (knees on the sand, not in it)
+            KeepLegsAboveGround(hips, s);
             GestureLayer();
             IdleLayer(talkHands: false); // (the talking clip talks with the hands)
             PoseHands();
         }
-
-        /// <summary>The CPR kneel: hips this far (times the body's scale) behind the root, as the hand-made kneel has them.</summary>
-        private const float CprKneelBack = 0.05f;
 
         /// <summary>
         /// Turns the whole clip-posed body (about its hips) so it faces no more than <paramref name="limit"/> degrees
@@ -710,13 +684,17 @@ namespace PleaseDontDrown.Avatars
         /// </summary>
         private void SwivelForearmClear(Transform upper, Transform fore, Transform hand, float s)
         {
-            float radius = 0.03f * s;
+            // (The whole forearm, elbow to wrist, as thick as it is: sampled only at two points, 3 cm round, a forearm
+            // across a tourist's forehead for a rescue breath lay 8 cm into her head.)
+            float radius = 0.04f * s;
             float Depth()
             {
-                Vector3 p = Vector3.Lerp(fore.position, hand.position, 0.45f), q = p;
-                float d = BodySpace.PushOut(ref q, radius, _nearBodies) ? (q - p).magnitude : 0f;
-                Vector3 e = Vector3.Lerp(fore.position, hand.position, 0.1f), r = e;
-                if (BodySpace.PushOut(ref r, radius, _nearBodies)) d = Mathf.Max(d, (r - e).magnitude);
+                float d = 0f;
+                for (int k = 0; k <= 4; k++)
+                {
+                    Vector3 p = Vector3.Lerp(fore.position, hand.position, k * 0.2f), q = p;
+                    if (BodySpace.PushOut(ref q, radius, _nearBodies)) d = Mathf.Max(d, (q - p).magnitude);
+                }
                 return d;
             }
             float depth = Depth();
@@ -732,7 +710,7 @@ namespace PleaseDontDrown.Avatars
             float minus = Depth();
             float sign = plus <= minus ? 1f : -1f;
             float best = depth, bestAngle = 0f;
-            for (int step = 1; step <= 10; step++)
+            for (int step = 1; step <= 14; step++)
             {
                 float angle = sign * 12f * step;
                 upper.rotation = Quaternion.AngleAxis(angle, axis) * start;
@@ -1711,7 +1689,49 @@ namespace PleaseDontDrown.Avatars
         /// </summary>
         // CPR: kneel tall over the chest, never folded over it (a big head bowed that far comes down over the hands).
         private const float MaxCprLean = 30f;
-        private static readonly HandPose CprLowerHand = new(0.22f, 0.15f, 0f), CprUpperHand = new(0.62f, 0.35f, 0f);
+        private static readonly Vector3[] TorsoProbes = { Vector3.down, new Vector3(0f, -0.7f, 0.7f), Vector3.forward };
+
+        /// <summary>
+        /// How far the trunk (its skin under and in front of the hips, the belly and the chest), moved by
+        /// <paramref name="by"/>, would have to go to be clear of everybody else: the largest push out of anyone.
+        /// Zero when it's clear.
+        /// </summary>
+        private Vector3 TorsoOutOfOthers(Vector3 by)
+        {
+            if (BodySpace.Rigs.Count < 2) return Vector3.zero;
+            float s = _rig.Scale;
+            Vector3 worst = Vector3.zero;
+            foreach (Transform bone in new[] { B(Bone.Hips), B(Bone.Spine), B(Bone.Chest) })
+            {
+                if (bone == null) continue;
+                foreach (Vector3 local in TorsoProbes)
+                {
+                    Vector3 dir = transform.TransformDirection(local).normalized;
+                    Vector3 skin = BodySpace.Surface(_rig, bone.position, dir, 0.45f * s) + by;
+                    Vector3 q = skin;
+                    if (BodySpace.PushOut(ref q, 0.01f * s, _rig) && (q - skin).sqrMagnitude > worst.sqrMagnitude) worst = q - skin;
+                }
+            }
+            return worst;
+        }
+
+        /// <summary>0..1 how far down into a rescue breath the body is (and on its way back up after one).</summary>
+        private float BreathWeight()
+        {
+            float since = Now - _gestureStart;
+            if (_gesture != AvatarGesture.Breath || since < 0f || since > 1.9f) return 0f;
+            float t = since / 1.1f;
+            return t < 1f ? Mathf.SmoothStep(0f, 1f, Mathf.Min(t / 0.28f, 1f)) : 1f - Mathf.SmoothStep(0f, 1f, (since - 1.1f) / 0.8f);
+        }
+
+        /// <summary>How far (times the body's scale) the kneeling body may come in towards the chest for the arms to reach.</summary>
+        private const float MaxCprShift = 0.4f;
+        /// <summary>0..1 how far this frame's hands are down on the chest (their pressing shape goes with it: in the
+        /// air, flat and fanned, the goofy lifeguard's hands were claws).</summary>
+        private float _cprHands;
+        // (The lower hand's fingers lifted and curled over the upper one's: at 0.22 the goofy lifeguard's fanned cartoon
+        // fingers lay splayed across the chest like a claw.)
+        private static readonly HandPose CprLowerHand = new(0.45f, 0.3f, 0f), CprUpperHand = new(0.62f, 0.35f, 0f);
 
         private void PoseHands()
         {
@@ -1739,13 +1759,14 @@ namespace PleaseDontDrown.Avatars
                     rotation = grip.Rotation(side);
                     pose = HandPose.Lerp(pose, grip.Pose, weight);
                 }
-                if (_cpr > 0.01f && !m.Defib)
+                if (_cpr > 0.01f && !m.Defib && _cprHands > 0.01f)
                 {
                     rotation = HandBones.Orient(fwd, Vector3.down, side);
-                    weight = _cpr;
+                    weight = _cprHands;
                     // The lower hand's heel on the chest, fingers lifted a little; the upper one's fingers curl down
-                    // round it (spread flat, the cartoon fingers fanned out like claws).
-                    pose = HandPose.Lerp(pose, right ? CprLowerHand : CprUpperHand, _cpr);
+                    // round it (spread flat, the cartoon fingers fanned out like claws). Only once nearly down on the
+                    // chest: on the way there, curling, they read as a claw reaching for it.
+                    pose = HandPose.Lerp(pose, right ? CprLowerHand : CprUpperHand, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.6f, 1f, _cprHands)));
                 }
                 if (right && _eat > 0.01f && !m.Drinking) pose = HandPose.Lerp(pose, HandPose.Cup, _eat);
                 if (_lunge > 0.01f && !(usesGrip && _hold > 0.01f) && !m.LongProp) pose = HandPose.Lerp(pose, HandPose.Cup, _lunge); // (a grab: hands open to take hold)
@@ -2013,6 +2034,35 @@ namespace PleaseDontDrown.Avatars
                 Turn(spine, right, step * cpr);
                 leaned += step;
             }
+            // Still out of reach (the game kneels the rescuer 0.6 m out, clear of a round belly, and the goofy
+            // lifeguard's arms are 56 cm long): the whole body comes in closer over the knees until the straight arms
+            // reach, stopping before a knee would go into the one lying there. (Leaning alone, his short back hardly
+            // moved his shoulders: the hands hung 10-25 cm over the chest, or stretched out level towards it.)
+            Transform hips = B(Bone.Hips);
+            float s = _rig.Scale;
+            {
+                Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
+                Vector3 target = point + up * 0.05f;
+                Vector3 flat = target - shoulders;
+                flat.y = 0f;
+                float v = shoulders.y - target.y, h = flat.magnitude;
+                float hWant = Mathf.Sqrt(Mathf.Max(0f, armReach * armReach - v * v));
+                // (Not while bent over the face for a breath: from up there the chest is out of reach on purpose.)
+                float shift = Mathf.Clamp(h - hWant, 0f, MaxCprShift * s) * (1f - BreathWeight());
+                if (shift > 0.005f && h > 1e-4f)
+                {
+                    Vector3 toward = flat / h;
+                    Vector3 kneeL = B(Bone.ShinL).position, kneeR = B(Bone.ShinR).position;
+                    for (int k = 0; k < 8 && shift > 0.005f; k++)
+                    {
+                        Vector3 by = toward * shift;
+                        if (!BodySpace.Inside(kneeL + by, 0.06f * s, _rig) && !BodySpace.Inside(kneeR + by, 0.06f * s, _rig) &&
+                            TorsoOutOfOthers(by).sqrMagnitude < 0.0001f) break;
+                        shift *= 0.75f;
+                    }
+                    hips.position += toward * (shift * cpr);
+                }
+            }
             if (m.Defib)
             {
                 // Leaned over: the hands again on the paddles' handles.
@@ -2020,10 +2070,16 @@ namespace PleaseDontDrown.Avatars
                 IK.Solve(upperR, foreR, la, lb, m.GripRight.Point, elbowR, _hold, false);
                 return;
             }
+            // The hands go down onto the chest once they can reach it (sliding back from a breath at the face, they
+            // stretched out level in the air towards it): as far out as the arms reach and no further.
+            Vector3 shouldersNow = (upperL.position + upperR.position) * 0.5f;
+            float short_ = Vector3.Distance(shouldersNow, point + up * 0.05f) - armReach;
+            float onChest = cpr * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.02f * s, 0.2f * s, short_)));
+            _cprHands = onChest;
             // (One right on top of the other, on the middle of the chest: 5 cm apart sideways they read as two
             // hands side by side.)
-            IK.Solve(upperR, foreR, la, lb, point + up * 0.02f, -fwd + right, cpr, false);
-            IK.Solve(upperL, foreL, la, lb, point + up * 0.075f, -fwd - right, cpr, false);
+            IK.Solve(upperR, foreR, la, lb, point + up * 0.02f, -fwd + right, onChest, false);
+            IK.Solve(upperL, foreL, la, lb, point + up * 0.075f, -fwd - right, onChest, false);
         }
 
         private void GestureLayer()
@@ -2374,9 +2430,9 @@ namespace PleaseDontDrown.Avatars
         /// the ground, the whole body is lifted just enough to keep it on top. (Not for sitting or lying on a towel:
         /// there the heels rest on the sand on purpose, and lifting them sat people in the air.)
         /// </summary>
-        private void KeepLegsAboveGround(Transform hips, float s, float kneeling = 0f)
+        private void KeepLegsAboveGround(Transform hips, float s)
         {
-            float low = Mathf.Max(Mathf.Max(_down, _kneel), kneeling);
+            float low = Mathf.Max(_down, _kneel);
             if (low < 0.01f || _swim > 0.01f || _seat > 0.01f || _sit > 0.01f || _lie > 0.01f || _lieFront > 0.01f || _carried > 0.01f || !Motion.Grounded) return;
             float floor = transform.position.y;
             float margin = 0.05f * s; // half a leg's thickness
@@ -2931,13 +2987,23 @@ namespace PleaseDontDrown.Avatars
                     bone.rotation = Quaternion.Slerp(Quaternion.identity, bend, share[i] * w) * bone.rotation;
                 }
             // 2. Face down onto theirs, tilted sideways a little, eyes shut (the face code does the eyes).
-            Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along * 0.35f, along) * Quaternion.Euler(0f, 0f, 38f);
+            // (Tilted well over: straighter, the goofy lifeguard's big nose went 8 cm into their face.)
+            Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along * 0.35f, along) * Quaternion.Euler(0f, 0f, 55f);
             head.rotation = Quaternion.Slerp(head.rotation, faceDown, w * 0.85f);
             // 3. Whatever is still missing: lean the hips in (up to 40 cm), knees stay; then curl the neck the last bit.
             Vector3 gap = target - MouthPoint;
             if (gap.sqrMagnitude > 1e-6f)
             {
                 hips.position += Vector3.ClampMagnitude(gap, 0.4f * _rig.Scale) * w; // (0.3 left a big-bellied man 5 cm short)
+                PoseLegs();
+            }
+            // 4. The chest and belly over them, not in them: bent that far down, the shirt went 5-8 cm into a slim
+            // tourist's shoulder. Lifted out of whoever lies there; the neck and chest bring the lips back down to theirs.
+            for (int pass = 0; pass < 2; pass++)
+            {
+                Vector3 lift = TorsoOutOfOthers(Vector3.zero);
+                if (lift.sqrMagnitude < 1e-6f) break;
+                hips.position += lift * (1.15f * w);
                 PoseLegs();
             }
             for (int pass = 0; pass < 6; pass++)
@@ -2948,9 +3014,16 @@ namespace PleaseDontDrown.Avatars
                     bone.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(toMouth, toLips), 0.6f * w) * bone.rotation;
                 }
 
-            // Hands: one on the forehead, one under the chin.
-            IK.Solve(upperL, foreL, la, lb, lips + along * 0.13f + Vector3.up * 0.07f - right * 0.05f, -fwd - right, w, false);
-            IK.Solve(upperR, foreR, la, lb, lips - along * 0.08f + Vector3.up * 0.02f + right * 0.04f, -fwd + right, w, false);
+            // Hands flat on the sand, steadying the body bent right down: one by their shoulder, one beside their head,
+            // on our side. (On the forehead and under the chin they were squeezed between the two heads, the goofy
+            // lifeguard's head covering the whole face: a clump of fingers on the eyes, or a claw in the air.)
+            Vector3 headward = Motion.CprPoint != Vector3.zero ? Vector3.ProjectOnPlane(lips - Motion.CprPoint, Vector3.up) : Vector3.zero;
+            headward = headward.sqrMagnitude > 1e-4f ? headward.normalized : Vector3.Cross(Vector3.up, along);
+            float sand = transform.position.y + 0.02f * _rig.Scale;
+            Vector3 OnSand(Vector3 p) => new Vector3(p.x, sand, p.z);
+            // (Out past a round dad's shoulder: 20 cm from the middle of him the hand was in it.)
+            PlaceHand(false, OnSand(lips - headward * 0.24f - along * 0.34f), along, Vector3.down, -fwd - right, w, HandPose.Relaxed);
+            PlaceHand(true, OnSand(lips + headward * 0.2f - along * 0.24f), along, Vector3.down, -fwd + right, w, HandPose.Relaxed);
         }
 
         // ------------------------------------------------------------------ head & face

@@ -158,6 +158,181 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        /// <summary>
+        /// CprBatch: CPR exactly as the game stages it. A real tourist flat on her back on a floor; the lifeguard where
+        /// PlayerAvatar.KneelBeside puts him (at her side by the chest, square to her), pressing as the game presses
+        /// (every 0.6 s, a breath after six, back to pressing). Every frame logs how far each palm is from the press
+        /// point, how bent the elbows are, and how far the shoulders are from over the hands; pictures from the side,
+        /// across and above at the pressing, the breath and after it, to Screenshots/CprCheck/. <c>-clips</c>: on the
+        /// clips. Ends with "[CprCheck] PASS" or "FAIL" (palms off the chest while pressing).
+        /// </summary>
+        public static void CprBatch()
+        {
+            try
+            {
+                Camera camera = ReviewCamera();
+                bool clips = Environment.GetCommandLineArgs().Contains("-clips");
+                const string root = "Screenshots/CprCheck";
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+                Directory.CreateDirectory(root);
+                var victimPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Game/Items/Prefabs/Tourist.prefab");
+                int failures = 0;
+                foreach (int tourist in new[] { 0, 1, 2, 3, 5 })
+                {
+                    var at = new Vector3(400f + 30f * tourist, 300f, 0f);
+                    GameObject floor = Floor(at);
+                    GameObject victimObject = Object.Instantiate(victimPrefab);
+                    foreach (Rigidbody rb in victimObject.GetComponentsInChildren<Rigidbody>()) rb.isKinematic = true;
+                    var victim = victimObject.GetComponent<VictimBody>();
+                    victimObject.transform.SetPositionAndRotation(at + Vector3.up * 0.14f, Quaternion.LookRotation(Vector3.up, Vector3.right));
+                    victim.ApplyLooks(AvatarLook.RandomTourist(tourist), tourist);
+                    Vector3 chest = victim.ChestPoint, head = victim.HeadPosition, mouth = victim.MouthPoint;
+                    AvatarRig victimRig = victimObject.GetComponentInChildren<AvatarRig>();
+                    // As PlayerAvatar.OnPump / KneelBeside.
+                    Vector3 down = chest - head;
+                    down.y = 0f;
+                    Vector3 press = chest + down.normalized * 0.07f;
+                    float reach = victim.KneelReach + 0.07f;
+                    Vector3 along = -down.normalized, across = Vector3.Cross(Vector3.up, along);
+                    Vector3 Spot(Vector3 kneel) => new Vector3(kneel.x, at.y, kneel.z) + across * reach;
+                    Quaternion facing = Quaternion.LookRotation(-across, Vector3.up);
+                    Vector3 pressSpot = Spot(VictimBody.KneelSpot(press, head)), breathSpot = Spot(VictimBody.BreathSpot(press, head));
+
+                    var go = new GameObject("Rescuer");
+                    go.transform.SetPositionAndRotation(pressSpot, facing);
+                    AvatarRig rig = Spawn(go, AvatarLook.Bodies.Goofy);
+                    var animator = go.AddComponent<AvatarAnimator>();
+                    animator.Rig = rig;
+                    animator.UseClips = clips;
+                    animator.RootOverride = facing;
+
+                    const float dt = 1f / 30f;
+                    float breathUntil = -1f, worstPress = 0f, worstInside = 0f;
+                    var baked = new Mesh();
+                    // How deep his skin goes into her (the hands left out: they're meant to be on her), and how many
+                    // of his vertices are more than 1 cm in.
+                    string insideParts = "";
+                    (float depth, int count) Inside()
+                    {
+                        var smr = rig.Renderer as SkinnedMeshRenderer;
+                        if (smr == null || victimRig == null) return (0f, 0);
+                        smr.BakeMesh(baked, true);
+                        Vector3[] verts = baked.vertices;
+                        Transform handL = rig[AvatarRig.Bone.HandL], handR = rig[AvatarRig.Bone.HandR];
+                        float deepest = 0f;
+                        int n = 0;
+                        var parts = new Dictionary<string, int>();
+                        AvatarRig.Bone[] named = { AvatarRig.Bone.Head, AvatarRig.Bone.Neck, AvatarRig.Bone.Chest, AvatarRig.Bone.Spine, AvatarRig.Bone.Hips,
+                            AvatarRig.Bone.UpperArmL, AvatarRig.Bone.UpperArmR, AvatarRig.Bone.ForearmL, AvatarRig.Bone.ForearmR, AvatarRig.Bone.ThighL, AvatarRig.Bone.ThighR,
+                            AvatarRig.Bone.ShinL, AvatarRig.Bone.ShinR };
+                        for (int i = 0; i < verts.Length; i += 3)
+                        {
+                            Vector3 w = smr.transform.TransformPoint(verts[i]);
+                            if ((w - handL.position).sqrMagnitude < 0.14f * 0.14f || (w - handR.position).sqrMagnitude < 0.14f * 0.14f) continue;
+                            float d = BodySpace.DepthIn(victimRig, w, 0f);
+                            if (d > 0.01f)
+                            {
+                                n++;
+                                AvatarRig.Bone near = named.OrderBy(b => (rig[b].position - w).sqrMagnitude).First();
+                                parts[near.ToString()] = parts.TryGetValue(near.ToString(), out int c) ? c + 1 : 1;
+                            }
+                            deepest = Mathf.Max(deepest, d);
+                        }
+                        insideParts = string.Join(" ", parts.Select(kv => kv.Key + ":" + kv.Value));
+                        return (deepest, n);
+                    }
+                    Vector3 body = pressSpot;
+                    var shots = new Dictionary<int, string> { { 75, "press_down" }, { 84, "press_up" }, { 210, "breath_in" }, { 222, "breath" }, { 240, "breath_up" }, { 252, "after_breath" }, { 270, "after_breath2" }, { 330, "pressing_again" } };
+                    for (int frame = 0; frame < 360; frame++)
+                    {
+                        float t = frame * dt;
+                        AvatarAnimator.TimeOverride = 300f + t;
+                        // Presses every 18 frames from 2 s; the seventh is a breath; pressing again after it.
+                        bool pressFrame = frame >= 60 && (frame - 60) % 18 == 0;
+                        int n = (frame - 60) / 18;
+                        if (pressFrame && n == 8)
+                        {
+                            animator.Play(AvatarGesture.Breath, mouth);
+                            breathUntil = t + 1.4f;
+                        }
+                        else if (pressFrame && n != 9) animator.Play(AvatarGesture.Pump, press);
+                        // The body slides up to the face for the breath and back (KneelBeside's easing).
+                        Vector3 want = t < breathUntil ? breathSpot : pressSpot;
+                        body = Vector3.Lerp(body, want, 1f - Mathf.Exp(-9f * dt));
+                        go.transform.position = body;
+                        animator.Motion = new AvatarMotion { FacingYaw = facing.eulerAngles.y, Grounded = true, Cpr = frame >= 30, CprPoint = press };
+                        animator.Tick(dt);
+
+                        float PalmGap(bool right)
+                        {
+                            Transform hand = rig[right ? AvatarRig.Bone.HandR : AvatarRig.Bone.HandL];
+                            Vector3 palm = hand.position - hand.up * (rig.HandLength * 0.5f);
+                            return Vector3.Distance(palm, press + Vector3.up * (right ? 0.02f : 0.075f));
+                        }
+                        float Elbow(bool right)
+                        {
+                            Transform u = rig[right ? AvatarRig.Bone.UpperArmR : AvatarRig.Bone.UpperArmL], f = rig[right ? AvatarRig.Bone.ForearmR : AvatarRig.Bone.ForearmL],
+                                h = rig[right ? AvatarRig.Bone.HandR : AvatarRig.Bone.HandL];
+                            return 180f - Vector3.Angle(u.position - f.position, h.position - f.position);
+                        }
+                        Vector3 shoulders = (rig[AvatarRig.Bone.UpperArmL].position + rig[AvatarRig.Bone.UpperArmR].position) * 0.5f;
+                        Vector3 overBy = shoulders - press;
+                        overBy.y = 0f;
+                        bool pressing = frame >= 70 && frame < 200;
+                        if (pressing) worstPress = Mathf.Max(worstPress, PalmGap(true), PalmGap(false));
+                        (float inDepth, int inCount) = frame % 6 == 0 ? Inside() : (0f, 0);
+                        if (frame % 6 == 0 && inCount > 0)
+                        {
+                            Transform fl = rig[AvatarRig.Bone.ForearmL], hl = rig[AvatarRig.Bone.HandL], ul = rig[AvatarRig.Bone.UpperArmL];
+                            string line = "";
+                            for (int k = 0; k <= 4; k++) line += $" {BodySpace.DepthIn(victimRig, Vector3.Lerp(fl.position, hl.position, k * 0.25f), 0.04f) * 100f:0.0}";
+                            line += $" | upper {BodySpace.DepthIn(victimRig, Vector3.Lerp(ul.position, fl.position, 0.5f), 0.04f) * 100f:0.0} elbow {BodySpace.DepthIn(victimRig, fl.position, 0.04f) * 100f:0.0}";
+                            Debug.Log($"[CprCheck]   left forearm depth along (cm):{line}");
+                        }
+                        if (pressing) worstInside = Mathf.Max(worstInside, inDepth);
+                        if (frame % 6 == 0)
+                            Debug.Log($"[CprCheck] tourist {tourist} t {t:0.00}: palms R {PalmGap(true) * 100f:0} L {PalmGap(false) * 100f:0} cm from the chest, body {inDepth * 100f:0.0} cm into her ({inCount} verts {insideParts}), " +
+                                      $"elbows bent R {Elbow(true):0} L {Elbow(false):0} deg, shoulders {overBy.magnitude * 100f:0} cm off over the hands, {shoulders.y - press.y:0.00} m above; " +
+                                      $"clips {animator.ClipDriven} {animator.ClipAction ?? "-"}");
+                        if (shots.TryGetValue(frame, out string name))
+                        {
+                            Vector3 mid = Vector3.Lerp(press, shoulders, 0.4f);
+                            // Close on the faces too (the breath: lips, the hand on the forehead, the one under the chin).
+                            Vector3 faces = Vector3.Lerp(mouth, rig[AvatarRig.Bone.Head].position, 0.3f);
+                            foreach ((string view, Vector3 offset) in new[] { ("faceside", along * 0.75f + Vector3.up * 0.15f - across * 0.1f), ("faceacross", -across * 0.8f + Vector3.up * 0.25f) })
+                            {
+                                camera.transform.position = faces + offset;
+                                camera.transform.LookAt(faces);
+                                Render(camera, $"{root}/t{tourist}_{frame:000}_{name}_{view}.jpg", 520, 420);
+                            }
+                            foreach ((string view, Vector3 offset) in new[] { ("side", along * 1.9f + Vector3.up * 0.35f), ("across", -across * 2.0f + Vector3.up * 0.7f),
+                                         ("feet", -along * 1.9f + Vector3.up * 0.35f), ("top", Vector3.up * 2.2f - across * 0.4f + along * 0.2f) })
+                            {
+                                camera.transform.position = mid + offset;
+                                camera.transform.LookAt(mid);
+                                Render(camera, $"{root}/t{tourist}_{frame:000}_{name}_{view}.jpg", 520, 420);
+                            }
+                        }
+                    }
+                    AvatarAnimator.TimeOverride = null;
+                    bool ok = worstPress < 0.06f && worstInside < 0.02f;
+                    failures += ok ? 0 : 1;
+                    Debug.Log($"[CprCheck] {(ok ? "PASS" : "FAIL")} tourist {tourist}: palms at most {worstPress * 100f:0} cm off the chest, body at most {worstInside * 100f:0.0} cm into her while pressing");
+                    animator.SendMessage("OnDestroy", SendMessageOptions.DontRequireReceiver);
+                    Object.DestroyImmediate(go);
+                    Object.DestroyImmediate(victimObject);
+                    Object.DestroyImmediate(floor);
+                }
+                Debug.Log(failures == 0 ? "[CprCheck] ALL PASS" : $"[CprCheck] {failures} FAILED");
+                EditorApplication.Exit(failures == 0 ? 0 : 1);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[CprCheck] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         public static void StatesBatch()
         {
             try
