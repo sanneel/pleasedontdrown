@@ -6,7 +6,7 @@ namespace PleaseDontDrown.Avatars
 {
     /// <summary>One-off moves that play over whatever the body is doing. TableBite: seated, a bite off the dish on the
     /// table in front (the point), up to the mouth (Fun.TableMeal).</summary>
-    public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Breath, Zap, Shoot, JumpShot, Burp, TableBite,
+    public enum AvatarGesture : byte { None, Interact, Throw, ChargeStart, ChargeEnd, Pump, Wave, Bite, EatStart, EatStop, Punch, Zap, Shoot, JumpShot, Burp, TableBite,
         PunchLeft, Hook, HookLeft, Uppercut, UppercutLeft, Overhand, OverhandLeft,
         /// <summary>A step-in lunge: front foot forward, hips and back in after it (a long weapon's thrust, a grab).</summary>
         Lunge }
@@ -50,6 +50,7 @@ namespace PleaseDontDrown.Avatars
         public bool Drinking;         // eating a drink: the hand keeps its grip on the bottle (tipped up at the lips), the head goes back
         public bool Cpr;
         public Vector3 CprPoint;      // world, the chest being pressed
+        public float CprClear;        // ...how far out from it the one lying there reaches, arms and all (the knees stay outside; 0: not known)
         public bool Defib;            // holding the defibrillator's paddles: kneeling (Cpr) keeps the hands on them
         public bool Seated;           // on a vehicle seat (hands come from the grips)
         public bool Straddle;         // seated astride a fat seat (a banana boat): knees well apart, feet back down its sides
@@ -297,11 +298,10 @@ namespace PleaseDontDrown.Avatars
             _flinchStart = Now;
         }
 
-        /// <param name="point">World target for aimed gestures (the face a punch lands on, the mouth for a rescue breath).</param>
+        /// <param name="point">World target for aimed gestures (the face a punch lands on).</param>
         public void Play(AvatarGesture gesture, Vector3 point)
         {
             if (gesture == AvatarGesture.Pump) { _lastPump = Now; return; }
-            if (gesture == AvatarGesture.Breath) _lastPump = Now; // stays kneeling
             _gesturePoint = point;
             if (gesture is AvatarGesture.ChargeStart or AvatarGesture.ChargeEnd or AvatarGesture.EatStart or AvatarGesture.EatStop or AvatarGesture.Bite)
                 return; // these come through Motion
@@ -632,6 +632,13 @@ namespace PleaseDontDrown.Avatars
                 if (upper == null || fore == null || hand == null) continue;
                 BodySpace.Near(hand.position, 0.3f * s, _rig, IgnoreBody, _nearBodies);
                 if (_nearBodies.Count == 0) continue;
+                // Pressing a chest: the hands are laid on the real skin there (PoseCprArms); the rough shape of the body
+                // stands over it and pushed them 7 cm off the breastbone. Only the forearms are kept out.
+                if (_cprHands > 0.01f)
+                {
+                    SwivelForearmClear(upper, fore, hand, s);
+                    continue;
+                }
                 HandBones fingers = _rig.Hand(right);
                 // The whole hand, not just the middle of the palm: the cartoon hands are 17 cm long with fanned
                 // fingers, so fingertips, the thumb and the wrist went into people while the palm stayed out (the
@@ -685,7 +692,7 @@ namespace PleaseDontDrown.Avatars
         private void SwivelForearmClear(Transform upper, Transform fore, Transform hand, float s)
         {
             // (The whole forearm, elbow to wrist, as thick as it is: sampled only at two points, 3 cm round, a forearm
-            // across a tourist's forehead for a rescue breath lay 8 cm into her head.)
+            // across a tourist's forehead lay 8 cm into her head.)
             float radius = 0.04f * s;
             float Depth()
             {
@@ -770,7 +777,7 @@ namespace PleaseDontDrown.Avatars
             if ((q - point).sqrMagnitude > push.sqrMagnitude) push = q - point;
         }
 
-        /// <summary>A body this one's hands may be inside of (somebody being carried on the shoulder, held for a kiss...). Null: none.</summary>
+        /// <summary>A body this one's hands may be inside of (somebody being carried on the shoulder, held in the arms...). Null: none.</summary>
         public AvatarRig IgnoreBody { get; set; }
 
         /// <summary>
@@ -781,8 +788,8 @@ namespace PleaseDontDrown.Avatars
         /// </summary>
         private void KeepHandsOutOfHead()
         {
-            // (CPR and the kiss of life put our own head right down by the hands on the chest, forehead and chin.)
-            if (_eat > 0.01f || _actWeight > 0.01f || _cpr > 0.01f || GestureActive(AvatarGesture.Breath, 1.1f) || _rig.HeadTop <= 0f) return;
+            // (CPR puts our own head right down over the hands on the chest.)
+            if (_eat > 0.01f || _actWeight > 0.01f || _cpr > 0.01f || _rig.HeadTop <= 0f) return;
             if (Motion.CarryingPerson && _hold > 0.01f) return; // (arms round the legs of someone on our shoulder, right under our chin)
             if (Motion.Shouldered && _hold > 0.01f) return; // (the trigger hand of a shouldered gun is right under the chin)
             if (Motion.Basketball && _hold > 0.01f) return; // ball grips already place the palms; swinging them breaks contact
@@ -1687,8 +1694,50 @@ namespace PleaseDontDrown.Avatars
         /// Wrists and fingers: loose fists when running, flat when swimming or pressing a chest, the grip's hand pose
         /// on held things (palm on the item, fingers wrapped round), an open hand to wave, a pointing finger to press.
         /// </summary>
-        // CPR: kneel tall over the chest, never folded over it (a big head bowed that far comes down over the hands).
-        private const float MaxCprLean = 30f;
+        // CPR: kneel tall over the chest, never folded over it (a big head bowed that far comes down over the hands);
+        // further over only for a chest lying too low for the straight arms to reach it any other way (a slim thief
+        // flat on his back: his chest 19 cm off the sand).
+        private const float MaxCprLean = 30f, MaxCprLeanLow = 55f;
+        /// <summary>
+        /// How much further in toward the press point (along <paramref name="toward"/>) the kneeling body can come before
+        /// the front of a knee (the cartoon knee and the shorts over it reach some 7 cm past the joint) is within
+        /// <paramref name="clear"/> of it: the one lying there, arms and all. Negative: too close already, by that much.
+        /// </summary>
+        private float KneesRoom(Vector3 point, Vector3 toward, float clear)
+        {
+            float s = _rig.Scale, room = float.MaxValue;
+            foreach (Bone knee in new[] { Bone.ShinL, Bone.ShinR })
+            {
+                Vector3 front = B(knee).position + toward * (0.07f * s);
+                float distance = Vector3.Dot(Vector3.ProjectOnPlane(front - point, Vector3.up), -toward);
+                room = Mathf.Min(room, distance - clear);
+            }
+            return room;
+        }
+
+        /// <summary>
+        /// Kneeling moved by <paramref name="by"/>: the knees and the thighs up to the hips clear of everybody else, and
+        /// the trunk too. (A wide pirate: the knee clear, a thigh 3 cm into him.)
+        /// </summary>
+        private bool LegsClear(Vector3 by, float s)
+        {
+            Vector3 kneeL = B(Bone.ShinL).position, kneeR = B(Bone.ShinR).position;
+            Vector3 thighL = Vector3.Lerp(B(Bone.ThighL).position, kneeL, 0.6f), thighR = Vector3.Lerp(B(Bone.ThighR).position, kneeR, 0.6f);
+            Vector3 hipL = Vector3.Lerp(B(Bone.ThighL).position, kneeL, 0.25f), hipR = Vector3.Lerp(B(Bone.ThighR).position, kneeR, 0.25f);
+            if (BodySpace.Inside(kneeL + by, 0.06f * s, _rig) || BodySpace.Inside(kneeR + by, 0.06f * s, _rig)) return false;
+            // (His own skin on the side toward them, from the legs and hips out: the goofy lifeguard's baggy shorts stand
+            // far wider than his thigh bones, and went 3-4 cm into a thief lying beside him while the bones were clear.)
+            Vector3 fwd = transform.forward, low = (transform.forward - Vector3.up * 0.6f).normalized;
+            foreach (Vector3 p in new[] { kneeL, kneeR, thighL, thighR, hipL, hipR, B(Bone.Hips).position })
+                foreach (Vector3 dir in new[] { fwd, low })
+                {
+                    // (The shorts and the cartoon knees: up to 8 cm out past the measured body. Allowed for.)
+                    Vector3 skin = BodySpace.Surface(_rig, p, dir, 0.45f * s) + by;
+                    if (BodySpace.Inside(skin, 0.09f * s, _rig)) return false;
+                }
+            return TorsoOutOfOthers(by).sqrMagnitude < 0.0001f;
+        }
+
         private static readonly Vector3[] TorsoProbes = { Vector3.down, new Vector3(0f, -0.7f, 0.7f), Vector3.forward };
 
         /// <summary>
@@ -1715,23 +1764,14 @@ namespace PleaseDontDrown.Avatars
             return worst;
         }
 
-        /// <summary>0..1 how far down into a rescue breath the body is (and on its way back up after one).</summary>
-        private float BreathWeight()
-        {
-            float since = Now - _gestureStart;
-            if (_gesture != AvatarGesture.Breath || since < 0f || since > 1.9f) return 0f;
-            float t = since / 1.1f;
-            return t < 1f ? Mathf.SmoothStep(0f, 1f, Mathf.Min(t / 0.28f, 1f)) : 1f - Mathf.SmoothStep(0f, 1f, (since - 1.1f) / 0.8f);
-        }
-
         /// <summary>How far (times the body's scale) the kneeling body may come in towards the chest for the arms to reach.</summary>
         private const float MaxCprShift = 0.4f;
         /// <summary>0..1 how far this frame's hands are down on the chest (their pressing shape goes with it: in the
         /// air, flat and fanned, the goofy lifeguard's hands were claws).</summary>
         private float _cprHands;
-        // (The lower hand's fingers lifted and curled over the upper one's: at 0.22 the goofy lifeguard's fanned cartoon
-        // fingers lay splayed across the chest like a claw.)
-        private static readonly HandPose CprLowerHand = new(0.45f, 0.3f, 0f), CprUpperHand = new(0.62f, 0.35f, 0f);
+        // The lower hand flat on the chest, fingers together and straight (curled, with the palm right on the skin,
+        // they went 3-4 cm down into it); the upper one on its back, fingers draped over it, not clawing down past it.
+        private static readonly HandPose CprLowerHand = new(0.04f, 0.1f, 0f), CprUpperHand = new(0.3f, 0.25f, 0f);
 
         private void PoseHands()
         {
@@ -2047,20 +2087,50 @@ namespace PleaseDontDrown.Avatars
                 flat.y = 0f;
                 float v = shoulders.y - target.y, h = flat.magnitude;
                 float hWant = Mathf.Sqrt(Mathf.Max(0f, armReach * armReach - v * v));
-                // (Not while bent over the face for a breath: from up there the chest is out of reach on purpose.)
-                float shift = Mathf.Clamp(h - hWant, 0f, MaxCprShift * s) * (1f - BreathWeight());
+                float shift = Mathf.Clamp(h - hWant, 0f, MaxCprShift * s);
                 if (shift > 0.005f && h > 1e-4f)
                 {
                     Vector3 toward = flat / h;
-                    Vector3 kneeL = B(Bone.ShinL).position, kneeR = B(Bone.ShinR).position;
-                    for (int k = 0; k < 8 && shift > 0.005f; k++)
-                    {
-                        Vector3 by = toward * shift;
-                        if (!BodySpace.Inside(kneeL + by, 0.06f * s, _rig) && !BodySpace.Inside(kneeR + by, 0.06f * s, _rig) &&
-                            TorsoOutOfOthers(by).sqrMagnitude < 0.0001f) break;
-                        shift *= 0.75f;
-                    }
+                    // (The knees, and the thighs along to the hips: kneeling in close to a wide pirate, a thigh went 3 cm
+                    // into him though the knee was clear.)
+                    if (m.CprClear > 0f) shift = Mathf.Min(shift, KneesRoom(point, toward, m.CprClear));
+                    else
+                        for (int k = 0; k < 10 && shift > 0.005f; k++)
+                        {
+                            if (LegsClear(toward * shift, s)) break;
+                            shift *= 0.75f;
+                        }
+                    if (shift <= 0.005f) shift = 0f;
                     hips.position += toward * (shift * cpr);
+                }
+            }
+            // Come in as close as the knees allow and still short: bend further over from the hips.
+            for (int k = 0; k < 4 && leaned < MaxCprLeanLow; k++)
+            {
+                Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
+                float gap = Vector3.Distance(shoulders, point + up * 0.05f) - armReach;
+                if (gap <= 0.005f) break;
+                float torso = Mathf.Max(Vector3.Distance(spine.position, shoulders), 0.1f);
+                float step = Mathf.Min(gap / torso * Mathf.Rad2Deg, MaxCprLeanLow - leaned);
+                Turn(spine, right, step * cpr);
+                leaned += step;
+            }
+            // Kneeling beside someone wider than the kneel spot allows for (a thief in a big coat, a pirate captain):
+            // back off until the knees and thighs are clear of them.
+            {
+                Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
+                Vector3 away = Vector3.ProjectOnPlane(shoulders - point, Vector3.up);
+                if (away.sqrMagnitude > 1e-4f)
+                {
+                    away.Normalize();
+                    if (m.CprClear > 0f)
+                    {
+                        float room = KneesRoom(point, -away, m.CprClear);
+                        if (room < 0f) hips.position += away * (Mathf.Min(-room, 0.3f * s) * cpr);
+                    }
+                    else if (!LegsClear(Vector3.zero, s))
+                        for (float d = 0.02f * s; d <= 0.3f * s; d += 0.02f * s)
+                            if (LegsClear(away * d, s)) { hips.position += away * (d * cpr); break; }
                 }
             }
             if (m.Defib)
@@ -2076,10 +2146,12 @@ namespace PleaseDontDrown.Avatars
             float short_ = Vector3.Distance(shouldersNow, point + up * 0.05f) - armReach;
             float onChest = cpr * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.02f * s, 0.2f * s, short_)));
             _cprHands = onChest;
-            // (One right on top of the other, on the middle of the chest: 5 cm apart sideways they read as two
-            // hands side by side.)
-            IK.Solve(upperR, foreR, la, lb, point + up * 0.02f, -fwd + right, onChest, false);
-            IK.Solve(upperL, foreL, la, lb, point + up * 0.075f, -fwd - right, onChest, false);
+            // The lower hand's palm flat on the skin of the press point, the upper one stacked on its back, both
+            // fingers across the chest. (Aiming the middle of a hand that went on straight out of the forearm, then
+            // turning it flat at the wrist, lifted the palm 4-8 cm off the chest on every body.) One right on top of
+            // the other: 5 cm apart sideways they read as two hands side by side.
+            PlaceHand(true, point + up * (0.004f * s), fwd, Vector3.down, -fwd + right, onChest, CprLowerHand);
+            PlaceHand(false, point + up * (0.042f * s), fwd, Vector3.down, -fwd - right, onChest, CprUpperHand);
         }
 
         private void GestureLayer()
@@ -2140,7 +2212,7 @@ namespace PleaseDontDrown.Avatars
 
         /// <summary>
         /// Seated on a vehicle, knocked out on the back, kneeling and begging, scared, hands up; and the aimed
-        /// gestures (punch, rescue breath, defibrillator zap, recoil). Blended over the normal pose.
+        /// gestures (punch, defibrillator zap, recoil). Blended over the normal pose.
         /// </summary>
         private void PoseSpecial()
         {
@@ -2745,7 +2817,6 @@ namespace PleaseDontDrown.Avatars
         private void AimedGestures(Transform upperL, Transform foreL, Transform upperR, Transform foreR)
         {
             _striking = 0;
-            Kissing = 0f;
             float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
             Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
             bool squared = Motion.Stance != FightStance.None && Motion.Pose == AvatarPose.Normal && !Motion.Swimming;
@@ -2753,19 +2824,6 @@ namespace PleaseDontDrown.Avatars
             if (ActiveStrike(out StrikeKind strikeKind, out bool strikeLeft, out float strikeTime))
                 Strike(strikeKind, strikeLeft, strikeTime, upperL, foreL, upperR, foreR, la, lb);
             else if (_stanceW > 0.001f) PoseFightStance(upperL, foreL, upperR, foreR, la, lb);
-            else if (GestureActive(AvatarGesture.Breath, 1.1f))
-            {
-                // Rescue breath, mouth to mouth: bend right down until our lips are on theirs (head tilted, eyes
-                // closed), one hand on the forehead, one lifting the chin; the knees stay where they are.
-                float t = GestureT(1.1f);
-                float w = Mathf.SmoothStep(0f, 1f, t < 0.28f ? t / 0.28f : t > 0.78f ? (1f - t) / 0.22f : 1f);
-                if (_gesturePoint == Vector3.zero)
-                {
-                    B(Bone.Hips).localRotation *= Quaternion.Euler(28f * w, 0f, 0f);
-                    B(Bone.Neck).localRotation *= Quaternion.Euler(25f * w, 0f, 0f);
-                }
-                else Kiss(_gesturePoint, w, upperL, foreL, upperR, foreR, la, lb);
-            }
             else if (GestureActive(AvatarGesture.Zap, 0.6f))
             {
                 // Paddles down on the chest, then a jolt.
@@ -2935,96 +2993,9 @@ namespace PleaseDontDrown.Avatars
         private static Vector3 Bezier(Vector3 a, Vector3 b, Vector3 c, float t) =>
             Vector3.Lerp(Vector3.Lerp(a, b, t), Vector3.Lerp(b, c, t), t);
 
-        /// <summary>
-        /// Our lips: the mouth bone sits on them (every body: built ones and the baked Meshy faces). Puckered up for a
-        /// kiss (the players' goofy body) they stick out in front of the face, and that's where the lips are then.
-        /// </summary>
-        private Vector3 MouthPoint
-        {
-            get
-            {
-                Transform head = B(Bone.Head);
-                Vector3 lips = B(Bone.Mouth) != null ? B(Bone.Mouth).position : head.TransformPoint(new Vector3(0f, 0.035f, 0.12f) * _rig.Scale);
-                return lips + head.TransformVector(Vector3.forward * (PuckerLength * Kissing));
-            }
-        }
+        /// <summary>Where our lips are: the mouth bone sits on them (every body: the built ones and the baked Meshy faces).</summary>
+        public Vector3 Lips => B(Bone.Mouth) != null ? B(Bone.Mouth).position : B(Bone.Head).TransformPoint(new Vector3(0f, 0.035f, 0.12f) * _rig.Scale);
 
-        /// <summary>How far the lips pucker out for a kiss, in head space (0: they don't). Set by AvatarFunny.</summary>
-        public float PuckerLength { get; set; }
-
-        /// <summary>0..1: how far into a kiss (a rescue breath) we are this frame.</summary>
-        public float Kissing { get; private set; }
-
-        /// <summary>Where our lips are right now (the kiss check lines two of these up).</summary>
-        public Vector3 Lips => MouthPoint;
-
-        /// <summary>
-        /// Lips on lips, kneeling: the knees and hips stay where the kneel put them; the back curls down (spine, then
-        /// chest, then neck, each turning a share of the way so the mouth heads for theirs, a few passes), the face
-        /// turns down to meet theirs tipped sideways the way people kiss, and only the last few centimetres are made
-        /// up by leaning the hips in. One hand cradles the forehead, the other lifts the chin.
-        /// </summary>
-        private void Kiss(Vector3 lips, float w, Transform upperL, Transform foreL, Transform upperR, Transform foreR, float la, float lb)
-        {
-            if (w <= 0.001f) return;
-            Kissing = w;
-            Transform hips = B(Bone.Hips), head = B(Bone.Head);
-            Vector3 fwd = transform.forward, right = transform.right;
-            Vector3 target = lips + Vector3.up * 0.01f;
-            Vector3 along = Vector3.ProjectOnPlane(target - hips.position, Vector3.up);
-            along = along.sqrMagnitude > 1e-4f ? along.normalized : fwd;
-
-            // 1. Curl the back down toward their face: spine, chest and neck share the bend (CCD, a few passes).
-            Transform[] chain = { B(Bone.Spine), B(Bone.Chest), B(Bone.Neck) };
-            float[] share = { 0.55f, 0.65f, 0.5f };
-            for (int pass = 0; pass < 6; pass++)
-                for (int i = 0; i < chain.Length; i++)
-                {
-                    Transform bone = chain[i];
-                    Vector3 toMouth = MouthPoint - bone.position, toLips = target - bone.position;
-                    if (toMouth.sqrMagnitude < 1e-6f || toLips.sqrMagnitude < 1e-6f) continue;
-                    Quaternion bend = Quaternion.FromToRotation(toMouth, toLips);
-                    bone.rotation = Quaternion.Slerp(Quaternion.identity, bend, share[i] * w) * bone.rotation;
-                }
-            // 2. Face down onto theirs, tilted sideways a little, eyes shut (the face code does the eyes).
-            // (Tilted well over: straighter, the goofy lifeguard's big nose went 8 cm into their face.)
-            Quaternion faceDown = Quaternion.LookRotation(Vector3.down + along * 0.35f, along) * Quaternion.Euler(0f, 0f, 55f);
-            head.rotation = Quaternion.Slerp(head.rotation, faceDown, w * 0.85f);
-            // 3. Whatever is still missing: lean the hips in (up to 40 cm), knees stay; then curl the neck the last bit.
-            Vector3 gap = target - MouthPoint;
-            if (gap.sqrMagnitude > 1e-6f)
-            {
-                hips.position += Vector3.ClampMagnitude(gap, 0.4f * _rig.Scale) * w; // (0.3 left a big-bellied man 5 cm short)
-                PoseLegs();
-            }
-            // 4. The chest and belly over them, not in them: bent that far down, the shirt went 5-8 cm into a slim
-            // tourist's shoulder. Lifted out of whoever lies there; the neck and chest bring the lips back down to theirs.
-            for (int pass = 0; pass < 2; pass++)
-            {
-                Vector3 lift = TorsoOutOfOthers(Vector3.zero);
-                if (lift.sqrMagnitude < 1e-6f) break;
-                hips.position += lift * (1.15f * w);
-                PoseLegs();
-            }
-            for (int pass = 0; pass < 6; pass++)
-                foreach (Transform bone in new[] { B(Bone.Chest), B(Bone.Neck) })
-                {
-                    Vector3 toMouth = MouthPoint - bone.position, toLips = target - bone.position;
-                    if (toMouth.sqrMagnitude < 1e-6f || toLips.sqrMagnitude < 1e-6f) continue;
-                    bone.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(toMouth, toLips), 0.6f * w) * bone.rotation;
-                }
-
-            // Hands flat on the sand, steadying the body bent right down: one by their shoulder, one beside their head,
-            // on our side. (On the forehead and under the chin they were squeezed between the two heads, the goofy
-            // lifeguard's head covering the whole face: a clump of fingers on the eyes, or a claw in the air.)
-            Vector3 headward = Motion.CprPoint != Vector3.zero ? Vector3.ProjectOnPlane(lips - Motion.CprPoint, Vector3.up) : Vector3.zero;
-            headward = headward.sqrMagnitude > 1e-4f ? headward.normalized : Vector3.Cross(Vector3.up, along);
-            float sand = transform.position.y + 0.02f * _rig.Scale;
-            Vector3 OnSand(Vector3 p) => new Vector3(p.x, sand, p.z);
-            // (Out past a round dad's shoulder: 20 cm from the middle of him the hand was in it.)
-            PlaceHand(false, OnSand(lips - headward * 0.24f - along * 0.34f), along, Vector3.down, -fwd - right, w, HandPose.Relaxed);
-            PlaceHand(true, OnSand(lips + headward * 0.2f - along * 0.24f), along, Vector3.down, -fwd + right, w, HandPose.Relaxed);
-        }
 
         // ------------------------------------------------------------------ head & face
 
@@ -3095,8 +3066,7 @@ namespace PleaseDontDrown.Avatars
             if (Motion.Talking) mouth = 0.12f + 0.5f * Mathf.Abs(Mathf.Sin(t * 13f) * Mathf.Sin(t * 5.3f + 1f));
             if (_down > 0.5f) { eyes = 0.08f; mouth = 0.45f; }
             else if (_lie > 0.5f && !Motion.Talking) { eyes = 0.12f; mouth = 0.05f; brows = 0.2f; } // soaking up the sun
-            if (GestureActive(AvatarGesture.Breath, 1.1f)) { mouth = 0.08f; eyes = 0.08f; brows = 0.3f; } // a kiss: lips pressed, eyes shut
-            else if (GestureActive(AvatarGesture.Burp, BurpSeconds))
+            if (GestureActive(AvatarGesture.Burp, BurpSeconds))
             {
                 float b = GestureT(BurpSeconds) * BurpSeconds;
                 if (b < 0.25f) { mouth = 0.05f; brows = 0.6f; } // holding it in, cheeks puffed

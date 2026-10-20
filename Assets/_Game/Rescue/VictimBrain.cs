@@ -62,7 +62,7 @@ namespace PleaseDontDrown.Rescue
     ///    seconds unless someone holds them; the state follows the air (distressed, panicking, drowning, out).
     ///  * Being held by a lifeguard or hanging onto a float calms them and lets them breathe.
     ///  * Reaching the shallows (or the dock) while conscious = Saved. Unconscious ones need CPR on land (Secondary):
-    ///    5 chest compressions, then 2 rescue breaths for a woman or a punch in the face for a man, and again.
+    ///    chest compressions (for a man a slap in the face after every 5, and again).
     ///    Someone out too long may flatline: then only the defibrillator brings them back.
     ///  * Shark bite: a leg is gone and they bleed. On land they need a hospital bed before the bleeding runs out.
     ///  * Condition or bleeding runs out = Lost ("airlifted by the rival lifeguard company"), no hard fail.
@@ -95,9 +95,9 @@ namespace PleaseDontDrown.Rescue
         [SerializeField] private float _cprReach = 3f;
         [Header("CPR steps (revive progress per press)")]
         [SerializeField] private int _compressionsPerSet = 5;
-        [SerializeField] private int _breathsPerSet = 2;
         [SerializeField] private float _compressGain = 0.05f;
-        [SerializeField] private float _breathGain = 0.1f;
+        [Tooltip("A woman gets no slap between sets: each compression brings her round this much (as fast as a man's set with its slap).")]
+        [SerializeField] private float _womanCompressGain = 0.09f;
         [SerializeField] private float _punchGain = 0.2f;
 
         [Header("After")]
@@ -171,7 +171,6 @@ namespace PleaseDontDrown.Rescue
         /// <summary>How far into the current CPR step (0 = none done yet) and how many it takes.</summary>
         public int CprCount => _cprCount.Value;
         public int CompressionsPerSet => _compressionsPerSet;
-        public int BreathsPerSet => _breathsPerSet;
         public bool IsAshore => _ashore.Value;
         public bool HasBeenRescued => _rescued.Value;
         public float ConditionSecondsLeft => _condition.Value * _conditionTotal.Value;
@@ -609,17 +608,16 @@ namespace PleaseDontDrown.Rescue
             // Just the step: the CPR panel on the right (UI.RescueHud) counts them and shows how far along it is.
             return _cprStep.Value switch
             {
-                CprStep.Breath => "Mouth-to-mouth",
                 CprStep.Punch => $"Slap {Name} awake!",
                 _ => "Chest compressions"
             };
         }
 
-        /// <summary>Each CPR step has its own button: pumps on Secondary, the kiss of life on Inspect (F), the slap on Primary.</summary>
+        /// <summary>Each CPR step has its own button: pumps on Secondary, the slap on Primary.</summary>
         public UnityEngine.InputSystem.InputAction SecondaryAction(PlayerHub player) => _flatline.Value ? GameInput.Secondary : KeyOf(_cprStep.Value);
 
         public static UnityEngine.InputSystem.InputAction KeyOf(CprStep step) =>
-            step switch { CprStep.Breath => GameInput.Inspect, CprStep.Punch => GameInput.Primary, _ => GameInput.Secondary };
+            step == CprStep.Punch ? GameInput.Primary : GameInput.Secondary;
 
         private static readonly string[] Counts = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
 
@@ -642,10 +640,6 @@ namespace PleaseDontDrown.Rescue
         {
             switch (step)
             {
-                case CprStep.Breath:
-                    _body.RescueBreath();
-                    if (player != null) player.ShowCprAction(step, _body.MouthPoint);
-                    break;
                 case CprStep.Punch:
                     // An open hand across the face, from the slapper's right to their left.
                     _body.Punched(player != null && player.Head != null ? -player.Head.right : Vector3.zero);
@@ -655,7 +649,7 @@ namespace PleaseDontDrown.Rescue
                     _body.Pump();
                     // Counted out loud over the chest, so everyone can see the compressions happening.
                     FloatingText.Spawn(_body.ChestPoint + Vector3.up * 0.45f, Counts[Mathf.Clamp(_cprCount.Value, 0, Counts.Length - 1)], new Color(1f, 1f, 1f, 0.95f), 0.9f, 0.55f);
-                    if (player != null) player.ShowPump(_body.ChestPoint, _body.HeadPosition, _body.KneelReach);
+                    if (player != null) player.ShowPump(_body.PressPoint, _body.HeadPosition, _body.KneelReach, _body.SideClearToward(player.transform.position));
                     break;
             }
         }
@@ -673,7 +667,7 @@ namespace PleaseDontDrown.Rescue
 
             _lastPumpTime = Time.time;
             if (!_cprHelpers.Contains(pumper.DisplayName)) _cprHelpers.Add(pumper.DisplayName);
-            float gain = step switch { CprStep.Breath => _breathGain, CprStep.Punch => _punchGain, _ => _compressGain };
+            float gain = step == CprStep.Punch ? _punchGain : IsFemale ? _womanCompressGain : _compressGain;
             _cpr.Value = Mathf.Min(1f, _cpr.Value + gain);
             AdvanceCprStep(step);
             CprObservers(step, caller.ClientId);
@@ -684,18 +678,18 @@ namespace PleaseDontDrown.Rescue
             Debug.Log($"[Victim] {Name} revived by {string.Join(", ", _cprHelpers)} after {took}");
         }
 
-        /// <summary>5 compressions, then 2 breaths (women) or a punch (men), and round again.</summary>
+        /// <summary>5 compressions, then (men) a slap, and round again.</summary>
         private void AdvanceCprStep(CprStep done)
         {
             int count = _cprCount.Value + 1;
-            int needed = done switch { CprStep.Compress => _compressionsPerSet, CprStep.Breath => _breathsPerSet, _ => 1 };
+            int needed = done == CprStep.Compress ? _compressionsPerSet : 1;
             if (count < needed)
             {
                 _cprCount.Value = (byte)count;
                 return;
             }
             _cprCount.Value = 0;
-            _cprStep.Value = done == CprStep.Compress ? IsFemale ? CprStep.Breath : CprStep.Punch : CprStep.Compress;
+            _cprStep.Value = done == CprStep.Compress && !IsFemale ? CprStep.Punch : CprStep.Compress;
         }
 
         private void Revive(PlayerHub by, VictimEvent e, string text)

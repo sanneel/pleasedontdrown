@@ -17,8 +17,8 @@ namespace PleaseDontDrown.Rescue
         Injured
     }
 
-    /// <summary>What the next CPR press does (story CPR: compressions, then breaths for women / a punch for men).</summary>
-    public enum CprStep : byte { Compress, Breath, Punch }
+    /// <summary>What the next CPR press does (story CPR: compressions; for men a slap after every set).</summary>
+    public enum CprStep : byte { Compress, Punch }
 
     public static class VictimStateExtensions
     {

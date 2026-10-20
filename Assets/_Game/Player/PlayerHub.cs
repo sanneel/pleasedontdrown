@@ -229,9 +229,10 @@ namespace PleaseDontDrown.Player
 
         /// <summary>This player pressed a chest for CPR (called on every machine; see VictimBrain).</summary>
         /// <param name="reach">How far from the middle of their body to kneel (<see cref="Rescue.VictimBody.KneelReach"/>).</param>
-        public void ShowPump(Vector3 chest, Vector3 head = default, float reach = 0.55f)
+        /// <param name="clear">How far out from the press point the body lying there reaches (the knees stay outside it; 0: not known).</param>
+        public void ShowPump(Vector3 chest, Vector3 head = default, float reach = 0.55f, float clear = 0f)
         {
-            _avatar.OnPump(chest, head, reach);
+            _avatar.OnPump(chest, head, reach, clear);
             if (_arms != null) _arms.OnPump(chest);
             if (IsOwner && Look != null) Look.KneelAt(chest, head, reach); // our own view kneels beside them
         }
@@ -251,22 +252,12 @@ namespace PleaseDontDrown.Player
             if (_arms != null) _arms.Play(AvatarGesture.TableBite, dish);
         }
 
-        /// <summary>The other CPR steps: a rescue breath at the mouth, or a punch to the face (every machine).</summary>
+        /// <summary>The other CPR step: a slap across the face (every machine).</summary>
         public void ShowCprAction(Rescue.CprStep step, Vector3 point)
         {
-            AvatarGesture gesture = step == Rescue.CprStep.Breath ? AvatarGesture.Breath : AvatarGesture.Punch;
-            _avatar.OnCprGesture(gesture, point);
-            if (_arms != null)
-            {
-                if (step == Rescue.CprStep.Punch) _arms.PlaySlap(point);
-                else _arms.Play(gesture, point);
-            }
-            // Mouth-to-mouth in first person: our view goes right down to their lips and back.
-            if (IsOwner && Look != null)
-            {
-                Look.StayKneeling();
-                if (step == Rescue.CprStep.Breath) Look.LeanIn(point, 1.1f);
-            }
+            _avatar.OnCprGesture(AvatarGesture.Punch, point);
+            if (_arms != null) _arms.PlaySlap(point);
+            if (IsOwner && Look != null) Look.StayKneeling();
         }
 
         // ------------------------------------------------------------------ burps

@@ -10,7 +10,7 @@ using UnityEngine;
 namespace PleaseDontDrown.Story
 {
     /// <summary>
-    /// The pink-and-white beach hut on island 1 and its gag: a tourist you brought back with the kiss of life takes
+    /// The pink-and-white beach hut on island 1 and its gag: a tourist you brought back with CPR takes
     /// you by the hand and walks you in there. The door shuts; for you the screen goes dark, for everyone outside the
     /// hut wobbles and out come squeaky bed springs, "ooh"s, a boing and a cuckoo clock. Nothing is shown. The host
     /// runs the scene (StoryDirector.LoveHutScene); this is its stage: the leading by the hand, the door, putting the

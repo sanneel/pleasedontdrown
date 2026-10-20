@@ -54,8 +54,8 @@ namespace PleaseDontDrown.UI
         private int _cprPercentShown = -1;
 
         /// <summary>
-        /// Looking at someone who needs CPR: the steps side by side, each with its own button (pump the chest, then
-        /// the kiss of life for a woman or a slap for a man), the one to do now lit up, and how far along they are.
+        /// Looking at someone who needs CPR: the steps, each with its own button (pump the chest; for a man, then a
+        /// slap), the one to do now lit up, and how far along they are.
         /// </summary>
         private void DrawCpr(PlayerHub local)
         {
@@ -63,19 +63,19 @@ namespace PleaseDontDrown.UI
             if (target == null || local.Interactor.CurrentSecondaryPrompt == null || !target.TryGetComponent(out VictimBrain v)) return;
             if (v.State != VictimState.Unconscious || v.IsFlatlined) return;
 
-            CprStep now = v.NextCprStep, second = v.IsFemale ? CprStep.Breath : CprStep.Punch;
+            CprStep now = v.NextCprStep;
+            int steps = v.IsFemale ? 1 : 2; // (a woman: compressions only)
             int stamp = System.HashCode.Combine((int)now, v.CprCount, GameInput.BindingsVersion);
             if (v != _cprPatient || stamp != _cprStamp)
             {
                 _cprPatient = v;
                 _cprStamp = stamp;
                 _cprKeys[0] = GameInput.KeyLabel(VictimBrain.KeyOf(CprStep.Compress));
-                _cprKeys[1] = GameInput.KeyLabel(VictimBrain.KeyOf(second));
+                _cprKeys[1] = GameInput.KeyLabel(VictimBrain.KeyOf(CprStep.Punch));
                 _cprWhat[0] = "PUMP THE CHEST";
-                _cprWhat[1] = second == CprStep.Breath ? "KISS OF LIFE" : "SLAP AWAKE";
+                _cprWhat[1] = "SLAP AWAKE";
                 _cprCount[0] = $"{(now == CprStep.Compress ? v.CprCount : v.CompressionsPerSet)} / {v.CompressionsPerSet}";
-                int needed = second == CprStep.Breath ? v.BreathsPerSet : 1;
-                _cprCount[1] = $"{(now == CprStep.Compress ? 0 : v.CprCount)} / {needed}";
+                _cprCount[1] = $"{(now == CprStep.Compress ? 0 : v.CprCount)} / 1";
             }
             int percent = Mathf.RoundToInt(v.Cpr01 * 100f);
             if (percent != _cprPercentShown)
@@ -90,7 +90,7 @@ namespace PleaseDontDrown.UI
             float left = Hud.Width - chip - 48f, top = Hud.Height * 0.5f - height - gap * 0.5f;
             Hud.Surface(new Rect(left - 18f, top - 54f, chip + 36f, 300f), 0.94f);
             Hud.Label(new Rect(left, top - 42f, chip, 28f), "RESCUE  /  CPR", 18f, Hud.Teal, TextAnchor.MiddleLeft, heavy: true, shadow: false);
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < steps; i++)
             {
                 bool current = (i == 0) == (now == CprStep.Compress);
                 var box = new Rect(left, top + i * (height + gap), chip, height);
@@ -104,7 +104,7 @@ namespace PleaseDontDrown.UI
                 Hud.FitLabel(new Rect(box.x + 108f, box.y + 8f, chip - 120f, 36f), _cprWhat[i], 21f, words, TextAnchor.MiddleLeft, heavy: true);
                 Hud.Label(new Rect(box.x + 108f, box.y + 40f, chip - 116f, 30f), _cprCount[i], 21f, words, TextAnchor.MiddleLeft, shadow: false);
             }
-            var bar = new Rect(left, top + 2f * height + gap + 14f, chip, 14f);
+            var bar = new Rect(left, top + steps * height + (steps - 1) * gap + 14f, chip, 14f);
             Hud.Bar(bar, v.Cpr01, Hud.Teal);
             Hud.Label(new Rect(bar.x, bar.yMax + 4f, bar.width, 30f), _cprPercent, 17f, Hud.Teal, heavy: true, shadow: false);
         }

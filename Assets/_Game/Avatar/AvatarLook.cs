@@ -155,8 +155,8 @@ namespace PleaseDontDrown.Avatars
 
         /// <summary>
         /// The hats anyone may wear: snug ones only. Big hats (straw, bucket, cowboy, pirate, crown, party hat,
-        /// headphones), like big heads, changed the whole character and got in the way of everything (the kiss of
-        /// life, held things, the camera).
+        /// headphones), like big heads, changed the whole character and got in the way of everything (CPR, held
+        /// things, the camera).
         /// </summary>
         public static readonly HatStyle[] Hats =
             { HatStyle.None, HatStyle.Cap, HatStyle.CapBackwards, HatStyle.Visor, HatStyle.Headband, HatStyle.Bandana, HatStyle.Beanie };

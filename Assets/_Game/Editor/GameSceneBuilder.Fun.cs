@@ -346,7 +346,7 @@ namespace PleaseDontDrown.Editor
 
         /// <summary>
         /// The public toilets (Art/Props/beach_toilets.glb): two cubicles, the right one shut and OCCUPIED, the left one
-        /// with a real door. That's where a grateful tourist drags her hero after the kiss of life (LoveHut, the gag in
+        /// with a real door. That's where a grateful tourist drags her hero after CPR (LoveHut, the gag in
         /// StoryDirector.Gags): the whole block shakes and squeaks while Sandy pretends she saw nothing.
         /// </summary>
         private static void BuildBeachToilets(Transform parent)

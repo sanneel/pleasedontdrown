@@ -403,7 +403,7 @@ namespace PleaseDontDrown.Story
             if (!_freePlay)
             {
                 if (rescued && victim.State != VictimState.Injured) _rescued.Add(victim);
-                if (rescued) _howRescued[victim] = e; // what they say afterwards depends on it (kissed, slapped, zapped...)
+                if (rescued) _howRescued[victim] = e; // what they say afterwards depends on it (pumped, slapped, zapped...)
                 if (rescued && credit != null) _heroOf[victim] = credit;
             }
             // For the chapter's report card (someone pulled out and then revived is one rescue, not two).
@@ -431,7 +431,7 @@ namespace PleaseDontDrown.Story
             "Community service, dear. I hand things BACK now. It's horrible.",
             "Found something? I'll give it to its owner. For free. *twitch*",
             "Don't look at me like that. I'm taking swimming lessons.",
-            "The kiss of life. I still think about it. Don't make it weird."
+            "You pumped my chest on that beach. I still think about it. Don't make it weird."
         };
 
         private static readonly string[] SandyLines =

@@ -149,7 +149,7 @@ namespace PleaseDontDrown.Story
             _sandy.ServerSetMood(AvatarMood.Happy);
             yield return Say(_sandy, "Oh! You must be the new lifeguard. I'm Sandy. I run the Lost & Found here.");
             yield return Say(_sandy, "The tourists on this island can't swim to save their lives. Literally. When someone's in trouble, the bell rings and you go and get them.");
-            yield return Say(_sandy, "Drag them onto the sand. If they're out cold: push on the chest. The ladies need a bit of air too, mouth-to-mouth. The men... a good smack in the face usually does it.");
+            yield return Say(_sandy, "Drag them onto the sand. If they're out cold: push on the chest, hard and fast, until they come round. The men... a good smack in the face helps too.");
             yield return Say(_sandy, "And they lose EVERYTHING. Wallets, phones, sunglasses. You find something, you bring it to me, and I pay you.");
             yield return Say(_sandy, "I'll be in my hut by the bell, at the window. And I'll shout if I see anything. Go on then!");
             _sandy.ServerSetMood(AvatarMood.Neutral);
@@ -211,7 +211,7 @@ namespace PleaseDontDrown.Story
         /// <summary>Sandy is the guide: the first time each step of a rescue comes up, she shouts what to do.</summary>
         private IEnumerator GuideHints()
         {
-            bool spotted = false, towing = false, cpr = false, breath = false, punch = false, found = false;
+            bool spotted = false, towing = false, cpr = false, punch = false, found = false;
             while (true)
             {
                 foreach (VictimBrain v in VictimBrain.All)
@@ -230,11 +230,6 @@ namespace PleaseDontDrown.Story
                     {
                         cpr = true;
                         StartCoroutine(Say(_sandy, $"(shouting) {v.Name} isn't breathing! Kneel down and push on the chest: right mouse, again and again!"));
-                    }
-                    else if (!breath && v.State == VictimState.Unconscious && v.NextCprStep == CprStep.Breath)
-                    {
-                        breath = true;
-                        StartCoroutine(Say(_sandy, "(shouting) Now give her air! Mouth-to-mouth! Press F!"));
                     }
                     else if (!punch && v.State == VictimState.Unconscious && v.NextCprStep == CprStep.Punch)
                     {

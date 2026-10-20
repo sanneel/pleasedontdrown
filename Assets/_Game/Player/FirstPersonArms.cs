@@ -27,7 +27,7 @@ namespace PleaseDontDrown.Player
         private const float MaxReach = 0.85f;    // from the eye
         private const float IdlePitch = 5f;
 
-        private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave, Punch, Breath, Drive, Slap, Bite }
+        private enum State { Idle, Run, Swim, Climb, Item, Cpr, Reach, ThrownItem, FollowThrough, Wave, Punch, Drive, Slap, Bite }
 
         private sealed class Hand
         {
@@ -503,17 +503,6 @@ namespace PleaseDontDrown.Player
                 state = State.Punch;
                 blend = 0.08f;
             }
-            else if (_gesture == AvatarGesture.Breath && sinceGesture < 1.1f && _reach != Vector3.zero)
-            {
-                // Mouth-to-mouth: the view leans right in to the lips (PlayerLook.LeanIn), so the hands hold the face
-                // from the sides, on the cheeks, and stay out of the way.
-                state = State.Breath;
-                Vector3 across = Vector3.ProjectOnPlane(cam.right, Vector3.up).normalized;
-                palm = _reach + across * (hand.Right ? 0.2f : -0.2f) - Vector3.up * 0.03f; // beside the head, out of view
-                rot = HandBones.Orient(Vector3.down, -across * (hand.Right ? 1f : -1f), side);
-                pose = HandPose.Cup;
-                blend = 0.12f;
-            }
             else if (hand.Right && Fun.TableMeal.LocalBiteGrip(_hub, out HandGrip bite))
             {
                 // A bite off the dish on the table (Fun.TableMeal): the hand goes over to the khinkali (or the glass)
@@ -672,10 +661,12 @@ namespace PleaseDontDrown.Player
             // Resting, swimming, holding things: never into a wall (reaching, pressing and punching do touch it).
             // A gun pulls itself back from walls; its hands stay on it.
             bool onGun = state == State.Item && _rigidGrip;
-            if (state is not (State.Reach or State.Bite or State.Cpr or State.Punch or State.Breath or State.Slap) && !onGun) palm = KeepOutOfWalls(eye, palm);
-            // Never inside another person, whatever the hand is doing: a punch or a slap lands on the skin, pressing
-            // a chest stays on it, a hand held out stops at whoever stands in front. (Not on a gun: its grip holds the hand.)
-            if (!onGun) BodySpace.PushOut(ref palm, 0.045f, _hub.Avatar != null ? _hub.Avatar.Rig : null);
+            if (state is not (State.Reach or State.Bite or State.Cpr or State.Punch or State.Slap) && !onGun) palm = KeepOutOfWalls(eye, palm);
+            // Never inside another person, whatever the hand is doing: a punch or a slap lands on the skin, a hand held
+            // out stops at whoever stands in front. (Not on a gun: its grip holds the hand. Not pressing a chest: the press
+            // point is on the real skin there, VictimBody.PressPoint, and the body's rough shape stands over it: pushed out
+            // of that, the hands went up onto a woman's bust.)
+            if (!onGun && state != State.Cpr) BodySpace.PushOut(ref palm, 0.045f, _hub.Avatar != null ? _hub.Avatar.Rig : null);
             hand.Wrist.SetPositionAndRotation(palm - hand.Rot * hand.Bones.PalmContact, hand.Rot);
             hand.Bones.Pose(hand.Pose);
         }

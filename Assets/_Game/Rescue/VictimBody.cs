@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using PleaseDontDrown.Avatars;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Items;
@@ -87,7 +88,6 @@ namespace PleaseDontDrown.Rescue
         private Vector3 _wadeDirection = Vector3.forward;
         private float _groundY;
         private int _voice;
-        private float _breathAt = float.NegativeInfinity;
         private float _punchAt = float.NegativeInfinity;
         private float _punchSide = 1f;
         private bool _punchLanded = true;
@@ -117,6 +117,77 @@ namespace PleaseDontDrown.Rescue
                 return transform.position + transform.forward * 0.17f + transform.up * 0.12f;
             }
         }
+
+        /// <summary>
+        /// Where CPR presses, the same place on every body: the lower breastbone, 38% of the way from the shoulders
+        /// to the hip joints, or as little further down the trunk (at most 52%) as it takes for the whole of the hands
+        /// to lie on flat skin; a woman: 48% down, under the bust, so the hands stay off it and each press's bounce
+        /// shows (40-48%: above where her hips start). Up on the highest of the skin under the hands there (measured on the body's own mesh), so they rest
+        /// on it.
+        /// (Placed from the chest bone, the hands landed anywhere from the breastbone to the belly button: the chest
+        /// bones sit at different heights on different models, the thief's down by his belt; at one spot's height,
+        /// the fingers went into the swell of a belly or a bust beside it.)
+        /// </summary>
+        public Vector3 PressPoint
+        {
+            get
+            {
+                if (_avatar != null && _avatar.IsBuilt && _avatar[AvatarRig.Bone.Spine] != null && _avatar[AvatarRig.Bone.Chest] != null)
+                {
+                    if (!_chestMeasured) MeasureChest();
+                    if (TorsoLine(out Vector3 shoulders, out Vector3 toHips, out float length))
+                    {
+                        Vector3 front = Vector3.ProjectOnPlane(transform.forward, toHips).normalized;
+                        return shoulders + toHips * (_pressT * length) + front * (_pressLift * _avatar.Scale);
+                    }
+                    return _avatar[AvatarRig.Bone.Chest].TransformPoint(_chestSkinLocal);
+                }
+                Vector3 chest = ChestPoint, down = Vector3.ProjectOnPlane(chest - HeadPosition, Vector3.up);
+                return chest + (down.sqrMagnitude > 1e-4f ? down.normalized * PressBelowChest : Vector3.zero);
+            }
+        }
+
+        /// <summary>
+        /// How far out from the middle of the body, at the chest, its trunk and the arm lying beside it reach on the side
+        /// of <paramref name="from"/> (their own mesh, metres): a rescuer kneeling there keeps the knees outside that.
+        /// (Knees kept out of the body's rough collision shape, they either couldn't come in close enough for the short
+        /// arms or knelt on a thief's arm; measured on both sides at once, a thief's arm flung out on the far side kept
+        /// the rescuer too far off to reach.)
+        /// </summary>
+        public float SideClearToward(Vector3 from)
+        {
+            if (_avatar == null || !_avatar.IsBuilt || _avatar[AvatarRig.Bone.Chest] == null) return 0f;
+            if (!_chestMeasured) MeasureChest();
+            float clear = _sideClearPlus;
+            if (TorsoLine(out Vector3 shoulders, out Vector3 toHips, out _))
+            {
+                Vector3 side = Vector3.Cross(toHips, Vector3.ProjectOnPlane(transform.forward, toHips).normalized);
+                if (Vector3.Dot(from - shoulders, side) < 0f) clear = _sideClearMinus;
+            }
+            return clear * _avatar.Scale;
+        }
+
+        /// <summary>The line down the middle of the trunk, from between the shoulders to between the hip joints.</summary>
+        private bool TorsoLine(out Vector3 shoulders, out Vector3 toHips, out float length)
+        {
+            shoulders = toHips = default;
+            length = 0f;
+            Transform ul = _avatar[AvatarRig.Bone.UpperArmL], ur = _avatar[AvatarRig.Bone.UpperArmR], tl = _avatar[AvatarRig.Bone.ThighL], tr = _avatar[AvatarRig.Bone.ThighR];
+            if (ul == null || ur == null || tl == null || tr == null) return false;
+            shoulders = (ul.position + ur.position) * 0.5f;
+            Vector3 line = (tl.position + tr.position) * 0.5f - shoulders;
+            length = line.magnitude;
+            if (length < 0.05f) return false;
+            toHips = line / length;
+            return true;
+        }
+
+        /// <summary>How far below the chest point (toward the hips) the hands press, if the body can't be measured.</summary>
+        public const float PressBelowChest = 0.07f;
+        /// <summary>The lower breastbone: this far from the shoulders to the hip joints, at most this far down to lie flat; a woman's, under the bust.</summary>
+        private const float PressDown = 0.38f, PressDownMost = 0.52f, PressDownWoman = 0.48f, PressUpWoman = 0.4f;
+        /// <summary>The hands' footprint on the chest (metres): half their width along the trunk, how far the fingers reach across it.</summary>
+        private const float HandsAlong = 0.065f, HandsAcross = 0.12f;
 
         /// <summary>
         /// Where a lifeguard's hands hold this body in their arms (a bridal carry): one forearm under the knee pits, the
@@ -188,6 +259,30 @@ namespace PleaseDontDrown.Rescue
         // once per look: the round dads' chests stand far higher off the sand than a bone offset tuned on slim bodies
         // (the hands went into their bellies) and their bellies far wider (the rescuer knelt inside them).
         private Vector3 _chestSkinLocal;
+        /// <summary>Tests: press this far down the trunk on every body instead of measuring (below 0: measure).</summary>
+        public static float PressTOverride = -1f;
+        private float _pressT = PressDown, _pressLift = 0.13f; // (down the trunk; the skin's height over its middle line, per scale)
+        private float _sideClearPlus = 0.3f, _sideClearMinus = 0.3f; // (either side, per scale)
+        private const int WidthBins = 40;
+
+        /// <summary>
+        /// A woman's press, down the trunk: under the bust (48%), or higher where her hips (a skirt's flare) start
+        /// widening out higher than that: on a short-waisted body pressed at 48%, the hands lay on the top of her
+        /// skirt. The hips start where, past the narrowest of the trunk, it is 2 cm wider again.
+        /// </summary>
+        private static float WomanPress(float[] width, float s)
+        {
+            int narrowest = -1;
+            for (int b = Mathf.RoundToInt(0.15f * WidthBins); b <= Mathf.RoundToInt(0.6f * WidthBins); b++)
+                if (width[b] > 0f && (narrowest < 0 || width[b] < width[narrowest])) narrowest = b;
+            if (narrowest < 0) return PressDownWoman;
+            for (int b = narrowest + 1; b < width.Length; b++)
+                if (width[b] >= width[narrowest] + 0.02f * s)
+                    return Mathf.Clamp((float)b / WidthBins, PressUpWoman, PressDownWoman);
+            return PressDownWoman;
+        }
+        /// <summary>How high off the ground a kneeling rescuer's knee reaches (per scale): the body's width up to there.</summary>
+        private const float KneeHeight = 0.14f;
         private float _chestHalfWidth = 0.18f;
         private bool _chestMeasured;
 
@@ -199,6 +294,8 @@ namespace PleaseDontDrown.Rescue
             float s = _avatar.Scale;
             Vector3 bone = Vector3.LerpUnclamped(spine.position, chest.position, 1.05f);
             _chestSkinLocal = chest.InverseTransformPoint(bone + transform.forward * (0.13f * s));
+            _pressT = PressDown;
+            _pressLift = 0.13f;
             _chestHalfWidth = 0.18f * s;
             SkinnedMeshRenderer skin = _avatar.Renderer;
             if (skin == null || skin.sharedMesh == null || head == null) return;
@@ -229,11 +326,49 @@ namespace PleaseDontDrown.Rescue
             // The hands lie across the body and are some 14 cm wide along it: their middle 6 cm under the bust's lower edge.
             float down = feminine && bustLow < 0.15f * s && bustLow > -0.25f * s ? Mathf.Max(0f, 0.06f * s - bustLow) : 0f;
             float depth = float.MinValue, half = 0f;
+            // The press point, on the line down the trunk: measured below over the skin under the hands.
+            bool torsoLine = TorsoLine(out Vector3 shoulders, out Vector3 toHips, out float torsoLength);
+            Vector3 pressFront = torsoLine ? Vector3.ProjectOnPlane(transform.forward, toHips).normalized : front;
+            Vector3 pressSide = torsoLine ? Vector3.Cross(toHips, pressFront).normalized : side;
+            var trunk = new List<Vector3>(); // (down the trunk 0..1, across it m, out in front of its middle line m)
+            var width = new float[WidthBins]; // (the trunk's half-width, arms aside, down it in steps of 2.5%)
+            var sides = new List<Vector2>(); // (across the trunk at the chest's level, m; height off the lowest of it, m)
+            float lowest = float.MaxValue;
+            // (The hands' footprint: 9 cm along the trunk, and across it as far as the fingers reach either way; the arms
+            // lying beside the trunk aren't under them.)
+            var arms = new HashSet<Transform>();
+            foreach (AvatarRig.Bone b in new[] { AvatarRig.Bone.UpperArmL, AvatarRig.Bone.UpperArmR, AvatarRig.Bone.ForearmL, AvatarRig.Bone.ForearmR,
+                         AvatarRig.Bone.HandL, AvatarRig.Bone.HandR })
+                if (_avatar[b] != null) arms.Add(_avatar[b]);
+            foreach (bool right in new[] { false, true })
+                if (_avatar.Hand(right) is { } fingers)
+                    foreach (Transform t in fingers.Bones) if (t != null) arms.Add(t);
             for (int i = 0; i < vertices.Length; i++)
             {
                 Vector3 d = toWorld.MultiplyPoint3x4(vertices[i]) - bone;
                 float a = Vector3.Dot(d, along), f = Vector3.Dot(d, front), x = Vector3.Dot(d, side);
                 if (Mathf.Abs(a + down) < 0.03f * s && Mathf.Abs(x) < 0.035f * s) depth = Mathf.Max(depth, f);
+                if (torsoLine)
+                {
+                    // (Everything at the chest's level, arms too: how wide the body lies there.)
+                    Vector3 dc = toWorld.MultiplyPoint3x4(vertices[i]) - shoulders;
+                    float tc = Vector3.Dot(dc, toHips) / torsoLength;
+                    if (tc > 0.15f && tc < 0.75f)
+                    {
+                        float y = toWorld.MultiplyPoint3x4(vertices[i]).y;
+                        sides.Add(new Vector2(Vector3.Dot(dc, pressSide), y));
+                        lowest = Mathf.Min(lowest, y);
+                    }
+                }
+                if (torsoLine && !(i < weights.Length && weights[i].boneIndex0 < bones.Length && arms.Contains(bones[weights[i].boneIndex0])))
+                {
+                    Vector3 dw = toWorld.MultiplyPoint3x4(vertices[i]) - shoulders;
+                    int bin = Mathf.FloorToInt(Vector3.Dot(dw, toHips) / torsoLength * WidthBins);
+                    if (bin >= 0 && bin < WidthBins) width[bin] = Mathf.Max(width[bin], Mathf.Abs(Vector3.Dot(dw, pressSide)));
+                    Vector3 dp = toWorld.MultiplyPoint3x4(vertices[i]) - shoulders;
+                    float t = Vector3.Dot(dp, toHips) / torsoLength, across = Vector3.Dot(dp, pressSide);
+                    if (t > PressDown - 0.15f && t < PressDownWoman + 0.4f && Mathf.Abs(across) < HandsAcross * s) trunk.Add(new Vector3(t, across, Vector3.Dot(dp, pressFront)));
+                }
                 // The torso's own skin (not the arms lying beside it), from the hips up to the chest.
                 if (i < weights.Length && a > -0.45f * s && a < 0.1f * s)
                 {
@@ -247,19 +382,62 @@ namespace PleaseDontDrown.Rescue
             // (Under the bust the belly lies lower than the chest: its skin may be only a centimetre in front of the bone.)
             if (depth > (down > 0f ? -0.04f : 0.04f) * s && depth < 0.6f * s) _chestSkinLocal = chest.InverseTransformPoint(at + front * (depth + 0.01f * s));
             if (half > 0.08f * s && half < 0.8f * s) _chestHalfWidth = half;
+            // Only up to knee height: a kneeling rescuer's knees go in under a round belly's overhang, as close as they
+            // would really kneel (kept outside all of it, they were too far out for the arms to reach the chest).
+            float sidePlus = 0f, sideMinus = 0f;
+            foreach (Vector2 v in sides)
+            {
+                if (v.y - lowest > KneeHeight * s) continue;
+                if (v.x > 0f) sidePlus = Mathf.Max(sidePlus, v.x);
+                else sideMinus = Mathf.Max(sideMinus, -v.x);
+            }
+            if (sidePlus > 0.08f * s && sidePlus < 1.2f * s) _sideClearPlus = sidePlus / s;
+            if (sideMinus > 0.08f * s && sideMinus < 1.2f * s) _sideClearMinus = sideMinus / s;
+            // Men: the lower breastbone, or as little further down as it takes for the hands to lie flat (a swell to one
+            // side), never down on the belly (searched all the way, a round dad's hands went on his belly, and where the
+            // mesh is thin the middle line's samples caught the skin of the back and every woman's went to her waist).
+            // Women: just under the bust (WomanPress): the rescuer's big hands no longer reach up over it
+            // (the bust's own bones end higher than its shape and its top: higher, pressed up from 38%, the fingers
+            // lay on a bikini top).
+            if (trunk.Count > 0)
+            {
+                float alongT = HandsAlong * s / torsoLength;
+                float from = PressTOverride >= 0f ? PressTOverride : _avatar.Look.Feminine ? WomanPress(width, s) : PressDown;
+                float to = PressTOverride >= 0f || _avatar.Look.Feminine ? from : PressDownMost;
+                float best = float.MaxValue;
+                for (float t = from; t <= to + 1e-4f; t += 0.01f)
+                {
+                    float footprint = float.MinValue, middle = float.MinValue;
+                    foreach (Vector3 v in trunk)
+                    {
+                        if (Mathf.Abs(v.x - t) > alongT) continue;
+                        footprint = Mathf.Max(footprint, v.z);
+                        if (v.z > 0f && Mathf.Abs(v.y) < 0.03f * s && Mathf.Abs(v.x - t) < 0.02f) middle = Mathf.Max(middle, v.z);
+                    }
+                    if (footprint == float.MinValue) continue;
+                    // (How far anything under the hands stands over the middle line; further down only for clearly flatter,
+                    // off a stiff coat's lapels, not down a round belly's slope.)
+                    float excess = middle != float.MinValue ? footprint - middle : float.MaxValue;
+                    if (t == from || excess < best - 0.01f * s)
+                    {
+                        _pressT = t;
+                        best = Mathf.Min(best, excess);
+                        if (footprint > 0f && footprint < 0.6f * s) _pressLift = footprint / s;
+                    }
+                    // (Flat enough already, or nearly: a round belly's slope starts right under the chest.)
+                    if (excess < (t == from ? 0.025f : 0.015f) * s) break;
+                }
+            }
             Debug.Log($"[Victim] {name}: chest skin {depth * 100f:F1} cm out from the bones{(down > 0f ? $", {down * 100f:F0} cm down, under the bust" : "")}, torso {half * 200f:F0} cm wide");
         }
         /// <summary>
         /// Where a rescuer kneels beside them for the compressions: level with a point a little below the chest (toward
         /// the hips), so the rescuer's big cartoon head hangs over their middle, not over their face, and from outside
-        /// you see the hands on the breastbone (the team, 2026-10-12). See <see cref="BreathSpot"/> for the kiss of life.
+        /// you see the hands on the breastbone (the team, 2026-10-12).
         /// </summary>
         public static Vector3 KneelSpot(Vector3 chest, Vector3 head) => head == Vector3.zero ? chest : Vector3.LerpUnclamped(chest, head, -0.15f);
 
-        /// <summary>Where a rescuer kneels for a rescue breath: up level with the shoulders, so the lips reach theirs.</summary>
-        public static Vector3 BreathSpot(Vector3 chest, Vector3 head) => head == Vector3.zero ? chest : Vector3.Lerp(chest, head, 0.42f);
-
-        /// <summary>The mouth (rescue breaths).</summary>
+        /// <summary>The mouth (cameras frame faces on it).</summary>
         public Vector3 MouthPoint => _avatar != null && _avatar.IsBuilt && _avatar[AvatarRig.Bone.Mouth] != null
             ? _avatar[AvatarRig.Bone.Mouth].position // on the painted lips of whoever this is
             : transform.TransformPoint(_headLocal + new Vector3(0f, -0.03f, 0.13f));
@@ -338,14 +516,6 @@ namespace PleaseDontDrown.Rescue
             // Pushed into the chest (lying on the back, the chest faces the body's forward), then bouncing back and
             // swinging about loosely for a moment.
             if (_jiggle != null) _jiggle.Shake(-transform.forward * 1.5f, transform.right * 0.9f + transform.up * 0.4f, 2.4f, 1.3f);
-        }
-
-        /// <summary>A rescue breath, mouth to mouth: a kiss, and the chest rises (local visual, every machine).</summary>
-        public void RescueBreath()
-        {
-            _breathAt = Time.time;
-            if (_audio != null) _audio.PlayOneShot(ProceduralAudio.Kiss, 0.9f);
-            if (_jiggle != null) _jiggle.Shake(transform.forward * 0.7f, transform.right * 0.3f, 1.6f, 1.2f);
         }
 
         /// <summary>How long after the press the hand lands (the swing: Player.FirstPersonArms.PlaySlap, the avatar's punch).</summary>
@@ -684,13 +854,10 @@ namespace PleaseDontDrown.Rescue
             if (_visual == null) return;
             float t = (Time.time - _squishAt) / 0.28f;
             float k = t < 1f ? Mathf.Sin(t * Mathf.PI) * (1f - t) : 0f;
-            // A rescue breath puffs the chest up for a moment.
-            float b = (Time.time - _breathAt) / 0.9f;
-            float rise = b < 1f ? Mathf.Sin(b * Mathf.PI) * 0.07f : 0f;
             // Zap: a quick shiver.
             float z = Time.time - _zapAt;
             float shiver = z < 0.45f ? Mathf.Sin(z * 90f) * 0.04f * (1f - z / 0.45f) : 0f;
-            _visual.localScale = new Vector3(1f + 0.12f * k + rise * 0.5f + shiver, 1f - 0.16f * k + shiver, 1f + 0.12f * k + rise);
+            _visual.localScale = new Vector3(1f + 0.12f * k + shiver, 1f - 0.16f * k + shiver, 1f + 0.12f * k);
         }
 
         // ------------------------------------------------------------------ physics step (every machine)

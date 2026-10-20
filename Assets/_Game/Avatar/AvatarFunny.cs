@@ -118,9 +118,6 @@ namespace PleaseDontDrown.Avatars
                 _parts.Add(eye.Root);
             }
             AvatarFunnyWear.Dress(rig, body, look, eyeScale, _parts);
-            _pucker = MakePucker(head, body);
-            _parts.Add(_pucker.gameObject);
-            if (rig.TryGetComponent(out AvatarAnimator animator)) animator.PuckerLength = PuckerReach;
             SetShadowsOnly(_shadowsOnly);
         }
 
@@ -130,8 +127,6 @@ namespace PleaseDontDrown.Avatars
                 if (part != null) { part.SetActive(false); Kill(part); }
             _parts.Clear();
             _eyes.Clear();
-            _glasses.Clear();
-            _glassesHead = null;
             if (_rig != null && _rig.IsBuilt) _rig[AvatarRig.Bone.Head].localScale = Vector3.one;
             _headScale = 1f;
         }
@@ -140,90 +135,11 @@ namespace PleaseDontDrown.Avatars
         {
             if (_body == null || _rig == null || !_rig.IsBuilt) return;
             if (!Mathf.Approximately(_headScale, 1f)) _rig[AvatarRig.Bone.Head].localScale = Vector3.one * _headScale;
-            PosePucker();
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             if (dt <= 0f) return;
             bool dizzy = Time.time < _dizzyUntil;
             foreach (GooglyEye eye in _eyes)
                 if (eye.Root != null) eye.Step(dt, dizzy);
-        }
-
-        // ------------------------------------------------------------------ the kiss: puckered lips
-
-        /// <summary>How far the puckered lips reach out of the mouth (head space).</summary>
-        private const float PuckerReach = 0.07f;
-        private Transform _pucker;
-        private readonly List<Transform> _glasses = new();
-        private Transform _glassesHead;
-
-        /// <summary>
-        /// Glasses tipped up onto the forehead for a kiss of life (left on, the lenses went into the face of the
-        /// tourist being given a breath), and back down after.
-        /// </summary>
-        private void PushUpGlasses(Transform head, float up)
-        {
-            if (head == null) return;
-            if (_glassesHead != head || _glasses.Exists(g => g == null))
-            {
-                _glassesHead = head;
-                _glasses.Clear();
-                foreach (Transform child in head)
-                    if (child.name.StartsWith("Blender glasses_")) _glasses.Add(child);
-            }
-            foreach (Transform g in _glasses)
-            {
-                // Turned about the temples (the arms' hinge, 12 cm behind the lenses at their height), lenses up.
-                Bounds b = g.TryGetComponent(out MeshFilter filter) && filter.sharedMesh != null ? filter.sharedMesh.bounds : default;
-                var pivot = new Vector3(0f, b.center.y, b.max.z - 0.12f);
-                Quaternion turn = Quaternion.Euler(-55f * up, 0f, 0f);
-                g.localRotation = turn;
-                g.localPosition = pivot - turn * pivot + new Vector3(0f, 0.015f * up, 0f);
-            }
-        }
-        private AvatarAnimator _animator;
-
-        /// <summary>
-        /// Big pink fish lips that push out of the mouth for a kiss (a rescue breath): they are what touches the
-        /// other mouth, so the big head, nose and googly eyes stay clear of the other face instead of sinking into it.
-        /// </summary>
-        private static Transform MakePucker(Transform head, AvatarBody body)
-        {
-            var go = new GameObject("Pucker");
-            go.transform.SetParent(head, false);
-            go.AddComponent<MeshFilter>().sharedMesh = _puckerMesh != null ? _puckerMesh : _puckerMesh = BuildPuckerMesh();
-            go.AddComponent<MeshRenderer>().sharedMaterial = AvatarRig.SharedMaterial;
-            go.transform.localScale = Vector3.zero;
-            return go.transform;
-        }
-
-        private static Mesh _puckerMesh;
-
-        private static Mesh BuildPuckerMesh()
-        {
-            var kit = new AvatarMeshKit();
-            kit.SetBone(0, Matrix4x4.identity);
-            var lipPink = new Color(0.93f, 0.42f, 0.5f);
-            var lipDark = new Color(0.78f, 0.27f, 0.36f);
-            Quaternion along = Quaternion.Euler(90f, 0f, 0f); // the kit's turned shapes stand on y: lay them along z
-            // A short snout of lip from the mouth out, then the round rolled lips at its tip, and a dark little "o".
-            kit.Frustum(new Vector3(0f, 0f, PuckerReach * 0.45f), 0.03f, 0.024f, PuckerReach * 0.9f, lipPink, along);
-            kit.Torus(new Vector3(0f, 0f, PuckerReach * 0.92f), 0.02f, 0.012f, lipDark, along, null, 18, 6);
-            kit.Disc(new Vector3(0f, 0f, PuckerReach * 0.97f), 0.011f, 0.004f, new Color(0.25f, 0.06f, 0.08f), along);
-            return kit.ToMesh("Pucker", new[] { Matrix4x4.identity });
-        }
-
-        /// <summary>Every frame (and by the editor's checks): the lips out by how far into a kiss we are.</summary>
-        public void PosePucker()
-        {
-            if (_pucker == null || _rig == null) return;
-            if (_animator == null) _rig.TryGetComponent(out _animator);
-            float k = _animator != null ? _animator.Kissing : 0f;
-            Transform head = _rig[AvatarRig.Bone.Head], mouth = _rig[AvatarRig.Bone.Mouth];
-            _pucker.localScale = Vector3.one * Mathf.SmoothStep(0f, 1f, k);
-            PushUpGlasses(head, Mathf.SmoothStep(0f, 1f, k));
-            if (k <= 0f || mouth == null) return;
-            _pucker.localPosition = head.InverseTransformPoint(mouth.position);
-            _pucker.localRotation = Quaternion.identity; // straight out of the face
         }
 
         private void OnDestroy()

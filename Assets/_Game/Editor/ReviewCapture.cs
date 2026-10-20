@@ -44,7 +44,7 @@ namespace PleaseDontDrown.Editor
             Directory.CreateDirectory("Screenshots/Review");
             var camera = GameObject.Find("MenuCamera").GetComponent<Camera>();
             camera.farClipPlane = 2000f;
-            camera.nearClipPlane = 0.02f; // face close-ups (the kiss of life) from a few centimetres away
+            camera.nearClipPlane = 0.02f; // face close-ups from a few centimetres away
             foreach (string raw in lines)
             {
                 string line = raw.Trim();
@@ -463,7 +463,6 @@ namespace PleaseDontDrown.Editor
                 case "pump": m.Cpr = true; m.CprPoint = go.transform.position + forward * 0.6f + Vector3.up * 0.2f; break;
                 case "charge": m.Charge = 1f; break;
                 case "eat": m.Eating = true; break;
-                case "kiss":
                 case "zap":
                 case "cpr": m.Cpr = true; m.CprPoint = go.transform.position + forward * 0.6f + Vector3.up * 0.2f; break;
                 case "down": m.Pose = AvatarPose.Down; m.Mood = AvatarMood.Hurt; break;
@@ -581,19 +580,18 @@ namespace PleaseDontDrown.Editor
             AvatarGesture gesture = pose switch
             {
                 "throw" => AvatarGesture.Throw, "wave" => AvatarGesture.Wave, "interact" => AvatarGesture.Interact, "punch" => AvatarGesture.Punch,
-                "kiss" => AvatarGesture.Breath, "zap" => AvatarGesture.Zap, "shoot" => AvatarGesture.Shoot, "jumpshot" => AvatarGesture.JumpShot,
+                "zap" => AvatarGesture.Zap, "shoot" => AvatarGesture.Shoot, "jumpshot" => AvatarGesture.JumpShot,
                 "pump" => AvatarGesture.Pump, "burp" => AvatarGesture.Burp, "burpwind" => AvatarGesture.Burp, _ => AvatarGesture.None
             };
             if (gesture != AvatarGesture.None)
             {
-                // Caught part-way through (the punch at full reach, the kiss with the lips down).
-                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Breath => 0.55f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, AvatarGesture.JumpShot => 0.3f, AvatarGesture.Pump => 0.06f, AvatarGesture.Burp => pose == "burpwind" ? 0.2f : 0.55f, _ => 0.12f };
+                // Caught part-way through (the punch at full reach).
+                float into = gesture switch { AvatarGesture.Wave => 0.6f, AvatarGesture.Punch => 0.24f, AvatarGesture.Zap => 0.3f, AvatarGesture.Shoot => 0.04f, AvatarGesture.JumpShot => 0.3f, AvatarGesture.Pump => 0.06f, AvatarGesture.Burp => pose == "burpwind" ? 0.2f : 0.55f, _ => 0.12f };
                 float now = AvatarAnimator.TimeOverride ?? 103f;
                 AvatarAnimator.TimeOverride = now;
                 Vector3 point = gesture switch
                 {
                     AvatarGesture.Punch => go.transform.position + forward * 0.75f + Vector3.up * 1.45f,
-                    AvatarGesture.Breath => go.transform.position + forward * 0.62f + Vector3.up * 0.22f,
                     AvatarGesture.Zap => go.transform.position + forward * 0.6f + Vector3.up * 0.2f,
                     _ => Vector3.zero
                 };

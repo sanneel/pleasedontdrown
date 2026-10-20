@@ -52,7 +52,7 @@ namespace PleaseDontDrown.Editor
                 GameObject victimObject = Object.Instantiate(victimPrefab);
                 foreach (Rigidbody rb in victimObject.GetComponentsInChildren<Rigidbody>()) rb.isKinematic = true;
                 var victim = victimObject.GetComponent<VictimBody>();
-                // Flat on her back, head toward +x (as KissCheck lays her).
+                // Flat on her back, head toward +x (as the CPR checks lay her).
                 victimObject.transform.SetPositionAndRotation(spot + Vector3.up * 0.14f, Quaternion.LookRotation(Vector3.up, Vector3.right));
                 var look = new AvatarLook { Body = id, Figure = (byte)(AvatarLook.Bodies.IsFeminine(id) ? 1 : 0) };
                 victim.ApplyLooks(look, id);

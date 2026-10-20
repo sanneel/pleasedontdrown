@@ -196,8 +196,6 @@ namespace PleaseDontDrown.Player
             ApplyHead();
         }
 
-        private Vector3 _leanPoint;
-        private float _leanStart = -10f, _leanLength;
 
         private Vector3 _kneelChest, _kneelHead;
         private float _kneelReach = 0.55f;
@@ -227,7 +225,7 @@ namespace PleaseDontDrown.Player
         /// <summary>
         /// Doing CPR: the view kneels beside the chest being pressed (as the body does for everyone else), so our hands
         /// reach it. From where we stood (up to a couple of metres off), lone hands flew out across the sand and
-        /// covered the face we were giving the kiss of life. Each press keeps us down; we stand up a moment after the last.
+        /// covered the face. Each press keeps us down; we stand up a moment after the last.
         /// </summary>
         public void KneelAt(Vector3 chest, Vector3 head, float reach = 0.55f)
         {
@@ -237,30 +235,10 @@ namespace PleaseDontDrown.Player
             _kneelUntil = Time.time + 1.4f;
         }
 
-        /// <summary>Another CPR step (the kiss of life, a slap) on the same chest: stay kneeling.</summary>
+        /// <summary>Another CPR step (a slap) on the same patient: stay kneeling.</summary>
         public void StayKneeling()
         {
             if (Time.time < _kneelUntil) _kneelUntil = Time.time + 1.4f;
-        }
-
-        /// <summary>
-        /// Lean the view right in to a point and back (mouth-to-mouth: the camera goes down to their lips, holds, and
-        /// comes back up). The look direction itself doesn't change.
-        /// </summary>
-        public void LeanIn(Vector3 worldPoint, float seconds)
-        {
-            _leanPoint = worldPoint;
-            _leanStart = Time.time;
-            _leanLength = Mathf.Max(0.3f, seconds);
-        }
-
-        /// <summary>0..1..0 over the lean: quick in, hold, back out.</summary>
-        private float LeanWeight()
-        {
-            float t = (Time.time - _leanStart) / _leanLength;
-            if (t < 0f || t > 1f) return 0f;
-            float inOut = t < 0.3f ? t / 0.3f : t > 0.75f ? (1f - t) / 0.25f : 1f;
-            return Mathf.SmoothStep(0f, 1f, inOut);
         }
 
         /// <summary>Gun recoil: the view climbs (x right, y up, degrees) quickly and stays there.</summary>
@@ -394,20 +372,7 @@ namespace PleaseDontDrown.Player
                 _camera.transform.rotation = Quaternion.Slerp(_camera.transform.rotation, down, w);
             }
 
-            // Leaning in (mouth-to-mouth): the eye comes down over their face (they lie on their back, face up) to just
-            // above the lips, looking down at them, head tipped a little, then back up.
-            float lean = LeanWeight();
-            if (lean > 0f)
-            {
-                Vector3 eye = _camera.transform.position;
-                Vector3 toward = Vector3.ProjectOnPlane(_leanPoint - eye, Vector3.up);
-                toward = toward.sqrMagnitude > 1e-4f ? toward.normalized : Vector3.ProjectOnPlane(_camera.transform.forward, Vector3.up).normalized;
-                Vector3 close = _leanPoint + Vector3.up * 0.19f - toward * 0.05f;
-                Quaternion face = Quaternion.LookRotation(_leanPoint - close, toward) * Quaternion.Euler(0f, 0f, 15f);
-                _camera.transform.SetPositionAndRotation(Vector3.Lerp(eye, close, lean), Quaternion.Slerp(_camera.transform.rotation, face, lean));
-            }
-
-            _thirdApplied = ThirdPerson && _kneel <= 0f && lean <= 0f;
+            _thirdApplied = ThirdPerson && _kneel <= 0f;
             if (_thirdApplied) ApplyThirdPerson();
 
             if (Time.frameCount - _viewFrame <= 1) _camera.transform.position = _viewFrom;

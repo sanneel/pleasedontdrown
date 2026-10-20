@@ -26,12 +26,12 @@ namespace PleaseDontDrown.Player
         private bool _remoteEating;
         private float _remoteChargeTime;
         private float _lastPumpTime = -10f;
+        private float _cprClear; // (how wide the one being pressed lies, from the press point: the knees stay outside it)
         private Vector3 _cprPoint, _kneelPoint; // where the hands press; where the body kneels beside it
         private Vector3 _kneelHead;             // their head: the body lies chest to head along this
         private float _kneelSide;               // which side of them we kneel on (+1/-1, kept for the whole CPR; 0 = not chosen)
         private Quaternion? _kneelFacing;       // turned square to their chest while kneeling
         private float _kneelTurn;
-        private float _breathUntil = float.NegativeInfinity;
         private Quaternion? _seatFacing;
         private Quaternion _kneelFacingTarget = Quaternion.identity;
         private float _kneelReach = 0.55f;      // how far out from the middle of their body (clear of a big belly)
@@ -90,14 +90,12 @@ namespace PleaseDontDrown.Player
         /// <summary>A gesture from this player (played locally for the owner, relayed to everyone else).</summary>
         public void OnGesture(AvatarGesture gesture) => OnGesture(gesture, Vector3.zero);
 
-        /// <summary>A CPR breath or punch: stays kneeling by the tourist.</summary>
         /// <summary>A gesture aimed at a point (a bite off a dish on the table).</summary>
         public void PlayGesture(AvatarGesture gesture, Vector3 point) => _animator.Play(gesture, point);
 
         public void OnCprGesture(AvatarGesture gesture, Vector3 point)
         {
             _lastPumpTime = Time.time;
-            if (gesture == AvatarGesture.Breath) _breathUntil = Time.time + 1.4f; // slide up to their face for it
             _animator.Play(gesture, point);
         }
 
@@ -137,15 +135,14 @@ namespace PleaseDontDrown.Player
         }
 
         /// <summary>A CPR compression by this player on a chest at <paramref name="chest"/>.</summary>
-        public void OnPump(Vector3 chest, Vector3 head = default, float reach = 0.55f)
+        public void OnPump(Vector3 chest, Vector3 head = default, float reach = 0.55f, float clear = 0f)
         {
+            _cprClear = clear;
             _lastPumpTime = Time.time;
-            // The hands on the lower half of the breastbone, not up at the collarbones by the face, and the body
-            // kneeling tall at their side with the arms reaching out and down to it, never folded over (Avatar:
-            // MaxCprLean): the goofy lifeguard's big head must stay well clear of the hands.
-            Vector3 down = head != Vector3.zero ? chest - head : Vector3.zero;
-            down.y = 0f;
-            _cprPoint = down.sqrMagnitude > 1e-4f ? chest + down.normalized * 0.07f : chest;
+            // The hands on the lower half of the breastbone (a tourist's VictimBody.PressPoint: on the skin there),
+            // and the body kneeling tall at their side with the arms reaching out and down to it, never folded over
+            // (Avatar: MaxCprLean): the goofy lifeguard's big head must stay well clear of the hands.
+            _cprPoint = chest;
             _kneelHead = head;
             _kneelPoint = Rescue.VictimBody.KneelSpot(_cprPoint, head);
             _kneelReach = reach + 0.07f; // (knees at their side, not on them; checked with ReviewCapture cpr:0.62)
@@ -249,6 +246,7 @@ namespace PleaseDontDrown.Player
 
             m.Cpr = Time.time - _lastPumpTime < 1.3f && !m.Swimming;
             m.CprPoint = _cprPoint;
+            m.CprClear = _cprClear;
             KneelBeside(m.Cpr && _cprPoint != Vector3.zero, position, dt);
 
             // On a vehicle: sitting, hands on the handlebars.
@@ -430,8 +428,7 @@ namespace PleaseDontDrown.Player
                 // Square to their side: along = their body (chest to head), across = out to the side we're on.
                 Vector3 along = _kneelHead != Vector3.zero ? _kneelHead - _cprPoint : Vector3.zero;
                 along.y = 0f;
-                Vector3 kneelPoint = Time.time < _breathUntil && _kneelHead != Vector3.zero
-                    ? Rescue.VictimBody.BreathSpot(_cprPoint, _kneelHead) : _kneelPoint;
+                Vector3 kneelPoint = _kneelPoint;
                 Vector3 to = kneelPoint - position;
                 to.y = 0f;
                 if (along.sqrMagnitude > 1e-4f)

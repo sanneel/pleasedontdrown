@@ -905,9 +905,8 @@ MonoBehaviour:
   _cprDecayPerSecond: 0.04
   _cprReach: 3
   _compressionsPerSet: 5
-  _breathsPerSet: 2
   _compressGain: 0.05
-  _breathGain: 0.1
+  _womanCompressGain: 0.09
   _punchGain: 0.2
   _celebrateSeconds: 4
   _leaveAfterSeconds: 45

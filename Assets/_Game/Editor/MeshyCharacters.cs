@@ -74,7 +74,7 @@ namespace PleaseDontDrown.Editor
         /// <summary>
         /// The Tripo women keep their eyes as Tripo painted them, never shut: their eyes are modelled (bulging or sunk
         /// in sockets) and every closed-eye texture painted over them left smears, cut irises and black lines.
-        /// Their face is still found (the mouth for the kiss of life).
+        /// Their face is still found (the mouth for the face).
         /// </summary>
         private static readonly HashSet<string> OpenEyesOnly = new()
             { "tourist_lola", "tourist_girl_red", "tourist_girl_blonde", "tourist_girl_redhead", "tourist_girl_black",

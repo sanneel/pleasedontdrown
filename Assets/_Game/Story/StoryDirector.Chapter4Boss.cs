@@ -22,7 +22,7 @@ namespace PleaseDontDrown.Story
     ///      the Kleptopus's big orange cousin under the jetty, dragging the dropped tourists under; (3) Sandy herself on
     ///      the jetty's end with the giant grabber claw (it flings you into the sea; the swim-up ramps bring you back),
     ///      until she's knocked off the end into the deep water ·
-    ///  4.8 Please don't drown: Sandy can't swim. Bring her in, CPR (the kiss of life on Sandy: the team has opinions);
+    ///  4.8 Please don't drown: Sandy can't swim. Bring her in, CPR (pumping Sandy's chest: the team has opinions);
     ///      she comes round and gives up.
     /// </summary>
     public partial class StoryDirector
@@ -305,7 +305,7 @@ namespace PleaseDontDrown.Story
                 if (_sandyInWater == null) yield break;
                 SetObjective("Sandy can't swim! Bring her in, then CPR");
                 Marker("Sandy", _sandyInWater.NetworkObject);
-                bool kissed = false, joked = false;
+                bool joked = false;
                 while (_sandyInWater != null && _sandyInWater.IsSpawned && _sandyInWater.State != VictimState.Lost)
                 {
                     if (_howRescued.TryGetValue(_sandyInWater, out VictimEvent how) && how is VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.SelfRescue ||
@@ -313,10 +313,9 @@ namespace PleaseDontDrown.Story
                     if (!joked && _sandyInWater.State == VictimState.Unconscious && _sandyInWater.IsAshore && !_sandyInWater.Item.IsHeld)
                     {
                         joked = true;
-                        SetObjective("CPR! Compressions, then the kiss of life");
+                        SetObjective("CPR! Pump her chest");
                         StartCoroutine(CprBanter());
                     }
-                    if (!kissed && _sandyInWater.CprCount > 0) kissed = true;
                     yield return new WaitForSeconds(0.25f);
                 }
                 if (_sandyInWater != null && _sandyInWater.IsSpawned && _sandyInWater.State != VictimState.Lost) break;
@@ -336,8 +335,8 @@ namespace PleaseDontDrown.Story
             _sandy.ServerSetPose(AvatarPose.Sit);
             _sandy.ServerSetMood(AvatarMood.Hurt);
             _sandy.ServerSetTalkable(false);
-            yield return Say(_sandy, "*cough* *COUGH* ...Did... did one of you just KISS me?");
-            yield return You("Lifeguard's code. Everybody gets saved. Even you. Don't make it weird.");
+            yield return Say(_sandy, "*cough* *COUGH* ...Who... who was pumping on me like a BEACH BALL?");
+            yield return You("Lifeguard's code. Everybody gets saved. Even you. You're welcome.");
             yield return Say(_sandy, "Twenty years... and I never learned to swim. Who needs to swim when you OWN the lifeguards?");
             _sandy.ServerSetMood(AvatarMood.Neutral);
             yield return Say(_sandy, "Fine. FINE. I give up. Finders keepers... losers weepers.");
@@ -486,9 +485,9 @@ namespace PleaseDontDrown.Story
 
         private IEnumerator CprBanter()
         {
-            yield return You("She needs the kiss of life. ...Somebody has to do it.");
+            yield return You("She's not breathing. ...Somebody has to do CPR on her.");
             yield return You("Not it. NOT IT. I called not it on the boat!");
-            yield return You("Fine. For the lifeguard's code. Don't look.");
+            yield return You("Fine. For the lifeguard's code. One, two, three...");
         }
     }
 }

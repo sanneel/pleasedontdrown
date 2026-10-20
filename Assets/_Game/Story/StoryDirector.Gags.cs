@@ -11,7 +11,7 @@ namespace PleaseDontDrown.Story
     /// <summary>
     /// The funny side of the story. Every island has just three rescues, and each one is somebody with their own silly
     /// reason to be out there: what they yell instead of "help!", what the guide says about it, and what they say once
-    /// they're saved (which also depends on how: kissed, slapped, zapped or just pulled out). A little changes from one
+    /// they're saved (which also depends on how: pumped, slapped, zapped or just pulled out). A little changes from one
     /// playthrough to the next (who it is, which gag from a short list, where they are), the story itself never does.
     /// Island 1 also has a false alarm: somebody screaming for help where the water is knee-deep.
     /// </summary>
@@ -114,11 +114,11 @@ namespace PleaseDontDrown.Story
         };
 
         // The first thing they say when they come round, by how they were brought back.
-        private static readonly string[] KissedLines =
+        private static readonly string[] PumpedLines =
         {
-            "(cough) Did you just... KISS me?!",
-            "(cough) Was that mouth-to-mouth? ...I think I need another one.",
-            "(cough) You taste like coconut. Thank you?"
+            "(cough) My ribs! ...You saved my life, didn't you?",
+            "(cough) Was that CPR? ...I think I need another round.",
+            "(cough) You push like a jackhammer. Thank you?"
         };
         private static readonly string[] SlappedLines =
         {
@@ -272,7 +272,7 @@ namespace PleaseDontDrown.Story
             Color color = VoiceColor(v);
             string[] first = how switch
             {
-                VictimEvent.Revived => v.IsFemale ? KissedLines : SlappedLines,
+                VictimEvent.Revived => v.IsFemale ? PumpedLines : SlappedLines,
                 VictimEvent.Zapped => ZappedLines,
                 _ => PulledOutLines
             };
@@ -286,7 +286,7 @@ namespace PleaseDontDrown.Story
                 Item item = SpawnItem(gag.Drop, p);
                 if (item != null && item.TryGetComponent(out LostItem lost)) lost.ServerSetup(name, false);
             }
-            // Brought back with the kiss of life on island 1: she has other plans for her hero.
+            // Brought back with CPR on island 1: she has other plans for her hero.
             if (how == VictimEvent.Revived && v != null && v.IsSpawned && v.IsFemale && _island == _island1 && hero != null && LoveHut.Instance != null)
                 yield return LoveHutScene(v, hero);
         }

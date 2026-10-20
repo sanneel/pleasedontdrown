@@ -17,13 +17,13 @@ namespace PleaseDontDrown.Core
         {
             _bell = _click = _cough = _thump = null;
             _crunch = _rustle = _bonk = _creak = _shut = null;
-            _breath = _zap = _punch = _cash = _engine = null;
+            _zap = _punch = _cash = _engine = null;
             _shots = null;
             _suppressed = _dryFire = _aimIn = _aimOut = _magOut = _magIn = _rack = _impact = null;
             _steps = null;
             _cries = null;
             _hitTick = _headDing = _killThunk = _fleshHit = null;
-            _kiss = _knifeSwish = _stab = null;
+            _knifeSwish = _stab = null;
             _stepVariant = 0;
         }
 
@@ -256,52 +256,7 @@ namespace PleaseDontDrown.Core
             return (thud * 0.8f + click * 0.4f) * Mathf.Clamp01(t / 0.002f);
         });
 
-        private static AudioClip _breath, _zap, _punch, _cash, _engine;
-
-        /// <summary>A long exhale (rescue breath).</summary>
-        public static AudioClip Breath => _breath != null ? _breath : _breath = Build("Breath", 0.8f, BreathWave());
-
-        private static System.Func<float, float> BreathWave()
-        {
-            var rng = new System.Random(311);
-            float low = 0f;
-            return t =>
-            {
-                low += ((float)(rng.NextDouble() * 2.0 - 1.0) - low) * 0.12f;
-                return low * 1.6f * Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 0.8f));
-            };
-        }
-
-        private static AudioClip _kiss;
-
-        /// <summary>Mouth-to-mouth: a controlled breath with a soft seal and release.</summary>
-        public static AudioClip Kiss => _kiss != null ? _kiss : _kiss = Build("Kiss", 1.0f, KissWave());
-
-        private static System.Func<float, float> KissWave()
-        {
-            var rng = new System.Random(733);
-            float air = 0f, low = 0f;
-            return t =>
-            {
-                float s = 0f;
-                if (t < 0.82f)
-                {
-                    air += ((float)(rng.NextDouble() * 2.0 - 1.0) - air) * 0.08f;
-                    low += (air - low) * 0.03f;
-                    float env = Mathf.Clamp01(t / 0.07f) * Mathf.Clamp01((0.82f - t) / 0.06f);
-                    float pressure = 0.8f + 0.35f * (t / 0.82f); // pushing harder toward the end
-                    s = (air - low) * 1.2f * env * pressure;
-                }
-                float u = t - 0.84f;
-                if (u > 0f)
-                {
-                    float pop = (float)(rng.NextDouble() * 2.0 - 1.0) * Mathf.Exp(-u * 90f);
-                    float click = Mathf.Sin(2f * Mathf.PI * 1900f * u) * Mathf.Exp(-u * 140f);
-                    s += (pop * 0.09f + click * 0.025f) * Mathf.Clamp01(u / 0.004f);
-                }
-                return s;
-            };
-        }
+        private static AudioClip _zap, _punch, _cash, _engine;
 
         /// <summary>Defibrillator: a rising whine, then a buzzing crack.</summary>
         public static AudioClip Zap => _zap != null ? _zap : _zap = Build("Zap", 0.7f, t =>
