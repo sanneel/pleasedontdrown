@@ -1,6 +1,6 @@
 # Base bodies: the GPT prompts (2026-10-20)
 
-Everyone in the game, the goofy lifeguard included, moves to one style: chunky clay-toy cartoon people (see
+Everyone in the game, the goofy lifeguard included, moves to one style: chunky clay-toy cartoon **adults** (see
 `New-Game-2026-10-20/style_reference_clay_tourists.webp` and Sandro's bikini girls sheet, saved next to it as
 `style_reference_bikini_girls.png`). Built on **two bodies only**, one man and one woman, sharing one skeleton,
 one height and one UV layout. Every character after that is the same body with a different texture, hair, hat,
@@ -24,45 +24,59 @@ at the same scale and the same height line.
 ## P1: the woman's base body
 
 ```
-Using the two attached pictures as the exact art style (chunky clay-toy cartoon people, soft matte clay shading,
-big round head about 1/3 of the body height, big friendly eyes, small nose, short stubby arms and legs, round soft
-belly, big simple hands with a thumb and four fingers together, big bare feet):
+Using the attached pictures only as the ART STYLE reference (soft matte clay-toy 3D cartoon, smooth rounded
+shapes, warm friendly look), but NOT their proportions:
 
-A neutral BASE BODY for a 3D game character, a woman. Character turnaround sheet: front view, three-quarter view,
-side view, back view, side by side, same scale, all four standing on the same line.
+A neutral BASE BODY of an ADULT WOMAN, about 35 years old, for a 3D game. Clearly a grown-up: an adult face
+(defined cheekbones, a jaw, adult eyes of normal cartoon size, not huge baby eyes, natural eyebrows), adult body
+proportions in a cartoon way: the head about 1/4 of the total height, a longer torso and longer legs than the
+reference, a defined waist and hips, a soft natural belly, a modest natural bust. Big simple hands (thumb plus four
+fingers together), big simple bare feet.
 
-Pose: A-pose. Arms straight, held out about 45 degrees from the body, palms facing down and slightly back,
-fingers together, thumb apart. Legs straight, feet apart about shoulder width, toes pointing forward.
-Head looking straight ahead, neutral calm face, mouth closed in a small smile, eyes open looking forward.
+Character turnaround sheet: front view, three-quarter view, side view, back view, side by side, same scale, all
+four standing on the same line, orthographic-looking straight views.
 
-Bald (no hair at all, a smooth round head: hair will be added separately). Plain simple one-colour skin
-(medium warm tan), no makeup, no freckles, no tattoos. A plain simple grey two-piece swimsuit (triangle top,
-simple bottoms) tight to the body with no strings, bows, frills or loose parts.
+Pose: A-pose. Arms straight and held well away from the body, about 45 degrees down from horizontal, with a clear
+gap between the arms and the torso; palms facing down, fingers together, thumb apart. Legs straight, feet apart
+about shoulder width with a clear gap between the thighs, toes forward. Head straight, neutral calm face, mouth
+closed in a small smile, eyes open looking forward.
 
-Plain light grey background, even soft studio light, no floor shadow, no text, no props, whole body in frame
-with space around it.
+Bald: a smooth round head with no hair (hair is added separately). Plain one-colour skin (medium warm tan), no
+makeup, no freckles, no tattoos. A plain matte grey one-piece swimsuit, simple and tight to the body, no straps
+details, no strings, bows, frills or loose parts.
+
+Plain light grey background, even soft studio light, no floor shadow, no text, no props, whole body in frame with
+space around it.
 ```
 
 ## P2: the man's base body
 
 ```
-Using the two attached pictures as the exact art style, and the attached woman base body as the size reference
-(same height, same head size, same hands and feet, same A-pose, same camera):
+Using the attached pictures only as the ART STYLE reference, and the attached woman base body as the SIZE and
+POSE reference (same camera, same A-pose, same head size, same hands and feet, the man a little taller):
 
-A neutral BASE BODY for a 3D game character, a man, made to match the woman exactly. Character turnaround sheet:
-front view, three-quarter view, side view, back view, side by side, same scale, all four standing on the same line.
+A neutral BASE BODY of an ADULT MAN, about 40 years old, for a 3D game, made to match the woman. Clearly a
+grown-up: an adult face (a jaw, a bigger nose, adult eyes of normal cartoon size, thick eyebrows), the head about
+1/4 of the total height, broader shoulders and chest than the woman, a soft round dad belly, no visible muscles.
 
-Pose: A-pose. Arms straight, held out about 45 degrees from the body, palms facing down and slightly back,
-fingers together, thumb apart. Legs straight, feet apart about shoulder width, toes pointing forward.
-Head looking straight ahead, neutral calm face, mouth closed in a small smile, eyes open looking forward.
+Character turnaround sheet: front view, three-quarter view, side view, back view, side by side, same scale, all
+four standing on the same line, orthographic-looking straight views.
 
-A slightly wider chest and shoulders than the woman, a soft round belly, no muscles showing. Bald (smooth round
-head), no beard, no body hair, plain one-colour skin (medium warm tan). Plain simple grey swim shorts tight to the
-body, ending above the knee, no drawstring, no pattern.
+Pose: A-pose. Arms straight and held well away from the body, about 45 degrees down from horizontal, with a clear
+gap between the arms and the torso; palms facing down, fingers together, thumb apart. Legs straight, feet apart
+about shoulder width with a clear gap between the thighs, toes forward. Head straight, neutral calm face, mouth
+closed in a small smile, eyes open looking forward.
 
-Plain light grey background, even soft studio light, no floor shadow, no text, no props, whole body in frame
-with space around it.
+Bald (smooth round head), no beard, no body hair, plain one-colour skin (medium warm tan). Plain matte grey swim
+shorts, tight to the body, ending above the knee, no drawstring, no pattern.
+
+Plain light grey background, even soft studio light, no floor shadow, no text, no props, whole body in frame with
+space around it.
 ```
+
+If GPT still draws them young: add `NOT a child, NOT a teenager: a 35-year-old woman / a 40-year-old dad` at the
+start, and attach a picture of an adult cartoon character you like (Pixar's Incredibles adults are about right)
+as a proportion reference.
 
 ## P3: goofy, the players' lifeguard, in the new style
 
