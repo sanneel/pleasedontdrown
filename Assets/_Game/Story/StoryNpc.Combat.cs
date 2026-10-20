@@ -109,6 +109,7 @@ namespace PleaseDontDrown.Story
         {
             _fighting = true;
             _fighter = profile;
+            if (profile.Style == FightStyle.Drunk) ServerSetDrunk(true);
             _weaponKind.Value = profile.Weapon.Kind;
             _armed.Value = true;
             _fightHome = home;
@@ -170,7 +171,8 @@ namespace PleaseDontDrown.Story
                 if (Time.time < _knockedUntil) return;
                 _pose.Value = AvatarPose.Normal; // back on their feet
                 _mood.Value = AvatarMood.Angry;
-                SetFight(FightState.Recover, 0.5f);
+                // (Getting up takes 1.8 s on the motion-captured clip: no swinging until they're nearly up.)
+                SetFight(FightState.Recover, AvatarClips.Enabled ? 1.5f : 0.5f);
                 ShoutObservers(_fighter.Style == FightStyle.Drunk ? "I'm fine... I'm FINE!" : "Is that all?!", false);
             }
             if (_pose.Value != AvatarPose.Normal) return;

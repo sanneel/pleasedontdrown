@@ -328,6 +328,7 @@ namespace PleaseDontDrown.Story
         private StoryNpc Drunk(Vector3 fire, Vector3 tavern)
         {
             StoryNpc npc = SpawnNpc("Wobbly Will", NpcRole.Pirate, PirateLook(9), fire + Vector3.right * 3f, 0f, 100);
+            npc.ServerSetDrunk(true);
             StartCoroutine(Stagger(npc, fire + Vector3.right * 3f, tavern + Vector3.back * 4f));
             return npc;
         }

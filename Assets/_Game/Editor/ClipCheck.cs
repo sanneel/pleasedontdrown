@@ -23,7 +23,7 @@ namespace PleaseDontDrown.Editor
     /// route (stand, walk, run, walk, stand): on the left the hand-made animation, on the right the clips. Frames go to
     /// Screenshots/ClipCompare/ (make a video with ffmpeg). <c>-body &lt;id&gt;</c> picks the body (default 16, Lola).
     /// </summary>
-    public static class ClipCheck
+    public static partial class ClipCheck
     {
         // Every body in the game (AvatarLook.Bodies), women first.
         private static readonly byte[] AllBodies = { 1, 2, 16, 17, 18, 19, 20, 21, 22, 23, 24, 11, 27, 28, 6, 26, 7, 25, 8, 9, 10, 12, 13 };

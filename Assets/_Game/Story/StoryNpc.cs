@@ -54,6 +54,7 @@ namespace PleaseDontDrown.Story
         private readonly SyncVar<int> _health = new SyncVar<int>();
         private readonly SyncVar<int> _maxHealth = new SyncVar<int>();
         private readonly SyncVar<bool> _hasBag = new SyncVar<bool>();
+        private readonly SyncVar<bool> _drunk = new SyncVar<bool>(); // staggers about (the clips' drunk walk)
 
         // Every machine.
         private Vector3 _lastPosition;
@@ -469,6 +470,9 @@ namespace PleaseDontDrown.Story
 
         /// <summary>Host: a shout above the head everyone sees (and hears).</summary>
         [Server]
+        /// <summary>Host: staggers about drunk from now on (everyone sees the drunk walk).</summary>
+        public void ServerSetDrunk(bool drunk) => _drunk.Value = drunk;
+
         public void ServerShout(string text, bool cry = false) => ShoutObservers(text, cry);
 
         [ObserversRpc]
@@ -678,6 +682,7 @@ namespace PleaseDontDrown.Story
                 Stance = Stance, // squared up for a fist fight (StoryNpc.Combat)
                 WindUp = WindUpDrawn
             };
+            _animator.Drunk = _drunk.Value;
             // Leading a lifeguard by the hand (the beach hut gag): her right hand back in his.
             if (LoveHut.HandHold(transform, out LoveHut.HandGripPoint hold))
             {

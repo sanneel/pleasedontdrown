@@ -18,6 +18,7 @@ namespace PleaseDontDrown.Editor
     /// </summary>
     public static class KissCheck
     {
+        private static bool UseClips => Array.IndexOf(Environment.GetCommandLineArgs(), "-clips") >= 0;
         private const float Tolerance = 0.035f; // lip centre to lip centre: the puckered lips are ~2 cm thick, so this is touching
 
         public static void RunBatch()
@@ -78,6 +79,7 @@ namespace PleaseDontDrown.Editor
             rig.Build(look);
             var animator = body.AddComponent<AvatarAnimator>();
             animator.Rig = rig;
+            animator.UseClips = UseClips; // (-clips: kneeling from the motion-captured CPR clip, as in the game)
             animator.Motion = new AvatarMotion { FacingYaw = 0f, Grounded = true, Cpr = true, CprPoint = chest };
             for (int i = 0; i < 60; i++) { AvatarAnimator.TimeOverride = 100f + i / 30f; animator.Tick(1f / 30f); }
             // Compressing (before any breath): the hands on the breastbone, the rescuer kneeling clear of the body.

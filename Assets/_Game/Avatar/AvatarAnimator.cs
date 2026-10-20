@@ -88,6 +88,29 @@ namespace PleaseDontDrown.Avatars
         private AvatarClips _clips;
         /// <summary>This frame's body came from the clips (the head and the rest go on top of it).</summary>
         public bool ClipDriven { get; private set; }
+        /// <summary>The clips' action this frame (null: none), for tests.</summary>
+        public string ClipAction => ClipDriven ? _clips?.CurrentAction : null;
+
+        // Between the clips and the hand-made animation the body crossfades (0: hand-made .. 1: clips), so switching
+        // (picking something up, starting to swim fast) never snaps the pose.
+        private float _clipMix;
+        private bool _clipStyled;
+        private int _seed;
+        // What the clips' action is this frame and how much of the body it has (the hand-made layer for the same thing
+        // steps back by as much).
+        private enum ClipAct : byte { None, Down, GetUp, Cpr, Scared, Tread }
+        private ClipAct _clipAct;
+        private float _clipActShare;
+        private readonly Quaternion[] _clipPose = new Quaternion[AvatarClips.PosedBones.Length];
+        private Vector3 _clipHips;
+
+        /// <summary>Staggers about (the tavern drunk): the clips' drunk walk and stand.</summary>
+        public bool Drunk
+        {
+            get => _drunk;
+            set { if (_drunk != value) { _drunk = value; _clipStyled = false; } }
+        }
+        private bool _drunk;
 
         /// <summary>
         /// Sitting on a towel (<see cref="AvatarPose.Sit"/>), the hips sit this far behind the character's root. Lying
@@ -233,6 +256,8 @@ namespace PleaseDontDrown.Avatars
         {
             set
             {
+                _seed = value;
+                _clipStyled = false;
                 _variety = Variety.From(value);
                 _hidden = HiddenInterval * Variety.Unit(value, 7); // crowds don't all pose on the same frame
             }
@@ -327,23 +352,30 @@ namespace PleaseDontDrown.Avatars
             UpdateIdle();
             SampleGround(dt);
             _rig.ResetPose(fingers: false); // PoseHands sets every finger bone
-            ClipDriven = WantsClips() && _clips.Prepare();
-            if (ClipDriven)
+
+            // The body from the clips, from the hand-made animation, or (switching) a crossfade of the two.
+            bool wantClips = WantsClips();
+            _clipMix = Mathf.MoveTowards(_clipMix, wantClips ? 1f : 0f, dt * 5f);
+            if (_clipMix > 0f && (_clips == null || !_clips.Prepare())) _clipMix = 0f;
+            _clipAct = ClipAct.None;
+            _clipActShare = 0f;
+            float clipMix = _clipMix * _clipMix * (3f - 2f * _clipMix);
+            if (_clipMix > 0f)
             {
-                // Standing, walking or running: the clips pose the body, legs and arms; the hands rest as they hang.
-                Vector3 ground = Motion.Velocity;
-                ground.y = 0f;
-                _clips.Evaluate(ground.magnitude, dt);
-                _rig.LeftHand?.Pose(HandPose.Relaxed);
-                _rig.RightHand?.Pose(HandPose.Relaxed);
+                ClipBody(dt);
+                if (_clipMix < 1f) SaveClipPose();
             }
-            else
+            if (_clipMix < 1f)
             {
+                if (_clipMix > 0f) _rig.ResetPose(fingers: false);
                 PoseBody();
                 PoseBurp();
                 PoseLegs();
                 PoseArms();
+                if (_clipMix > 0f) BlendToClipPose(clipMix);
             }
+            _clipActShare *= clipMix;
+            ClipDriven = _clipMix > 0.5f;
             PoseHead();
             PoseSpecial();
             KeepHandsOutOfHead();
@@ -366,18 +398,244 @@ namespace PleaseDontDrown.Avatars
         }
 
         /// <summary>
-        /// Only plain standing, walking and running go to the clips for now: anything with hands on something, a pose
-        /// of its own, water, a seat or a fight stays with the hand-made animation.
+        /// What goes to the clips: standing about (and talking), walking and running; and whole-body actions there are
+        /// good clips for: kneeling over a chest for CPR, knocked out and getting up, terrified, treading water.
+        /// Anything with hands on something, a seat, a fight stance, a swimmer making way or a pose of its own stays with
+        /// the hand-made animation.
         /// </summary>
         private bool WantsClips()
         {
             if (!UseClips && !(AvatarClips.Enabled && Application.isPlaying)) return false;
+            if (!AvatarClips.Available) return false;
             AvatarMotion m = Motion;
-            if (!m.Grounded || m.Swimming || m.Underwater || m.Climbing || m.Pose != AvatarPose.Normal || m.Seated || m.Cpr ||
-                m.Defib || m.CarryingPerson || m.Holding || m.Stance != FightStance.None || m.Flying || m.StarJump ||
-                m.Crouch > 0.05f || m.Eating || m.Drinking || m.Charge > 0.01f || GestureActive(AvatarGesture.Lunge, LungeSeconds)) return false;
-            _clips ??= new AvatarClips(_rig);
-            return true;
+            bool busy = m.Climbing || m.Seated || m.Defib || m.CarryingPerson || m.Flying || m.StarJump || m.Eating || m.Drinking ||
+                        m.Charge > 0.01f || GestureActive(AvatarGesture.Lunge, LungeSeconds) || _seat > 0.01f || _kneel > 0.01f ||
+                        _sit > 0.01f || _chair > 0.01f || _lie > 0.01f || _lieFront > 0.01f || _carried > 0.01f || _fly > 0.01f;
+            bool want;
+            if (busy) want = false;
+            // Knocked down (and getting up again): whatever was in the hands has gone, the guard is down.
+            else if (m.Pose == AvatarPose.Down || Rising) want = !m.Swimming;
+            else if (m.Holding || m.Stance != FightStance.None || m.Crouch > 0.05f) want = false;
+            else if (m.Cpr || _cpr > 0.01f) want = !m.Swimming;
+            else if (m.Swimming) want = !m.Underwater && !_crawling && _swimMove < 0.05f && _under < 0.01f && AvatarClips.Get(TreadClip) != null;
+            else if (m.Pose == AvatarPose.Scared) want = m.Grounded && AvatarClips.Get(ScaredClip) != null;
+            else want = m.Grounded && m.Pose == AvatarPose.Normal && _handsUp < 0.01f;
+            if (want) _clips ??= new AvatarClips(_rig);
+            return want;
+        }
+
+        // The clips for each action (Resources/Mixamo).
+        private const string FallClip = "Knocked Out Back", GetUpClip = "Getting Up From Back", CprClip = "CPR",
+            ScaredClip = "Terrified", TreadClip = "Treading Water";
+        /// <summary>Knocked down, the clip's fall plays this many times its own speed (a story fighter is only down for
+        /// 1.6-2.3 s: on the sand in 1.2 s).</summary>
+        private const float FallRate = 1.25f;
+        /// <summary>The fall in its clip: from the blow landing (before it, a boxer's guard) to lying still.</summary>
+        private const float FallFrom = 0.9f, FallTo = 2.4f;
+        /// <summary>Getting up in its clip: from the first stir (before it, lying still) to stood up.</summary>
+        private const float GetUpFrom = 2.9f, GetUpTo = 6.1f;
+        /// <summary>Getting up from the clip takes this long (sped up from the clip's 3.2 s: the fighter is back in
+        /// the fight soon after, StoryNpc.Combat).</summary>
+        private const float ClipGetUpTime = 1.8f;
+        /// <summary>The CPR clip, kneeling over the chest with straight arms, at this moment (seconds) of its
+        /// compressions: the hands come down onto the chest from here with each press.</summary>
+        private const float CprPoseTime = 0.4f;
+
+        /// <summary>Getting up after being knocked down (the get-up still playing).</summary>
+        private bool Rising => Motion.Pose != AvatarPose.Down && Now >= _upSince && Now - _upSince < ClipGetUpTime;
+
+        /// <summary>This character's idle, walk and run on the clips: women walk like women; each tourist stands about
+        /// their own way; the drunk staggers.</summary>
+        private AvatarClips.Style ClipStyle()
+        {
+            bool feminine = _rig.Look.Feminine || AvatarLook.Bodies.IsFeminine(_rig.Look.Body);
+            var style = AvatarClips.Style.Basic;
+            if (feminine) style.Walk = "Female Walk";
+            if (Lively)
+            {
+                string[] idles = feminine
+                    ? new[] { "Female Idle", "Happy Idle", "Weight Shift Idle", AvatarClips.Idle }
+                    : new[] { AvatarClips.Idle, "Weight Shift Idle", "Happy Idle", "Bored Idle" };
+                style.Idle = idles[Mathf.Abs(_seed) % idles.Length];
+            }
+            if (_drunk)
+            {
+                style.Idle = "Drunk Idle";
+                style.Walk = "Drunk Walk";
+            }
+            return style;
+        }
+
+        /// <summary>Which talking clip, by mood and by who it is (so two people talking don't wave their hands alike).</summary>
+        private string TalkClip()
+        {
+            if (Motion.Mood == AvatarMood.Angry) return (_seed & 1) == 0 ? "Arguing" : "Yelling";
+            if (Motion.Mood == AvatarMood.Happy) return "Talking Funny";
+            string[] talks = { "Talking", "Talking Question One Hand", "Talking Question Two Hands" };
+            return talks[Mathf.Abs(_seed / 3) % talks.Length];
+        }
+
+        /// <summary>
+        /// The body from the clips: getting about (with its own style, and talking), and on top whichever action the
+        /// moment calls for. The bits the clips can't know go on after: the hands pressing on the chest for CPR, how
+        /// high a swimmer floats, the hands.
+        /// </summary>
+        private void ClipBody(float dt)
+        {
+            AvatarMotion m = Motion;
+            float s = _rig.Scale;
+            if (!_clipStyled)
+            {
+                _clips.SetStyle(ClipStyle());
+                _clipStyled = true;
+            }
+            Vector3 ground = m.Velocity;
+            ground.y = 0f;
+            _clips.Talk(TalkClip(), _talk);
+
+            // The action.
+            string file = null;
+            float time = 0f, weight = 0f;
+            Vector3 offset = Vector3.zero;
+            float yaw = 0f;
+            if (m.Pose == AvatarPose.Down && !m.Swimming)
+            {
+                // Over from facing ahead, landing on the back where the hand-made fall lands (just behind the feet:
+                // where the character still is for everyone else).
+                _clipAct = ClipAct.Down;
+                file = FallClip;
+                time = Mathf.Min(FallFrom + (Now - _downSince) * FallRate, AvatarClips.Length(FallClip));
+                weight = Mathf.Clamp01((Now - _downSince) / 0.12f);
+                FallAlignment(Mathf.InverseLerp(FallFrom, FallTo, time), out yaw, out offset);
+            }
+            else if (Rising)
+            {
+                // Up from exactly where and how the fall left the body lying, ending stood where the character is,
+                // facing ahead. (Moving off before it's done, the get-up gives way to the walk.)
+                _clipAct = ClipAct.GetUp;
+                file = GetUpClip;
+                float u = Mathf.Clamp01((Now - _upSince) / ClipGetUpTime);
+                time = Mathf.Lerp(GetUpFrom, GetUpTo, u);
+                Vector3 flatVelocity = new Vector3(_smoothVelocity.x, 0f, _smoothVelocity.z);
+                weight = (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.85f, 1f, u))) * (1f - Mathf.InverseLerp(0.5f, 1.5f, flatVelocity.magnitude));
+                FallAlignment(1f, out float lyingYaw, out _);
+                var (startHips, startTurn) = _clips.HipsPoseAt(GetUpClip, GetUpFrom);
+                var (endHips, endTurn) = _clips.HipsPoseAt(GetUpClip, GetUpTo);
+                float lyingFacing = AvatarClips.FacingYaw(_clips.HipsPoseAt(FallClip, FallTo).rotation) + lyingYaw;
+                float yaw0 = Mathf.DeltaAngle(AvatarClips.FacingYaw(startTurn), lyingFacing), yaw1 = -AvatarClips.FacingYaw(endTurn);
+                Vector3 from = LyingAt - Quaternion.Euler(0f, yaw0, 0f) * startHips, to = -(Quaternion.Euler(0f, yaw1, 0f) * endHips);
+                float k = Mathf.SmoothStep(0f, 1f, u);
+                yaw = Mathf.LerpAngle(yaw0, yaw1, k);
+                offset = Vector3.Lerp(from, to, k);
+                offset.y = 0f;
+            }
+            else if (_cpr > 0.001f && !m.Swimming)
+            {
+                _clipAct = ClipAct.Cpr;
+                file = CprClip;
+                time = CprPoseTime;
+                weight = _cpr;
+            }
+            else if (_scared > 0.001f)
+            {
+                _clipAct = ClipAct.Scared;
+                file = ScaredClip;
+                time = Now + _variety.Phase;
+                weight = _scared;
+            }
+            else if (_swim > 0.001f)
+            {
+                _clipAct = ClipAct.Tread;
+                file = TreadClip;
+                time = Now + _variety.Phase;
+                weight = _swim;
+            }
+            _clipActShare = weight;
+            _clips.Action(file, time, weight, offset, yaw);
+            _clips.Evaluate(_clipAct == ClipAct.None ? ground.magnitude : 0f, dt);
+
+            Transform hips = B(Bone.Hips);
+            // Standing about (and talking), the clips turn the body now and then (looking round, arguing): kept
+            // facing the way the character does, near enough, so nobody turns their back on whoever they talk to.
+            if (_clipAct == ClipAct.None) KeepFacing(hips, 30f, 1f - Mathf.Clamp01(ground.magnitude / 0.5f));
+            if (_clipAct == ClipAct.Tread)
+                hips.position += Vector3.up * (_swim * 0.18f * s); // as high in the water as the hand-made treading
+            if (_clipAct == ClipAct.Scared)
+                KeepFacing(hips, 35f, _scared); // (the clip spins right round in its panic: the scared keep facing the danger)
+            if (_clipAct == ClipAct.Cpr)
+            {
+                // The clip kneels a little turned and off to one side of where it was captured: square on to the chest,
+                // knees where the game kneels the rescuer (the same place the hand-made kneel has the hips), so the
+                // hands reach the chest and the lips reach the mouth for a breath.
+                KeepFacing(hips, 0f, _cpr);
+                Vector3 local = transform.InverseTransformPoint(hips.position);
+                Vector3 want = new Vector3(0f, local.y, -CprKneelBack * s);
+                hips.position += transform.TransformVector(new Vector3(want.x - local.x, 0f, want.z - local.z) * _cpr);
+                // Each press: the body dips onto the straight arms (the hands go down with it, onto the chest).
+                float pumpDip = Mathf.Max(0f, 1f - (Now - _lastPump) / 0.25f) * 0.05f * s * _cpr;
+                hips.position -= Vector3.up * pumpDip;
+                if (!m.Defib) PoseCprArms(_cpr);
+            }
+            KeepLegsAboveGround(hips, s, _clipAct == ClipAct.Cpr ? _cpr : 0f); // (knees on the sand, not in it)
+            GestureLayer();
+            IdleLayer(talkHands: false); // (the talking clip talks with the hands)
+            PoseHands();
+        }
+
+        /// <summary>The CPR kneel: hips this far (times the body's scale) behind the root, as the hand-made kneel has them.</summary>
+        private const float CprKneelBack = 0.05f;
+
+        /// <summary>
+        /// Turns the whole clip-posed body (about its hips) so it faces no more than <paramref name="limit"/> degrees
+        /// away from where the character faces, by <paramref name="weight"/>.
+        /// </summary>
+        private void KeepFacing(Transform hips, float limit, float weight)
+        {
+            Vector3 facing = Vector3.ProjectOnPlane(hips.forward, Vector3.up);
+            if (facing.sqrMagnitude < 0.01f || weight < 0.001f) return;
+            float yaw = Vector3.SignedAngle(transform.forward, facing, Vector3.up);
+            float over = yaw - Mathf.Clamp(yaw, -limit, limit);
+            if (Mathf.Abs(over) > 0.01f) hips.rotation = Quaternion.AngleAxis(-over * weight, Vector3.up) * hips.rotation;
+        }
+
+        /// <summary>Where the knocked-out body's hips lie (rig space, on the sand): where the hand-made fall puts them.</summary>
+        private Vector3 LyingAt => new Vector3(0f, 0f, -0.45f * _rig.Scale);
+
+        /// <summary>
+        /// The fall clip turned so it starts facing ahead, and moved (more as it goes over) so it starts at the feet and
+        /// lands at <see cref="LyingAt"/>. <paramref name="progress"/>: 0 the blow, 1 lying still.
+        /// </summary>
+        private void FallAlignment(float progress, out float yaw, out Vector3 offset)
+        {
+            var (startHips, startTurn) = _clips.HipsPoseAt(FallClip, FallFrom);
+            Vector3 endHips = _clips.HipsPoseAt(FallClip, FallTo).position;
+            yaw = -AvatarClips.FacingYaw(startTurn);
+            Quaternion turn = Quaternion.Euler(0f, yaw, 0f);
+            Vector3 from = -(turn * startHips), to = LyingAt - turn * endHips;
+            offset = Vector3.Lerp(from, to, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(progress)));
+            offset.y = 0f;
+        }
+
+        /// <summary>Keeps the clips' pose of the body (local turns, and the hips' place) to blend the hand-made one into.</summary>
+        private void SaveClipPose()
+        {
+            Bone[] bones = AvatarClips.PosedBones;
+            for (int i = 0; i < bones.Length; i++)
+                if (B(bones[i]) != null) _clipPose[i] = B(bones[i]).localRotation;
+            _clipHips = B(Bone.Hips).localPosition;
+        }
+
+        /// <summary>The hand-made pose that is on the body now, this much of the way to the clips' saved one.</summary>
+        private void BlendToClipPose(float w)
+        {
+            Bone[] bones = AvatarClips.PosedBones;
+            for (int i = 0; i < bones.Length; i++)
+            {
+                Transform t = B(bones[i]);
+                if (t != null) t.localRotation = Quaternion.Slerp(t.localRotation, _clipPose[i], w);
+            }
+            Transform hips = B(Bone.Hips);
+            hips.localPosition = Vector3.Lerp(hips.localPosition, _clipHips, w);
         }
 
         private void OnDestroy() => _clips?.Release();
@@ -1372,7 +1630,7 @@ namespace PleaseDontDrown.Avatars
 
             ArmIKLayers();
             GestureLayer();
-            IdleLayer();
+            IdleLayer(talkHands: true);
             PoseHands();
         }
 
@@ -1380,7 +1638,7 @@ namespace PleaseDontDrown.Avatars
         /// Habits of someone standing around: scratching the head, hands on the hips, a stretch, shading the eyes
         /// to look out to sea, wiping the brow; and talking with the hands.
         /// </summary>
-        private void IdleLayer()
+        private void IdleLayer(bool talkHands)
         {
             float s = _rig.Scale;
             Transform upperL = B(Bone.UpperArmL), foreL = B(Bone.ForearmL), upperR = B(Bone.UpperArmR), foreR = B(Bone.ForearmR);
@@ -1388,7 +1646,7 @@ namespace PleaseDontDrown.Avatars
             Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
 
             // Talking: the right hand comes up and beats time with the words (only someone standing with free hands).
-            float talking = _talk * IdleWeight * (1f - _actWeight) * (Lively ? 1f : 0f);
+            float talking = talkHands ? _talk * IdleWeight * (1f - _actWeight) * (Lively ? 1f : 0f) : 0f;
             if (talking > 0.01f)
             {
                 float beat = Mathf.Sin(Now * 5.2f + _variety.Phase) * 0.5f + Mathf.Sin(Now * 2.1f) * 0.5f;
@@ -1723,38 +1981,49 @@ namespace PleaseDontDrown.Avatars
                 IK.Solve(upperR, foreR, la, lb, mouth, -up + right * 0.6f, _eat, false);
             }
 
-            if (_cpr > 0.01f)
+            if (_cpr > 0.01f) PoseCprArms(_cpr);
+        }
+
+        /// <summary>
+        /// CPR: arms straight down, hands stacked on the chest (with the defibrillator: on its two paddles), leaning
+        /// over as far as it takes for straight arms to reach.
+        /// </summary>
+        private void PoseCprArms(float cpr)
+        {
+            AvatarMotion m = Motion;
+            Transform upperL = B(Bone.UpperArmL), foreL = B(Bone.ForearmL), upperR = B(Bone.UpperArmR), foreR = B(Bone.ForearmR);
+            float la = _rig.UpperArmLength, lb = _rig.ForearmLength + _rig.HandLength * 0.5f;
+            Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
+            Vector3 elbowL = -fwd * 0.4f - up * 0.6f - right * 0.5f;
+            Vector3 elbowR = -fwd * 0.4f - up * 0.6f + right * 0.5f;
+            Vector3 point = m.Defib ? (m.GripLeft.Point + m.GripRight.Point) * 0.5f : m.CprPoint;
+            if (point == Vector3.zero) point = transform.position + fwd * 0.55f + up * 0.15f;
+            // Leaning further over a chest the straight arms don't reach (a wide round dad is knelt beside from
+            // further out): the shoulders come over the hands, the way compressions are really done, instead of
+            // the hands hovering in the air in front of an upright rescuer.
+            Transform spine = B(Bone.Spine);
+            float armReach = (la + lb) * 0.97f, leaned = 0f;
+            for (int k = 0; k < 4 && leaned < MaxCprLean; k++)
             {
-                // Arms straight down, hands stacked on the chest (with the defibrillator: on its two paddles).
-                Vector3 point = m.Defib ? (m.GripLeft.Point + m.GripRight.Point) * 0.5f : m.CprPoint;
-                if (point == Vector3.zero) point = transform.position + fwd * 0.55f + up * 0.15f;
-                // Leaning further over a chest the straight arms don't reach (a wide round dad is knelt beside from
-                // further out): the shoulders come over the hands, the way compressions are really done, instead of
-                // the hands hovering in the air in front of an upright rescuer.
-                Transform spine = B(Bone.Spine);
-                float armReach = (la + lb) * 0.97f, leaned = 0f;
-                for (int k = 0; k < 4 && leaned < MaxCprLean; k++)
-                {
-                    Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
-                    float gap = Vector3.Distance(shoulders, point + up * 0.05f) - armReach;
-                    if (gap <= 0.005f) break;
-                    float torso = Mathf.Max(Vector3.Distance(spine.position, shoulders), 0.1f);
-                    float step = Mathf.Min(gap / torso * Mathf.Rad2Deg, MaxCprLean - leaned);
-                    Turn(spine, right, step * _cpr);
-                    leaned += step;
-                }
-                if (m.Defib)
-                {
-                    // Leaned over: the hands again on the paddles' handles.
-                    IK.Solve(upperL, foreL, la, lb, m.GripLeft.Point, elbowL, _hold, false);
-                    IK.Solve(upperR, foreR, la, lb, m.GripRight.Point, elbowR, _hold, false);
-                    return;
-                }
-                // (One right on top of the other, on the middle of the chest: 5 cm apart sideways they read as two
-                // hands side by side.)
-                IK.Solve(upperR, foreR, la, lb, point + up * 0.02f, -fwd + right, _cpr, false);
-                IK.Solve(upperL, foreL, la, lb, point + up * 0.075f, -fwd - right, _cpr, false);
+                Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
+                float gap = Vector3.Distance(shoulders, point + up * 0.05f) - armReach;
+                if (gap <= 0.005f) break;
+                float torso = Mathf.Max(Vector3.Distance(spine.position, shoulders), 0.1f);
+                float step = Mathf.Min(gap / torso * Mathf.Rad2Deg, MaxCprLean - leaned);
+                Turn(spine, right, step * cpr);
+                leaned += step;
             }
+            if (m.Defib)
+            {
+                // Leaned over: the hands again on the paddles' handles.
+                IK.Solve(upperL, foreL, la, lb, m.GripLeft.Point, elbowL, _hold, false);
+                IK.Solve(upperR, foreR, la, lb, m.GripRight.Point, elbowR, _hold, false);
+                return;
+            }
+            // (One right on top of the other, on the middle of the chest: 5 cm apart sideways they read as two
+            // hands side by side.)
+            IK.Solve(upperR, foreR, la, lb, point + up * 0.02f, -fwd + right, cpr, false);
+            IK.Solve(upperL, foreL, la, lb, point + up * 0.075f, -fwd - right, cpr, false);
         }
 
         private void GestureLayer()
@@ -1992,14 +2261,17 @@ namespace PleaseDontDrown.Avatars
                 Turn(B(Bone.Head), transform.right, -(4f + 14f * bow) * _kneel);
             }
 
-            if (_scared > 0.01f || _handsUp > 0.01f)
+            // (Whatever the clips' action already does, the hand-made layer for it only adds what's left.)
+            float handMade = 1f - _clipActShare;
+            float scared = _scared * (_clipAct == ClipAct.Scared ? handMade : 1f);
+            if (scared > 0.01f || _handsUp > 0.01f)
             {
                 // Scared: hands up by the face, shoulders in. Hands up: arms straight up ("don't shoot").
                 float shake = Mathf.Sin(Now * 30f) * 2f;
-                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(-60f + shake, 0f, -35f), _scared);
-                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-120f, 0f, 0f), _scared);
-                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-60f - shake, 0f, 35f), _scared);
-                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-120f, 0f, 0f), _scared);
+                upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(-60f + shake, 0f, -35f), scared);
+                foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-120f, 0f, 0f), scared);
+                upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(-60f - shake, 0f, 35f), scared);
+                foreR.localRotation = Quaternion.Slerp(foreR.localRotation, Quaternion.Euler(-120f, 0f, 0f), scared);
                 upperL.localRotation = Quaternion.Slerp(upperL.localRotation, Quaternion.Euler(0f, 0f, -165f), _handsUp);
                 foreL.localRotation = Quaternion.Slerp(foreL.localRotation, Quaternion.Euler(-10f, 0f, 0f), _handsUp);
                 upperR.localRotation = Quaternion.Slerp(upperR.localRotation, Quaternion.Euler(0f, 0f, 165f), _handsUp);
@@ -2008,7 +2280,8 @@ namespace PleaseDontDrown.Avatars
                 _rig.RightHand?.Pose(HandPose.Wave);
             }
 
-            if (_down > 0.01f) PoseDown(hips, upperL, foreL, upperR, foreR, s);
+            float down = _down * (_clipAct is ClipAct.Down or ClipAct.GetUp ? handMade : 1f);
+            if (down > 0.01f) PoseDown(hips, upperL, foreL, upperR, foreR, s, down);
 
             BeachPoses(hips, upperL, foreL, upperR, foreR, s);
             AimedGestures(upperL, foreL, upperR, foreR);
@@ -2038,7 +2311,7 @@ namespace PleaseDontDrown.Avatars
         /// going down the knees give first, the hips drop and sit back, then the back goes over and lands; getting up
         /// it sits up with the feet drawn in, rolls forward into a crouch over the feet and stands from there.
         /// </summary>
-        private void PoseDown(Transform hips, Transform upperL, Transform foreL, Transform upperR, Transform foreR, float s)
+        private void PoseDown(Transform hips, Transform upperL, Transform foreL, Transform upperR, Transform foreR, float s, float w)
         {
             Vector3 rest = _rig.RestPosition(Bone.Hips);
             var lying = new DownKey(new Vector3(0f, 0.13f * s, -0.45f * s), -90f, 0f, 0f, 8f, -50f, 1f);
@@ -2068,7 +2341,6 @@ namespace PleaseDontDrown.Avatars
             }
 
             bool gettingUp = Motion.Pose != AvatarPose.Down;
-            float w = _down;
             hips.localPosition = Vector3.Lerp(hips.localPosition, key.Hips, w);
             hips.localRotation = Quaternion.Slerp(hips.localRotation, Quaternion.Euler(key.HipTurn, 0f, 0f), w);
             B(Bone.Spine).localRotation = Quaternion.Slerp(B(Bone.Spine).localRotation, Quaternion.Euler(key.Curl, 0f, 0f), w);
@@ -2102,9 +2374,9 @@ namespace PleaseDontDrown.Avatars
         /// the ground, the whole body is lifted just enough to keep it on top. (Not for sitting or lying on a towel:
         /// there the heels rest on the sand on purpose, and lifting them sat people in the air.)
         /// </summary>
-        private void KeepLegsAboveGround(Transform hips, float s)
+        private void KeepLegsAboveGround(Transform hips, float s, float kneeling = 0f)
         {
-            float low = Mathf.Max(_down, _kneel);
+            float low = Mathf.Max(Mathf.Max(_down, _kneel), kneeling);
             if (low < 0.01f || _swim > 0.01f || _seat > 0.01f || _sit > 0.01f || _lie > 0.01f || _lieFront > 0.01f || _carried > 0.01f || !Motion.Grounded) return;
             float floor = transform.position.y;
             float margin = 0.05f * s; // half a leg's thickness
@@ -2163,25 +2435,28 @@ namespace PleaseDontDrown.Avatars
             if (_down > 0.01f && Motion.Pose == AvatarPose.Down)
             {
                 float since = Now - _downSince;
+                // (The clips' fall throws its own arms and lands its own way: only the stars after it from here.)
+                float own = _clipAct == ClipAct.Down ? 1f - _clipActShare : 1f;
                 // Going over: the arms fly up as the back goes over...
-                if (since > 0.15f && since < FallTime)
+                if (since > 0.15f && since < FallTime && own > 0.01f)
                 {
                     float fling = Mathf.Sin((since - 0.15f) / (FallTime - 0.15f) * Mathf.PI);
-                    Turn(upperL, transform.right, -110f * fling);
-                    Turn(upperR, transform.right, -110f * fling);
+                    Turn(upperL, transform.right, -110f * fling * own);
+                    Turn(upperR, transform.right, -110f * fling * own);
                 }
                 // ...it lands with a bounce (and the head knocks back on the sand)...
                 const float land = FallTime - 0.05f;
-                if (since > land && since < land + 0.3f)
+                if (since > land && since < land + 0.3f && own > 0.01f)
                 {
-                    float bounce = Mathf.Sin((since - land) / 0.3f * Mathf.PI);
+                    float bounce = Mathf.Sin((since - land) / 0.3f * Mathf.PI) * own;
                     hips.position += Vector3.up * (bounce * 0.06f * s * _down);
                     Turn(head, transform.right, -14f * bounce);
                 }
                 // ...and lies there seeing stars, the head rolling slowly side to side.
-                if (since > FallTime + 0.2f)
+                float stars = _clipAct == ClipAct.Down ? (FallTo - FallFrom) / FallRate + 0.2f : FallTime + 0.2f;
+                if (since > stars)
                 {
-                    float dizzy = Mathf.Clamp01((since - FallTime - 0.2f) * 2f) * _down;
+                    float dizzy = Mathf.Clamp01((since - stars) * 2f) * _down;
                     Vector3 along = (head.position - neck.position).normalized;
                     Turn(head, along, Mathf.Sin(Now * 2.4f) * 30f * dizzy);
                 }
