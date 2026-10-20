@@ -42,8 +42,9 @@ about shoulder width with a clear gap between the thighs, toes forward. Head str
 closed in a small smile, eyes open looking forward.
 
 Bald: a smooth round head with no hair (hair is added separately). Plain one-colour skin (medium warm tan), no
-makeup, no freckles, no tattoos. A plain matte grey one-piece swimsuit, simple and tight to the body, no straps
-details, no strings, bows, frills or loose parts.
+makeup, no freckles, no tattoos. A plain matte grey two-piece swimsuit, tight to the body: a simple
+bikini top (two plain triangle cups with straight thin shoulder straps) and simple normal bikini bottoms, the belly
+bare between them; no strings hanging, no bows, ties, frills or loose parts.
 
 Plain light grey background, even soft studio light, no floor shadow, no text, no props, whole body in frame with
 space around it.
@@ -131,3 +132,15 @@ Sandy (and Sandy at her Lost & Found booth), the sunburnt dad and his ten look-a
 Lola and the six beach girls, the barista, the bartender, Marisol and the second hotel attendant, the hotel
 director, Bellhop Benny, the black-tee tourist, Milo, the THIEF, the four pirates, the Pirate King, the FK rival
 lifeguard. Every one is P4 on P1 or P2; none gets its own 3D model.
+
+### The chosen woman base (2026-10-21): swap the one-piece for a two-piece
+
+`base_woman.png` came out in a one-piece; the girls wear a normal bikini top and bottoms. Attach `base_woman.png`:
+
+```
+Same character, same body, same face, same A-pose, same camera, same four views. Only change the swimsuit: replace
+the grey one-piece with a plain matte grey two-piece, tight to the body: a simple bikini top (two plain triangle
+cups with straight thin shoulder straps, a thin band under the bust) and simple normal bikini bottoms, the belly
+bare between them. No strings hanging, no bows, ties, frills or loose parts. Plain light grey background, no floor
+shadow, no text.
+```
