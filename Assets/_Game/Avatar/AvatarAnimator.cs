@@ -464,13 +464,14 @@ namespace PleaseDontDrown.Avatars
             return style;
         }
 
+        private static readonly string[] Talks = { "Talking", "Talking Question One Hand", "Talking Question Two Hands" };
+
         /// <summary>Which talking clip, by mood and by who it is (so two people talking don't wave their hands alike).</summary>
         private string TalkClip()
         {
             if (Motion.Mood == AvatarMood.Angry) return (_seed & 1) == 0 ? "Arguing" : "Yelling";
             if (Motion.Mood == AvatarMood.Happy) return "Talking Funny";
-            string[] talks = { "Talking", "Talking Question One Hand", "Talking Question Two Hands" };
-            return talks[Mathf.Abs(_seed / 3) % talks.Length];
+            return Talks[Mathf.Abs(_seed / 3) % Talks.Length];
         }
 
         /// <summary>
@@ -547,7 +548,8 @@ namespace PleaseDontDrown.Avatars
             if (_clipAct == ClipAct.None) FeetOnGround(hips, dt);
             KeepLegsAboveGround(hips, s);
             GestureLayer();
-            IdleLayer(talkHands: false); // (the talking clip talks with the hands)
+            // (No hand-made habits on the clips: the idles and the talking clips have their own life. Laid over them, a
+            // stretch held both arms straight up, eyes were shaded with the arms still out: the user, 2026-10-20.)
             PoseHands();
         }
 

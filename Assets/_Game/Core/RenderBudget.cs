@@ -14,12 +14,13 @@ namespace PleaseDontDrown.Core
     /// </summary>
     public static class RenderBudget
     {
-        // Hidden below this share of the screen height (before the quality level's LOD bias).
+        // Hidden below this share of the screen height (before the quality level's LOD bias). (At 0.6% on High the
+        // whole island 3 jungle, 3.6 million triangles, was drawn from island 1 across the sea: 16 million a frame.)
         private static float CullHeight => GraphicsQuality.Current switch
         {
-            GraphicsQuality.Tier.Low => 0.02f,
-            GraphicsQuality.Tier.Medium => 0.012f,
-            _ => 0.006f,
+            GraphicsQuality.Tier.Low => 0.03f,
+            GraphicsQuality.Tier.Medium => 0.02f,
+            _ => 0.012f,
         };
 
         // Meshes smaller than this (largest side, metres) cast no shadow.
