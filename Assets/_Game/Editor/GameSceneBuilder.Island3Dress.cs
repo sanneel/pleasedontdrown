@@ -39,6 +39,7 @@ namespace PleaseDontDrown.Editor
             foreach (var s in Island3Signs) PirateSign(root, s.name, s.at, s.yaw, s.text, board, post, paint);
 
             DressPirateDock(island, root, post);
+            DressPirateBeach(root);
             Debug.Log($"[Island3Dress] PASS: {Island3Signs.Length} signs, the east dock dressed ({root.GetComponentsInChildren<Transform>().Length} objects)");
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
@@ -60,6 +61,51 @@ namespace PleaseDontDrown.Editor
                 TextMesh t = WorldText(root, "Words", new Vector3(0f, 1.9f, 0.03f + 0.035f * side), text, 80, 0.026f, paint);
                 t.transform.localRotation = Quaternion.Euler(0f, side > 0 ? 180f : 0f, side > 0 ? -3f : 3f);
             }
+        }
+
+        /// <summary>
+        /// The east beach by the village (2026-10-19, Tripo `fishing_net_rack` and `rope_fence`): two nets drying on
+        /// driftwood racks on the sand either side of the dock, and a rope fence along the top of the beach in front of
+        /// the village, open where the path comes down to the dock.
+        /// </summary>
+        private static void DressPirateBeach(Transform root)
+        {
+            var group = new GameObject("PirateBeachDress").transform;
+            group.SetParent(root, false);
+            int nets = 0, fences = 0;
+            GameObject Place(string model, Vector2 at, float yaw)
+            {
+                var feet = new Vector3(at.x, 0f, at.y);
+                feet.y = SurfaceUnder(feet, 30f);
+                if (feet.y < WaterLevel + 0.2f) return null;
+                return TripoModel(model, group, feet, yaw, Vector3.one);
+            }
+            foreach ((Vector2 at, float yaw) in new[] { (new Vector2(113f, -884f), 80f), (new Vector2(113.5f, -919f), 100f) })
+            {
+                GameObject n = Place("fishing_net_rack", at, yaw);
+                if (n == null) continue;
+                var box = n.AddComponent<BoxCollider>();
+                Bounds b = TripoBounds(n.transform, n.transform);
+                box.center = b.center;
+                box.size = new Vector3(b.size.x, b.size.y, Mathf.Min(b.size.z, 0.6f));
+                nets++;
+            }
+            // Fence segments (4 m) end to end along the beach top at x 106, z -858 to -897, a gap for the dock path.
+            for (float z = -860f; z > -898f; z -= 4f)
+            {
+                if (z < -893f && z > -898f) continue;
+                GameObject fence = Place("rope_fence", new Vector2(106.3f, z), 90f);
+                if (fence == null) continue;
+                foreach (MeshFilter mf in fence.GetComponentsInChildren<MeshFilter>()) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                fences++;
+            }
+            foreach ((Vector2 at, float yaw) in new[] { (new Vector2(106.3f, -908f), 90f), (new Vector2(106.3f, -912f), 90f), (new Vector2(106.3f, -916f), 90f) })
+                if (Place("rope_fence", at, yaw) is { } f2)
+                {
+                    foreach (MeshFilter mf in f2.GetComponentsInChildren<MeshFilter>()) mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                    fences++;
+                }
+            Debug.Log($"[Island3Dress] east beach: {nets} net racks, {fences} fence sections");
         }
 
         private static void DressPirateDock(Transform island, Transform root, Material wood)

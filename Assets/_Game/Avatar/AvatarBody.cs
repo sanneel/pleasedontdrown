@@ -14,8 +14,6 @@ namespace PleaseDontDrown.Avatars
         public string DisplayName;
         public Mesh Mesh;               // bone order = AvatarRig's (body bones, then left and right fingers)
         public Material Material;
-        [Tooltip("The same, with the painted eyes shut (painted into the texture): worn while the eyes are closed. Null: none.")]
-        public Material ClosedEyesMaterial;
         [Tooltip("Rest local position of every AvatarRig.Bone (limbs point down their -Y, like the code-built rig).")]
         public Vector3[] RestPositions;
         public float Scale = 1f;        // as AvatarRig.Scale: hip height / 0.92
@@ -33,9 +31,13 @@ namespace PleaseDontDrown.Avatars
         [Tooltip("Which way each finger points from its knuckle, in hand space, as a right hand (empty: straight down). " +
                  "Cartoon hands fan their fingers out; bent the straight-down way they curled sideways into a claw.")]
         public Vector3[] FingerDirsL, FingerDirsR;
-        [Tooltip("Eyelids on the eye bones and an open mouth on the mouth bone are part of the mesh: scaling those bones " +
-                 "up closes the eyes / opens the mouth over the painted face.")]
+        [Tooltip("A face was found in the texture: the eye and mouth bones are on it.")]
         public bool HasFace;
+        [Tooltip("The living face (Editor/MeshyCharacters.FaceRig.cs, AvatarFace): the material's face shader can shut the " +
+                 "eyes and move them about; the mesh is cut along the lips with a jaw shape key (and smile, frown, brows).")]
+        public bool FaceEyes, FaceMouth;
+        [Tooltip("The inside of the mouth (the last submesh): the body's material with front faces culled. Null: no mouth inside.")]
+        public Material MouthMaterial;
         [Tooltip("The head's size from the head bone: up to its top, out to its widest, forward to the face, back to the back of the skull (hair included).")]
         public float HeadTop, HeadHalfWidth, HeadFront, HeadBack;
 

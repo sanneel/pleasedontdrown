@@ -427,6 +427,78 @@ namespace PleaseDontDrown.Editor
             }
         }
 
+        /// <summary>
+        /// FeetBatch: every body on the clips standing (each lively idle), talking and walking, set up as the game sets
+        /// them (the body a child of its character, at a height of its own in it) on floors at sea level, up on a porch
+        /// and down in a dip: the lower sole must stay on the floor. (Tested only at the origin, the clips' bodies
+        /// walked over the sea and knee-deep in the sand in the game, 2026-10-20.)
+        /// </summary>
+        public static void FeetBatch()
+        {
+            try
+            {
+                ReviewCamera();
+                byte[] bodies = BodiesArg(string.Join(",", AllBodies));
+                int failures = 0, k = 0;
+                foreach (byte body in bodies)
+                    foreach (float floorY in new[] { 0f, 1.8f, -0.6f })
+                        foreach (float inside in new[] { 0f, 0.15f, -0.2f })
+                            foreach (string state in new[] { "idle", "talk", "walk" })
+                            {
+                                var at = new Vector3(600f + 12f * (k % 20), floorY, 12f * (k / 20));
+                                k++;
+                                GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                                floor.transform.position = at - Vector3.up * 0.5f;
+                                floor.transform.localScale = new Vector3(10f, 1f, 10f);
+                                Physics.SyncTransforms();
+                                var character = new GameObject("Character " + body);
+                                character.transform.position = at;
+                                var go = new GameObject("Avatar");
+                                go.transform.SetParent(character.transform, false);
+                                go.transform.localPosition = Vector3.up * inside;
+                                AvatarRig rig = Spawn(go, body);
+                                var animator = go.AddComponent<AvatarAnimator>();
+                                animator.Rig = rig;
+                                animator.UseClips = true;
+                                animator.Lively = true;
+                                animator.Seed = 3 + k;
+                                const float dt = 1f / 30f;
+                                float worstOver = 0f, worstUnder = 0f;
+                                for (float t = 0f; t < 3f; t += dt)
+                                {
+                                    AvatarAnimator.TimeOverride = 300f + t;
+                                    var m = new AvatarMotion { FacingYaw = 0f, Grounded = true, Talking = state == "talk" };
+                                    if (state == "walk") m.Velocity = Vector3.forward * 1.3f;
+                                    character.transform.position += m.Velocity * dt;
+                                    // (The game keeps the character on the floor: here the floor is flat at floorY.)
+                                    animator.Motion = m;
+                                    animator.Tick(dt);
+                                    Physics.SyncTransforms();
+                                    if (t < 1f) continue;
+                                    float sole = Mathf.Min(rig[AvatarRig.Bone.FootL].position.y, rig[AvatarRig.Bone.FootR].position.y) - rig.AnkleHeight;
+                                    float gap = sole - floorY;
+                                    worstOver = Mathf.Max(worstOver, gap);
+                                    worstUnder = Mathf.Min(worstUnder, gap);
+                                }
+                                AvatarAnimator.TimeOverride = null;
+                                bool clips = animator.ClipDriven;
+                                bool ok = clips && worstOver < 0.03f && worstUnder > -0.03f;
+                                if (!ok) failures++;
+                                if (!ok || body == bodies[0])
+                                    Debug.Log($"[Feet] {(ok ? "PASS" : "FAIL")} body {body} floor {floorY:0.0} inside {inside:0.0} {state}: lower sole {worstUnder * 100f:0.0} to {worstOver * 100f:0.0} cm off the floor{(clips ? "" : " (not on the clips!)")}");
+                                Object.DestroyImmediate(character);
+                                Object.DestroyImmediate(floor);
+                            }
+                Debug.Log(failures == 0 ? $"[Feet] ALL PASS ({k} cases)" : $"[Feet] {failures} FAILED of {k}");
+                EditorApplication.Exit(failures == 0 ? 0 : 1);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Feet] FAILED: {e}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         public static void StatesBatch()
         {
             try

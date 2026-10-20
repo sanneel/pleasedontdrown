@@ -97,6 +97,8 @@ namespace PleaseDontDrown.Avatars
             public const byte HotelAttendantB = 28;
             /// <summary>Tripo (ArtSource/Tripo/Latest, 2026-10-19): Finders Keepers' lifeguards, orange shirt, white shorts, orange visor.</summary>
             public const byte FkRival = 29;
+            /// <summary>Tripo (ArtSource/Tripo/Latest, 2026-10-19): the Grand Coral's bellhop, a young man in the teal and gold uniform.</summary>
+            public const byte HotelBellhop = 30;
 
             /// <summary>
             /// The tourist women (Tripo, ArtSource/Tripo/Tourists): Lola, and four girls sharing one Smart Mesh body with

@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: tourist_girl_barista_material
-  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
+  m_Shader: {fileID: 4800000, guid: bf1d7f4f955d0ac4c9922af792891945, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -17,8 +17,7 @@ Material:
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap:
-    RenderType: Opaque
+  stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -26,7 +25,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: e385500b96d014442b136f7f9dab08a0, type: 3}
+        m_Texture: {fileID: 2800000, guid: aa9f9c28278878e41b047432328ae3ea, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -49,8 +48,16 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _FaceLid:
+        m_Texture: {fileID: 2800000, guid: 21ecbcbb424824a45a4de35ae454604d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _FaceOpen:
+        m_Texture: {fileID: 2800000, guid: c90f4734f6f32bb40a58cd5b35f973c5, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: e385500b96d014442b136f7f9dab08a0, type: 3}
+        m_Texture: {fileID: 2800000, guid: aa9f9c28278878e41b047432328ae3ea, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -98,6 +105,9 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
+    - _FaceMidX: -0.0020366032
+    - _FaceOn: 1
+    - _FaceShutAt: 0.3
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -119,6 +129,13 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _FaceEyeL: {r: -0.049999107, g: 1.518598, b: 0.02655, a: 0.020051956}
+    - _FaceEyeR: {r: 0.049750898, g: 1.5193815, b: 0.027, a: 0.02046144}
+    - _FaceGaze: {r: 0, g: 0, b: 0, a: 0}
+    - _FaceLash: {r: 0.00081746426, g: 0.000055175948, b: 0.0030507743, a: 1}
+    - _FaceLids: {r: 0, g: 0, b: 0, a: 0}
+    - _FaceRect: {r: -0.079549104, g: 1.4955249, b: 6.2774634, a: 21.097046}
+    - _FaceSclera: {r: 0.8458379, g: 0.7574507, b: 0.6993035, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

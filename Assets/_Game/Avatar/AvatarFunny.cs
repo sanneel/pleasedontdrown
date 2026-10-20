@@ -64,6 +64,16 @@ namespace PleaseDontDrown.Avatars
         }
 
         private float _dizzyUntil = float.NegativeInfinity;
+        private float _lidL, _lidR;
+
+        /// <summary>How far each googly eye's lid is down (0 open .. 1 shut), from the face (AvatarRig.SetFace).</summary>
+        public void SetLids(float left, float right)
+        {
+            _lidL = left;
+            _lidR = right;
+            for (int i = 0; i < _eyes.Count; i++) // (now too: review pictures run no LateUpdate)
+                if (_eyes[i].Root != null) _eyes[i].Lid(i == 0 ? left : right);
+        }
 
         /// <summary>Seeing stars: the pupils roll round and round for this long.</summary>
         public void Dizzy(float seconds) => _dizzyUntil = Time.time + seconds;
@@ -89,7 +99,7 @@ namespace PleaseDontDrown.Avatars
             SkinnedMeshRenderer skin = rig.Renderer;
             if (skin != null)
             {
-                skin.sharedMaterial = _material;
+                skin.sharedMaterials = AvatarRig.BodyMaterials(body, _material);
                 Mesh mesh = skin.sharedMesh;
                 void Shape(string name, bool on)
                 {
@@ -113,7 +123,7 @@ namespace PleaseDontDrown.Avatars
                 Vector3 at = left ? body.GooglyL : body.GooglyR;
                 // Cross-eyed: both pupils rest toward the nose (the left eye is on -X).
                 Vector2 rest = look.Eyes == 2 ? new Vector2(left ? 0.6f : -0.6f, 0.1f) : Vector2.zero;
-                var eye = GooglyEye.Create(head, at, body.GooglyRadius * eyeScale, pupil, rest);
+                var eye = GooglyEye.Create(head, at, body.GooglyRadius * eyeScale, pupil, rest, look.SkinColor);
                 _eyes.Add(eye);
                 _parts.Add(eye.Root);
             }
@@ -138,8 +148,13 @@ namespace PleaseDontDrown.Avatars
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             if (dt <= 0f) return;
             bool dizzy = Time.time < _dizzyUntil;
-            foreach (GooglyEye eye in _eyes)
-                if (eye.Root != null) eye.Step(dt, dizzy);
+            for (int i = 0; i < _eyes.Count; i++)
+            {
+                GooglyEye eye = _eyes[i];
+                if (eye.Root == null) continue;
+                eye.Step(dt, dizzy);
+                eye.Lid(i == 0 ? _lidL : _lidR);
+            }
         }
 
         private void OnDestroy()
@@ -234,7 +249,7 @@ namespace PleaseDontDrown.Avatars
 
             private static readonly Dictionary<int, Mesh> _whites = new(), _pupils = new();
 
-            public static GooglyEye Create(Transform head, Vector3 paintedFront, float radius, float pupilShare, Vector2 rest)
+            public static GooglyEye Create(Transform head, Vector3 paintedFront, float radius, float pupilShare, Vector2 rest, Color skin)
             {
                 var go = new GameObject("GooglyEye");
                 go.transform.SetParent(head, false);
@@ -265,6 +280,14 @@ namespace PleaseDontDrown.Avatars
                 });
                 pupil.AddComponent<MeshRenderer>().sharedMaterial = AvatarRig.SharedMaterial;
                 eye._pupil = pupil.transform;
+                // The lid: skin over the dome from the top down, built as far down as it is shut (Lid).
+                var lid = new GameObject("Lid");
+                lid.transform.SetParent(go.transform, false);
+                eye._lidFilter = lid.AddComponent<MeshFilter>();
+                eye._lidRenderer = lid.AddComponent<MeshRenderer>();
+                eye._lidRenderer.sharedMaterial = AvatarRig.SharedMaterial;
+                eye._lidRenderer.enabled = false;
+                eye._skin = skin;
                 eye.Place();
                 return eye;
             }
@@ -318,6 +341,66 @@ namespace PleaseDontDrown.Avatars
                     }
                 }
                 Place();
+            }
+
+            private MeshFilter _lidFilter;
+            private MeshRenderer _lidRenderer;
+            private Mesh _lidMesh;
+            private float _lidShown = -1f;
+            private Color _skin;
+
+            /// <summary>
+            /// The lid down to <paramref name="shut"/> (0 open .. 1 shut): a shell of skin just over the dome (and the
+            /// pupil), from its top down to a line that sweeps down the eye, a dark lash rim along that edge.
+            /// </summary>
+            public void Lid(float shut)
+            {
+                shut = Mathf.Clamp01(shut);
+                if (Mathf.Abs(shut - _lidShown) < 0.02f || _lidFilter == null) return;
+                _lidShown = shut;
+                _lidRenderer.enabled = shut > 0.02f;
+                if (_pupil != null) _pupil.gameObject.SetActive(shut < 0.96f); // (shut right down: nothing pokes through)
+                if (shut <= 0.02f) return;
+                if (_lidMesh == null) _lidMesh = new Mesh { name = "GooglyLid" };
+                const int rows = 8, cols = 16;
+                float r = _radius * 1.04f, depth = _radius * 0.55f + _pupilRadius * 0.4f + 0.004f; // (over the pupil too)
+                var center = new Vector3(0f, 0f, -_radius * 0.15f);
+                float edge = r - 2f * r * Mathf.Lerp(0f, 0.98f, shut);
+                var vertices = new Vector3[(rows + 1) * (cols + 1)];
+                var normals = new Vector3[vertices.Length];
+                var colors = new Color[vertices.Length];
+                Color lash = new Color(0.12f, 0.08f, 0.07f);
+                for (int j = 0; j <= rows; j++)
+                {
+                    float y = Mathf.Lerp(r, edge, j / (float)rows);
+                    float across = Mathf.Sqrt(Mathf.Max(0f, r * r - y * y));
+                    for (int i = 0; i <= cols; i++)
+                    {
+                        float x = Mathf.Lerp(-across, across, i / (float)cols);
+                        float rho2 = (x * x + y * y) / (r * r);
+                        float z = depth * Mathf.Sqrt(Mathf.Max(0f, 1f - rho2));
+                        int k = j * (cols + 1) + i;
+                        vertices[k] = center + new Vector3(x, y, z);
+                        normals[k] = new Vector3(x / (r * r), y / (r * r), z / (depth * depth)).normalized;
+                        colors[k] = j == rows ? lash : _skin;
+                    }
+                }
+                var triangles = new int[rows * cols * 6];
+                int t = 0;
+                for (int j = 0; j < rows; j++)
+                    for (int i = 0; i < cols; i++)
+                    {
+                        int a = j * (cols + 1) + i, b = a + 1, c = a + cols + 1, d = c + 1;
+                        triangles[t++] = a; triangles[t++] = c; triangles[t++] = b; // (facing out toward +z)
+                        triangles[t++] = b; triangles[t++] = c; triangles[t++] = d;
+                    }
+                _lidMesh.Clear();
+                _lidMesh.vertices = vertices;
+                _lidMesh.normals = normals;
+                _lidMesh.colors = colors;
+                _lidMesh.triangles = triangles;
+                _lidMesh.RecalculateBounds();
+                _lidFilter.sharedMesh = _lidMesh;
             }
 
             private void Place()

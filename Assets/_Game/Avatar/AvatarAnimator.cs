@@ -74,7 +74,7 @@ namespace PleaseDontDrown.Avatars
     /// throw wind-up and release, CPR, eating, plus a looking head, blinking and gestures. No animation clips.
     /// </summary>
     [DefaultExecutionOrder(50)]
-    public class AvatarAnimator : MonoBehaviour
+    public partial class AvatarAnimator : MonoBehaviour
     {
         [SerializeField] private AvatarRig _rig;
         [SerializeField] private float _turnSpeed = 10f;
@@ -99,7 +99,7 @@ namespace PleaseDontDrown.Avatars
         private int _seed;
         // What the clips' action is this frame and how much of the body it has (the hand-made layer for the same thing
         // steps back by as much).
-        private enum ClipAct : byte { None, Down, GetUp, Scared, Tread }
+        private enum ClipAct : byte { None, Down, GetUp, Tread }
         private ClipAct _clipAct;
         private float _clipActShare;
         private readonly Quaternion[] _clipPose = new Quaternion[AvatarClips.PosedBones.Length];
@@ -163,10 +163,8 @@ namespace PleaseDontDrown.Avatars
         public AvatarGesture CurrentGesture => Now - _gestureStart < 1.6f ? _gesture : AvatarGesture.None;
         private float _gestureStart;
         private float _lastPump = -10f;
-        private float _nextBlink;
         private float _dt;
         private HandPose _poseL = HandPose.Relaxed, _poseR = HandPose.Relaxed;
-        private float _blinkUntil;
 
         // Reactions (story characters): flinching from a blow, falling when knocked out, glancing back while fleeing.
         private float _flinchStart = -10f;
@@ -420,7 +418,9 @@ namespace PleaseDontDrown.Avatars
             // CPR kneels tall, hand-made: the CPR clip sits back on its heels, its shoulders too low for the arms to reach.
             else if (m.Cpr || _cpr > 0.01f) want = false;
             else if (m.Swimming) want = !m.Underwater && !_crawling && _swimMove < 0.05f && _under < 0.01f && AvatarClips.Get(TreadClip) != null;
-            else if (m.Pose == AvatarPose.Scared) want = m.Grounded && AvatarClips.Get(ScaredClip) != null;
+            // Scared: hand-made, hands up by the face. (The Terrified clip squatted right down with claws for hands,
+            // or flailed its fists over its head: the user, 2026-10-20.)
+            else if (m.Pose == AvatarPose.Scared) want = false;
             else want = m.Grounded && m.Pose == AvatarPose.Normal && _handsUp < 0.01f;
             if (want) _clips ??= new AvatarClips(_rig);
             return want;
@@ -428,7 +428,7 @@ namespace PleaseDontDrown.Avatars
 
         // The clips for each action (Resources/Mixamo).
         private const string FallClip = "Knocked Out Back", GetUpClip = "Getting Up From Back",
-            ScaredClip = "Terrified", TreadClip = "Treading Water";
+            TreadClip = "Treading Water";
         /// <summary>Knocked down, the clip's fall plays this many times its own speed (a story fighter is only down for
         /// 1.6-2.3 s: on the sand in 1.2 s).</summary>
         private const float FallRate = 1.25f;
@@ -527,13 +527,6 @@ namespace PleaseDontDrown.Avatars
                 offset = Vector3.Lerp(from, to, k);
                 offset.y = 0f;
             }
-            else if (_scared > 0.001f)
-            {
-                _clipAct = ClipAct.Scared;
-                file = ScaredClip;
-                time = Now + _variety.Phase;
-                weight = _scared;
-            }
             else if (_swim > 0.001f)
             {
                 _clipAct = ClipAct.Tread;
@@ -551,8 +544,7 @@ namespace PleaseDontDrown.Avatars
             if (_clipAct == ClipAct.None) KeepFacing(hips, 30f, 1f - Mathf.Clamp01(ground.magnitude / 0.5f));
             if (_clipAct == ClipAct.Tread)
                 hips.position += Vector3.up * (_swim * 0.18f * s); // as high in the water as the hand-made treading
-            if (_clipAct == ClipAct.Scared)
-                KeepFacing(hips, 35f, _scared); // (the clip spins right round in its panic: the scared keep facing the danger)
+            if (_clipAct == ClipAct.None) FeetOnGround(hips, dt);
             KeepLegsAboveGround(hips, s);
             GestureLayer();
             IdleLayer(talkHands: false); // (the talking clip talks with the hands)
@@ -2391,7 +2383,7 @@ namespace PleaseDontDrown.Avatars
 
             // (Whatever the clips' action already does, the hand-made layer for it only adds what's left.)
             float handMade = 1f - _clipActShare;
-            float scared = _scared * (_clipAct == ClipAct.Scared ? handMade : 1f);
+            float scared = _scared;
             if (scared > 0.01f || _handsUp > 0.01f)
             {
                 // Scared: hands up by the face, shoulders in. Hands up: arms straight up ("don't shoot").
@@ -2495,6 +2487,28 @@ namespace PleaseDontDrown.Avatars
                 foot.localRotation = Quaternion.Slerp(foot.localRotation, Quaternion.Euler(key.Foot, 0f, 0f), w);
             }
         }
+
+        /// <summary>
+        /// Standing, walking, talking on the clips: the lower foot's sole on the ground under it (the clips know nothing
+        /// of the ground, and their body came out at whatever height the humanoid put it: in the game people walked a
+        /// hand's width over the sea or knee-deep in the sand, the user, 2026-10-20). Eased, so a run's moment in the
+        /// air doesn't jerk the body down.
+        /// </summary>
+        private void FeetOnGround(Transform hips, float dt)
+        {
+            if (!Motion.Grounded || _groundWeight < 0.02f)
+            {
+                _clipGroundFix = 0f;
+                return;
+            }
+            float root = transform.position.y, ankle = _rig.AnkleHeight;
+            float overL = B(Bone.FootL).position.y - ankle - (root + _groundL);
+            float overR = B(Bone.FootR).position.y - ankle - (root + _groundR);
+            float over = Mathf.Min(overL, overR) * _groundWeight;
+            _clipGroundFix = Mathf.Lerp(_clipGroundFix, over, 1f - Mathf.Exp(-20f * dt));
+            hips.position -= Vector3.up * _clipGroundFix;
+        }
+        private float _clipGroundFix;
 
         /// <summary>
         /// Knocked down or going down onto the knees (and getting up again) the hips get there before the legs have
@@ -3040,40 +3054,6 @@ namespace PleaseDontDrown.Avatars
             // On the clips' body the looking goes on top of the clip's own head movement.
             B(Bone.Neck).localRotation = ClipDriven ? B(Bone.Neck).localRotation * neck : neck;
             B(Bone.Head).localRotation = ClipDriven ? B(Bone.Head).localRotation * head : head;
-        }
-
-        private void PoseFace()
-        {
-            float t = Now;
-            if (t > _nextBlink)
-            {
-                _blinkUntil = t + 0.11f;
-                _nextBlink = t + Random.Range(2.2f, 5f);
-            }
-            float eyes = t < _blinkUntil ? 0.1f : 1f;
-            if (Motion.Underwater) eyes = Mathf.Min(eyes, 0.55f); // squinting
-            float mouth = 0.05f + _run * 0.35f * _move;
-            if (_eat > 0.5f) mouth = Mathf.Abs(Mathf.Sin(t * 9f)) * 0.7f;
-            if (Motion.Underwater) mouth = 0f;
-            float brows = _charge * 0.8f + _cpr * -0.5f;
-            switch (Motion.Mood)
-            {
-                case AvatarMood.Happy: brows = 0.25f; mouth = Mathf.Max(mouth, 0.15f); break;
-                case AvatarMood.Scared: brows = -1f; eyes = Mathf.Max(eyes, 1.4f); mouth = Mathf.Max(mouth, 0.35f); break;
-                case AvatarMood.Angry: brows = 1f; eyes = Mathf.Min(eyes, 0.75f); break;
-                case AvatarMood.Hurt: brows = -0.8f; eyes = Mathf.Min(eyes, 0.35f); mouth = 0.5f; break;
-            }
-            if (Motion.Talking) mouth = 0.12f + 0.5f * Mathf.Abs(Mathf.Sin(t * 13f) * Mathf.Sin(t * 5.3f + 1f));
-            if (_down > 0.5f) { eyes = 0.08f; mouth = 0.45f; }
-            else if (_lie > 0.5f && !Motion.Talking) { eyes = 0.12f; mouth = 0.05f; brows = 0.2f; } // soaking up the sun
-            if (GestureActive(AvatarGesture.Burp, BurpSeconds))
-            {
-                float b = GestureT(BurpSeconds) * BurpSeconds;
-                if (b < 0.25f) { mouth = 0.05f; brows = 0.6f; } // holding it in, cheeks puffed
-                else if (b < 1.05f) { mouth = 0.8f + 0.15f * Mathf.Sin(t * 37f); eyes = 0.35f; brows = -0.4f; }
-                else { mouth = 0.12f; eyes = 1.15f; brows = 0.35f; } // ...pardon me
-            }
-            _rig.SetExpression(eyes, mouth, brows);
         }
     }
 

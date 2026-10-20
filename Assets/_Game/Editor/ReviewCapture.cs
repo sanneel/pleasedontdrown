@@ -72,6 +72,56 @@ namespace PleaseDontDrown.Editor
                     Render(camera, p[1]);
                     continue;
                 }
+                if (p[0] == "face")
+                {
+                    // face <jaw> <lids> <lower lids> <smile> <frown> <brows up> <angry> <sad> [gaze x] [gaze y]: the last
+                    // posed avatar's face set by hand (missing numbers 0).
+                    GameObject last = Spawned.LastOrDefault(g => g != null && g.GetComponent<AvatarRig>() != null);
+                    if (last == null) { Debug.LogWarning("[Review] face: nobody posed"); continue; }
+                    float V(int k) => p.Length > k ? F(k) : 0f;
+                    last.GetComponent<AvatarRig>().SetFace(new FaceState
+                    {
+                        Jaw = V(1), LidL = V(2), LidR = V(2), LowL = V(3), LowR = V(3), Smile = V(4), Frown = V(5),
+                        BrowUp = V(6), BrowAngry = V(7), BrowSad = V(8), Gaze = new Vector2(V(9), V(10))
+                    });
+                    continue;
+                }
+                if (p[0] == "bodycam")
+                {
+                    // bodycam <shot> <yaw> <distance> <fov> <height> [w h]: the last posed avatar from <yaw> degrees round its
+                    // front, looking at a point <height> metres up its body (its hips: 1, its chest: 1.25), level.
+                    GameObject last = Spawned.LastOrDefault(g => g != null && g.GetComponent<AvatarRig>() != null);
+                    if (last == null) { Debug.LogWarning("[Review] bodycam: nobody posed"); continue; }
+                    var bodyRig = last.GetComponent<AvatarRig>();
+                    Vector3 hipsAt = bodyRig[AvatarRig.Bone.Hips].position;
+                    Vector3 target = new Vector3(hipsAt.x, last.transform.position.y + F(5), hipsAt.z);
+                    Vector3 round = Quaternion.Euler(0f, F(2), 0f) * last.transform.forward;
+                    camera.transform.position = target + round * F(3);
+                    camera.transform.LookAt(target);
+                    camera.fieldOfView = F(4);
+                    Render(camera, p[1], p.Length > 7 ? int.Parse(p[6]) : 800, p.Length > 7 ? int.Parse(p[7]) : 1000);
+                    continue;
+                }
+                if (p[0] == "facecam")
+                {
+                    // facecam <shot> <yaw> <distance> <fov> [size]: the last posed avatar's face, from <yaw> degrees round
+                    // from straight in front (0 front, 35 three-quarter, 90 side), a square picture.
+                    GameObject last = Spawned.LastOrDefault(g => g != null && g.GetComponent<AvatarRig>() != null);
+                    if (last == null) { Debug.LogWarning("[Review] facecam: nobody posed"); continue; }
+                    var faceRig = last.GetComponent<AvatarRig>();
+                    // Between the eyes and the mouth, a little toward the eyes.
+                    Vector3 eyes = (faceRig[AvatarRig.Bone.EyeL].position + faceRig[AvatarRig.Bone.EyeR].position) * 0.5f;
+                    Vector3 middle = Vector3.Lerp(eyes, faceRig[AvatarRig.Bone.Mouth].position, 0.35f);
+                    // Round the head's own up (a face lying down is shot from above it).
+                    Transform head = faceRig[AvatarRig.Bone.Head];
+                    Vector3 front = Quaternion.AngleAxis(F(2), head.up) * head.forward;
+                    camera.transform.position = middle + front * F(3) + head.up * 0.02f;
+                    camera.transform.LookAt(middle, head.up);
+                    camera.fieldOfView = F(4);
+                    int size = p.Length > 5 ? int.Parse(p[5]) : 900;
+                    Render(camera, p[1], size, size);
+                    continue;
+                }
                 if (p[0] == "nearm")
                 {
                     // nearm <object name> <shot> dx dy dz tx ty tz fov: as near, but in metres (its turn, not its scale:
@@ -292,6 +342,15 @@ namespace PleaseDontDrown.Editor
 
         private static readonly System.Collections.Generic.List<GameObject> Spawned = new();
 
+        private static float SunFacingYaw()
+        {
+            Light sun = RenderSettings.sun != null ? RenderSettings.sun
+                : Object.FindObjectsByType<Light>(FindObjectsSortMode.None).FirstOrDefault(l => l.type == LightType.Directional);
+            if (sun == null) return 0f;
+            Vector3 toSun = -sun.transform.forward;
+            return Mathf.Atan2(toSun.x, toSun.z) * Mathf.Rad2Deg + 25f; // (a little from the side: some shape on the face)
+        }
+
         private static void SpawnAvatar(string[] p)
         {
             float F(int k) => float.Parse(p[k], CultureInfo.InvariantCulture);
@@ -346,7 +405,8 @@ namespace PleaseDontDrown.Editor
                 blendTo = parts[1];
                 blendTime = parts.Length > 2 ? float.Parse(parts[2], CultureInfo.InvariantCulture) : 2f;
             }
-            float yaw = F(5);
+            // yaw "sun": facing the sun (a face lit from the front, for close-ups).
+            float yaw = p[5] == "sun" ? SunFacingYaw() : F(5);
             Vector3 forward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
             go.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
             var m = new AvatarMotion { FacingYaw = yaw, Grounded = true };
@@ -766,9 +826,8 @@ namespace PleaseDontDrown.Editor
             _ => null
         };
 
-        private static void Render(Camera camera, string name)
+        private static void Render(Camera camera, string name, int w = 1200, int h = 800)
         {
-            const int w = 1200, h = 800;
             var rt = new RenderTexture(w, h, 24);
             camera.targetTexture = rt;
             camera.Render();

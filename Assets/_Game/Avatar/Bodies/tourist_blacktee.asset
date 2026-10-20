@@ -16,7 +16,6 @@ MonoBehaviour:
   DisplayName: Tourist (black tee)
   Mesh: {fileID: 4300000, guid: eaea2d3e46917ac47b809fe5f17055b0, type: 2}
   Material: {fileID: 2100000, guid: cf35fdeb0d22bb54c94d03e04c4366aa, type: 2}
-  ClosedEyesMaterial: {fileID: 0}
   RestPositions:
   - {x: 0, y: 0.904, z: -0.0036015138}
   - {x: -4.9333323e-17, y: 0.08383733, z: 0.00067398814}
@@ -113,6 +112,9 @@ MonoBehaviour:
   - {x: 0, y: -0.98736024, z: -0.15849203}
   - {x: 0, y: -0.992779, z: -0.11995755}
   HasFace: 1
+  FaceEyes: 0
+  FaceMouth: 1
+  MouthMaterial: {fileID: 2100000, guid: 5a0ca7777428f684a919477229aa9b99, type: 2}
   HeadTop: 0.30267024
   HeadHalfWidth: 0.16062863
   HeadFront: 0.16109645

@@ -16,7 +16,6 @@ MonoBehaviour:
   DisplayName: Finders Keepers lifeguard
   Mesh: {fileID: 4300000, guid: 1654a02ae415c354da44dfec42db00f2, type: 2}
   Material: {fileID: 2100000, guid: a65cf9c3f31c51b4986bf84d922f522e, type: 2}
-  ClosedEyesMaterial: {fileID: 0}
   RestPositions:
   - {x: 0, y: 0.88391113, z: -0.015690312}
   - {x: 0, y: 0.040950894, z: -0.00297424}
@@ -35,8 +34,8 @@ MonoBehaviour:
   - {x: 0.07643272, y: -0.039111137, z: -0.0016314723}
   - {x: 0, y: -0.3962807, z: 0}
   - {x: 0, y: -0.3769579, z: 0}
-  - {x: -0.07845803, y: 0.22893274, z: 0.10817515}
-  - {x: 0.08205274, y: 0.2318331, z: 0.10828525}
+  - {x: -0.06512765, y: 0.23492813, z: 0.11369814}
+  - {x: 0.062822364, y: 0.2357583, z: 0.1151534}
   - {x: -0.012, y: 0.17046559, z: 0.16719273}
   - {x: -0.059779987, y: 0.26900995, z: 0.25248498}
   - {x: 0.059779987, y: 0.26900995, z: 0.25248498}
@@ -113,6 +112,9 @@ MonoBehaviour:
   - {x: 0, y: -0.9832308, z: -0.18236534}
   - {x: 0, y: -0.97761714, z: -0.21039174}
   HasFace: 1
+  FaceEyes: 1
+  FaceMouth: 0
+  MouthMaterial: {fileID: 0}
   HeadTop: 0.49816656
   HeadHalfWidth: 0.21896887
   HeadFront: 0.2805389

@@ -30,3 +30,20 @@ the dock, the north beach with towels and parasols. Island size 180 x 110 m.
 ## Suggested order (if the team agrees)
 1, 2, 13 (cheap, change the look the most) → 11, 6 (needed by the story) → 3, 8, 10 → the rest.
 Items 4 and 5 need part A first.
+
+## Status 2026-10-19 (Shako's Claude)
+
+| # | State |
+|---|---|
+| 1, 2, 3, 11, 13, 14 | Done in the overnight island 2 work (palms, lamps, the arch and fountain, the cushion ride, signs, the gala) |
+| 4 | Partly: Marisol, the attendant, the waitress, and now **Bellhop Benny** at the door (Tripo body 30, a man in the hotel's teal and gold) |
+| 5 | Partly: slot players and lounger guests (overnight) |
+| 6 | Done: the marina with the hotel's yacht, and now a **second motor yacht** moored on the pier's other side |
+| 7 | **Done: four over-water bungalows** on stilts off the south shore, on a railed boardwalk (`GameSceneBuilder.Island2ResortBatch`) |
+| 8 | **Done: six cabana daybeds** on the south beach |
+| 9 | **Done: a tennis court** on the lawn inside the cart road (no mini-golf) |
+| 10 | **Done, on the lawn instead of the roof**: a helipad with the resort helicopter (the hotel's roofs are railed terraces) |
+| 12 | **Done: a swim-up bar** at the pool's east end: a counter in the water with stools under it, a Tripo tiki back bar with bottles under a Tripo thatched palapa (look and swim only, no orders) |
+| A9 | The drivable golf cart wears the **Tripo golf cart**; a second one is parked in the pool's bay |
+
+Pictures: `Docs/Island-2-Resort-2026-10-19/`. Tripo list: `.claude/skills/pdd-tripo/prompts/island2-resort.md`.

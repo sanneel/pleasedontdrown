@@ -221,7 +221,7 @@ namespace PleaseDontDrown.Story
             while (PoliceBoat != null && !PoliceBoat.Arrived && Time.time - t < 60f) yield return null;
             Check("4.9 the police launch ties up at the police dock", PoliceBoat != null && berth != null && (PoliceBoat.transform.position - berth.position).magnitude < 3f);
             t = Time.time;
-            while (_markerLabel.Value != "Everyone" && Time.time - t < 60f) yield return null;
+            while (_markerLabel.Value != "Everyone" && Time.time - t < 120f) yield return null; // (five police lines first: 60 s was too close)
             Check("4.9 Sandy and the THIEF are taken away on it", _sandy != null && PoliceBoat != null && (_sandy.transform.position - PoliceBoat.transform.position).magnitude < 4f);
             int shown = 0;
             foreach (Transform tr in GameObject.Find("Environment/Island4/Warehouse").GetComponentsInChildren<Transform>())

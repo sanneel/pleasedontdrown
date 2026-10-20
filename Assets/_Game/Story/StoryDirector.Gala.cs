@@ -79,7 +79,7 @@ namespace PleaseDontDrown.Story
             });
             // The staff, in the hotel's uniform (Sandro's Tripo flight-attendant model, like Marisol at the desk): a
             // bellhop at the door, a waitress going between the bar and the pool, a pool attendant on the deck.
-            AddResident("I2Hotel", () => Staff("Bellhop Bella", BellboySpot, 0f).gameObject);
+            AddResident("I2Hotel", () => Staff("Bellhop Benny", BellboySpot, 0f, AvatarLook.Bodies.HotelBellhop).gameObject);
             AddResident("I2Hotel", () => Staff("Pool attendant Ines", PoolAttendantSpot, 0f).gameObject);
             AddResident("I2Hotel", () =>
             {
@@ -97,10 +97,10 @@ namespace PleaseDontDrown.Story
         private static readonly Vector3[] WaiterRoute =
             { new(-40f, 1.8f, -243f), new(-12f, 1.8f, -238.5f), new(2.5f, 1.8f, -235.2f), new(8f, 1.8f, -235.5f), new(32f, 1.8f, -235.5f), new(50f, 1.8f, -240.5f) };
 
-        private StoryNpc Staff(string displayName, Vector3 at, float yaw)
+        private StoryNpc Staff(string displayName, Vector3 at, float yaw, byte body = AvatarLook.Bodies.HotelAttendantB)
         {
-            AvatarLook look = GuestLook(4242, 1);
-            look.Body = AvatarLook.Bodies.HotelAttendantB;
+            AvatarLook look = GuestLook(4242, AvatarLook.Bodies.IsFeminine(body) ? 1 : 0);
+            look.Body = body;
             StoryNpc npc = SpawnNpc(displayName, NpcRole.Bystander, look, at, yaw);
             npc.ServerSetTalkable(false);
             return npc;

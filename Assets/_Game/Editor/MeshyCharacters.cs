@@ -50,13 +50,14 @@ namespace PleaseDontDrown.Editor
             (AvatarLook.Bodies.HotelAttendantA, "Hotel attendant (Marisol)", "hotel_attendant_a"),
             (AvatarLook.Bodies.HotelAttendantB, "Hotel attendant", "hotel_attendant_b"),
             (AvatarLook.Bodies.FkRival, "Finders Keepers lifeguard", "fk_rival"),
+            (AvatarLook.Bodies.HotelBellhop, "Hotel bellhop", "hotel_bellhop"),
         };
 
-        /// <summary>Bodies that keep their painted face as it is: the robber's eyes are behind sunglasses (lids would blink on the lenses).</summary>
-        private static readonly HashSet<string> PaintedFaceOnly = new() { "robber" };
-
-        /// <summary>Faces whose eyes are behind sunglasses: placed by the face's proportions (they talk, never blink).</summary>
-        private static readonly HashSet<string> EyesHidden = new() { "tourist_blacktee" };
+        /// <summary>
+        /// Faces whose eyes are behind sunglasses: placed by the face's proportions (they talk and frown, never blink).
+        /// The robber's are painted shades (before the living faces his face was left as it was).
+        /// </summary>
+        private static readonly HashSet<string> EyesHidden = new() { "tourist_blacktee", "robber" };
 
         /// <summary>
         /// Mouths the lip search can't find, measured on the model (x, y of the middle, width; metres, Unity space): the
@@ -69,18 +70,13 @@ namespace PleaseDontDrown.Editor
             // (the search found the attendants' chins: pale pink lips on pale skin)
             ["hotel_attendant_a"] = new Vector3(0.005f, 1.486f, 0.045f),
             ["hotel_attendant_b"] = new Vector3(0.0025f, 1.487f, 0.045f),
+            // (a smile painted as a line: the search took a shirt seam, a moustache's edge; measured on the face fit
+            // pictures, Screenshots/Faces/Fit, 2026-10-19)
+            ["pirate_girl"] = new Vector3(-0.028f, 1.399f, 0.045f),
+            ["pirate_fat"] = new Vector3(0f, 1.512f, 0.05f), // (the grin under the moustache, not the moustache)
+            ["pirate_marksman"] = new Vector3(0f, 1.556f, 0.045f),
+            ["pirate_quartermaster"] = new Vector3(-0.008f, 1.699f, 0.045f),
         };
-
-        /// <summary>
-        /// The Tripo women keep their eyes as Tripo painted them, never shut: their eyes are modelled (bulging or sunk
-        /// in sockets) and every closed-eye texture painted over them left smears, cut irises and black lines.
-        /// Their face is still found (the mouth for the face).
-        /// </summary>
-        private static readonly HashSet<string> OpenEyesOnly = new()
-            { "tourist_lola", "tourist_girl_red", "tourist_girl_blonde", "tourist_girl_redhead", "tourist_girl_black",
-              "tourist_girl_pink", "tourist_girl_lavender", "tourist_girl_barista", "tourist_girl_bartender",
-              "pirate_fat", "pirate_girl", "pirate_marksman", "pirate_quartermaster", "hotel_director",
-              "pirate_king", "hotel_attendant_a", "hotel_attendant_b", "tourist_blacktee", "fk_rival" };
 
         private static readonly int BoneTotal = (int)Bone.Count + 2 * HandBones.BoneCount;
 
@@ -675,15 +671,6 @@ namespace PleaseDontDrown.Editor
 
         // ------------------------------------------------------------------ face
 
-        /// <summary>Geometry added to a model: more vertices for its mesh, each on one bone.</summary>
-        private sealed class ExtraGeometry
-        {
-            public readonly List<Vector3> Vertices = new(), Normals = new();
-            public readonly List<Vector2> Uvs = new();
-            public readonly List<BoneWeight> Weights = new();
-            public readonly List<int> Triangles = new();
-        }
-
         /// <summary>
         /// Where a base model's painted eyes and mouth are, tied to the vertices round them. Its look-alikes are the
         /// same mesh reshaped and repainted (pale skin and white hair can pass for the whites of eyes, so looking for
@@ -695,6 +682,7 @@ namespace PleaseDontDrown.Editor
             public Spot EyeL, EyeR, Mouth;
             public bool HasMouth;
             public float MouthWidth;
+            public Spot WhitesL, WhitesR; // the eyes as the face rig cut them out (MeshyCharacters.FaceRig.cs), for its look-alikes
         }
 
         /// <summary>A box on the face and the vertices near it (their middle and spread, to carry it to a reshaped face).</summary>
@@ -870,18 +858,16 @@ namespace PleaseDontDrown.Editor
 
         /// <summary>
         /// These models' faces are painted on. The painted eyes and mouth are found in the texture (the whites of the
-        /// eyes; lips and teeth), and three small pieces are added in front of them: a lid of the face's own skin
-        /// colour over each eye, hinged along its top edge on the eye bone, with a dark lash line along its lower
-        /// edge; and a dark oval on the mouth bone. Scaled flat (bone scale y = 0) they are not there at all; the game
-        /// scales the lids down over the eyes to blink and the oval up to open the mouth.
+        /// eyes; lips and teeth); the living face is rigged over them from that (MeshyCharacters.FaceRig.cs). Null: no
+        /// face found (it stays as painted).
         /// </summary>
-        private static bool BuildFace(string file, Mesh source, Vector3[] vertices, Vector3[] normals, BoneWeight[] weights, Material imported,
-            Vector3 headJoint, ExtraGeometry extra, out Vector3 lidL, out Vector3 lidR, out Vector3 mouthAt, out float eyeLevel)
+        private static FoundFace BuildFace(string file, Mesh source, Vector3[] vertices, Vector3[] normals, BoneWeight[] weights, Material imported,
+            Vector3 headJoint, out Vector3 lidL, out Vector3 lidR, out Vector3 mouthAt, out float eyeLevel)
         {
             lidL = lidR = mouthAt = Vector3.zero;
             eyeLevel = 0f;
             Texture texture = FindBaseColor(imported);
-            if (texture == null) return false;
+            if (texture == null) return null;
             const int size = 1024;
             Color32[] pixels = ReadPixels(texture, size);
             Vector2[] uvs = source.uv;
@@ -899,7 +885,7 @@ namespace PleaseDontDrown.Editor
                 int bone = Dominant(weights[i]);
                 if (bone == (int)Bone.HandL || bone == (int)Bone.HandR) handColors.Add(At(uvs[i]));
             }
-            if (handColors.Count < 20) return false;
+            if (handColors.Count < 20) return null;
             var skin = new Color(Median(handColors.Select(c => c.r)), Median(handColors.Select(c => c.g)), Median(handColors.Select(c => c.b)));
 
             // The front of the head, as points with their colour.
@@ -925,7 +911,7 @@ namespace PleaseDontDrown.Editor
             if (faceSkin.Count < 200)
             {
                 Debug.LogWarning($"[Build] body {file}: no face skin found (skin {skin}): the face stays still");
-                return false;
+                return null;
             }
             List<float> faceX = faceSkin.Select(s => Mathf.Abs(s.P.x)).OrderBy(v => v).ToList(), faceY = faceSkin.Select(s => s.P.y).OrderBy(v => v).ToList();
             float half = Percentile(faceX, 0.98f), bottom = Percentile(faceY, 0.02f), top = Percentile(faceY, 0.98f), height = top - bottom;
@@ -986,184 +972,30 @@ namespace PleaseDontDrown.Editor
                 eyeNote = " (where the base model's are)";
             }
             else basis = null;
+            bool guessed = false;
             if (!found)
             {
-                Debug.LogWarning($"[Build] body {file}: eyes not found in the texture: the face stays still");
-                return false;
+                // Not found in the texture: where a face's eyes usually sit (the face image may still find them: FitFaceRig).
+                float y = bottom + 0.62f * height, x = 0.42f * half;
+                eyeL = new Rect(-x - 0.015f, y - 0.008f, 0.03f, 0.016f);
+                eyeR = new Rect(x - 0.015f, y - 0.008f, 0.03f, 0.016f);
+                found = guessed = true;
+                Debug.LogWarning($"[Build] body {file}: eyes not found in the texture: guessed");
             }
             eyeLevel = (eyeL.center.y + eyeR.center.y) * 0.5f;
 
-            // Colours to paint with: the skin round the eyes (for the lids) and the darkest spot in them (lashes, mouth).
             float level = eyeLevel;
-            Vector2 SkinRound(Rect eye)
-            {
-                // The usual skin colour in a band round the eye: the lid must not stand out from what is next to it.
-                Rect outer = Rect.MinMaxRect(eye.xMin - 0.015f, eye.yMin - 0.015f, eye.xMax + 0.015f, eye.yMax + 0.015f);
-                // A closed lid is the skin above the eye come down: that strip first (it is often a shade darker than the cheek).
-                Rect above = Rect.MinMaxRect(eye.xMin, eye.yMax + 0.001f, eye.xMax, eye.yMax + 0.012f);
-                List<Sample> around = faceSkin.Where(s => above.Contains(new Vector2(s.P.x, s.P.y))).ToList();
-                if (around.Count < 20) around = faceSkin.Where(s => outer.Contains(new Vector2(s.P.x, s.P.y)) && !eye.Contains(new Vector2(s.P.x, s.P.y))).ToList();
-                if (around.Count < 20) around = faceSkin.Where(s => Mathf.Abs(s.P.y - level) < 0.05f).ToList();
-                if (around.Count < 20) around = faceSkin;
-                var usual = new Color(Median(around.Select(s => s.C.r)), Median(around.Select(s => s.C.g)), Median(around.Select(s => s.C.b)));
-                // A shade under the usual skin: a lid over an eyeball sits in the eye's shadow.
-                var lid = usual * 0.93f;
-                return around.OrderBy(s => Distance(s.C, lid)).First().Uv;
-            }
-            Color SkinRoundColor(Rect eye) => At(SkinRound(eye));
-            Rect both = Rect.MinMaxRect(eyeL.xMin, Mathf.Min(eyeL.yMin, eyeR.yMin), eyeR.xMax, Mathf.Max(eyeL.yMax, eyeR.yMax));
-            Vector2 darkUv = samples.Where(s => both.Contains(new Vector2(s.P.x, s.P.y)) && !(s.P.x > eyeL.xMax && s.P.x < eyeR.xMin))
-                .OrderBy(s => s.C.r + s.C.g + s.C.b).First().Uv;
-
-            // A rounded patch lying on the face, between two heights of its oval (v: -1 bottom .. 1 top).
-            void Patch(Vector2 center, float rx, float ry, float vFrom, float vTo, float lift, Vector2 uv, Bone bone, Func<float, float, float, Vector2> uvAt = null)
-            {
-                List<Sample> near = samples.Where(s => Mathf.Abs(s.P.x - center.x) < rx + 0.012f && Mathf.Abs(s.P.y - center.y) < ry + 0.012f).ToList();
-                // Only the face itself: a lock of hair hanging in front of the eye (25 cm out) pulled lid points onto
-                // it, and the stretched lid broke up into pieces.
-                if (near.Count > 0)
-                {
-                    // (How far out the face is, from its skin only: the hair in front can outnumber it.)
-                    List<Sample> skinNear = near.Where(s => Distance(s.C, skin) < 0.2f).ToList();
-                    float faceZ = Median((skinNear.Count >= 20 ? skinNear : near).Select(s => s.P.z));
-                    near = near.Where(s => Mathf.Abs(s.P.z - faceZ) < 0.025f).ToList(); // (hair behind the face too: the inside of a lock)
-                }
-                const int nx = 10, ny = 8;
-                int first = extra.Vertices.Count;
-                // One direction for the whole patch (lit evenly, like the skin round it), not each bump's own.
-                Vector3 facing = Vector3.zero;
-                foreach (Sample s in near) facing += s.N;
-                facing = facing.sqrMagnitude > 1e-6f ? facing.normalized : Vector3.forward;
-                for (int j = 0; j <= ny; j++)
-                    for (int i = 0; i <= nx; i++)
-                    {
-                        float u = -1f + 2f * i / nx, v = Mathf.Lerp(vFrom, vTo, j / (float)ny);
-                        float x = center.x + rx * u * Mathf.Sqrt(1f - 0.5f * v * v), y = center.y + ry * v * Mathf.Sqrt(1f - 0.5f * u * u);
-                        Sample on = default;
-                        float best = float.MaxValue, front = float.MinValue;
-                        Vector3 round = Vector3.zero;
-                        foreach (Sample s in near)
-                        {
-                            float d = (s.P.x - x) * (s.P.x - x) + (s.P.y - y) * (s.P.y - y);
-                            if (d < best) { best = d; on = s; }
-                            if (d < 0.014f * 0.014f) round += s.N;
-                            // Modelled lashes and eyeballs stand out from the face: the patch goes over whatever is in front.
-                            // (Over a wide circle: a bulging painted eye has few vertices, and a lid that only looked
-                            // 8 mm around itself went behind the bulge in patches.)
-                            if (d < 0.016f * 0.016f) front = Mathf.Max(front, s.P.z);
-                        }
-                        // In the middle it clears whatever stands out (the eyeball, modelled lashes); toward its rim it
-                        // comes down onto the face itself, so it reads as skin and not as a plate stuck on.
-                        float rim = Mathf.Pow(Mathf.Max(Mathf.Abs(u), Mathf.Abs(v)), 3f);
-                        float z = Mathf.Lerp(Mathf.Max(on.P.z, front), on.P.z, rim * 0.85f) + lift * Mathf.Lerp(1f, 0.25f, rim);
-                        extra.Vertices.Add(new Vector3(x, y, z));
-                        // Lit like the face under it: mostly the way the face curves there, evened out so the bumps of
-                        // a modelled eye don't show as blotches, and rounded a little like a lid over an eyeball.
-                        Vector3 lit = facing * 0.45f + (round.sqrMagnitude > 1e-6f ? round.normalized : facing) * 0.55f;
-                        Vector3 lidNormal = (lit.normalized + new Vector3(u * 0.3f, v * 0.22f, 0f)).normalized;
-                        // Toward its rim it takes the face's own shading, so it doesn't stand out as a lighter disc.
-                        float edge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.45f, 1f, Mathf.Max(Mathf.Abs(u), Mathf.Abs(v))));
-                        extra.Normals.Add(Vector3.Slerp(lidNormal, on.N.sqrMagnitude > 1e-6f ? on.N.normalized : lidNormal, edge));
-                        extra.Uvs.Add(uvAt != null ? uvAt(x, y, v) : uv);
-                        extra.Weights.Add(new BoneWeight { boneIndex0 = (int)bone, weight0 = 1f });
-                    }
-                // Even the patch out (it only ever moves forward: nothing behind may poke through).
-                for (int pass = 0; pass < 2; pass++)
-                {
-                    var depth = new float[(nx + 1) * (ny + 1)];
-                    for (int j = 0; j <= ny; j++)
-                        for (int i = 0; i <= nx; i++)
-                        {
-                            float sum = 0f;
-                            int count = 0;
-                            for (int dj = -1; dj <= 1; dj++)
-                                for (int di = -1; di <= 1; di++)
-                                {
-                                    int jj = j + dj, ii = i + di;
-                                    if (jj < 0 || jj > ny || ii < 0 || ii > nx) continue;
-                                    sum += extra.Vertices[first + jj * (nx + 1) + ii].z;
-                                    count++;
-                                }
-                            depth[j * (nx + 1) + i] = sum / count;
-                        }
-                    for (int k = 0; k < depth.Length; k++)
-                    {
-                        int i = k % (nx + 1), j = k / (nx + 1);
-                        if (i == 0 || i == nx || j == 0 || j == ny) continue; // the rim stays down on the face
-                        Vector3 at = extra.Vertices[first + k];
-                        extra.Vertices[first + k] = new Vector3(at.x, at.y, Mathf.Max(at.z, depth[k]));
-                    }
-                }
-                for (int j = 0; j < ny; j++)
-                    for (int i = 0; i < nx; i++)
-                    {
-                        int a = first + j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1;
-                        extra.Triangles.AddRange(new[] { a, b, c, b, d, c });
-                    }
-            }
             float SurfaceZ(Vector2 at) => samples.OrderBy(s => (s.P.x - at.x) * (s.P.x - at.x) + (s.P.y - at.y) * (s.P.y - at.y)).First().P.z;
-
-            Vector3 Lid(Rect eye, Rect other, Bone bone)
+            // The eye bones on the top middle of each eye (where the old lids hinged; gaze and the portrait read them).
+            lidL = new Vector3(eyeL.center.x, eyeL.yMax, SurfaceZ(new Vector2(eyeL.center.x, eyeL.yMax)));
+            lidR = new Vector3(eyeR.center.x, eyeR.yMax, SurfaceZ(new Vector2(eyeR.center.x, eyeR.yMax)));
+            bool hidden = EyesHidden.Contains(file);
+            var face = new FoundFace
             {
-                // Faces are symmetric: the lid covers this eye as found and the other eye mirrored across the
-                // middle, so a badly found eye (small flat painted eyes) still ends up all under its lid.
-                Rect mirror = Rect.MinMaxRect(-other.xMax, other.yMin, -other.xMin, other.yMax);
-                eye = Rect.MinMaxRect(Mathf.Min(eye.xMin, mirror.xMin), Mathf.Min(eye.yMin, mirror.yMin),
-                    Mathf.Max(eye.xMax, mirror.xMax), Mathf.Max(eye.yMax, mirror.yMax));
-                // A little bigger than the painted eye (an oval inside a box misses its corners).
-                float rx = eye.width * 0.5f * 1.28f + 0.002f, ry = eye.height * 0.5f * 1.3f + 0.002f; // all of the painted eye, its corners too
-                // The lid is the skin just above the eye come down over it: textured with that strip of the face
-                // itself (its own tone and shading detail), not one flat colour, which read as a smudge.
-                Vector2 flat = SkinRound(eye);
-                List<Sample> strip = faceSkin.Where(s => s.P.y > eye.yMax && s.P.y < eye.yMax + 0.016f && Distance(s.C, skin) < 0.11f
-                                                         && Mathf.Abs(s.P.x - eye.center.x) < rx + 0.004f).ToList(); // (pale hair passed for skin)
-                // One piece of the texture only: a strip crossing a UV seam would mix two far-apart places into
-                // the lid (bits of eye and hair showed on it).
-                if (strip.Count > 0)
-                {
-                    var middleUv = new Vector2(Median(strip.Select(s => s.Uv.x)), Median(strip.Select(s => s.Uv.y)));
-                    strip = strip.Where(s => (s.Uv - middleUv).sqrMagnitude < 0.03f * 0.03f).ToList();
-                }
-                // Face position -> texture: one smooth (affine) map fitted to that strip, so the lid's texture is one
-                // continuous piece of skin (mapping each lid point to its own nearest sample let the in-between
-                // texture wander across the painted eye). If it doesn't fit cleanly (a seam, a mirror), one flat colour.
-                Func<float, float, float, Vector2> skinAbove = null;
-                if (strip.Count >= 30 && FitAffine(strip, out Vector3 fu, out Vector3 fv, out float residual) && residual < 0.004f)
-                    skinAbove = (x, y, v) =>
-                    {
-                        float want = eye.yMax + 0.002f + (v + 1f) * 0.5f * 0.011f; // lid bottom = right above the eye, top = higher
-                        return new Vector2(fu.x * x + fu.y * want + fu.z, fv.x * x + fv.y * want + fv.z);
-                    };
-                // Check it: every bit of the lid must come out skin-coloured (no eye, lash or hair on it). Else flat.
-                if (skinAbove != null)
-                    for (int j = 0; j <= 8 && skinAbove != null; j++)
-                        for (int i = 0; i <= 10; i++)
-                        {
-                            float u = -1f + 2f * i / 10f, v = -1f + 2f * j / 8f;
-                            float x = eye.center.x + rx * u * Mathf.Sqrt(1f - 0.5f * v * v), y = eye.center.y + ry * v * Mathf.Sqrt(1f - 0.5f * u * u);
-                            if (Distance(At(skinAbove(x, y, v)), skin) > 0.16f) { skinAbove = null; break; }
-                        }
-                Patch(eye.center, rx, ry, -1f, 1f, 0.004f, flat, bone, skinAbove);
-                Patch(eye.center, rx, ry, -1f, -0.84f, 0.006f, darkUv, bone); // the lashes: a thin dark line along the lid's edge
-                var hinge = new Vector2(eye.center.x, eye.center.y + ry);
-                return new Vector3(hinge.x, hinge.y, SurfaceZ(hinge));
-            }
-            // Closed eyes painted into a copy of the texture (MeshyCharacters.ClosedEyes.cs); the old lid patches only
-            // where that can't be done. Each eye as found, together with the other one mirrored (a badly found eye).
-            Rect Both(Rect eye, Rect other) => Rect.MinMaxRect(Mathf.Min(eye.xMin, -other.xMax), Mathf.Min(eye.yMin, other.yMin),
-                Mathf.Max(eye.xMax, -other.xMin), Mathf.Max(eye.yMax, other.yMax));
-            Color lashColor = Color.Lerp(At(darkUv), Color.black, 0.35f);
-            if (OpenEyesOnly.Contains(file) || PaintClosedEyes(texture, vertices, normals, uvs, triangles, headJoint.y - 0.03f,
-                    new[] { Both(eyeL, eyeR), Both(eyeR, eyeL) }, SkinRoundColor(eyeL), lashColor, file))
-            {
-                lidL = new Vector3(eyeL.center.x, eyeL.yMax, SurfaceZ(new Vector2(eyeL.center.x, eyeL.yMax)));
-                lidR = new Vector3(eyeR.center.x, eyeR.yMax, SurfaceZ(new Vector2(eyeR.center.x, eyeR.yMax)));
-            }
-            else
-            {
-                lidL = Lid(eyeL, eyeR, Bone.EyeL);
-                lidR = Lid(eyeR, eyeL, Bone.EyeR);
-            }
+                EyeL = eyeL, EyeR = eyeR, EyeLevel = eyeLevel, Skin = skin,
+                // An eye under a patch is the other one mirrored: nothing there to blink.
+                SeeL = !hidden && (basis != null || foundL || guessed), SeeR = !hidden && (basis != null || foundR || guessed), Guessed = guessed
+            };
 
             // Mouth: lips (redder and bluer than the skin) and teeth, under the eyes, in the middle.
             float skinRed = Redness(skin), skinBlue = Blueness(skin), between = (eyeR.center.x - eyeL.center.x) * 0.5f;
@@ -1184,10 +1016,11 @@ namespace PleaseDontDrown.Editor
                 if (basis.HasMouth && basis.Mouth.Anchors.Length >= 6)
                 {
                     Rect box = basis.Mouth.On(vertices);
-                    float rx = Mathf.Clamp(box.width * 0.3f, 0.009f, 0.019f);
-                    // (No open-mouth patch: a dark disc on painted lips only ever looked like a hole.)
                     mouthAt = new Vector3(box.center.x, box.center.y, SurfaceZ(box.center));
                     mouthNote = "mouth where the base model's is";
+                    face.HasMouth = true;
+                    face.Mouth = box.center;
+                    face.MouthWidth = box.width;
                 }
             }
             if (basis == null && MouthHints.TryGetValue(file, out Vector3 hint))
@@ -1198,6 +1031,9 @@ namespace PleaseDontDrown.Editor
                 mouthNote = $"mouth {hint.z * 100f:0.0} cm wide at y {center.y:0.000} (measured by hand)";
                 fit.HasMouth = true;
                 fit.Mouth = Spot.At(new Rect(center.x - hint.z * 0.5f, center.y - 0.01f, hint.z, 0.02f), vertices, normals, faceFloor);
+                face.HasMouth = face.MouthHinted = true;
+                face.Mouth = center;
+                face.MouthWidth = hint.z;
             }
             if (lips.Count >= 15)
             {
@@ -1207,20 +1043,18 @@ namespace PleaseDontDrown.Editor
                 if (dark.Count < 5) dark = lips;
                 List<Sample> line = dark.Take(Mathf.Max(5, dark.Count / 5)).ToList();
                 var center = new Vector2(Mathf.Clamp(lips.Average(s => s.P.x), -0.012f, 0.012f), Median(line.Select(s => s.P.y)));
-                // An open mouth as wide as a third of the lips (it was a 1-2 cm dot), the dark red of the line
-                // between the lips, not the black of the lashes.
-                float rx = Mathf.Clamp(width * 0.3f, 0.009f, 0.019f);
-                Vector2 mouthUv = line.Count > 0 ? line[0].Uv : darkUv;
-                // (No open-mouth patch: a dark disc on painted lips only ever looked like a hole.)
                 mouthAt = new Vector3(center.x, center.y, SurfaceZ(center));
                 mouthNote = $"mouth {width * 100f:0.0} cm wide at y {center.y:0.000}";
                 fit.HasMouth = true;
                 fit.Mouth = Spot.At(new Rect(center.x - width * 0.5f, center.y - 0.01f, width, 0.02f), vertices, normals, faceFloor);
+                face.HasMouth = true;
+                face.Mouth = center;
+                face.MouthWidth = width;
             }
             if (baseFile == file) BaseFaces[file] = fit;
             Debug.Log($"[Build] body {file}: face {half * 200f:0.0} cm wide, eyes at y {eyeLevel:0.000} " +
-                      $"({eyeL.width * 100f:0.0} x {eyeL.height * 100f:0.0} cm){eyeNote}, {mouthNote}");
-            return true;
+                      $"({eyeL.width * 100f:0.0} x {eyeL.height * 100f:0.0} cm){eyeNote}{(face.SeeL && face.SeeR ? "" : face.SeeL || face.SeeR ? ", one eye hidden" : ", eyes hidden")}, {mouthNote}");
+            return face;
         }
 
         private static AvatarBody Bake(string glbPath, byte id, string displayName, string file)
@@ -1384,12 +1218,11 @@ namespace PleaseDontDrown.Editor
                     body.HeadBack = Mathf.Max(body.HeadBack, headAt.z - v.z);
                 }
 
-                // The face: eyelids and an open mouth over the painted ones (found in the texture).
-                var extra = new ExtraGeometry();
-                Vector3 lidL = default, lidR = default, mouthAt = default;
-                float eyeLevel = 0f;
-                body.HasFace = !PaintedFaceOnly.Contains(file) && BuildFace(file, source, vertices, normals, weights, skin.sharedMaterial, P(Bone.Head), extra,
-                    out lidL, out lidR, out mouthAt, out eyeLevel);
+                // The face: where its eyes and mouth are painted (found in the texture), and the living face rigged over
+                // them (MeshyCharacters.FaceRig.cs).
+                FoundFace found = BuildFace(file, source, vertices, normals, weights, skin.sharedMaterial, P(Bone.Head),
+                    out Vector3 lidL, out Vector3 lidR, out Vector3 mouthAt, out float eyeLevel);
+                body.HasFace = found != null;
                 if (body.HasFace)
                 {
                     Set(Bone.EyeL, lidL - P(Bone.Head), lidL, Quaternion.identity);
@@ -1398,11 +1231,48 @@ namespace PleaseDontDrown.Editor
                     body.EyeHeight = eyeLevel;
                     body.RestPositions = rest;
                 }
+                // (The funny body's googly eyes cover its painted ones: only its mouth comes alive.)
+                if (found != null && FunnyBodies.Contains(file)) found.SeeL = found.SeeR = false;
+                FaceRig faceRig = found != null ? FitFaceRig(file, found, source, vertices, normals, skin.sharedMaterial) : null;
+                if (faceRig != null && faceRig.Mouth && faceRig.MouthMoved)
+                {
+                    // The mouth found again on the face (the texture search had taken something else for it).
+                    var lips = new Vector3(faceRig.Cx, faceRig.LineAt(faceRig.Cx), faceRig.MouthZ);
+                    Set(Bone.Mouth, lips - P(Bone.Head), lips, Quaternion.identity);
+                    body.RestPositions = rest;
+                }
+                if (faceRig != null && (faceRig.L != null || faceRig.R != null))
+                {
+                    // The eye bones on the eyes as cut out of the face (the texture search can be fooled by pale hair).
+                    Vector3 Top(EyeFit e, float mirror)
+                    {
+                        float x = mirror * (e.Cx - faceRig.MidX) + faceRig.MidX, z = faceRig.Image.FrontZ(x, e.MaxTop - 0.002f);
+                        return new Vector3(x, e.MaxTop, float.IsNaN(z) ? lidL.z : z);
+                    }
+                    Vector3 eyeL = faceRig.L != null ? Top(faceRig.L, 1f) : Top(faceRig.R, -1f);
+                    Vector3 eyeR = faceRig.R != null ? Top(faceRig.R, 1f) : Top(faceRig.L, -1f);
+                    Set(Bone.EyeL, eyeL - P(Bone.Head), eyeL, Quaternion.identity);
+                    Set(Bone.EyeR, eyeR - P(Bone.Head), eyeR, Quaternion.identity);
+                    body.RestPositions = rest;
+                }
 
                 // The players' funny body: part ids for recolouring, the googly eyes, nose and teeth (MeshyCharacters.Funny.cs).
                 FunnyFit funny = FunnyBodies.Contains(file)
                     ? FitFunny(file, source, vertices, normals, weights, skin.sharedMaterial, P(Bone.Head), P(Bone.Neck), P(Bone.Hips), P(Bone.Chest), P(Bone.Spine))
                     : null;
+
+                var parts = new MeshParts
+                {
+                    V = vertices.ToList(), N = normals.ToList(), T = tangents.Length == vertices.Length ? tangents.ToList() : null,
+                    Uv = source.uv.ToList(), W = weights.ToList(), Original = vertices.Length,
+                    Tris = Enumerable.Range(0, source.subMeshCount).Select(sm => source.GetTriangles(sm).ToList()).ToArray()
+                };
+                if (faceRig != null && faceRig.Mouth)
+                {
+                    RefineMouth(faceRig, parts);
+                    CutMouth(faceRig, parts);
+                    if (faceRig.Mouth) AddMouthInside(faceRig, parts);
+                }
 
                 string meshPath = $"{OutputDir}/{file}_mesh.asset";
                 var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
@@ -1410,29 +1280,24 @@ namespace PleaseDontDrown.Editor
                 if (isNew) mesh = new Mesh();
                 mesh.Clear();
                 mesh.name = file;
-                mesh.indexFormat = source.indexFormat;
-                bool hasTangents = tangents.Length == vertices.Length;
-                int baseCount = vertices.Length;
-                mesh.vertices = vertices.Concat(extra.Vertices).ToArray();
-                mesh.normals = normals.Concat(extra.Normals).ToArray();
-                if (hasTangents) mesh.tangents = tangents.Concat(extra.Vertices.Select(_ => new Vector4(1f, 0f, 0f, 1f))).ToArray();
-                mesh.uv = source.uv.Concat(extra.Uvs).ToArray();
-                mesh.subMeshCount = source.subMeshCount;
-                for (int sm = 0; sm < source.subMeshCount; sm++)
-                {
-                    int[] triangles = source.GetTriangles(sm);
-                    if (sm == 0) triangles = triangles.Concat(extra.Triangles.Select(t => t + baseCount)).ToArray();
-                    mesh.SetTriangles(triangles, sm);
-                }
-                mesh.boneWeights = weights.Concat(extra.Weights).ToArray();
+                mesh.indexFormat = parts.V.Count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : source.indexFormat;
+                mesh.SetVertices(parts.V);
+                mesh.SetNormals(parts.N);
+                if (parts.T != null) mesh.SetTangents(parts.T);
+                mesh.SetUVs(0, parts.Uv);
+                mesh.SetUVs(3, FaceData(faceRig, parts)); // where each vertex is on the face (the face shader)
+                mesh.subMeshCount = parts.Tris.Length;
+                for (int sm = 0; sm < parts.Tris.Length; sm++) mesh.SetTriangles(parts.Tris[sm], sm);
+                mesh.boneWeights = parts.W.ToArray();
                 mesh.bindposes = bind.Select(m => m.inverse).ToArray();
                 if (funny != null) AddFunnyShapes(mesh, funny, vertices, weights, mesh.vertexCount);
+                if (faceRig != null) AddFaceShapes(faceRig, parts, mesh);
                 mesh.RecalculateBounds();
                 if (isNew) AssetDatabase.CreateAsset(mesh, meshPath);
                 else EditorUtility.SetDirty(mesh);
                 body.Mesh = mesh;
                 body.Material = BodyMaterial(skin.sharedMaterial, file);
-                body.ClosedEyesMaterial = body.HasFace && !OpenEyesOnly.Contains(file) ? SaveClosedEyes(file, body.Material) : null; // (MeshyCharacters.ClosedEyes.cs)
+                DressFace(faceRig, body, body.Material, file);
                 if (funny != null) ApplyFunny(body, funny, file, P(Bone.Head));
 
                 string bodyPath = $"{OutputDir}/{file}.asset";

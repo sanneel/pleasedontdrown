@@ -16,7 +16,6 @@ MonoBehaviour:
   DisplayName: Tourist (sunburnt dad) #10
   Mesh: {fileID: 4300000, guid: b11d71fa0e5d5ca4b93617b18a6221ba, type: 2}
   Material: {fileID: 2100000, guid: e8aa712af9c038c4bbf7bffb69af7c5e, type: 2}
-  ClosedEyesMaterial: {fileID: 2100000, guid: 5328075692287fc4bafd3f1ac34eaa26, type: 2}
   RestPositions:
   - {x: 0, y: 0.8939555, z: 0.01001206}
   - {x: -9.533156e-16, y: 0.07512671, z: 0.008965954}
@@ -35,8 +34,8 @@ MonoBehaviour:
   - {x: 0.11137255, y: -0.03955531, z: -0.011564864}
   - {x: 0, y: -0.4025835, z: 0}
   - {x: 0, y: -0.38474208, z: 0}
-  - {x: -0.036600735, y: 0.1857698, z: 0.12837619}
-  - {x: 0.037300393, y: 0.19202662, z: 0.12736994}
+  - {x: -0.036650155, y: 0.19268203, z: 0.12682554}
+  - {x: 0.036099847, y: 0.19098878, z: 0.12722409}
   - {x: -0.010529213, y: 0.06886351, z: 0.1387698}
   - {x: -0.041777443, y: 0.18799849, z: 0.17369832}
   - {x: 0.041777443, y: 0.18799849, z: 0.17369832}
@@ -113,6 +112,9 @@ MonoBehaviour:
   - {x: 0, y: -0.99528086, z: -0.09703615}
   - {x: 0, y: -0.98180133, z: -0.1899111}
   HasFace: 1
+  FaceEyes: 1
+  FaceMouth: 1
+  MouthMaterial: {fileID: 2100000, guid: 956b669a21a526b46811e6b888409472, type: 2}
   HeadTop: 0.34814537
   HeadHalfWidth: 0.15205212
   HeadFront: 0.19299814
