@@ -291,9 +291,62 @@ for v in bm.verts:
     if (v.co - loc).dot(nrm) < 0.004:
         v.co = loc + nrm * 0.004
         pushed += 1
+# Below the chin the hair lies on the neck, shoulders and back, and moves with the chest, not the head. (Weighted to
+# the head and hanging straight down, long hair stood off the back like a board: lying on her back, the girl lay on
+# it, held up off the sand.) Pulled toward the torso's skin, keeping a tenth of the gap, and weighted from the head
+# just under the chin to the chest 12 cm lower.
+torso_names = {'Hips', 'Spine', 'Chest', 'BustL', 'BustR', 'Neck', 'ShoulderL', 'ShoulderR'}
+group_name = {g.index: g.name for g in body.vertex_groups}
+torso_v = set()
+for v in body.data.vertices:
+    if v.groups:
+        g = max(v.groups, key=lambda x: x.weight)
+        if group_name.get(g.group) in torso_names:
+            torso_v.add(v.index)
+bm_torso = bm_body.copy()
+bm_torso.verts.ensure_lookup_table()
+bmesh.ops.delete(bm_torso, geom=[f for f in bm_torso.faces if not all(v.index in torso_v for v in f.verts)], context='FACES')
+bvh_torso = BVHTree.FromBMesh(bm_torso)
+# (Behind the head the hair is pulled in from halfway up the head: hanging straight down from the crown, it stood
+# 20 cm off the nape, and lying on her back she either lay on that or it went into the sand.)
+bm_skin = bm_body.copy()
+head_v = set()
+for v in body.data.vertices:
+    if v.groups:
+        g = max(v.groups, key=lambda x: x.weight)
+        if group_name.get(g.group) in torso_names or group_name.get(g.group) == 'Head':
+            head_v.add(v.index)
+bmesh.ops.delete(bm_skin, geom=[f for f in bm_skin.faces if not all(v.index in head_v for v in f.verts)], context='FACES')
+bvh_skin = BVHTree.FromBMesh(bm_skin)
+drape_span = 0.12
+chest_w = {}
+draped = 0
+bm.verts.index_update()
+for v in bm.verts:
+    behind = v.co.y - body_cy > 0.45 * body_w
+    if v.co.z < chin + 0.02:
+        w = min(1.0, (chin + 0.02 - v.co.z) / drape_span)
+        chest_w[v.index] = w * w * (3 - 2 * w)
+    k = 0.0
+    if v.co.z < chin + 0.02:
+        k = min(1.0, (chin + 0.02 - v.co.z) / drape_span)
+        k = k * k * (3 - 2 * k)
+    if behind and v.co.z < chin + 0.3 * hh:
+        # Behind the head: a gentle pull from higher up, over a long way down (a sharp one left a shelf in the hair).
+        kb = min(1.0, (chin + 0.3 * hh - v.co.z) / 0.3)
+        k = max(k, 0.75 * kb * kb * (3 - 2 * kb))
+    if k <= 0.0:
+        continue
+    loc, nrm, _, dist = (bvh_skin if behind else bvh_torso).find_nearest(v.co)
+    if loc is None:
+        continue
+    off = v.co - loc
+    if off.dot(nrm) > 0.01 and off.length > 1e-6:
+        v.co = loc + off.normalized() * (0.01 + (off.length - 0.01) * (1 - 0.88 * k))
+        draped += 1
 bm.to_mesh(me)
 bm.free()
-log(f'scale {s:.3f}, {len(me.vertices)} hair vertices, {pushed} pushed out of the head')
+log(f'scale {s:.3f}, {len(me.vertices)} hair vertices, {pushed} pushed out of the head, {draped} draped on the back')
 
 # ------------------------------------------------------------------ one texture: the body's picture with a strip under it
 bmat = body.data.materials[0]
@@ -335,7 +388,13 @@ hair.data.materials.append(bmat)
 for g in list(hair.vertex_groups):
     hair.vertex_groups.remove(g)
 hg = hair.vertex_groups.new(name='Head')
-hg.add(list(range(len(hair.data.vertices))), 1.0, 'REPLACE')
+cg = hair.vertex_groups.new(name='Chest')
+for i in range(len(hair.data.vertices)):
+    k = chest_w.get(i, 0.0)
+    if k < 0.999:
+        hg.add([i], 1.0 - k, 'REPLACE')
+    if k > 0.001:
+        cg.add([i], k, 'REPLACE')
 bpy.ops.object.select_all(action='DESELECT')
 hair.select_set(True)
 body.select_set(True)

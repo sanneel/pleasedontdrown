@@ -116,9 +116,9 @@ MonoBehaviour:
   FaceMouth: 1
   MouthMaterial: {fileID: 2100000, guid: 5a57c6a23baad124eabf6eb0d0376efa, type: 2}
   HeadTop: 0.3068998
-  HeadHalfWidth: 0.23626114
+  HeadHalfWidth: 0.23511545
   HeadFront: 0.12812246
-  HeadBack: 0.40586573
+  HeadBack: 0.40401265
   Recolor: {fileID: 0}
   RegionLuma: []
   GooglyL: {x: 0, y: 0, z: 0}

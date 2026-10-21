@@ -21,7 +21,7 @@ namespace PleaseDontDrown.Rescue
     /// also swims it: keeps the head up, dunks under when panicking, lets go when unconscious.
     /// </summary>
     [RequireComponent(typeof(VictimBrain), typeof(ItemSync))]
-    public class VictimBody : MonoBehaviour, IHoldPose
+    public partial class VictimBody : MonoBehaviour, IHoldPose
     {
         private enum LimbKind { ArmL, ArmR, LegL, LegR }
 
@@ -35,6 +35,11 @@ namespace PleaseDontDrown.Rescue
             public float Side;          // +1 right, -1 left
             public bool IsArm;
             public float Spring = -1f;  // current drive, to avoid re-assigning it every step
+            public CapsuleCollider Stick; // the upper arm or thigh (fitted to the drawn body: VictimBody.Fit.cs)
+            public CapsuleCollider Lower; // the forearm or shin
+            public CapsuleCollider End;   // the hand or foot (heel to toe)
+            public float Reach = 0.8f;    // joint to fingertips / sole, metres
+            public float SoleBelowEnd = 0.08f; // the foot bone to the sole (standing height from the drawn feet)
         }
 
         [SerializeField] private Transform _visual;
@@ -455,6 +460,9 @@ namespace PleaseDontDrown.Rescue
             _buoyancy = GetComponent<Buoyancy>();
             _rb.solverIterations = 12;
             _rb.solverVelocityIterations = 4;
+            // Pushed out of an overlap (spawned on the sand, colliders refitted to the body) gently: at the default
+            // 10 m/s a body that started a few centimetres into the sand was thrown into the air.
+            _rb.maxDepenetrationVelocity = 1.5f;
             BuildLimbs();
         }
 
@@ -506,6 +514,7 @@ namespace PleaseDontDrown.Rescue
             // Hips of the cartoon body on the torso's hip joints.
             _avatar.transform.localPosition = new Vector3(0f, _hipY - _avatar.HipHeight, 0f);
             _avatar.transform.localRotation = Quaternion.identity;
+            _fitIn = 2; // fit the colliders once the limbs have posed the new body (LateUpdate)
         }
 
         /// <summary>A CPR compression: a squish and a thump (local visual, every machine).</summary>
@@ -766,6 +775,9 @@ namespace PleaseDontDrown.Rescue
             else if (state.IsStruggling()) { armBend = 30f + 15f * Mathf.Sin(Time.time * 5f); legBend = 35f + 20f * Mathf.Sin(Time.time * 4f); }
             else if (_wading || _walkingAway) { armBend = 18f; legBend = 22f; }
             else { armBend = 15f; legBend = 4f; }
+            // The knees bend back: lying down (on the back or front) that pushed the heels into the sand. Only an
+            // upright body bends them.
+            if (!_item.IsHeld) legBend *= Mathf.InverseLerp(0.4f, 0.85f, Mathf.Abs(transform.up.y));
 
             foreach (Limb limb in _limbs)
             {
@@ -778,6 +790,9 @@ namespace PleaseDontDrown.Rescue
                 _avatar[upper].rotation = limb.Body.transform.rotation; // both hang down their local -Y at rest
                 _avatar[lower].localRotation = limb.IsArm ? Quaternion.Euler(-armBend, 0f, 0f) : Quaternion.Euler(legBend, 0f, 0f);
             }
+            if (_fitIn > 0 && --_fitIn == 0) FitColliders();
+            if (_standing && !_item.IsHeld) MeasureFeet();
+            else _footGap = 0f;
 
             // The limp arms hang where the ragdoll lets them: carried against a lifeguard's chest, or with somebody
             // kneeling right beside, they went into that body. Swung out at the shoulder until clear.
@@ -891,6 +906,9 @@ namespace PleaseDontDrown.Rescue
             if (_rb.isKinematic || _item.IsHeld)
                 return; // someone else simulates the torso, or a lifeguard's hands steer it
 
+            UpdateStanding((recovered || _wading) && (state is VictimState.Fine or VictimState.Saved) && transform.up.y > 0.8f
+                           && Time.time >= _layDownUntil);
+            KeepOutOfGround();
             _mode = "-";
             if (!(state is VictimState.Fine or VictimState.Saved)) _riseStart = -1f; // (a fresh get-up next time they recover)
             if (Time.time < _layDownUntil)
@@ -1194,7 +1212,7 @@ namespace PleaseDontDrown.Rescue
 
             // Held high enough that the feet clear the sand (dragging feet tipped the body forward into a stoop): that
             // height comes up with the rise, not all at once.
-            float height = Mathf.Lerp(0.3f, 1.24f, rise);
+            float height = Mathf.Lerp(0.3f, rise >= 1f ? StandHeight() : _standHeight + _heightTrim, rise);
             float lift = Mathf.Clamp((_groundY + height - p.y) * 90f - v.y * 20f + 10f * rise, -30f, 55f);
             _rb.AddForce(Vector3.up * lift, ForceMode.Acceleration);
 
@@ -1258,10 +1276,31 @@ namespace PleaseDontDrown.Rescue
                 body.solverIterations = 12;
                 body.solverVelocityIterations = 4;
                 body.maxAngularVelocity = 25f;
+                body.maxDepenetrationVelocity = 1.5f;
                 limb.Joint = CreateJoint(limb, t.localPosition);
+                limb.Stick = t.GetComponent<CapsuleCollider>();
+                limb.Lower = t.gameObject.AddComponent<CapsuleCollider>();
+                limb.Lower.sharedMaterial = limb.Stick != null ? limb.Stick.sharedMaterial : null;
+                limb.Lower.radius = 0.05f;
+                limb.Lower.height = 0.3f;
+                limb.Lower.center = new Vector3(0f, i < 2 ? -0.45f : -0.6f, 0f);
+                limb.End = t.gameObject.AddComponent<CapsuleCollider>();
+                limb.End.sharedMaterial = limb.Stick != null ? limb.Stick.sharedMaterial : null;
+                limb.End.radius = 0.05f;
+                limb.End.height = 0.1f;
+                limb.End.center = new Vector3(0f, i < 2 ? -0.62f : -0.82f, i < 2 ? 0f : 0.05f);
                 limbs.Add(limb);
             }
             _limbs = limbs.ToArray();
+
+            // Long or curly hair hanging below the head gets a collider of its own (sized in FitColliders).
+            var hairGo = new GameObject("HairBack");
+            hairGo.transform.SetParent(transform, false);
+            hairGo.layer = gameObject.layer;
+            _hairBox = hairGo.AddComponent<BoxCollider>();
+            CapsuleCollider torsoCollider = GetComponent<CapsuleCollider>();
+            if (torsoCollider != null) _hairBox.sharedMaterial = torsoCollider.sharedMaterial;
+            _hairBox.size = Vector3.one * 0.01f;
 
             // Parts of the same person don't collide with each other.
             Collider[] all = GetComponentsInChildren<Collider>(true);
@@ -1462,8 +1501,11 @@ namespace PleaseDontDrown.Rescue
                         SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 160f + 12f * Mathf.Sin(t * 8f + ph), 10f) : LegPose(limb, 85f, 12f));
                         break;
                     default:
+                        // Sitting on the sand, legs out in front. Lying on the back (thrown, knocked over) the legs go
+                        // down flat with the body: sitting legs on a body lying back stuck up in the air.
+                        float sitting = Mathf.InverseLerp(0.35f, 0.8f, transform.up.y);
                         SetDrive(limb, limb.IsArm ? 280f : 440f, 28f);
-                        SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 22f, -35f) : LegPose(limb, 85f, 12f));
+                        SetTarget(limb.Joint, limb.IsArm ? ArmPose(limb, 22f, -35f) : LegPose(limb, Mathf.Lerp(4f, 85f, sitting), 12f));
                         break;                }
             }
         }
@@ -1485,6 +1527,49 @@ namespace PleaseDontDrown.Rescue
                 sb.Append($"  {limb.Kind}: points {down:F2} (spring {limb.Spring:F0})\n");
             }
             return sb.ToString();
+        }
+
+        private static Mesh _sinkMesh;
+        private static readonly System.Collections.Generic.List<Vector3> _sinkVerts = new();
+
+        /// <summary>
+        /// Tests: how far the drawn body goes below the sand. Every 4th vertex of the skinned mesh is checked against
+        /// the ground under it; returns the deepest one (metres, positive = under the sand) and the bone it is nearest.
+        /// </summary>
+        public float SinkDepth(out string where, out int under)
+        {
+            where = "-";
+            under = 0;
+            if (_avatar == null || !_avatar.IsBuilt) return 0f;
+            if (_sinkMesh == null) _sinkMesh = new Mesh();
+            float worst = float.NegativeInfinity;
+            Vector3 worstPoint = Vector3.zero;
+            foreach (SkinnedMeshRenderer r in _avatar.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                if (!r.enabled) continue;
+                r.BakeMesh(_sinkMesh, true);
+                _sinkMesh.GetVertices(_sinkVerts);
+                Matrix4x4 m = Matrix4x4.TRS(r.transform.position, r.transform.rotation, Vector3.one);
+                for (int i = 0; i < _sinkVerts.Count; i += 4)
+                {
+                    Vector3 w = m.MultiplyPoint3x4(_sinkVerts[i]);
+                    float ground = Shore.GroundHeightAt(w + Vector3.up * 0.3f);
+                    if (float.IsNaN(ground)) continue;
+                    float depth = ground - w.y;
+                    if (depth > 0.01f) under++;
+                    if (depth > worst) { worst = depth; worstPoint = w; }
+                }
+            }
+            float best = float.MaxValue;
+            for (int b = 0; b < (int)AvatarRig.Bone.EyeL; b++)
+            {
+                Transform t = _avatar[(AvatarRig.Bone)b];
+                if (t == null) continue;
+                float d = (t.position - worstPoint).sqrMagnitude;
+                if (d < best) { best = d; where = ((AvatarRig.Bone)b).ToString(); }
+            }
+            where += $" {transform.InverseTransformPoint(worstPoint):F2}";
+            return worst;
         }
     }
 }

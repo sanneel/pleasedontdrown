@@ -217,6 +217,15 @@ namespace PleaseDontDrown.Rescue
                 item.Sync.Body.angularVelocity = UnityEngine.Random.insideUnitSphere * 4f;
                 DevCommands.Print($"launched {v.Name}");
             }, cheat: true, owner: this);
+            DevCommands.Register("sinkcheck", "", "How deep each tourist's drawn body goes under the sand (worst vertex, nearest bone).", _ =>
+            {
+                foreach (VictimBrain v in FindObjectsByType<VictimBrain>(FindObjectsSortMode.None))
+                {
+                    float d = v.Body.SinkDepth(out string where, out int under);
+                    float lie = v.transform.position.y - Shore.GroundHeightAt(v.transform.position + Vector3.up);
+                    Debug.Log($"[Sink] {v.Name} body {v.Look.Body} ({v.State}): deepest {d * 100f:F1} cm at {where}, {under} vertices >1 cm under, torso {lie:F3} up {v.transform.up.y:F2} | {v.Body.FitReport}");
+                }
+            }, owner: this);
             DevCommands.Register("ragdoll", "", "Show where the nearest tourist's limbs point (pose debugging).", _ =>
             {
                 VictimBrain v = Nearest();
@@ -227,7 +236,7 @@ namespace PleaseDontDrown.Rescue
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "drill", "victims", "victim", "vset", "cpr", "clearvictims", "ragdoll", "launch" })
+            foreach (string c in new[] { "drill", "victims", "victim", "vset", "cpr", "clearvictims", "ragdoll", "launch", "sinkcheck" })
                 DevCommands.Unregister(c, this);
         }
 
