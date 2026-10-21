@@ -127,7 +127,10 @@ namespace PleaseDontDrown.Avatars
             /// </summary>
             public const byte VariantFirst = 32;
             public const int VariantsPerBase = 10;
-            public static readonly byte[] VariantBases = { TouristRed, TouristSporty, TouristPurple, TouristBuddy };
+            public static readonly byte[] VariantBases = { TouristRed, TouristSporty, TouristPurple, TouristBuddy, BaseWoman, BaseMan };
+
+            /// <summary>The new game's beach girls: the base woman repainted (ArtSource/Tripo/Bases/girls_spec.json), her face untouched.</summary>
+            public static byte BaseGirl(int n) => Variant(BaseWoman, n);
 
             public static byte Variant(byte baseBody, int n)
             {
@@ -138,7 +141,7 @@ namespace PleaseDontDrown.Avatars
             /// <summary>The base tourist or one of its look-alikes (a missing body falls back to the code-built one).</summary>
             /// <summary>Women's bodies (the look's Figure should say feminine: bust jiggle, CPR lines).</summary>
             public static bool IsFeminine(byte body) =>
-                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender or PirateGirl or HotelAttendantA or HotelAttendantB or BaseWoman || body >= VariantFirst && body < VariantFirst + 48;
+                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender or PirateGirl or HotelAttendantA or HotelAttendantB or BaseWoman || body >= VariantFirst && body < VariantFirst + 48 || body >= VariantFirst + 64 && body < VariantFirst + 80;
 
             public static byte PickVariant(System.Random rng, byte baseBody) => Variant(baseBody, rng.Next(VariantsPerBase + 1));
 

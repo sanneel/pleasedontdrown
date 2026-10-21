@@ -7,6 +7,10 @@ blender -b --factory-startup -P ArtSource/Tools/make_variants.py -- <in.glb> <ou
   --feminine 1        women: bust size varies, no grey hair or beards
   --preview <prefix>  also render a front lineup (+ close-ups of the faces) of the original and every variant
   --masks <prefix>    debug: write the skin / hair / eye / clothes masks as pictures
+  --spec <file.json>  exact variants instead of random ones (the new game's characters on the shared bases): a list of
+                      {"name", "skin": [r,g,b], "hair": [r,g,b] (brows on a bald base), "cloth": [r,g,b] (paints grey
+                      clothes that colour, keeping their shading), "bust", "belly", "height", "torso", "limbs"}.
+                      The face and head are never reshaped: the game's face (eyes, lids, mouth) stays the base's.
 
 How the texture is split: every texel is traced back to the spot on the body it colours (the UV triangles are drawn
 into a map of 3D positions). Skin = the colours found on the hands and the middle of the face; hair = what is left on
@@ -24,7 +28,7 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, PREFIX = argv[0], argv[1]
-opts = {'count': 10, 'seed': 1, 'feminine': 1, 'preview': '', 'masks': '', 'start': 1}
+opts = {'count': 10, 'seed': 1, 'feminine': 1, 'preview': '', 'masks': '', 'start': 1, 'spec': ''}
 i = 2
 while i < len(argv):
     key = argv[i].lstrip('-')
@@ -407,9 +411,17 @@ def recolour(p):
         new_hair = to_linear(srgb(p['hair']))[None] * detail[:, None]
         out = out * (1 - hair[:, None]) + new_hair * hair[:, None]
     # Eyes: the iris takes the new colour, pupils stay dark.
-    iris = to_linear(srgb(p['eyes']))[None] * np.clip(Y / 0.12, 0.15, 1.6)[:, None]
-    out = out * (1 - eyes[:, None]) + iris * eyes[:, None]
+    if p.get('eyes') is not None:
+        iris = to_linear(srgb(p['eyes']))[None] * np.clip(Y / 0.12, 0.15, 1.6)[:, None]
+        out = out * (1 - eyes[:, None]) + iris * eyes[:, None]
     result = to_srgb(out)
+    # Clothes painted a colour (spec mode: the bases' clothes are plain grey, a hue turn can't colour them).
+    if p.get('cloth') is not None:
+        cl = to_linear(result)
+        yc = luminance(cl)
+        yref = max(1e-4, float(np.median(yc[clothes > 0.5])) if (clothes > 0.5).any() else 0.2)
+        painted = to_linear(srgb(p['cloth']))[None] * np.clip(yc / yref, 0, 3)[:, None]
+        result = to_srgb(cl * (1 - clothes[:, None]) + painted * clothes[:, None])
     # Clothes: hue turned (only coloured parts; white/black stay), a bit more or less saturated.
     if p['cloth_hue'] != 0:
         hsv = rgb_to_hsv(result)
@@ -446,6 +458,19 @@ for n in range(opts['count']):
         'height': rng.uniform(0.955, 1.045),
     }
     variants.append(p)
+
+if opts['spec']:
+    # Exact characters: no face or head change, the body only where the spec says.
+    variants = []
+    for e in json.load(open(opts['spec'])):
+        variants.append({
+            'skin_name': e['name'], 'skin': tuple(e['skin']), 'hair_name': e['name'], 'hair': tuple(e.get('hair', (40, 30, 25))),
+            'eyes_name': 'base', 'eyes': None, 'cloth': tuple(e['cloth']) if 'cloth' in e else None,
+            'cloth_hue': 0, 'cloth_sat': 1.0,
+            'head': 1.0, 'face_w': 1.0, 'jaw': 1.0, 'face_d': 1.0, 'chin': 1.0,
+            'torso': e.get('torso', 1.0), 'limbs': e.get('limbs', 1.0), 'belly': e.get('belly', 1.0),
+            'bust': e.get('bust', 1.0), 'height': e.get('height', 1.0),
+        })
 
 manifest = []
 rig_rest = {b.name: (b.head_local.copy(), b.tail_local.copy()) for b in rig.data.bones}

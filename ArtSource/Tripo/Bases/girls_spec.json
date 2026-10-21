@@ -1,0 +1,9 @@
+[
+  {"name": "lola",     "skin": [208, 158, 112], "hair": [58, 38, 27],    "cloth": [206, 32, 44],   "bust": 1.08, "height": 1.0},
+  {"name": "red",      "skin": [222, 170, 128], "hair": [98, 66, 44],    "cloth": [232, 76, 58],   "bust": 1.0,  "height": 1.02},
+  {"name": "blonde",   "skin": [236, 192, 162], "hair": [176, 140, 92],  "cloth": [28, 178, 190],  "bust": 1.04, "height": 0.98},
+  {"name": "redhead",  "skin": [244, 212, 190], "hair": [176, 84, 40],   "cloth": [22, 150, 82],   "bust": 0.95, "height": 1.01},
+  {"name": "blackhair","skin": [150, 100, 66],  "hair": [24, 21, 21],    "cloth": [212, 40, 140],  "bust": 1.1,  "height": 0.99},
+  {"name": "pink",     "skin": [240, 190, 168], "hair": [196, 176, 146], "cloth": [242, 112, 172], "bust": 1.0,  "height": 0.97},
+  {"name": "lavender", "skin": [238, 204, 180], "hair": [24, 21, 21],    "cloth": [168, 138, 222], "bust": 0.97, "height": 1.03}
+]
