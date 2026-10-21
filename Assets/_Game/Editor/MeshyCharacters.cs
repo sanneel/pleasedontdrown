@@ -51,6 +51,8 @@ namespace PleaseDontDrown.Editor
             (AvatarLook.Bodies.HotelAttendantB, "Hotel attendant", "hotel_attendant_b"),
             (AvatarLook.Bodies.FkRival, "Finders Keepers lifeguard", "fk_rival"),
             (AvatarLook.Bodies.HotelBellhop, "Hotel bellhop", "hotel_bellhop"),
+            (AvatarLook.Bodies.BaseWoman, "Base woman", "base_woman"),
+            (AvatarLook.Bodies.BaseMan, "Base man", "base_man"),
         };
 
         /// <summary>

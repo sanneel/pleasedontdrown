@@ -81,13 +81,19 @@ namespace PleaseDontDrown.Avatars
 
             /// <summary>
             /// The pirates (Tripo, ArtSource/Tripo/Pirates, rigged by prepare_character.py): the king, and the crew that
-            /// <see cref="Story.StoryDirector.PirateLook"/> deals out. 14-15 are kept for the teen and the brawler.
+            /// <see cref="Story.StoryDirector.PirateLook"/> deals out.
             /// </summary>
             public const byte PirateKing = 9;
             public const byte PirateFat = 10;
             public const byte PirateGirl = 11;
             public const byte PirateMarksman = 12;
             public const byte PirateQuartermaster = 13;
+            /// <summary>
+            /// The new game's two shared bodies (Tripo multi-view from GPT designs, 2026-10-21, Docs/21-Base-Body-Prompts.md):
+            /// every character will be one of these with its own texture, hair, hat and sliders.
+            /// </summary>
+            public const byte BaseWoman = 14;
+            public const byte BaseMan = 15;
             /// <summary>The hotel director (island 2: the gala, the yacht keys).</summary>
             public const byte HotelDirector = 25;
             /// <summary>Tripo (ArtSource/Tripo/Latest, 2026-10-12): a beach tourist in a black tee, red shorts and sunglasses.</summary>
@@ -132,7 +138,7 @@ namespace PleaseDontDrown.Avatars
             /// <summary>The base tourist or one of its look-alikes (a missing body falls back to the code-built one).</summary>
             /// <summary>Women's bodies (the look's Figure should say feminine: bust jiggle, CPR lines).</summary>
             public static bool IsFeminine(byte body) =>
-                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender or PirateGirl or HotelAttendantA or HotelAttendantB || body >= VariantFirst && body < VariantFirst + 48;
+                body is >= Sandy and <= TouristPurple or >= Lola and <= GirlLavender or PirateGirl or HotelAttendantA or HotelAttendantB or BaseWoman || body >= VariantFirst && body < VariantFirst + 48;
 
             public static byte PickVariant(System.Random rng, byte baseBody) => Variant(baseBody, rng.Next(VariantsPerBase + 1));
 
