@@ -199,6 +199,24 @@ namespace PleaseDontDrown.Rescue
                 StartCoroutine(PumpRoutine(pumps, gap));
             }, cheat: true, owner: this);
             DevCommands.Register("clearvictims", "", "Remove every tourist.", _ => ClearServer(), cheat: true, owner: this);
+            DevCommands.Register("launch", "[up m/s] [away m/s]", "Fling the nearest tourist into the air (default 9 up, 3 away from you): shooting and catching tests.", args =>
+            {
+                VictimBrain v = Nearest();
+                PlayerHub me = PlayerHub.Local;
+                if (v == null || me == null) throw new InvalidOperationException("no tourist");
+                float up = args.Length > 0 ? DevCommands.ParseFloat(args, 0) : 9f;
+                float away = args.Length > 1 ? DevCommands.ParseFloat(args, 1) : 3f;
+                Vector3 flat = v.transform.position - me.transform.position;
+                flat.y = 0f;
+                flat = flat.sqrMagnitude > 1e-4f ? flat.normalized : me.transform.forward;
+                var item = v.GetComponent<Items.Item>();
+                if (item.IsHeld) throw new InvalidOperationException("someone is holding them");
+                item.Sync.RequestAuthority();
+                item.Sync.Body.isKinematic = false;
+                item.Sync.Body.linearVelocity = Vector3.up * up + flat * away;
+                item.Sync.Body.angularVelocity = UnityEngine.Random.insideUnitSphere * 4f;
+                DevCommands.Print($"launched {v.Name}");
+            }, cheat: true, owner: this);
             DevCommands.Register("ragdoll", "", "Show where the nearest tourist's limbs point (pose debugging).", _ =>
             {
                 VictimBrain v = Nearest();
@@ -209,7 +227,7 @@ namespace PleaseDontDrown.Rescue
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "drill", "victims", "victim", "vset", "cpr", "clearvictims", "ragdoll" })
+            foreach (string c in new[] { "drill", "victims", "victim", "vset", "cpr", "clearvictims", "ragdoll", "launch" })
                 DevCommands.Unregister(c, this);
         }
 

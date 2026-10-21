@@ -11,6 +11,9 @@ blender -b --factory-startup -P ArtSource/Tools/make_variants.py -- <in.glb> <ou
                       {"name", "skin": [r,g,b], "hair": [r,g,b] (brows on a bald base), "cloth": [r,g,b] (paints grey
                       clothes that colour, keeping their shading), "bust", "belly", "height", "torso", "limbs"}.
                       The face and head are never reshaped: the game's face (eyes, lids, mouth) stays the base's.
+                      "scalp": [r,g,b] paints a bald base's scalp under the hair that colour (front hairline over the
+                      brows, above the ears at the sides, down to the nape at the back): a gap under a fitted hair
+                      piece (attach_hair.py) reads as hair. Never below the brows: the face stays as it is.
 
 How the texture is split: every texel is traced back to the spot on the body it colours (the UV triangles are drawn
 into a map of 3D positions). Skin = the colours found on the hands and the middle of the face; hair = what is left on
@@ -328,6 +331,24 @@ if opts['masks']:
         img.file_format = 'PNG'
         img.save()
 
+# Scalp (spec "scalp"): the head above a hairline that runs over the brows in front, above the ears at the sides and
+# down to the nape at the back, soft over 1.5 cm.
+_r = np.hypot(Px - head_center[0], Py - head_center[1]) + 1e-6
+_front = np.clip((head_center[1] - Py) / _r, -1, 1)  # +1: the face side (the body looks along -y)
+# (Never down beside the eyes: on the face side the line stays over the brows, 0.66 of the head up.)
+_line = np.where(_front > 0, head_z + head_len * (0.5 + 0.16 * smooth(_front / 0.3) + 0.14 * smooth((_front - 0.78) / 0.2)),
+                 head_z + head_len * (0.5 - 0.4 * smooth(-_front / 0.7)))
+scalp = (covered & (Pz > head_z - 0.02)).astype(np.float64) * np.clip((Pz - _line) / 0.015, 0, 1)
+log(f'scalp {np.mean(scalp > 0.5) * 100:.1f}% of texels (head {head_z:.3f}..{top_z:.3f})')
+if opts['masks']:
+    _m = bpy.data.images.new('scalp_mask', TW, TH)
+    _px = np.ones((TW * TH, 4), dtype=np.float32)
+    _px[:, :3] = scalp[:, None]
+    _m.pixels.foreach_set(_px.ravel())
+    _m.filepath_raw = opts['masks'] + '_scalp.png'
+    _m.file_format = 'PNG'
+    _m.save()
+
 # ------------------------------------------------------------------ shape
 
 base_co = co_local.copy()
@@ -414,6 +435,10 @@ def recolour(p):
     if p.get('eyes') is not None:
         iris = to_linear(srgb(p['eyes']))[None] * np.clip(Y / 0.12, 0.15, 1.6)[:, None]
         out = out * (1 - eyes[:, None]) + iris * eyes[:, None]
+    # Scalp under the hair: the hair's colour with the skin's own shading.
+    if p.get('scalp') is not None:
+        sk = to_linear(srgb(p['scalp']))[None] * np.clip(Y / max(1e-4, float(luminance(skin_ref_lin[None])[0])), 0.2, 2.0)[:, None] * 0.9
+        out = out * (1 - scalp[:, None]) + sk * scalp[:, None]
     result = to_srgb(out)
     # Clothes painted a colour (spec mode: the bases' clothes are plain grey, a hue turn can't colour them).
     if p.get('cloth') is not None:
@@ -466,6 +491,7 @@ if opts['spec']:
         variants.append({
             'skin_name': e['name'], 'skin': tuple(e['skin']), 'hair_name': e['name'], 'hair': tuple(e.get('hair', (40, 30, 25))),
             'eyes_name': 'base', 'eyes': None, 'cloth': tuple(e['cloth']) if 'cloth' in e else None,
+            'scalp': tuple(e['scalp']) if 'scalp' in e else None,
             'cloth_hue': 0, 'cloth_sat': 1.0,
             'head': 1.0, 'face_w': 1.0, 'jaw': 1.0, 'face_d': 1.0, 'chin': 1.0,
             'torso': e.get('torso', 1.0), 'limbs': e.get('limbs', 1.0), 'belly': e.get('belly', 1.0),

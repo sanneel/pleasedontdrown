@@ -548,6 +548,20 @@ namespace PleaseDontDrown.Rescue
         /// their view (head to their right), ready for CPR. Called by the holder's hands just before letting go.
         /// Returns false in the water (dropped there, they just float).
         /// </summary>
+        /// <summary>
+        /// Thrown: the limbs leave with the torso. Only the torso got the throw, so the arms and legs hung back on
+        /// their joints and pulled a 10 m/s throw down to a 3 m flop.
+        /// </summary>
+        public void FlingLimbs(Vector3 velocity, Vector3 spin)
+        {
+            foreach (Limb limb in _limbs)
+            {
+                if (limb.Body == null || limb.Body.isKinematic) continue;
+                limb.Body.linearVelocity = velocity + Vector3.Cross(spin, limb.Body.position - _rb.position);
+                limb.Body.angularVelocity = spin;
+            }
+        }
+
         public bool LayDown(PlayerHub holder)
         {
             if (holder == null) return false;

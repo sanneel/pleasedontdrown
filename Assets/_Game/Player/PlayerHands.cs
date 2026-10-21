@@ -52,6 +52,7 @@ namespace PleaseDontDrown.Player
         [Header("Throwing (hold Drop)")]
         [Tooltip("Throw speed at full charge (m/s, added to how it's moving).")]
         [SerializeField] private float _maxThrowSpeed = 10f;
+        private const float PersonThrowLift = 5f; // m/s up on top of the aim, at full charge
         [Tooltip("Seconds of holding Drop to full charge.")]
         [SerializeField] private float _chargeTime = 0.5f;
         [Tooltip("Released before this share of the charge: just dropped.")]
@@ -275,6 +276,7 @@ namespace PleaseDontDrown.Player
             Vector3 playerVelocity = _hub.Motor.Velocity;
             Vector3 velocity;
             Vector3 spin;
+            Rescue.VictimBody flung = null;
             if (charge < 0f && item.TryGetComponent(out Rescue.VictimBody victim) && victim.LayDown(_hub))
             {
                 // A person, put down on land: laid on their back on the sand in front of us, ready for CPR.
@@ -291,6 +293,13 @@ namespace PleaseDontDrown.Player
                 spin = live ? body.angularVelocity : Vector3.zero;
                 if (charge > 0f)
                     velocity += AimTransform.forward * (charge * _maxThrowSpeed * item.ThrowStrength);
+                if (charge > 0f && item.TryGetComponent(out Rescue.VictimBody thrown))
+                {
+                    // A person goes up in a big arc (something to shoot at, or for a mate to catch) and tumbles.
+                    velocity += Vector3.up * (charge * PersonThrowLift);
+                    spin += Vector3.Cross(Vector3.up, AimTransform.forward).normalized * (charge * 3f);
+                    flung = thrown;
+                }
                 // A basketball thrown at a hoop goes on a proper arc (Fun.BasketballHoop.TryAssist).
                 if (charge > 0f && item.DisplayName == Fun.BasketballHoop.BallName && live &&
                     Fun.BasketballHoop.TryAssist(body.position, AimTransform.forward, charge, body.linearDamping, out Vector3 shot))
@@ -308,6 +317,7 @@ namespace PleaseDontDrown.Player
                 LastThrowCharge = charge;
             }
             item.Release(_hub, velocity, spin);
+            if (flung != null) flung.FlingLimbs(velocity, spin);
             if (charge > 0f) Fun.ThrownImpact.Arm(item, _hub); // whoever it hits gets bonked
             BeachAudio.PlayLocal(charge >= 0f ? BeachAudio.Throw : BeachAudio.Drop, 0.6f);
             Invalidate();

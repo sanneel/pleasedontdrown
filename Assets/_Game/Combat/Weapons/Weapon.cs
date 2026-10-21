@@ -603,6 +603,8 @@ namespace PleaseDontDrown.Combat
             {
                 HitServer(nob, hit.point, direction);
                 WeaponHud.ShowHitMarker();
+                // A tourist (flying through the air or lying about) is knocked about by it too.
+                if (Item.FromCollider(hit.collider) is { } hitItem && !hitItem.IsHeld) Shove(hitItem, hit.point, direction, damage);
             }
             else if (hit.collider.GetComponentInParent<PlayerHub>() is { } player && player != holder)
             {
@@ -610,12 +612,15 @@ namespace PleaseDontDrown.Combat
                 WeaponHud.ShowHitMarker();
             }
             else if (Item.FromCollider(hit.collider) is { } item && !item.IsHeld)
-            {
-                // Knock loose things (and people lying about) around: we take over their physics for a moment.
-                item.Sync.RequestAuthority();
-                if (!item.Sync.Body.isKinematic)
-                    item.Sync.Body.AddForceAtPosition(direction * (_force * Mathf.Max(0.3f, damage / 30f)), hit.point, ForceMode.VelocityChange);
-            }
+                Shove(item, hit.point, direction, damage);
+        }
+
+        /// <summary>Knock a loose thing (or a person lying about or flying through the air) around: we take over its physics for a moment.</summary>
+        private void Shove(Item item, Vector3 point, Vector3 direction, int damage)
+        {
+            item.Sync.RequestAuthority();
+            if (!item.Sync.Body.isKinematic)
+                item.Sync.Body.AddForceAtPosition(direction * (_force * Mathf.Max(0.3f, damage / 30f)), point, ForceMode.VelocityChange);
         }
 
         [ServerRpc(RequireOwnership = false)]

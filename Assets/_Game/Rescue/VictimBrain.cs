@@ -4,6 +4,7 @@ using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using PleaseDontDrown.Avatars;
+using PleaseDontDrown.Combat;
 using PleaseDontDrown.Core;
 using PleaseDontDrown.Interaction;
 using PleaseDontDrown.Items;
@@ -69,7 +70,7 @@ namespace PleaseDontDrown.Rescue
     /// Everyone else reads the synced state; <see cref="VictimBody"/> turns it into motion on every machine.
     /// </summary>
     [RequireComponent(typeof(Item), typeof(VictimBody))]
-    public class VictimBrain : NetworkBehaviour, IInteractionSecondary
+    public class VictimBrain : NetworkBehaviour, IInteractionSecondary, IDamageable
     {
         [Header("Panic (0-100)")]
         [SerializeField] private float _panicRise = 1.2f;
@@ -132,6 +133,8 @@ namespace PleaseDontDrown.Rescue
         private readonly SyncVar<string> _shouts = new SyncVar<string>();
         private readonly SyncVar<bool> _vip = new SyncVar<bool>();
         private readonly SyncVar<bool> _knockedOut = new SyncVar<bool>();
+        private readonly SyncVar<bool> _dead = new SyncVar<bool>();
+        private int _health = 100; // (host: shots)
         private string[] _shoutLines = System.Array.Empty<string>();
 
         private Item _item;
@@ -183,6 +186,8 @@ namespace PleaseDontDrown.Rescue
         public bool VipTipped { get; set; }
         /// <summary>Knocked out in a fight on land (a bar brawler): carry them to the infirmary's bed.</summary>
         public bool IsKnockedOut => _knockedOut.Value;
+        /// <summary>Shot dead: a limp body on the sand (or floating) for a while, then gone.</summary>
+        public bool IsDead => _dead.Value;
         public float BleedSecondsLeft => _bleedLeft.Value;
         /// <summary>What they shout in trouble instead of "help!" (empty = the usual).</summary>
         public string[] Shouts => _shoutLines;
@@ -392,8 +397,8 @@ namespace PleaseDontDrown.Rescue
                     break;
 
                 case VictimState.Lost:
-                    // (Taken by a rival: towed off at once. Airlifted: a moment to see it.)
-                    if (Time.time - _stateSince > (_takenByRival ? 1.2f : 3f))
+                    // (Taken by a rival: towed off at once. Airlifted: a moment to see it. Shot: the body stays a while.)
+                    if (Time.time - _stateSince > (_dead.Value ? DeadBodySeconds : _takenByRival ? 1.2f : 3f))
                         Despawn(gameObject);
                     break;
             }
@@ -755,6 +760,53 @@ namespace PleaseDontDrown.Rescue
             }
             Announce(VictimEvent.Bitten, $"A SHARK bit {Name}'s leg off! Get {They} out and rush {They} to the infirmary!");
             Debug.Log($"[Victim] {Name} bitten by a shark");
+        }
+
+        // ------------------------------------------------------------------ shot
+
+        /// <summary>How long a shot-down tourist's body lies there before it goes.</summary>
+        private const float DeadBodySeconds = 90f;
+
+        /// <summary>Called out over a tourist shot while flying through the air (thrown, launched, bounced).</summary>
+        private static readonly string[] AirShots =
+            { "CLAY PIGEON!", "PULL!", "SKEET SHOT!", "AIR STRIKE!", "FLYING TOURIST!", "ABSOLUTELY UNNECESSARY", "BIRD WATCHER", "DUCK SEASON!" };
+
+        /// <summary>
+        /// Host: a bullet (or a blow). Slapstick, never gore: the first hit knocks them out cold (CPR still brings them
+        /// round), enough of them and they're done for, a limp body. A tourist shot in mid-air gets a trickshot name.
+        /// (The shove itself is the gun's: whoever simulates the body pushes it, Combat.Weapon.)
+        /// </summary>
+        public bool ServerTakeHit(int damage, DamageKind kind, PlayerHub attacker, Vector3 point, Vector3 direction)
+        {
+            if (_dead.Value || _state.Value == VictimState.Lost) return false;
+            string by = attacker != null ? attacker.DisplayName : "someone";
+            float ground = Shore.GroundHeightAt(transform.position + Vector3.up * 0.5f);
+            bool wet = WaterSurface.Exists && WaterSurface.DepthOf(transform.position) > 0f;
+            bool flying = !_item.IsHeld && !wet && (float.IsNaN(ground) || transform.position.y - ground > 0.9f);
+            // (A hit in mid-air is the trick: it counts double.)
+            _health -= Mathf.Max(1, damage) * (flying ? 2 : 1);
+            ShotObservers(point, flying ? AirShots[Random.Range(0, AirShots.Length)] : null);
+            if (_health <= 0)
+            {
+                _dead.Value = true;
+                _condition.Value = 0f;
+                SetState(VictimState.Lost, VictimEvent.Lost, flying ? $"{by} shot {Name} out of the sky." : $"{by} shot {Name}. {(IsFemale ? "She" : "He")} won't be getting up again.");
+                Debug.Log($"[Victim] {Name} shot dead by {by}{(flying ? " in mid-air" : "")}");
+            }
+            else if (_state.Value.IsConscious())
+            {
+                PassOut(VictimEvent.Collapsed, $"{by} shot {Name}! {(IsFemale ? "She" : "He")} is out cold: CPR, quick!", null);
+                Debug.Log($"[Victim] {Name} shot by {by}{(flying ? " in mid-air" : "")}: out cold ({_health} left)");
+            }
+            return true;
+        }
+
+        [ObserversRpc]
+        private void ShotObservers(Vector3 point, string airShot)
+        {
+            FloatingText.Spawn(point + Vector3.up * 0.3f, "OW!", new Color(1f, 0.86f, 0.3f), 0.9f, 0.8f);
+            if (!string.IsNullOrEmpty(airShot))
+                FloatingText.Spawn(point + Vector3.up * 1.1f, airShot, new Color(1f, 0.55f, 0.15f), 1.6f, 2.2f);
         }
 
         /// <summary>Host: knocked out in a fight on land (a bar brawler): lying there, to be carried to the infirmary.</summary>

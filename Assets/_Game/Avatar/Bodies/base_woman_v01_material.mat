@@ -38,7 +38,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: -371797103906613617, guid: 8548f6d60b8d56b46ae85d9ff734f399, type: 3}
+        m_Texture: {fileID: 2800000, guid: 2573f3bdad43aeb428716b6427919868, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -70,7 +70,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
-        m_Texture: {fileID: -371797103906613617, guid: 8548f6d60b8d56b46ae85d9ff734f399, type: 3}
+        m_Texture: {fileID: 2800000, guid: 2573f3bdad43aeb428716b6427919868, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
@@ -118,7 +118,7 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
-    - _FaceMidX: -0.00038582087
+    - _FaceMidX: -0.0003973469
     - _FaceOn: 1
     - _FaceShutAt: 0.3
     - _GlossMapScale: 0
@@ -142,13 +142,13 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FaceEyeL: {r: -0.055135824, g: 1.5120494, b: 0.027600002, a: 0.019043207}
-    - _FaceEyeR: {r: 0.054889183, g: 1.512281, b: 0.027225, a: 0.01927507}
+    - _FaceEyeL: {r: -0.05495985, g: 1.5121241, b: 0.027750002, a: 0.019312859}
+    - _FaceEyeR: {r: 0.054915156, g: 1.5126957, b: 0.027375001, a: 0.019954443}
     - _FaceGaze: {r: 0, g: 0, b: 0, a: 0}
-    - _FaceLash: {r: 0.071094975, g: 0.03780841, b: 0.02323802, a: 1}
+    - _FaceLash: {r: 0.07123902, g: 0.038807966, b: 0.024665529, a: 1}
     - _FaceLids: {r: 0, g: 0, b: 0, a: 0}
-    - _FaceRect: {r: -0.08573582, g: 1.4899307, b: 5.8530874, a: 22.371363}
-    - _FaceSclera: {r: 0.89347285, g: 0.8379865, b: 0.80687, a: 1}
+    - _FaceRect: {r: -0.08570985, g: 1.4896019, b: 5.847953, a: 21.715525}
+    - _FaceSclera: {r: 0.8865248, g: 0.8338121, b: 0.80014604, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

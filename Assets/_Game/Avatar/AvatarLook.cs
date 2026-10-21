@@ -132,6 +132,9 @@ namespace PleaseDontDrown.Avatars
             /// <summary>The new game's beach girls: the base woman repainted (ArtSource/Tripo/Bases/girls_spec.json), her face untouched.</summary>
             public static byte BaseGirl(int n) => Variant(BaseWoman, n);
 
+            /// <summary>The new game's beach girls (16, the base woman with her own skin, bikini and hair): every woman on the beach.</summary>
+            public static readonly byte[] BeachGirls = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(1, 16), n => Variant(BaseWoman, n)));
+
             public static byte Variant(byte baseBody, int n)
             {
                 int index = System.Array.IndexOf(VariantBases, baseBody);
@@ -152,7 +155,7 @@ namespace PleaseDontDrown.Avatars
             public static byte Modelled(AvatarLook look)
             {
                 if (look.Body == 0) return Goofy;
-                if (look.Feminine || IsFeminine(look.Body)) return TouristWomen[(look.Skin + look.HairColor) % TouristWomen.Length];
+                if (look.Feminine || IsFeminine(look.Body)) return BeachGirls[(look.Skin + look.HairColor) % BeachGirls.Length];
                 return TouristBuddy;
             }
         }
@@ -250,7 +253,7 @@ namespace PleaseDontDrown.Avatars
             // Every tourist is a generated model (a base or one of its look-alikes); the code-built fields above are only
             // the fallback if the model library is missing.
             look.Body = feminine
-                ? Bodies.TouristWomen[rng.Next(Bodies.TouristWomen.Length)]
+                ? Bodies.BeachGirls[rng.Next(Bodies.BeachGirls.Length)]
                 : rng.Next(4) == 0 ? Bodies.TouristTee : Bodies.PickVariant(rng, Bodies.TouristBuddy); // one man in four in the black tee
             return look;
         }
