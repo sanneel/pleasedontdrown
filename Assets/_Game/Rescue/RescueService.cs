@@ -156,6 +156,33 @@ namespace PleaseDontDrown.Rescue
             return brain;
         }
 
+        /// <summary>Host: a body just spawned for this player (someone they picked up) goes into their hands.</summary>
+        [Server]
+        public void ServerGiveBody(NetworkConnection to, VictimBrain body)
+        {
+            if (to != null && body != null) GiveBodyTarget(to, body.ObjectId);
+        }
+
+        [TargetRpc]
+        private void GiveBodyTarget(NetworkConnection target, int bodyId) => StartCoroutine(TakeWhenSpawned(bodyId));
+
+        /// <summary>Waits (a few frames at most) for the new body to exist here, then picks it up.</summary>
+        private static System.Collections.IEnumerator TakeWhenSpawned(int id)
+        {
+            float until = Time.time + 2f;
+            while (Time.time < until)
+            {
+                if (FishNet.InstanceFinder.ClientManager != null &&
+                    FishNet.InstanceFinder.ClientManager.Objects.Spawned.TryGetValue(id, out NetworkObject nob) && nob != null &&
+                    nob.TryGetComponent(out Items.Item item) && PlayerHub.Local != null && PlayerHub.Local.Hands != null)
+                {
+                    PlayerHub.Local.Hands.TryPickUp(item);
+                    yield break;
+                }
+                yield return null;
+            }
+        }
+
         /// <summary>Host: a floating landing reward in the world with a celebratory sound.</summary>
         [Server]
         public void ServerCallout(Vector3 at, string text, bool big) => CalloutObservers(at, text, big);
@@ -226,6 +253,25 @@ namespace PleaseDontDrown.Rescue
                     Debug.Log($"[Sink] {v.Name} body {v.Look.Body} ({v.State}): deepest {d * 100f:F1} cm at {where}, {under} vertices >1 cm under, torso {lie:F3} up {v.transform.up.y:F2} | {v.Body.FitReport}");
                 }
             }, owner: this);
+            DevCommands.Register("picknpc", "[on land 1|0]", "Walk up to the nearest beach-goer you could pick up and press E on them (automated tests).", args =>
+            {
+                PlayerHub me = PlayerHub.Local;
+                if (me == null) throw new InvalidOperationException("no local player");
+                bool land = args.Length == 0 || args[0] != "0";
+                Story.StoryNpc best = null;
+                float bestSq = 250f * 250f;
+                foreach (Story.StoryNpc n in Story.StoryNpc.All)
+                {
+                    if (n == null || !n.CanInteract(me) || (land && n.IsSwimming)) continue;
+                    float d = (n.transform.position - me.transform.position).sqrMagnitude;
+                    if (d < bestSq) { bestSq = d; best = n; }
+                }
+                if (best == null) throw new InvalidOperationException("nobody to pick up nearby");
+                Vector3 from = best.transform.position - best.transform.forward * 1.3f + Vector3.up * 0.3f;
+                me.Motor.Teleport(from);
+                DevCommands.Print($"picking up {best.Name}");
+                best.OnInteract(me);
+            }, cheat: true, owner: this);
             DevCommands.Register("ragdoll", "", "Show where the nearest tourist's limbs point (pose debugging).", _ =>
             {
                 VictimBrain v = Nearest();
@@ -236,7 +282,7 @@ namespace PleaseDontDrown.Rescue
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "drill", "victims", "victim", "vset", "cpr", "clearvictims", "ragdoll", "launch", "sinkcheck" })
+            foreach (string c in new[] { "drill", "victims", "victim", "vset", "cpr", "clearvictims", "ragdoll", "launch", "sinkcheck", "picknpc" })
                 DevCommands.Unregister(c, this);
         }
 

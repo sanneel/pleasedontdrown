@@ -504,11 +504,13 @@ namespace PleaseDontDrown.Story
 
         // ------------------------------------------------------------------ talking
 
-        public bool CanInteract(PlayerHub player) => _talkable.Value && _pose.Value != AvatarPose.Down;
+        // E picks people up (StoryNpc.Pickup.cs); talking is T, the secondary action.
+        public bool CanTalk(PlayerHub player) => _talkable.Value && _pose.Value != AvatarPose.Down;
 
-        public string GetPrompt(PlayerHub player) => !string.IsNullOrEmpty(_talkPrompt.Value) ? _talkPrompt.Value : $"Talk to {Name}";
+        public string TalkPrompt => !string.IsNullOrEmpty(_talkPrompt.Value) ? _talkPrompt.Value : $"Talk to {Name}";
 
-        public void OnInteract(PlayerHub player)
+        /// <summary>Talk to this character (T; story tests call it directly).</summary>
+        public void Talk(PlayerHub player)
         {
             if (Time.time < _nextTalkRequest) return;
             _nextTalkRequest = Time.time + 0.6f;
@@ -563,8 +565,8 @@ namespace PleaseDontDrown.Story
             Vector3 push = new Vector3(direction.x, 0f, direction.z).normalized;
             if (FightStaggers())
             {
-                _knock = push * (kind == DamageKind.Bullet ? 2f : 3.5f);
-                _staggerUntil = Time.time + (kind == DamageKind.Bullet ? 0.35f : 0.6f);
+                _knock = push * (kind == DamageKind.Bullet ? 1.2f : 2f);
+                _staggerUntil = Time.time + (kind == DamageKind.Bullet ? 0.25f : 0.4f);
             }
             HitObservers(point, push, _health.Value, kind == DamageKind.Bullet, killed, damage, head, attacker);
             OnServerHit(attacker);
@@ -809,9 +811,10 @@ namespace PleaseDontDrown.Story
             BrainUpdate(dt);
 
             Vector3 p = transform.position;
+            if (Time.time < _staggerUntil && _pose.Value == AvatarPose.Down) _staggerUntil = 0f; // (knocked down or out: they drop where they stood, no sliding off along the sand)
             if (Time.time < _staggerUntil)
             {
-                // Knocked back by a hit, sliding to a stop (against a wall, not into it).
+                // Knocked back by a hit, a step back to a stop (against a wall, not into it).
                 transform.position = Grounded(MoveChecked(p, _knock * dt));
                 _knock = Vector3.MoveTowards(_knock, Vector3.zero, dt * 8f);
                 return;

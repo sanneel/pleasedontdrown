@@ -618,6 +618,9 @@ namespace PleaseDontDrown.Combat
         /// <summary>Knock a loose thing (or a person lying about or flying through the air) around: we take over its physics for a moment.</summary>
         private void Shove(Item item, Vector3 point, Vector3 direction, int damage)
         {
+            // Only something in the air is knocked about: a body lying on the sand slid off along it with every shot.
+            float ground = Rescue.Shore.GroundHeightAt(item.Sync.Body.position + Vector3.up * 0.5f);
+            if (!float.IsNaN(ground) && item.Sync.Body.position.y - ground < 0.6f) return;
             item.Sync.RequestAuthority();
             if (!item.Sync.Body.isKinematic)
                 item.Sync.Body.AddForceAtPosition(direction * (_force * Mathf.Max(0.3f, damage / 30f)), point, ForceMode.VelocityChange);

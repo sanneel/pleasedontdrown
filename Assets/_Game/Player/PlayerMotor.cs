@@ -79,6 +79,7 @@ namespace PleaseDontDrown.Player
         private float _maxSpeed;                 // current speed cap (eases between walk / sprint / crouch)
         private float _speedFrom, _speedTo, _speedBlend = 1f;
         private Vector3 _moveVelocity;           // the horizontal velocity the movement model keeps
+        private const float KnockedGroundBrake = 14f; // m/s² a knocked-back body loses sliding on the ground
         private float _crouchBlend;              // 0 standing .. 1 crouched
         private bool _hasJumped;
         private float _slipSpeed;                // how much of the speed is sliding down a steep slope (the camera doesn't bob)
@@ -424,8 +425,11 @@ namespace PleaseDontDrown.Player
             Vector3 wish = Facing * new Vector3(input.x, 0f, input.y);
             if (knocked)
             {
-                // Knocked back: the shove carries us (movement takes over again when it's spent).
+                // Knocked back: the shove carries us (movement takes over again when it's spent). On the ground it
+                // stops quickly: knocked flat, a lifeguard used to slide on across the sand on their back.
                 _moveVelocity = new Vector3(v.x, 0f, v.z);
+                if (IsGrounded && !_launched)
+                    _moveVelocity = Vector3.MoveTowards(_moveVelocity, Vector3.zero, KnockedGroundBrake * dt);
             }
             else
             {

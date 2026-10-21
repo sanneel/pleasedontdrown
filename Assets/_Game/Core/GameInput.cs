@@ -16,6 +16,7 @@ namespace PleaseDontDrown.Core
         public static InputAction Sprint { get; private set; }
         public static InputAction Crouch { get; private set; }
         public static InputAction Interact { get; private set; }
+        public static InputAction Talk { get; private set; }
         public static InputAction Primary { get; private set; }
         public static InputAction Secondary { get; private set; }
         public static InputAction Drop { get; private set; }
@@ -68,6 +69,8 @@ namespace PleaseDontDrown.Core
             Crouch.AddBinding("<Gamepad>/buttonEast");
             Interact = _gameplay.AddAction("Interact", InputActionType.Button, "<Keyboard>/e");
             Interact.AddBinding("<Gamepad>/buttonWest");
+            Talk = _gameplay.AddAction("Talk", InputActionType.Button, "<Keyboard>/t");
+            Talk.AddBinding("<Gamepad>/leftShoulder");
             Primary = _gameplay.AddAction("Primary", InputActionType.Button, "<Mouse>/leftButton");
             Primary.AddBinding("<Gamepad>/rightTrigger");
             Secondary = _gameplay.AddAction("Secondary", InputActionType.Button, "<Mouse>/rightButton");
@@ -100,7 +103,7 @@ namespace PleaseDontDrown.Core
             Rebindable = new[]
             {
                 new Rebind("FORWARD", Move, 1), new Rebind("BACK", Move, 2), new Rebind("LEFT", Move, 3), new Rebind("RIGHT", Move, 4),
-                new Rebind("JUMP", Jump, 0), new Rebind("SPRINT", Sprint, 0), new Rebind("CROUCH", Crouch, 0), new Rebind("USE / RESCUE", Interact, 0),
+                new Rebind("JUMP", Jump, 0), new Rebind("SPRINT", Sprint, 0), new Rebind("CROUCH", Crouch, 0), new Rebind("USE / PICK UP", Interact, 0), new Rebind("TALK", Talk, 0),
                 new Rebind("PUNCH / FIRE", Primary, 0), new Rebind("CPR / AIM", Secondary, 0), new Rebind("DROP / THROW", Drop, 0), new Rebind("WAVE", Emote, 0),
                 new Rebind("RELOAD", Reload, 0), new Rebind("INSPECT", Inspect, 0)
             };

@@ -9,15 +9,23 @@
 
 You're a lifeguard. Tourists get into trouble; you grab them and **throw** them: to a friend who catches them in
 the air, onto a trampoline, behind a boat, out of a cannon. Every throw is a **trickshot** with a silly name and a
-score. A tourist who lands alive is a **rescue**: you get paid and tipped. One who doesn't make it is a **body**:
-you cart it to **Sandy's Lost & Found** booth on the beach, sign an absurd receipt, she pays you and says "I'll take
-care of the family." Sandy slowly gets weirder (new freezers, a white van, a sign: "Please don't name the
-merchandise") until, after enough deliveries, her **back room** door is left open: crates, an order board, hints
-of an organ trade. Nobody tells the players what they've been part of. Sandy just asks, calmly: "Brought anything
-else today?"
+score. Anyone can be picked up (E) and thrown: tourists, beach-goers, guests, pirates, your friends.
 
-Rescuing must still be the better choice: a live tourist pays more than a body, and the best trickshots need the
-tourist alive at the end.
+**Sandy is the beach doctor.** She runs a little clinic by the lifeguard station and hires you: "Bring them to me,
+alive or not. I'll save them." Every person you hand in (out cold, half drowned, or already dead) she takes through
+the curtain, pays you, and later tells you they pulled through: "Your guy from yesterday? Walking again. Lovely
+man." A rescue on the beach still pays best; a body pays less, but she takes those too.
+
+**The twist (island 2):** at the Grand Coral hotel you find out where the people really went. Sandy is the head of
+a trafficking ring; nobody you brought her was ever saved. She doesn't deny it. She threatens you: every receipt has
+your name on it, you brought her every one of them, and the police would love to hear it. From now on you work for
+her, or else.
+
+**The ending:** you play along, learn how the business works, and in the end turn it on her and take it over. The
+last scene: you behind her desk, the ring is yours. (Sandro, 2026-10-22.)
+
+Rescuing must still be the better choice on the beach: a live tourist pays more than a body, and the best
+trickshots need the tourist alive at the end.
 
 ## 2. Tone (keep it a cartoon)
 
@@ -56,6 +64,15 @@ the bases when they're ready.
 ## 4. The mechanics, in order
 
 Each phase ends playable and tested in the built game with two players (host + client).
+
+### Done so far (2026-10-22)
+
+- E picks anyone up: tourists, players, beach-goers, guests, pirates, robbers (they become tourist bodies, so throws,
+  air shots, CPR and deliveries work on them). Talking is **T** now. Sandy, the receptionist, the rival and the police
+  only talk (they carry the story).
+- Throw anyone high (hold G); shots in the air do double damage and kill; bodies stay 90 s.
+- No sliding: people knocked down or out drop where they stand (NPCs, stunned players, shot bodies on the sand).
+- Bodies stay out of the sand (colliders fitted to each drawn body, `VictimBody.Fit.cs`).
 
 ### Phase 1: throw and catch (the core)
 
@@ -99,15 +116,17 @@ Each phase ends playable and tested in the built game with two players (host + c
 - **Done when**: rescue pay and tips show for 5 different rescues; a body can be carried, thrown and stacked on a
   cart in co-op.
 
-### Phase 4: Sandy's Lost & Found
+### Phase 4: Dr. Sandy's beach clinic (deliveries)
 
-- A beach booth by the lifeguard station on island 1 (and later one per island): "SANDY'S LOST & FOUND",
-  hand-painted, a bell, a freezer chest behind the counter.
-- Bring a body to the counter (carried or on a cart) and press E: a **receipt** pops up to sign (one line each,
-  absurd): "1 x tourist, slightly used", "Condition: relaxed", "Return policy: none", "Signed: ______", with the
-  player's name scribbled. Sandy pays (less than a rescue), takes it through a curtain, says one of her lines: "I'll
-  take care of the family." / "Lovely. Any more?" / "Ooh, this one's fresh." / "Don't worry about the paperwork."
-- **Done when**: a delivery works in co-op from both players, pays, plays a line, and the body is gone.
+- A beach booth by the lifeguard station on island 1: "DR. SANDY: BEACH CLINIC", hand-painted, a bell, a curtain,
+  a freezer chest behind the counter that she calls "the recovery room".
+- Bring anyone to the counter (carried, on a cart, or thrown onto it) and press E: out cold, injured or **dead**
+  all count. A **receipt** pops up to sign (one line each, absurd): "1 x patient, slightly used", "Condition:
+  relaxed", "Prognosis: excellent", "Signed: ______", with the player's name scribbled. Sandy pays (a body less than
+  someone breathing), takes them through the curtain, says one of her lines: "I'll save them, don't worry." /
+  "Lovely. Any more?" / "Ooh, this one's fresh." / "Don't worry about the paperwork."
+- A while later she mentions how they're doing ("Your redhead from this morning? Up and dancing.").
+- **Done when**: a delivery works in co-op from both players, pays, plays a line, and the person is gone.
 
 ### Phase 5: transport chaos
 
@@ -125,20 +144,35 @@ Each phase ends playable and tested in the built game with two players (host + c
   **cannon** on island 3.
 - **Done when**: each launcher fires a tourist and a player, each has its trickshot name.
 
-### Phase 7: Sandy gets suspicious (the twist)
+### Phase 7: the truth about Sandy (island 2)
 
-Driven by the number of deliveries (server-side, saved), each step visible to everyone:
+On island 1 only small signs, driven by the number of deliveries (server-side, saved), each visible to everyone:
 
 | Deliveries | What changes |
 |---|---|
-| 3 | A second freezer chest appears behind the booth |
-| 6 | A white van parks behind the booth now and then, a man in sunglasses carries a cooler in, nods |
-| 10 | A sign on the booth: "PLEASE DON'T NAME THE MERCHANDISE" |
-| 15 | A third freezer; Sandy hums; the van comes every day; a price list with blanked-out items |
-| 20 | The back room door is **left open**: crates, coolers stamped FRAGILE / KEEP COLD, an order board with code words, a phone ringing. Players can walk in. Sandy, behind them, calm: "Brought anything else today?" |
+| 3 | A second freezer chest appears behind the clinic |
+| 6 | A white van parks behind the clinic now and then, a man in sunglasses carries a cooler in, nods |
+| 10 | A sign: "PLEASE DON'T NAME THE PATIENTS" |
+| 15 | A third freezer; Sandy hums; the van comes every day; the van drives off toward the hotel island |
 
-- What happens after the back room is open: **open question for Sandro** (see 7). The default until decided:
-  nothing changes in Sandy's manner; the players can keep delivering, and the bodies' pay goes up a little.
+On island 2 (the Grand Coral hotel) the players find out:
+
+- In the hotel's service corridor: the white van, the coolers, an order board with code words, and people they
+  delivered (recognisable by look and name) being moved, not "recovering". A guest list with "SOLD" stamps.
+- Sandy turns up behind them, calm as ever. She doesn't deny it: she's the head of it. **The threat**: a stack of
+  receipts, every one signed by the players. "You brought me every single one. Imagine what the police would
+  think." From here the players work for her: her deliveries, her jobs, her prices.
+- Gameplay after the reveal: Sandy's jobs on islands 2-3 (deliver this many, this kind of person, by tonight), each
+  one paying better and getting nastier; refusing has consequences (the police are tipped off about you, a raid on
+  the lifeguard station).
+
+### Phase 9: taking over (the ending)
+
+- While working for her, the players collect what they need to turn it around (her ledger, the buyers' names, a
+  recording of her), and win over her people (the van driver, the man in sunglasses).
+- The final job: Sandy is the one delivered. The players take the clinic, the van and the ring. The last scene:
+  the players behind Sandy's desk; the van driver: "Where to, boss?"
+- Keep it a cartoon (section 2): implied, never shown; slapstick, no gore.
 
 ### Phase 8: the old story goes
 
@@ -148,7 +182,8 @@ Driven by the number of deliveries (server-side, saved), each step visible to ev
 - The islands stay as places, each with its own tourists and launchers: island 1 (the beach, the booth, the
   lifeguard station), island 2 (the Grand Coral hotel: the pool, the slide, the bar, the bungalows), island 3 (Skull
   Cove at night: pirates, the pirate cannon), island 4 (the corporate HQ: repurposed, see 7).
-- A short intro instead of chapter 1.1: Sandy hires you ("Save them if you can. If you can't... bring them to me.").
+- A short intro instead of chapter 1.1: Dr. Sandy hires you ("Save them if you can. If you can't... bring them to me.
+  I'll save them.").
 
 ## 5. Who does what
 
@@ -177,8 +212,8 @@ it's called done; `perf` on islands 1-3 (keep island 1 under 8 ms a frame on thi
 
 ## 7. Open questions for Sandro
 
-1. After the back room opens: does anything happen (police, a choice to report her or join her, an ending, a
-   "season 2"), or does it just stay creepy and funny?
+1. ~~After the back room opens~~: decided 2026-10-22 (section 1, phases 7 and 9): Sandy is revealed on island 2 as
+   the head of a trafficking ring, blackmails the players into working for her, and in the end they take it over.
 2. Island 4 (the Finders Keepers HQ): keep it as a place (Sandy's "warehouse"?), or drop it?
 3. Score and money: per player or shared by the team? A leaderboard?
 4. Can tourists die from players' throws on purpose (e.g. throwing one off the hotel roof onto the sand), or only

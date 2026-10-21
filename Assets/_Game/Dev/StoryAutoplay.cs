@@ -332,7 +332,7 @@ namespace PleaseDontDrown.Dev
                     me.Motor.Teleport(npc.transform.position + Vector3.back * 1.5f + Vector3.up * 0.2f);
                     me.Look.LookAt(npc.HeadPosition);
                     yield return new WaitForSeconds(0.4f);
-                    npc.OnInteract(me);
+                    npc.Talk(me);
                     yield return new WaitForSeconds(0.5f);
                     break;
                 }
