@@ -45,7 +45,6 @@ namespace PleaseDontDrown.Story
 
         private readonly SyncVar<string> _name = new SyncVar<string>();
         private readonly SyncVar<ulong> _look = new SyncVar<ulong>();
-        private readonly SyncVar<bool> _vip = new SyncVar<bool>();
         private readonly SyncVar<NpcRole> _role = new SyncVar<NpcRole>();
         private readonly SyncVar<AvatarPose> _pose = new SyncVar<AvatarPose>();
         private readonly SyncVar<AvatarMood> _mood = new SyncVar<AvatarMood>();
@@ -53,7 +52,6 @@ namespace PleaseDontDrown.Story
         private readonly SyncVar<string> _talkPrompt = new SyncVar<string>();
         private readonly SyncVar<int> _health = new SyncVar<int>();
         private readonly SyncVar<int> _maxHealth = new SyncVar<int>();
-        private readonly SyncVar<bool> _hasBag = new SyncVar<bool>();
         private readonly SyncVar<bool> _drunk = new SyncVar<bool>(); // staggers about (the clips' drunk walk)
 
         // Every machine.
@@ -62,7 +60,6 @@ namespace PleaseDontDrown.Story
         private float _talkUntil;
         private float _lookYaw;
         private bool _swimPose;
-        private GameObject _bag, _disguise;
         private float _nextTalkRequest;
         private CapsuleCollider _bodyCollider;
         private SphereCollider _headCollider;
@@ -106,8 +103,6 @@ namespace PleaseDontDrown.Story
         public AvatarRig Rig => _rig;
         public AvatarLook Look => AvatarLook.Unpack(_look.Value);
         public ulong LookPacked => _look.Value;
-        /// <summary>A VIP hotel guest (gold hat): if they get into trouble in the water they're a VIP to rescue (tips).</summary>
-        public bool IsVip => _vip.Value;
         public AvatarPose Pose => _pose.Value;
         public int Health => _health.Value;
         public int MaxHealth => _maxHealth.Value;
@@ -187,14 +182,11 @@ namespace PleaseDontDrown.Story
         private void Awake()
         {
             _look.OnChange += (_, next, _) => ApplyLook(next);
-            _vip.OnChange += (_, next, _) => AvatarVipHat.Set(_rig, next);
             _name.OnChange += (_, next, _) =>
             {
                 if (_nameTag != null) _nameTag.text = next;
                 if (!string.IsNullOrEmpty(next)) gameObject.name = $"Npc_{next}";
             };
-            _hasBag.OnChange += (_, next, _) => ShowBag(next);
-            _role.OnChange += (_, _, _) => ShowDisguise();
             _pose.OnChange += (_, next, _) => FitColliders(next);
             _bodyCollider = GetComponent<CapsuleCollider>();
             _headCollider = GetComponent<SphereCollider>();
@@ -262,7 +254,6 @@ namespace PleaseDontDrown.Story
         {
             base.OnStopNetwork();
             _all.Remove(this);
-            Stealth.Unregister(this);
         }
 
         public override void OnStartClient()
@@ -270,7 +261,6 @@ namespace PleaseDontDrown.Story
             base.OnStartClient();
             ApplyLook(_look.Value);
             if (_nameTag != null) _nameTag.text = Name;
-            ShowBag(_hasBag.Value);
             FitColliders(_pose.Value);
         }
 
@@ -286,7 +276,6 @@ namespace PleaseDontDrown.Story
             _look.Value = look.Pack();
             _maxHealth.Value = health;
             _health.Value = health;
-            _hasBag.Value = role == NpcRole.Robber;
             _talkable.Value = role is NpcRole.Guide or NpcRole.Receptionist;
             _pose.Value = AvatarPose.Normal;
             _mood.Value = AvatarMood.Neutral;
@@ -301,9 +290,7 @@ namespace PleaseDontDrown.Story
 
         [Server] public void ServerSetPose(AvatarPose pose) => _pose.Value = pose;
         [Server] public void ServerSetMood(AvatarMood mood) => _mood.Value = mood;
-        [Server] public void ServerSetVip(bool vip) => _vip.Value = vip;
         [Server] public void ServerSetHealth(int health, int max) { _maxHealth.Value = max; _health.Value = health; }
-        [Server] public void ServerSetBag(bool hasBag) => _hasBag.Value = hasBag;
 
         /// <summary>Host: walk (or run) to a point on land, then stop.</summary>
         [Server]
@@ -464,7 +451,6 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void GestureObservers(AvatarGesture gesture, Vector3 point)
         {
-            if (_weaponView != null && _weaponView.PlaysGesture(gesture)) return; // the cutlass slash, the gun's kick
             if (_animator != null) _animator.Play(gesture, point);
         }
 
@@ -551,19 +537,12 @@ namespace PleaseDontDrown.Story
             if (_maxHealth.Value <= 0 || _health.Value <= 0) return false; // can't be hurt / already down
             bool head = IsHeadshot(kind, point);
             if (head) damage *= 2; // (StoryNpc.HitFeel)
-            damage = FightOnHit(damage, kind, attacker, direction); // a fighter's guard, interrupted blows, knockdowns
-            if (_lastHitBlocked)
-            {
-                // Blocked: no flinch, no flash, no damage (BlockObservers made the thud).
-                if (attacker != null) Debug.Log($"[Hit] {attacker.DisplayName} hits {Name}: blocked");
-                return true;
-            }
             _health.Value = Mathf.Max(0, _health.Value - damage);
-            if (attacker != null) Debug.Log($"[Hit] {attacker.DisplayName} hits {Name}: -{damage} ({kind}{(head ? ", head" : "")}), {_health.Value} left{(_fighting ? $" [{_fight}]" : "")}");
+            if (attacker != null) Debug.Log($"[Hit] {attacker.DisplayName} hits {Name}: -{damage} ({kind}{(head ? ", head" : "")}), {_health.Value} left");
             // The last of their health to a gun or a bite kills them; to fists and blades it knocks them out (StoryNpc.Rivals).
             bool killed = _health.Value <= 0 && KillsOutright(kind);
             Vector3 push = new Vector3(direction.x, 0f, direction.z).normalized;
-            if (FightStaggers())
+            if (_pose.Value != AvatarPose.Down)
             {
                 _knock = push * (kind == DamageKind.Bullet ? 1.2f : 2f);
                 _staggerUntil = Time.time + (kind == DamageKind.Bullet ? 0.25f : 0.4f);
@@ -607,7 +586,6 @@ namespace PleaseDontDrown.Story
             if (raw.sqrMagnitude > 900f) raw = Vector3.zero;
             _velocity = Vector3.Lerp(_velocity, raw, 1f - Mathf.Exp(-10f * dt));
             _lastPosition = position;
-            UpdateWeaponView();
             UpdateAnimation();
             UpdateHitFlash();
             UpdateNameTag();
@@ -677,9 +655,7 @@ namespace PleaseDontDrown.Story
                 Mood = _mood.Value,
                 Talking = Time.time < _talkUntil,
                 Seated = false,
-                LookBack = _role.Value == NpcRole.Robber && _pose.Value == AvatarPose.Normal && !swimming,
-                Stance = Stance, // squared up for a fist fight (StoryNpc.Combat)
-                WindUp = WindUpDrawn
+                LookBack = _role.Value == NpcRole.Robber && _pose.Value == AvatarPose.Normal && !swimming
             };
             _animator.Drunk = _drunk.Value;
             // Leading a lifeguard by the hand (the beach hut gag): her right hand back in his.
@@ -803,7 +779,6 @@ namespace PleaseDontDrown.Story
                 transform.rotation = Quaternion.Euler(0f, _ride.transform.eulerAngles.y, 0f);
                 return;
             }
-            if (_held) return; // in an animal's jaws: it moves us (StoryNpc.Rivals)
 
             BrainUpdate(dt);
 
@@ -814,12 +789,6 @@ namespace PleaseDontDrown.Story
                 // Knocked back by a hit, a step back to a stop (against a wall, not into it).
                 transform.position = Grounded(MoveChecked(p, _knock * dt));
                 _knock = Vector3.MoveTowards(_knock, Vector3.zero, dt * 8f);
-                return;
-            }
-
-            if (FightMove(dt)) // fighting: stepping in, circling, backing off (StoryNpc.Combat)
-            {
-                Separate(dt);
                 return;
             }
 
@@ -1191,31 +1160,6 @@ namespace PleaseDontDrown.Story
             AvatarLook look = AvatarLook.Unpack(packed);
             if (_rig.IsBuilt && _rig.Look.Equals(look)) return;
             _rig.Build(look);
-            ShowBag(_hasBag.Value);
-            ShowDisguise();
-        }
-
-        /// <summary>The robber's backpack: a lumpy bag on his back (bursts open when he goes down).</summary>
-        private void ShowBag(bool show)
-        {
-            if (!show)
-            {
-                if (_bag != null) _bag.SetActive(false);
-                return;
-            }
-            if (_rig == null || !_rig.IsBuilt) return;
-            if (_bag == null) _bag = RobberBag.Create();
-            RobberBag.Wear(_bag, _rig);
-            _bag.SetActive(true);
-        }
-
-        /// <summary>The thief looks like one: a black beanie and a bandana over his face, made to fit this body's head.</summary>
-        private void ShowDisguise()
-        {
-            // (His own model is already dressed for it: sunglasses and a headband.)
-            bool wear = _role.Value == NpcRole.Robber && _rig != null && _rig.IsBuilt && _rig.Look.Body != AvatarLook.Bodies.Robber;
-            if (_disguise != null) Destroy(_disguise); // the head may have changed size with the look
-            _disguise = wear ? RobberDisguise.Create(_rig) : null;
         }
     }
 }

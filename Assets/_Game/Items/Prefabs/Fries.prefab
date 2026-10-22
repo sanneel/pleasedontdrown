@@ -112,7 +112,6 @@ GameObject:
   - component: {fileID: 4061301137644611712}
   - component: {fileID: 7524255374589022789}
   - component: {fileID: 4336060329159745160}
-  - component: {fileID: 6050442388724867202}
   m_Layer: 0
   m_Name: Fries
   m_TagString: Untagged
@@ -468,23 +467,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.World.ImpactSound
   _audio: {fileID: 4061301137644611712}
   _minSpeed: 2.2
---- !u!114 &6050442388724867202
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1013485125305460571}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: be01ec0b5cc601c4f89607ea5f49f089, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: PleaseDontDrown::PleaseDontDrown.Fun.TableMeal
-  _componentIndexCache: 255
-  _addedNetworkObject: {fileID: 8305081079500736153}
-  _networkObjectCache: {fileID: 0}
-  _bites: 3
-  _pieceNames: []
 --- !u!1 &7554264752223479137
 GameObject:
   m_ObjectHideFlags: 0

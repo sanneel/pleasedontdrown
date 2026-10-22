@@ -300,13 +300,6 @@ namespace PleaseDontDrown.Player
                     spin += Vector3.Cross(Vector3.up, AimTransform.forward).normalized * (charge * 3f);
                     flung = thrown;
                 }
-                // A basketball thrown at a hoop goes on a proper arc (Fun.BasketballHoop.TryAssist).
-                if (charge > 0f && item.DisplayName == Fun.BasketballHoop.BallName && live &&
-                    Fun.BasketballHoop.TryAssist(body.position, AimTransform.forward, charge, body.linearDamping, out Vector3 shot))
-                {
-                    velocity = shot;
-                    spin = Vector3.Cross(new Vector3(shot.x, 0f, shot.z).normalized, Vector3.up) * 8f; // backspin
-                }
             }
 
             StopEating();
@@ -322,14 +315,7 @@ namespace PleaseDontDrown.Player
             BeachAudio.PlayLocal(charge >= 0f ? BeachAudio.Throw : BeachAudio.Drop, 0.6f);
             Invalidate();
             ResetHoldState();
-            bool jumpShot = charge > 0f && item.DisplayName == Fun.BasketballHoop.BallName;
-            if (jumpShot)
-            {
-                // A basketball: a jump shot. Both arms go up and the shooter hops as the ball leaves the hands.
-                _hub.Gesture(AvatarGesture.JumpShot);
-                if (_hub.Motor != null && _hub.Motor.IsGrounded && !_hub.Motor.IsSwimming) _hub.Motor.AddImpulse(Vector3.up * 3.4f);
-            }
-            else if (charge >= 0f) _hub.Gesture(AvatarGesture.Throw);
+            if (charge >= 0f) _hub.Gesture(AvatarGesture.Throw);
             else if (_chargeAnnounced) _hub.Gesture(AvatarGesture.ChargeEnd);
             _chargeAnnounced = false;
         }
@@ -510,7 +496,6 @@ namespace PleaseDontDrown.Player
 
         private void ReadSlotInput()
         {
-            if (Fun.BarSeat.MenuOpen) return; // sitting at a bar: the number keys order from its menu
             for (int i = 0; i < SlotCount; i++)
                 if (GameInput.Slots[i].WasPressedThisFrame())
                 {
@@ -609,11 +594,6 @@ namespace PleaseDontDrown.Player
         private void GetHoldTarget(Item item, out Vector3 position, out Quaternion rotation)
         {
             Transform aim = ViewModel ? AimTransform : _head;
-            if (item.TryGetComponent(out Fun.BasketballDribble basketball))
-            {
-                basketball.GetHoldTarget(_hub, aim, out position, out rotation);
-                return;
-            }
             // Somebody else's gun or bat: held by their body (third person), not floated in front of their eyes the
             // way our own first-person view model is (that put guns up beside the head, pointing at the sky).
             if (!ViewModel && item.RigidInHand && item.GripRight != null)
@@ -764,8 +744,6 @@ namespace PleaseDontDrown.Player
         {
             left = right = default;
             if (item == null) return GripKind.None;
-            if (item.TryGetComponent(out Fun.BasketballDribble dribble))
-                return dribble.GetGrips(_hub, out left, out right);
             // Hand-placed grips on the item win (fingers along the grip's forward, palm toward its down).
             if (item.GripRight != null || item.GripLeft != null)
             {

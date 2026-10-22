@@ -67,53 +67,7 @@ namespace PleaseDontDrown.Editor
             Material defibYellow = GetMaterial("DefibYellow", new Color(1f, 0.82f, 0.15f));
             Material red = GetMaterial("RescueRed", new Color(0.86f, 0.16f, 0.13f));
 
-            void Lost(GameObject go, int reward, bool evidence = false)
-            {
-                var so = new SerializedObject(go.AddComponent<LostItem>());
-                Require(so, "_reward").intValue = reward;
-                Require(so, "_evidence").boolValue = evidence;
-                so.ApplyModifiedPropertiesWithoutUndo();
-                SetBool(go.GetComponent<Item>(), "_pocketable", true);
-                SetEnum(go.GetComponent<Item>(), "_grip", (int)ItemGrip.OneHand);
-                SetRef(go.AddComponent<ImpactSound>(), "_audio", SpatialAudio(go, 1.5f, 20f));
-            }
             Vector3 smallHold = new(0.2f, -0.28f, 0.5f);
-
-            yield return BuildItem("Wallet", "Wallet", 0.25f, smallHold, new Vector3(-20f, 0f, 0f), 1f, wood, root =>
-            {
-                Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.12f, 0.03f, 0.09f), leather);
-                Primitive(PrimitiveType.Cube, "Stitch", root, new Vector3(0f, 0.016f, 0f), new Vector3(0.1f, 0.004f, 0.07f), gold, keepCollider: false);
-                DressProp(root, "wallet");
-            }, density: 0.6f, configure: go => Lost(go, 30));
-
-            yield return BuildItem("Phone", "Phone", 0.2f, smallHold, new Vector3(-30f, 0f, 0f), 1f, wood, root =>
-            {
-                Primitive(PrimitiveType.Cube, "Body", root, Vector3.zero, new Vector3(0.08f, 0.012f, 0.16f), black);
-                Primitive(PrimitiveType.Cube, "Screen", root, new Vector3(0f, 0.0065f, 0f), new Vector3(0.07f, 0.002f, 0.14f), screen, keepCollider: false);
-                DressProp(root, "phone");
-            }, density: 1.4f, configure: go => Lost(go, 40)); // phones sink: dive for it
-
-            yield return BuildItem("Sunglasses", "Sunglasses", 0.08f, smallHold, Vector3.zero, 1f, wood, root =>
-            {
-                Primitive(PrimitiveType.Cube, "Bridge", root, Vector3.zero, new Vector3(0.14f, 0.015f, 0.015f), pink);
-                foreach (float side in new[] { -1f, 1f })
-                    Primitive(PrimitiveType.Sphere, "Lens", root, new Vector3(0.045f * side, -0.012f, 0f), new Vector3(0.055f, 0.04f, 0.012f), lens, keepCollider: false);
-                DressProp(root, "sunglasses", fitCollider: true);
-            }, density: 0.8f, configure: go => Lost(go, 20));
-
-            yield return BuildItem("Watch", "Watch", 0.12f, smallHold, Vector3.zero, 1f, wood, root =>
-            {
-                Primitive(PrimitiveType.Cylinder, "Face", root, Vector3.zero, new Vector3(0.05f, 0.008f, 0.05f), gold);
-                Primitive(PrimitiveType.Cube, "Band", root, new Vector3(0f, -0.004f, 0f), new Vector3(0.025f, 0.006f, 0.16f), black, keepCollider: false);
-                DressProp(root, "watch", fitCollider: true);
-            }, density: 1.6f, configure: go => Lost(go, 35));
-
-            yield return BuildItem("Baggie", "Baggie", 0.05f, smallHold, Vector3.zero, 1f, wood, root =>
-            {
-                Primitive(PrimitiveType.Cube, "Bag", root, Vector3.zero, new Vector3(0.09f, 0.025f, 0.07f), baggie);
-                Primitive(PrimitiveType.Cube, "Seal", root, new Vector3(0f, 0f, 0.036f), new Vector3(0.09f, 0.03f, 0.006f), red, keepCollider: false);
-                DressProp(root, "baggie");
-            }, density: 0.3f, configure: go => Lost(go, 25, evidence: true));
 
             yield return BuildItem("JetSkiKeys", "Jet Ski Keys", 0.1f, smallHold, Vector3.zero, 1f, rubber, root =>
             {
@@ -127,21 +81,8 @@ namespace PleaseDontDrown.Editor
                 SetEnum(go.GetComponent<Item>(), "_grip", (int)ItemGrip.OneHand);
             });
 
-            yield return BuildItem("FleetKeyCase", "Fleet Key Case", 0.7f, smallHold, Vector3.zero, 1f, rubber, root =>
-            {
-                Primitive(PrimitiveType.Cube, "OrangeCase", root, Vector3.zero, new Vector3(0.42f, 0.17f, 0.30f), orange);
-                Primitive(PrimitiveType.Cube, "Lid", root, new Vector3(0f, 0.10f, 0f), new Vector3(0.44f, 0.045f, 0.32f), black, keepCollider: false);
-                for (int i = 0; i < 4; i++)
-                {
-                    Primitive(PrimitiveType.Cube, "KeyTag", root, new Vector3(-0.14f + i * 0.095f, 0.13f, 0f), new Vector3(0.06f, 0.02f, 0.12f), orange, keepCollider: false);
-                    Primitive(PrimitiveType.Cube, "Key", root, new Vector3(-0.14f + i * 0.095f, 0.135f, 0.07f), new Vector3(0.02f, 0.018f, 0.07f), steel, keepCollider: false);
-                }
-                Primitive(PrimitiveType.Cube, "Handle", root, new Vector3(0f, 0.02f, -0.19f), new Vector3(0.17f, 0.05f, 0.07f), black, keepCollider: false);
-            }, density: 0.25f, configure: go => SetBool(go.GetComponent<Item>(), "_pocketable", true));
-
-            // Guns: pistol, SMG, shotgun, rifle, sniper (GameSceneBuilder.Weapons.cs).
+            // Guns: the pistol and the shotgun (GameSceneBuilder.Weapons.cs).
             foreach (Object gun in BuildWeapons(wood)) yield return gun;
-            yield return BuildKnife(wood);
 
             yield return BuildItem("Defibrillator", "Defibrillator", 2.5f, new Vector3(0.05f, -0.4f, 0.62f), Vector3.zero, 0.8f, wood, root =>
             {
@@ -165,7 +106,6 @@ namespace PleaseDontDrown.Editor
         private static void BuildStoryPrefabs()
         {
             Directory.CreateDirectory(StoryPrefabDir);
-            BuildRobberBackpack();
 
             // ---- a story character: host-moved, procedurally animated, talkable, punchable
             var root = new GameObject("StoryNpc");
@@ -263,18 +203,17 @@ namespace PleaseDontDrown.Editor
             // Sandy's Lost & Found is the old shack (door off): she sits inside at the window, you hand things in at
             // the window's shelf. Without the Meshy shack there's a stand-alone kiosk instead.
             Transform shack = env.Find("Station_Shack");
-            LostAndFound lostAndFound;
             StoryNpc sandy;
             if (shack != null && shack.Find("FloorCollision") != null)
             {
-                lostAndFound = BuildShackLostAndFound(shack, out Vector3 stool, out float stoolYaw);
+                BuildShackLostAndFound(shack, out Vector3 stool, out float stoolYaw);
                 sandy = PlaceNpc(npcPrefab, story, "Sandy", stool, stoolYaw);
             }
             else
             {
                 Vector3 kioskPos = OnGround(KioskPosition);
                 float kioskYaw = Quaternion.LookRotation(new Vector3(0f, 0f, 15f) - new Vector3(kioskPos.x, 0f, kioskPos.z)).eulerAngles.y;
-                Transform kiosk = BuildKiosk(env, kioskPos, kioskYaw, out lostAndFound);
+                Transform kiosk = BuildKiosk(env, kioskPos, kioskYaw);
                 sandy = PlaceNpc(npcPrefab, story, "Sandy", OnGround(kiosk.TransformPoint(new Vector3(1.7f, 0f, 0.9f))), kioskYaw);
             }
 
@@ -283,29 +222,20 @@ namespace PleaseDontDrown.Editor
             BuildCrowd(story, "BeachCrowd_Island1", npcPrefab, towels1, new Vector2(-24f, 20f), new Vector2(-34f, -8f),
                 new Vector2(-32f, 32f), new Vector2(-14f, 4f), swimmers: 7, waders: 3, seed: 1000);
 
-            // Lost things turn up by the shore in front of the station (first spot) and next to people's towels.
-            var lostSpots = new List<Transform> { Point(story, "LostItemSpot_0", OnGround(LostItemSpots[0]), 0f) };
-            for (int i = 0; i < towels1.Length; i += 2)
-                lostSpots.Add(Point(story, $"LostItemSpot_{lostSpots.Count}", OnGround(towels1[i].position + towels1[i].right * 1.1f), 0f));
             Transform robberSpawn = Point(story, "RobberSpawn", OnGround(RobberSpawn), 90f);
 
             BuildRentalDock(env, story, npcPrefab, out StoryNpc rentalOperator, out Vehicle[] rentalFleet,
                 out Transform[] rentalBerths, out Transform rentalKeys);
-            Vehicle jetSki = rentalFleet[0];
 
             // ---------------------------------------------------------------- island 2: the hotel
             BuildDock(env, "HotelDock", Dock2, 24f);
-            Transform hotel = BuildHotel(env, npcPrefab, story, out StoryNpc receptionist, out ShopCounter reception, out Transform desk,
+            Transform hotel = BuildHotel(env, npcPrefab, story, out StoryNpc receptionist, out Transform desk,
                 out Transform infirmary, out Transform firstAid, out Transform hotelDoor);
-            Transform jetSkiDock2 = Point(story, "JetSkiDock2", OnWater(JetSkiDock2), 180f);
             Transform arrival = Point(story, "Island2Arrival", Island2Arrival, 0f);
             // On the sand in front of the hotel: island 2 was raised to a 1.5 m plateau and a fixed 0.3 m put arrivals
             // under the ground, into the sea.
             Transform island2Spawn = Point(story, "Island2Spawn", OnGround(Island2Spawn) + Vector3.up * 0.3f, 0f);
-            Transform pirateLanding = Point(story, "PirateLanding", OnGround(PirateLanding), 0f);
-            Transform pirateStart = Point(story, "PirateBoatStart", OnWater(PirateBoatStart),
-                Quaternion.LookRotation(PirateLanding - PirateBoatStart).eulerAngles.y);
-            Vehicle pirateBoat = BuildPirateBoat(env, OnWater(PirateBoatParked), 30f);
+            BuildPirateBoat(env, OnWater(PirateBoatParked), 30f);
             Transform[] towels2 = BuildTowels(env, "Island2", Island2TowelXs, seaTowardPositiveZ: true, startZ: -195f, Island2Avoid(), seed: 22);
             BuildCrowd(story, "BeachCrowd_Island2", npcPrefab, towels2, new Vector2(-18f, 56f), new Vector2(-198f, -180f),
                 new Vector2(-22f, 60f), new Vector2(-216f, -204f), swimmers: 5, waders: 2, seed: 2000);
@@ -325,23 +255,9 @@ namespace PleaseDontDrown.Editor
             SetRef(director, "_sharkPrefab", sharkPrefab.GetComponent<Shark>());
             SetRef(director, "_sandy", sandy);
             SetRef(director, "_receptionist", receptionist);
-            SetRef(director, "_lostAndFound", lostAndFound);
-            SetRef(director, "_reception", reception);
-            SetRef(director, "_receptionDesk", desk);
-            SetRef(director, "_jetSki", jetSki);
             SetRef(director, "_rentalOperator", rentalOperator);
             SetRefs(director, "_rentalFleet", rentalFleet);
-            SetRefs(director, "_rentalBerths", rentalBerths);
-            SetRef(director, "_rentalKeySpot", rentalKeys);
-            SetRef(director, "_jetSkiIsland2Dock", jetSkiDock2);
-            SetRef(director, "_pirateBoat", pirateBoat);
-            SetRef(director, "_pirateBoatStart", pirateStart);
-            SetRef(director, "_pirateLanding", pirateLanding);
-            SetRef(director, "_hotelDoor", hotelDoor);
-            SetRef(director, "_infirmary", infirmary);
-            SetRef(director, "_firstAid", firstAid);
             SetRef(director, "_island2Spawn", island2Spawn);
-            SetRefs(director, "_lostItemSpots", lostSpots.ToArray());
 
             var so = new SerializedObject(director);
             // Island 1: everyone pulled out collapses and needs CPR (the design wants every CPR moment seen).
@@ -602,7 +518,7 @@ namespace PleaseDontDrown.Editor
         /// things in here), a sign under the eaves, the rates, and a stool inside where Sandy sits looking out.
         /// Window position measured from a screenshot of the Meshy shack (4 m model units, scaled like the walls).
         /// </summary>
-        private static LostAndFound BuildShackLostAndFound(Transform shack, out Vector3 stool, out float stoolYaw)
+        private static void BuildShackLostAndFound(Transform shack, out Vector3 stool, out float stoolYaw)
         {
             float k = ShackScale;
             float east = 1.30f * k, floor = 0.575f * k, windowZ = -0.30f * k;
@@ -612,12 +528,6 @@ namespace PleaseDontDrown.Editor
             // The counter: a plank over the window's own shelf (window opening y 2.13..3.21, shelf at 1.89).
             GameObject counter = Primitive(PrimitiveType.Cube, "LostAndFoundCounter", shack, new Vector3(east + 0.16f, 1.9f, windowZ), new Vector3(0.42f, 0.08f, 1.8f), wood);
             TagSurface(counter, SurfaceKind.Wood);
-            counter.AddComponent<NetworkObject>();
-            var lostAndFound = counter.AddComponent<LostAndFound>();
-            var pay = new GameObject("PayPoint").transform;
-            pay.SetParent(shack, false);
-            pay.localPosition = new Vector3(east + 0.3f, 2.4f, windowZ);
-            SetRef(lostAndFound, "_payPoint", pay);
 
             // Painted sign standing on the roof over the window, the price chalkboard under the counter. Both face east;
             // the pictures are painted by ArtSource/Tools/make_signs.py (engine text looked cheap, Meshy can't write).
@@ -627,8 +537,6 @@ namespace PleaseDontDrown.Editor
             SignPicture(shack, "LostAndFoundSignFace", new Vector3(east + 0.068f, 4.72f, windowZ), -90f, new Vector2(2.5f, 0.78f), "lost_and_found_sign");
             Primitive(PrimitiveType.Cube, "PriceBoard", shack, new Vector3(east + 0.05f, 1.24f, windowZ), new Vector3(0.04f, 0.58f, 0.93f), wood, keepCollider: false);
             SignPicture(shack, "PriceBoardFace", new Vector3(east + 0.078f, 1.24f, windowZ), -90f, new Vector2(0.93f, 0.58f), "lost_and_found_prices");
-            ConfigureInteractable(counter.AddComponent<Interactable>(), new[] { counter.GetComponent<Collider>() },
-                new[] { counter.GetComponent<Renderer>(), board.GetComponent<Renderer>() }, 3.2f);
 
             // A raised booth floor under the window (0.4 m: characters step up onto it) so she looks out of it,
             // and her stool on it, facing the window (no collider: she sits on it, nobody trips on it).
@@ -647,7 +555,6 @@ namespace PleaseDontDrown.Editor
             Vector3 stoolLocal = boothTop + Vector3.up * barStool; // her feet, on the footrest
             stool = shack.TransformPoint(stoolLocal);
             stoolYaw = shack.eulerAngles.y + 90f;
-            return lostAndFound;
         }
 
         /// <summary>
@@ -678,7 +585,7 @@ namespace PleaseDontDrown.Editor
         }
 
         /// <summary>Sandy's kiosk: counter (hand things in here), back board, striped awning and a sign.</summary>
-        private static Transform BuildKiosk(Transform env, Vector3 position, float yaw, out LostAndFound lostAndFound)
+        private static Transform BuildKiosk(Transform env, Vector3 position, float yaw)
         {
             Material wood = GetMaterial("Wood", new Color(0.55f, 0.36f, 0.22f));
             Material teal = GetMaterial("KioskTeal", new Color(0.18f, 0.55f, 0.55f));
@@ -704,13 +611,6 @@ namespace PleaseDontDrown.Editor
             WorldText(kiosk, "Rates", new Vector3(0f, 1.55f, -0.94f), "We pay for:\nwallets $30  phones $40\nwatches $35  sunglasses $20", 56, 0.02f, new Color(0.2f, 0.2f, 0.2f))
                 .transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
 
-            counter.AddComponent<NetworkObject>();
-            lostAndFound = counter.AddComponent<LostAndFound>();
-            var pay = new GameObject("PayPoint").transform;
-            pay.SetParent(kiosk, false);
-            pay.localPosition = new Vector3(0f, 1.6f, 0.2f);
-            SetRef(lostAndFound, "_payPoint", pay);
-            ConfigureInteractable(counter.AddComponent<Interactable>(), new[] { counter.GetComponent<Collider>() }, new[] { counter.GetComponent<Renderer>() }, 3.8f);
             return kiosk;
         }
 
@@ -732,7 +632,7 @@ namespace PleaseDontDrown.Editor
         /// The Grand Coral Hotel (greybox): a two-storey block facing north with an open doorway. Inside, the reception
         /// desk (shop + receptionist) on the left, the infirmary bed on the right, the first-aid box by the door.
         /// </summary>
-        private static Transform BuildHotel(Transform env, GameObject npcPrefab, Transform story, out StoryNpc receptionist, out ShopCounter reception,
+        private static Transform BuildHotel(Transform env, GameObject npcPrefab, Transform story, out StoryNpc receptionist,
             out Transform desk, out Transform infirmary, out Transform firstAid, out Transform door)
         {
             Material wall = GetMaterial("HotelWall", new Color(0.98f, 0.9f, 0.78f));
@@ -772,39 +672,11 @@ namespace PleaseDontDrown.Editor
             name.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
             TagSurface(hotel.gameObject, SurfaceKind.Wood);
 
-            // Reception desk (left of the door) with the shop and the receptionist behind it.
+            // Reception desk (left of the door) with the receptionist behind it.
             GameObject deskGo = Primitive(PrimitiveType.Cube, "ReceptionDesk", hotel, new Vector3(-6f, 0.85f, 2.2f), new Vector3(3.2f, 1.1f, 0.8f), trim);
             Primitive(PrimitiveType.Cube, "DeskTop", hotel, new Vector3(-6f, 1.43f, 2.25f), new Vector3(3.4f, 0.06f, 1f), wood, keepCollider: false);
             TextMesh deskSign = WorldText(hotel, "DeskSign", new Vector3(-6f, 0.95f, 2.62f), "RECEPTION", 70, 0.03f, Color.white);
             deskSign.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-            deskGo.AddComponent<NetworkObject>();
-            reception = deskGo.AddComponent<ShopCounter>();
-            var shopSpawn = new GameObject("ShopSpawn").transform;
-            shopSpawn.SetParent(hotel, false);
-            shopSpawn.localPosition = new Vector3(-5.2f, 1.6f, 2.3f);
-            SetRef(reception, "_spawnPoint", shopSpawn);
-            var shopSo = new SerializedObject(reception);
-            Require(shopSo, "_title").stringValue = "Grand Coral reception";
-            SerializedProperty products = Require(shopSo, "_products");
-            (string item, int price, string blurb)[] stock =
-            {
-                ("Knife", 80, "Left mouse stabs whatever is in front of you. Z / C change the skin."),
-                ("Pistol", 250, "For when guests get attacked. Left mouse shoots, right mouse aims, R reloads."),
-                ("SMG", 600, "Sprays. Hold the trigger. 30 rounds."),
-                ("Shotgun", 700, "Eight pellets a shot. Knocks you back too."),
-                ("Rifle", 900, "Full auto, accurate when you aim. Takes a 4x scope."),
-                ("Sniper", 1200, "One shot, one pirate. 8x scope included."),
-            };
-            products.arraySize = stock.Length;
-            for (int i = 0; i < stock.Length; i++)
-            {
-                SerializedProperty product = products.GetArrayElementAtIndex(i);
-                product.FindPropertyRelative("Item").stringValue = stock[i].item;
-                product.FindPropertyRelative("Price").intValue = stock[i].price;
-                product.FindPropertyRelative("Blurb").stringValue = stock[i].blurb;
-            }
-            shopSo.ApplyModifiedPropertiesWithoutUndo();
-            ConfigureInteractable(deskGo.AddComponent<Interactable>(), new[] { deskGo.GetComponent<Collider>() }, new[] { deskGo.GetComponent<Renderer>() }, 3f);
             desk = deskGo.transform;
             receptionist = PlaceNpc(npcPrefab, story, "Receptionist", hotel.TransformPoint(new Vector3(-6f, 0.3f, 0.9f)), 0f);
 

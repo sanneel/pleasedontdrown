@@ -450,7 +450,6 @@ namespace PleaseDontDrown.Editor
                 spot.localPosition = new Vector3(-3.5f + i, 1.36f, BbCounterZ + 0.23f);
                 serve.Add(spot);
             }
-            if (bar.GetComponentInChildren<Barista>() is { } b) SetRefs(b, "_serveSpots", serve.ToArray());
             if (bar.Find("WipeFrom") is { } wipeFrom) wipeFrom.localPosition = new Vector3(-0.25f, 1.19f, BbCounterZ - 0.17f);
             if (bar.Find("WipeTo") is { } wipeTo) wipeTo.localPosition = new Vector3(0.75f, 1.19f, BbCounterZ - 0.17f);
             foreach (Transform c in bar)

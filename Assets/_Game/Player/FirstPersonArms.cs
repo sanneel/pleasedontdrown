@@ -503,16 +503,6 @@ namespace PleaseDontDrown.Player
                 state = State.Punch;
                 blend = 0.08f;
             }
-            else if (hand.Right && Fun.TableMeal.LocalBiteGrip(_hub, out HandGrip bite))
-            {
-                // A bite off the dish on the table (Fun.TableMeal): the hand goes over to the khinkali (or the glass)
-                // and holds it while it comes up in front of the mouth, like eating something held.
-                state = State.Bite;
-                palm = bite.Point;
-                rot = bite.Rotation(side);
-                pose = bite.Pose;
-                blend = 0.3f;
-            }
             else if (sincePump < 1.2f)
             {
                 // CPR: palms flat on the chest, right hand on top, pressing on each pump.

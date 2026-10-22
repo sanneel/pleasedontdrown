@@ -163,7 +163,7 @@ namespace PleaseDontDrown.Player
             if (wish.sqrMagnitude > 1f) wish.Normalize();
 
             float speed = (IsSprinting ? _swimSprintSpeed : _swimSpeed) * SpeedMultiplier * HungerSpeedScale * CarryFactor(0.06f);
-            Vector3 target = wish * speed + TsunamiState.CurrentAt(_rb.position);
+            Vector3 target = wish * speed;
 
             bool verticalIntent = dive || (rise && IsHeadUnderwater);
             if (_gasping && IsHeadUnderwater)

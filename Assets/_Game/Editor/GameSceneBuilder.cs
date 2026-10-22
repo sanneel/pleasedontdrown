@@ -445,9 +445,8 @@ namespace PleaseDontDrown.Editor
             }
             var items = new List<Object> { crate, ball, ring, cooler, coconut, tourist };
             items.AddRange(BuildStoryItems(torus));
-            items.AddRange(BuildFunItems()); // basketball (GameSceneBuilder.Fun.cs)
+            items.AddRange(BuildFunItems()); // the beer (GameSceneBuilder.Fun.cs)
             items.AddRange(BuildBarFoodItems()); // fries, cola, cocktail for the bars (GameSceneBuilder.BarFood.cs)
-            items.AddRange(BuildChapter4Items()); // the money sack and Sandy's Lost & Found tag (GameSceneBuilder.Chapter4Items.cs)
             SetRefs(catalog, "_items", items.ToArray());
             EditorUtility.SetDirty(catalog);
             return catalog;
@@ -732,7 +731,6 @@ namespace PleaseDontDrown.Editor
             SetRef(surface, "_material", LoadOrCreateMaterial("Ocean", AssetDatabase.LoadAssetAtPath<Shader>(OceanShaderPath)));
             ocean.AddComponent<NetworkObject>();
             ocean.AddComponent<OceanState>();
-            ocean.AddComponent<TsunamiState>();
             ocean.AddComponent<UnderwaterFx>();
             SetRef(ocean.AddComponent<SplashFx>(), "_particleMaterial", GetSplashMaterial());
 
@@ -832,7 +830,7 @@ namespace PleaseDontDrown.Editor
         {
             float height = Mathf.Max(Mathf.Max(ProfileHeight(ShoreCoordinate(x, z), x, z, true), Island2Ground(x, z)),
                 Mathf.Max(ProfileHeight(DevIslandShore(x, z), x, z, false), Island3Height(x, z)));
-            return BasketballGroundHeight(x, z, height + Island1DuneHeight(x, z));
+            return height + Island1DuneHeight(x, z);
         }
 
         private static float ProfileHeight(float shore, float x, float z, bool dunesInland)

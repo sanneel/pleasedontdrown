@@ -120,15 +120,8 @@ namespace PleaseDontDrown.Story
             if (local == null || !GameInput.GameplayActive) return;
             Camera cam = local.Look != null ? local.Look.Camera : null;
 
-            // The credits roll over a clean screen: no objective, no team funds, no marker under them.
-            bool credits = CreditsRoll.Rolling;
-            if (!credits) DrawObjective();
-            else TopLeftBottom = Hud.Margin;
-            if (cam != null)
-            {
-                if (!credits) DrawMarker(cam, local);
-                DrawLostSparkles(cam, local);
-            }
+            DrawObjective();
+            if (cam != null) DrawMarker(cam, local);
             DrawReport(); // (under the subtitles: its dim mustn't darken what's being said)
             DrawDialogue();
             DrawTitle();
@@ -167,11 +160,6 @@ namespace PleaseDontDrown.Story
                 }
                 below = card.yMax + 6f;
             }
-            if (story != null && story.GalaGoal > 0)
-            {
-                DrawGalaBar(story, below);
-                below += 52f;
-            }
             TopLeftBottom = below;
             if (Economy.Instance != null)
             {
@@ -205,24 +193,6 @@ namespace PleaseDontDrown.Story
             }
         }
 
-        /// <summary>
-        /// The gala fund (chapter 2): a plain bar under the objective that fills with the team's money toward the gala
-        /// ($1,000 per lifeguard). No numbers and no percent on purpose (Shako, Docs/16); it glows gold once full.
-        /// </summary>
-        private static void DrawGalaBar(StoryDirector story, float top)
-        {
-            const float width = 300f;
-            float fill = story.GalaFill01;
-            Hud.Label(new Rect(Hud.Margin + 2f, top, width, 20f), "GALA FUND", 15f, Hud.Sand, TextAnchor.MiddleLeft, heavy: true);
-            var bar = new Rect(Hud.Margin, top + 24f, width, 12f);
-            if (fill >= 1f)
-            {
-                float glow = 0.35f + 0.25f * Mathf.Sin(Time.unscaledTime * 4f);
-                Hud.Fill(new Rect(bar.x - 3f, bar.y - 3f, bar.width + 6f, bar.height + 6f), new Color(1f, 0.82f, 0.35f, glow), 9f);
-            }
-            Hud.Bar(bar, fill, new Color(1f, 0.8f, 0.32f));
-        }
-
         private void DrawMarker(Camera cam, PlayerHub local)
         {
             StoryDirector story = StoryDirector.Instance;
@@ -252,27 +222,6 @@ namespace PleaseDontDrown.Story
             bool below = sy < 110f;
             Hud.Label(new Rect(sx - 250f, below ? sy + 18f : sy - 74f, 500f, 56f), $"<b>{story.MarkerLabel}</b>\n{distance:F0} m", 21f,
                 Hud.Sand, TextAnchor.UpperCenter);
-        }
-
-        private void DrawLostSparkles(Camera cam, PlayerHub local)
-        {
-            var items = Item.All;
-            for (int i = 0; i < items.Count; i++)
-            {
-                Item item = items[i];
-                if (item.IsHeld || !item.TryGetComponent(out LostItem lost)) continue;
-                float d = Vector3.Distance(local.transform.position, item.transform.position);
-                if (d > 14f) continue;
-                Vector3 s = cam.WorldToScreenPoint(item.transform.position + Vector3.up * 0.35f);
-                if (s.z < 0f) continue;
-                float twinkle = 0.55f + 0.45f * Mathf.Sin(Time.time * 6f + item.GetInstanceID());
-                float a = Mathf.Clamp01((14f - d) / 6f) * twinkle;
-                Color color = lost.IsEvidence ? new Color(1f, 0.5f, 0.4f, a) : new Color(1f, 0.95f, 0.5f, a);
-                // A four-pointed glint: two thin crossed strokes.
-                float x = s.x / Hud.Scale, y = (Screen.height - s.y) / Hud.Scale, arm = 9f + 5f * twinkle;
-                Hud.Fill(new Rect(x - 2f, y - arm, 4f, arm * 2f), color, 2f);
-                Hud.Fill(new Rect(x - arm, y - 2f, arm * 2f, 4f), color, 2f);
-            }
         }
 
         // The name plate: who's talking (worked out again only when the speaker changes), and when they came in.
@@ -356,7 +305,6 @@ namespace PleaseDontDrown.Story
             NpcRole.Robber => "ROBBER",
             NpcRole.Pirate => "PIRATE",
             NpcRole.Guest => "HOTEL GUEST",
-            NpcRole.Rival => "FINDERS KEEPERS",
             NpcRole.Police => "POLICE",
             _ => "TOURIST"
         };

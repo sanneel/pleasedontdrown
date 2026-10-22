@@ -11,7 +11,7 @@ namespace PleaseDontDrown.Story
     /// How a hit on a character feels (every machine, from HitObservers): the body flashes red for a moment, a ball
     /// throws a red puff off where it struck, the damage pops up over the head (a headshot bigger and gold, with its
     /// own ding), and whoever landed it gets the host's confirmation: a hit marker (gold for a headshot, red for a
-    /// kill) and a tick, ding or thunk. The health bar (<see cref="NpcHealthBar"/>) only shows once they're hurt.
+    /// kill) and a tick, ding or thunk.
     /// Headshots (a ball above the shoulders of someone standing) do double damage (host, ServerTakeHit).
     /// </summary>
     public partial class StoryNpc
@@ -24,7 +24,6 @@ namespace PleaseDontDrown.Story
         private MaterialPropertyBlock _flashBlock;
         private float _flashAt = -10f;
         private bool _flashing;
-        private NpcHealthBar _healthBar;
 
         /// <summary>Host: a ball above the shoulders of someone standing (the head is the top ~30 cm).</summary>
         private bool IsHeadshot(DamageKind kind, Vector3 point) =>
@@ -65,7 +64,6 @@ namespace PleaseDontDrown.Story
                 AudioSource.PlayClipAtPoint(bullet ? ProceduralAudio.BulletFlesh : ProceduralAudio.HitTick, ear + (point - ear).normalized * 2f, bullet ? 0.55f : 0.35f);
             }
 
-            if (_healthBar != null) _healthBar.Hit(damage);
         }
 
         /// <summary>How big a popup over someone's head is drawn: about the same size on screen near or far.</summary>

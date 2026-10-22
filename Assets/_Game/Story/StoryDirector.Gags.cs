@@ -24,7 +24,6 @@ namespace PleaseDontDrown.Story
             public string Shouts;       // what they yell, '|' between lines
             public string Spotted;      // the guide's comment once they're out there ({name}, {he}, {him}, {his}, {himself})
             public string[] After;      // what they say once they're saved
-            public string Drop;         // a lost thing of theirs that turns up in the shallows afterwards, or null
         }
 
         private static readonly Gag[] Island1Gags =
@@ -41,8 +40,7 @@ namespace PleaseDontDrown.Story
                 Id = "influencer",
                 Shouts = "CHAT, I'M DROWNING!|LIKE AND SUBSCRIBE!|THIS IS GREAT CONTENT!|DON'T FORGET TO FOLLOW!",
                 Spotted = "Is {name} FILMING {himself} drowning?!",
-                After = new[] { "Did you get my good side? ...Wait. Where's my PHONE?!" },
-                Drop = "Phone"
+                After = new[] { "Did you get my good side? ...Wait. Where's my PHONE?!" }
             },
             new()
             {
@@ -78,9 +76,9 @@ namespace PleaseDontDrown.Story
         {
             new()
             {
-                Id = "vip",
+                Id = "complainer",
                 Shouts = "DO YOU KNOW WHO I AM?!|I'M A GOLD MEMBER!|I PAID FOR A SEA VIEW, NOT THIS!|GET ME THE MANAGER!",
-                Spotted = "That's {name}, our VIP guest. Please don't let {him} drown. {He} tips.",
+                Spotted = "That's {name}. {He} has complained about everything since check-in. Please don't let {him} drown.",
                 After = new[] { "I'm leaving a one-star review. For the ocean." }
             },
             new()
@@ -177,7 +175,6 @@ namespace PleaseDontDrown.Story
         };
 
         private readonly HashSet<string> _usedGags = new();
-        private Coroutine _hints;
 
         /// <summary>A gag from the pool that suits a man (0), a woman (1) or either (-1), not one used already this run.</summary>
         private Gag PickGag(Gag[] pool, int figure)
@@ -203,52 +200,6 @@ namespace PleaseDontDrown.Story
         }
 
         private static Color VoiceColor(VictimBrain v) => v.IsFemale ? new Color(1f, 0.8f, 0.9f) : new Color(0.8f, 0.9f, 1f);
-
-        private void StartHints()
-        {
-            if (_hints == null) _hints = StartCoroutine(GuideHints());
-        }
-
-        private void StopHints()
-        {
-            if (_hints != null) StopCoroutine(_hints);
-            _hints = null;
-        }
-
-        /// <summary>
-        /// One rescue with a gag: a swimmer from the crowd gets into trouble yelling their own thing, the guide comments
-        /// (<paramref name="say"/> goes in front: "(shouting) ", "(over the speaker) "), and once they're saved they say
-        /// how it was. Someone lost to the rival company is replaced by somebody else with the same gag.
-        /// </summary>
-        private IEnumerator GagRescue(IslandSetup island, Gag gag, TouristProfile profile, StoryNpc guide, string say, string objective)
-        {
-            _island = island;
-            profile.Shouts = gag.Shouts;
-            if (profile.Figure < 0 && gag.Figure >= 0) profile.Figure = gag.Figure;
-            SetObjective(objective, 0, 1);
-            Debug.Log($"[Story] gag '{gag.Id}' ({(profile.Figure == 1 ? "F" : profile.Figure == 0 ? "M" : "?")})");
-            VictimBrain current = null, saved = null;
-            float nextSpawn = Time.time + 2f;
-            _rescued.Clear();
-            while (true)
-            {
-                foreach (VictimBrain v in _rescued)
-                    if (v == current) saved = v;
-                _rescued.Clear();
-                if (saved != null) break;
-                if ((current == null || !current.IsSpawned || current.State == VictimState.Lost) && Time.time >= nextSpawn)
-                {
-                    nextSpawn = Time.time + _spawnGap;
-                    current = SpawnStoryTourist(island, profile);
-                    if (current != null && guide != null && !string.IsNullOrEmpty(gag.Spotted))
-                        StartCoroutine(Comment(guide, say + gag.Spotted, current));
-                }
-                yield return new WaitForSeconds(0.25f);
-            }
-            _waveTourists.Remove(saved);
-            _progress.Value = 1;
-            yield return Reaction(saved, gag);
-        }
 
         /// <summary>The guide's comment on somebody in trouble, once nobody else is talking (and only while they still are in trouble).</summary>
         private IEnumerator Comment(StoryNpc guide, string text, VictimBrain about)
@@ -276,18 +227,13 @@ namespace PleaseDontDrown.Story
                 VictimEvent.Zapped => ZappedLines,
                 _ => PulledOutLines
             };
-            Vector3 at = v.transform.position;
+            // On island 1 (the hut is there), not the hotel's or Skull Cove's beach.
+            bool onIsland1 = (v.transform.position - BeachPointFrom(v.transform.position, _island1)).sqrMagnitude < 120f * 120f;
             yield return new WaitForSeconds(1.2f);
             yield return Say(name, Pick(first), color);
-            if (gag.After is { Length: > 0 }) yield return Say(name, Pick(gag.After), color);
-            if (!string.IsNullOrEmpty(gag.Drop))
-            {
-                Vector3 p = at + new Vector3(Random.Range(-3f, 3f), 0.5f, Random.Range(-2f, 2f));
-                Item item = SpawnItem(gag.Drop, p);
-                if (item != null && item.TryGetComponent(out LostItem lost)) lost.ServerSetup(name, false);
-            }
+            if (gag?.After is { Length: > 0 }) yield return Say(name, Pick(gag.After), color);
             // Brought back with CPR on island 1: she has other plans for her hero.
-            if (how == VictimEvent.Revived && v != null && v.IsSpawned && v.IsFemale && _island == _island1 && hero != null && LoveHut.Instance != null)
+            if (how == VictimEvent.Revived && v != null && v.IsSpawned && v.IsFemale && onIsland1 && hero != null && LoveHut.Instance != null)
                 yield return LoveHutScene(v, hero);
         }
 
@@ -472,7 +418,8 @@ namespace PleaseDontDrown.Story
             float nextShout = 0f;
             _talks.Clear();
             panicker.ServerSetTalkable(true, $"Calm {panicker.Name} down");
-            while (StoryNpc.NearestPlayer(panicker.transform.position, 3.5f) == null && !_talks.Exists(t => t.npc == panicker))
+            float giveUp = Time.time + 75f; // nobody came: they calm down by themselves
+            while (StoryNpc.NearestPlayer(panicker.transform.position, 3.5f) == null && !_talks.Exists(t => t.npc == panicker) && Time.time < giveUp)
             {
                 if (Time.time >= nextShout)
                 {
@@ -485,7 +432,15 @@ namespace PleaseDontDrown.Story
             panicker.ServerSetTalkable(false);
             _talks.Clear();
             NoMarker();
-            SetObjective(string.Empty);
+            SetObjective("Keep the tourists alive out there");
+            if (Time.time >= giveUp)
+            {
+                panicker.ServerSetPose(AvatarPose.Normal);
+                panicker.ServerSetMood(AvatarMood.Neutral);
+                if (lender != null) lender.Return(panicker);
+                else Remove(panicker);
+                yield break;
+            }
             PlayerHub lifeguard = StoryNpc.NearestPlayer(panicker.transform.position, 60f);
             if (lifeguard != null) panicker.ServerFace(lifeguard.transform.position);
             yield return Say(panicker, gag.Arrive);

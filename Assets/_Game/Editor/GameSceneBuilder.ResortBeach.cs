@@ -173,9 +173,6 @@ namespace PleaseDontDrown.Editor
             // These collisions follow the supplied U-shaped bar, including the open rear aisle (GameSceneBuilder.HotelBar.cs).
             TripoBarColliders(root);
             root.gameObject.AddComponent<NetworkObject>();
-            BuildBarista(root);
-            PlaceHotelBarista(root);
-            for (int i = 0; i < 4; i++) root.Find("ServeSpot" + i).localPosition = new Vector3(-2.4f + i * 1.6f, 1.58f, 4.88f);
             foreach (string item in new[] { "Beer", "Coconut" })
             {
                 var rack = root.gameObject.AddComponent<ItemRack>(); var spots = new List<Object>();

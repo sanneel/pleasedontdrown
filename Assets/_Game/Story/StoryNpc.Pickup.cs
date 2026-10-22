@@ -21,7 +21,7 @@ namespace PleaseDontDrown.Story
 
         private bool CanBePickedUp =>
             _role.Value is NpcRole.Bystander or NpcRole.Guest or NpcRole.Pirate or NpcRole.Robber &&
-            !_talkable.Value && !_held && _ride == null && !NetworkObject.IsSceneObject; // (placed in the scene: a story character, Milo at the rentals)
+            !_talkable.Value && _ride == null && !NetworkObject.IsSceneObject; // (placed in the scene: a story character, Milo at the rentals)
 
         public bool CanInteract(PlayerHub player) => CanBePickedUp && player.Hands != null;
 

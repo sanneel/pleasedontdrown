@@ -31,7 +31,6 @@ namespace PleaseDontDrown.World
             new("Island 1", 12.5f, 10f, 110f),
             new("Island 2", -5f, -275f, 130f),
             new("Island 3", 20f, -900f, 170f),
-            new("Island 4", 560f, -400f, 150f),
             new("Dev island", -230f, -60f, 70f),
         };
 

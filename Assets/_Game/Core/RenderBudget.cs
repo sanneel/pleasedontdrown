@@ -67,8 +67,7 @@ namespace PleaseDontDrown.Core
                     if (r is not MeshRenderer || listed.Contains(r) || r.TryGetComponent(out LODGroup _)) continue;
                     // Never hidden: what glows (lamp bulbs at night are the scene) and what can be picked up (a lost
                     // wallet must stay findable on every level). (Not "anything networked": the whole island is.)
-                    if (Glows(r) || r.GetComponentInParent<Items.Item>(true) != null || r.GetComponentInParent<Items.ItemSync>(true) != null
-                        || r.GetComponentInParent<Story.LostItem>(true) != null) continue;
+                    if (Glows(r) || r.GetComponentInParent<Items.Item>(true) != null || r.GetComponentInParent<Items.ItemSync>(true) != null) continue;
                     var group = r.gameObject.AddComponent<LODGroup>();
                     group.fadeMode = LODFadeMode.None;
                     group.SetLODs(new[] { new LOD(CullHeight, new[] { r }) });

@@ -176,6 +176,9 @@ On island 2 (the Grand Coral hotel) the players find out:
 
 ### Phase 8: the old story goes
 
+**Done early, 2026-10-23** (`23-Scope-Change.md`): the old chapters, island 4 and the rest of the cut list are out of
+the game (archived in `Archive/OldGame/`); the game starts in the open shift. Still to do here: the short intro.
+
 - `StoryDirector` chapters 1-4 (beats 1.1-4.9, the Finders Keepers company, the THIEF's confession, the Sandy boss,
   her CPR, the credits) are switched off, then removed once the new loop covers the islands. Sandy stays as the
   booth keeper and the guide's voice on island 1.

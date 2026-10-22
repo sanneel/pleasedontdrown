@@ -1,181 +1,198 @@
-using System;
-using System.Collections.Generic;
-using FishNet.Object;
+using System.Collections;
 using PleaseDontDrown.Avatars;
-using PleaseDontDrown.Combat;
-using PleaseDontDrown.Creatures;
+using PleaseDontDrown.Rescue;
+using PleaseDontDrown.Vehicles;
 using UnityEngine;
 
 namespace PleaseDontDrown.Story
 {
     /// <summary>
-    /// Skull Cove lives before you get there (host). Its lookout parrots and the guards on the lane, the jungle's guards
-    /// and monkeys, the river's alligators, Old Snapper asleep in its pond and Iron Jaw Jack in the tavern are put on the
-    /// island while the team is still out at sea (nobody sees them appear) and they stay: each mission is about the ones
-    /// already there, and nobody vanishes once it's done. A failed mission puts its group back as it was (the team is
-    /// back at the mission's start then, away from them). Groups:
-    ///  I3Lookouts (3.1: the night watch, sleepers and lantern guards) · I3Tavern (3.4) · I3Jungle (3.5) · I3River (3.6) · I3Snapper (3.7, gone once beaten).
+    /// The islands' own people (host), put there when the game starts: Milo at his boat dock on island 1; the hotel's
+    /// director, staff and guests on island 2; Skull Cove's pirates on island 3 (asleep round the campfire, a crowd at
+    /// the fire, two walking the lane, the village drunk). They're ordinary people now: anyone can be picked up and
+    /// thrown. (The beach crowds are BeachCrowd's.)
     /// </summary>
     public partial class StoryDirector
     {
-        private sealed class Resident
+        [Header("Island one boats")]
+        [SerializeField] private StoryNpc _rentalOperator;
+        [SerializeField] private Vehicle[] _rentalFleet = System.Array.Empty<Vehicle>();
+        private readonly FishNet.Object.Synchronizing.SyncVar<bool> _rentalUnlocked = new(false);
+        public bool RentalUnlocked => _rentalUnlocked.Value;
+        public System.Collections.Generic.IReadOnlyList<Vehicle> RentalFleet => _rentalFleet;
+
+        private const string Island3Places = "Environment/Island3/Story/";
+
+        private void SetRentalAccess(bool unlocked)
         {
-            public string Group;
-            public Func<GameObject> Make;
-            public GameObject Body;
+            _rentalUnlocked.Value = unlocked;
+            foreach (Vehicle ski in _rentalFleet)
+                if (ski != null) ski.ServerSetLocked(!unlocked, "Milo's boat");
         }
 
-        private readonly List<Resident> _residents = new();
-
-        /// <summary>Host: someone who lives on the island (made now, and again by <see cref="ResetResidents"/>).</summary>
-        private void AddResident(string group, Func<GameObject> make)
+        private void PopulateIslands()
         {
-            var r = new Resident { Group = group, Make = make };
-            r.Body = MakeResident(r);
-            _residents.Add(r);
-        }
-
-        private GameObject MakeResident(Resident r)
-        {
-            GameObject body = r.Make();
-            if (body != null) _spawnedActors.Remove(body); // not a mission's: a mission's cleanup doesn't take it
-            return body;
-        }
-
-        /// <summary>Host: the living bodies of a group, of type <typeparamref name="T"/>.</summary>
-        private List<T> ResidentsOf<T>(string group) where T : Component
-        {
-            var list = new List<T>();
-            foreach (Resident r in _residents)
-                if (r.Group == group && r.Body != null && r.Body.TryGetComponent(out T t)) list.Add(t);
-            return list;
-        }
-
-        /// <summary>Host: a group back as it was at the start (calm, healed, at home): despawned and made again.</summary>
-        private void ResetResidents(string group)
-        {
-            foreach (Resident r in _residents)
+            if (_rentalOperator != null)
             {
-                if (r.Group != group) continue;
-                RemoveBody(r);
-                r.Body = MakeResident(r);
+                _rentalOperator.ServerSetup("Milo", NpcRole.Bystander, RentalLook);
+                _rentalOperator.ServerSetTalkable(false);
+            }
+            PopulateIsland2();
+            PopulateIsland3();
+        }
+
+        // ------------------------------------------------------------------ island 2: the Grand Coral
+
+        // Lobby spot of the hotel director (in front of the reception, facing the door).
+        private static readonly Vector3 DirectorSpot = new(24.5f, 1.85f, -249.6f);
+        private static readonly Vector3 BellboySpot = new(22.4f, 1.85f, -241.2f), PoolAttendantSpot = new(50.5f, 1.7f, -241.5f);
+        // Along the front of the hotel, from the Coral Bar's deck to the pool deck and back (clear of the carpet's ropes,
+        // and on the sea side of the forecourt fountain at (2.5, -238.5)).
+        private static readonly Vector3[] WaiterRoute =
+            { new(-40f, 1.8f, -243f), new(-12f, 1.8f, -238.5f), new(2.5f, 1.8f, -235.2f), new(8f, 1.8f, -235.5f), new(32f, 1.8f, -235.5f), new(50f, 1.8f, -240.5f) };
+
+        private void PopulateIsland2()
+        {
+            StoryNpc director = SpawnIndoors("Mr. Castellane", NpcRole.Guide, DirectorLook, DirectorSpot, 0f);
+            director.ServerSetTalkable(false);
+            // The staff, in the hotel's uniform: a bellhop at the door, a waitress going between the bar and the pool, a
+            // pool attendant on the deck.
+            Staff("Bellhop Benny", BellboySpot, 0f, AvatarLook.Bodies.HotelBellhop);
+            Staff("Pool attendant Ines", PoolAttendantSpot, 0f);
+            StoryNpc waiter = Staff("Waitress Paola", WaiterRoute[0], 90f);
+            StartCoroutine(Rounds(waiter, WaiterRoute, 6f, 12f, 1.5f));
+            SlotGuests();
+            LoungerGuests();
+        }
+
+        private StoryNpc Staff(string displayName, Vector3 at, float yaw, byte body = AvatarLook.Bodies.HotelAttendantB)
+        {
+            AvatarLook look = GuestLook(4242, AvatarLook.Bodies.IsFeminine(body) ? 1 : 0);
+            look.Body = body;
+            StoryNpc npc = SpawnNpc(displayName, NpcRole.Bystander, look, at, yaw);
+            npc.ServerSetTalkable(false);
+            return npc;
+        }
+
+        // Guests at the casino's slot machines (GameSceneBuilder.HotelInterior: six along the outer wall, a low stool in
+        // front of each): which machine (0-5), sitting facing it.
+        private static readonly int[] SlotSeats = { 1, 4 };
+        private const float SlotStoolX = -2.15f, SlotStoolTop = 2.16f, SlotFirstZ = -246.4f, SlotStep = 1.15f, SlotSitDrop = 0.5f;
+
+        private void SlotGuests()
+        {
+            for (int k = 0; k < SlotSeats.Length; k++)
+            {
+                var at = new Vector3(SlotStoolX, SlotStoolTop - SlotSitDrop, SlotFirstZ - SlotSeats[k] * SlotStep);
+                StoryNpc guest = SpawnIndoors(VictimBrain.RandomName(k == 0), NpcRole.Guest, GuestLook(8300 + k * 13, k == 0 ? 1 : 0), at, 270f);
+                guest.ServerSetPose(AvatarPose.SitStool);
             }
         }
 
-        /// <summary>Host: a group is gone for good (Old Snapper beaten): it isn't made again. What's left of it is an
-        /// ordinary story actor now (cleared with the rest when the story moves on).</summary>
-        private void ForgetResidents(string group)
+        // Guests sitting up on the pool's loungers, backs to the backrest (the set's -z), feet toward the pool. The sitting
+        // pose's root is at the feet, the hips SitBack behind them: the hips just in front of the backrest.
+        private static readonly (string set, float side)[] LoungerSeats = { ("LoungeS0", -1f), ("LoungeN2", 1f) };
+        private const float LoungerSide = 1.2f, LoungerTop = 0.66f, LoungerHipsZ = -0.38f;
+
+        private void LoungerGuests()
         {
-            foreach (Resident r in _residents)
-                if (r.Group == group && r.Body != null) _spawnedActors.Add(r.Body);
-            _residents.RemoveAll(r => r.Group == group);
+            for (int k = 0; k < LoungerSeats.Length; k++)
+            {
+                GameObject set = GameObject.Find("Environment/Island2Pool/" + LoungerSeats[k].set);
+                if (set == null) continue;
+                Transform t = set.transform;
+                Vector3 feet = t.TransformPoint(new Vector3(LoungerSeats[k].side * LoungerSide, LoungerTop, LoungerHipsZ + StoryNpc.SitBack));
+                StoryNpc guest = SpawnIndoors(VictimBrain.RandomName(k == 0), NpcRole.Guest, GuestLook(9100 + k * 17, k == 0 ? 1 : 0), feet, t.eulerAngles.y);
+                guest.ServerSetPose(AvatarPose.Sit);
+                guest.ServerSetMood(AvatarMood.Happy);
+            }
         }
 
-        private void RemoveBody(Resident r)
+        /// <summary>A character inside the hotel, exactly where asked (the navmesh snap put the lobby's people on its roof).</summary>
+        private StoryNpc SpawnIndoors(string displayName, NpcRole role, AvatarLook look, Vector3 at, float yaw)
         {
-            if (r.Body == null) return;
-            if (r.Body.TryGetComponent(out StoryNpc npc)) npc.ServerStopFighting();
-            if (r.Body.TryGetComponent(out Creature creature)) creature.ServerReleaseAll();
-            if (r.Body.TryGetComponent(out NetworkObject nob) && nob.IsSpawned) Despawn(r.Body);
-            r.Body = null;
+            StoryNpc npc = SpawnNpc(displayName, role, look, at, yaw);
+            npc.ServerTeleport(at, yaw, keepExact: true);
+            return npc;
         }
 
-        /// <summary>Host: everyone who lives on the islands goes (the story restarts or jumps).</summary>
-        private void CleanupResidents()
-        {
-            foreach (Resident r in _residents) RemoveBody(r);
-            _residents.Clear();
-        }
+        // ------------------------------------------------------------------ island 3: Skull Cove (always night)
 
-        /// <summary>The current beat comes before <paramref name="id"/>.</summary>
-        private bool BeatBefore(string id)
-        {
-            int at = _beats.FindIndex(b => b.Id == id);
-            return at < 0 || _beatIndex < at;
-        }
+        private static readonly string[] SleeperNames = { "Snorin' Sam", "Drowsy Dan", "Old Wheeze", "Barnacle Bess", "Nodding Ned", "Grumbles", "Lazy Lars", "Mumbling Mick" };
+        private static readonly string[] FireCrowd = { "One-Tooth Tess", "Bilge Bob", "Rum Rita", "Patch", "Salty Sven" };
+        private static readonly string[] DrunkSongs = { "Yo ho ho... hic!", "Fifteen men on a dead man's... where was I?", "Who moved the island?", "Hic! Lovely night for it.", "The moon's got two of it..." };
 
-        /// <summary>Host: Skull Cove's people and animals (once; again after the story restarts or jumps).</summary>
+        /// <summary>The night village's places (GameSceneBuilder.Island3Night): the dock, the sleepers' spots, the campfire.</summary>
+        private static Transform NightPoint(string name) => GameObject.Find("Environment/Island3/NightArrival/" + name)?.transform;
+
+        private static Transform Island3Point(string name) => GameObject.Find(Island3Places + name)?.transform;
+
         private void PopulateIsland3()
         {
-            if (_residents.Exists(r => r.Group.StartsWith("I3"))) return;
-            // The night watch between the mountain and the THIEF's shack (Skull Cove is always at night): pirates asleep
-            // round the campfire and by the porches, two guards walking the lane with lanterns. (The lookout parrots'
-            // perches stand empty: the birds sleep at night.)
+            int people = 0;
+            // Asleep round the campfire and by the porches.
             for (int i = 0; i < 12; i++)
             {
-                int k = i;
-                if (NightPoint($"Sleeper_{k}") is not { } spot) break;
-                AddResident("I3Lookouts", () => Sleeper(k, spot).gameObject);
+                if (NightPoint($"Sleeper_{i}") is not { } spot) break;
+                StoryNpc sleeper = SpawnNpc(SleeperNames[i % SleeperNames.Length], NpcRole.Pirate, PirateLook(i + 3), spot.position, spot.eulerAngles.y, 100);
+                sleeper.ServerTeleport(spot.position, spot.eulerAngles.y, keepExact: true);
+                sleeper.ServerSetPose(AvatarPose.Lie);
+                people++;
             }
+            // Still up at the fire, mugs in hand.
+            if (NightPoint("Campfire") is { } fire)
+            {
+                for (int i = 0; i < FireCrowd.Length; i++)
+                {
+                    float a = (i * 72f + 20f) * Mathf.Deg2Rad;
+                    Vector3 at = fire.position + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 3.4f;
+                    StoryNpc npc = SpawnNpc(FireCrowd[i], NpcRole.Pirate, PirateLook(i + 5), at, 0f, 100);
+                    npc.ServerFace(fire.position);
+                    npc.ServerSetMood(AvatarMood.Happy);
+                    people++;
+                }
+                // The village drunk staggers between the fire and the tavern, singing.
+                GameObject tavern = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor");
+                if (tavern != null)
+                {
+                    StoryNpc drunk = SpawnNpc("Wobbly Will", NpcRole.Pirate, PirateLook(9), fire.position + Vector3.right * 3f, 0f, 100);
+                    drunk.ServerSetDrunk(true);
+                    StartCoroutine(Rounds(drunk, new[] { fire.position + Vector3.right * 3f, tavern.transform.position + Vector3.back * 4f }, 9f, 14f, 1.1f, DrunkSongs));
+                    people++;
+                }
+            }
+            // Two walking the lane.
             if (Island3Point("GuardA_0") is { } a0 && Island3Point("GuardA_1") is { } a1)
-                AddResident("I3Lookouts", () => NightGuard("Bosun Barnaby", 0, a0.position, a1.position).gameObject);
+                people += Walker("Bosun Barnaby", 0, a0.position, a1.position);
             if (Island3Point("GuardB_0") is { } b0 && Island3Point("GuardB_1") is { } b1)
-                AddResident("I3Lookouts", () => NightGuard("Squint", 2, b1.position, b0.position).gameObject);
+                people += Walker("Squint", 2, b1.position, b0.position);
+            Debug.Log($"[Story] Skull Cove: {people} pirates");
+        }
 
-            // The THIEF at home on his porch (he lives here: when you get to his shack he's there to let you in).
-            if (Island3Point("Thief") is { } shack)
-                AddResident("I3Thief", () =>
-                {
-                    _thief = SpawnNpc("THIEF", NpcRole.Guide, RobberLook, shack.position, shack.eulerAngles.y + 180f);
-                    return _thief.gameObject;
-                });
+        private int Walker(string name, int look, Vector3 a, Vector3 b)
+        {
+            StoryNpc npc = SpawnNpc(name, NpcRole.Pirate, PirateLook(look), a, 0f, 100);
+            StartCoroutine(Rounds(npc, new[] { a, b }, 4f, 9f, 1.4f));
+            return 1;
+        }
 
-            // The tavern's champion, waiting for someone to ask about the treasure.
-            GameObject floor = GameObject.Find("Environment/Island3/PirateTavern/RoomFloor");
-            if (CageRingCentre() is { } ring)
+        /// <summary>Host: walks back and forth along <paramref name="route"/>, resting at each end (and shouting a line now and then).</summary>
+        private IEnumerator Rounds(StoryNpc npc, Vector3[] route, float restMin, float restMax, float speed, string[] lines = null)
+        {
+            int i = 0, step = 1;
+            while (npc != null && npc.IsSpawned)
             {
-                // He waits in the ring beside the tavern (C7).
-                AddResident("I3Tavern", () =>
-                    SpawnNpc("Iron Jaw Jack", NpcRole.Pirate, PirateLookOf(AvatarLook.Bodies.PirateFat), ring, 180f, 160).gameObject);
-                // The regulars round the ring, mugs up, waiting for a fight to bet on (they cheer the cage fight, 3.4).
-                for (int i = 0; i < TavernRegulars.Length; i++)
-                {
-                    int k = i;
-                    AddResident("I3Tavern", () => TavernRegular(k, ring).gameObject);
-                }
+                bool end = i == 0 || i == route.Length - 1;
+                yield return new WaitForSeconds(end ? Random.Range(restMin, restMax) : 0.2f);
+                if (npc == null || !npc.IsSpawned) yield break;
+                if (!npc.IsUpright) continue; // knocked down or carried off: wait till they're up again
+                if (i + step < 0 || i + step >= route.Length) step = -step;
+                i += step;
+                npc.ServerMoveTo(route[i] + new Vector3(Random.Range(-1f, 1f), 0f, Random.Range(-1f, 1f)), speed);
+                if (lines != null && Random.value < 0.6f) npc.ServerShout(lines[Random.Range(0, lines.Length)]);
+                float started = Time.time;
+                while (npc != null && npc.IsMoving && Time.time - started < 30f) yield return new WaitForSeconds(0.3f);
             }
-
-            // A drunk staggering between the tavern and the campfire, singing (too drunk to notice anyone sneaking by).
-            if (NightPoint("Campfire") is { } fire && floor != null)
-                AddResident("I3Locals", () => Drunk(fire.position, floor.transform.position).gameObject);
-
-            // The jungle between the west road and the river: three guards on their beats, three monkeys.
-            string[] names = { "Mangy Mo", "Long Tom", "Grog" };
-            for (int i = 0; i < 3; i++)
-            {
-                int k = i;
-                if (Island3Point($"JungleGuard_{k}_0") is { } p0 && Island3Point($"JungleGuard_{k}_1") is { } p1)
-                    AddResident("I3Jungle", () => SpawnGuard(names[k], k + 1, p0.position, 0f, new[] { p0.position, p1.position }).gameObject);
-                if (Island3Point($"MonkeyHome_{k}") is { } home)
-                    AddResident("I3Jungle", () => SpawnCreature(CreatureKind.Monkey, home.position, 0f, "Monkey")?.gameObject);
-            }
-
-            // The river: two alligators.
-            for (int i = 0; i < 2; i++)
-                if (Island3Point($"Gator_{i}") is { } g)
-                    AddResident("I3River", () => SpawnCreature(CreatureKind.Alligator, g.position, g.eulerAngles.y, "Alligator")?.gameObject);
-
-            // The Pirate King on his throne in the palace, two guards at his side (3.7b; only once part C has built the
-            // palace: Environment/Island3/Story/PalaceThrone).
-            if (BeatBefore("3.8") && GameObject.Find(Island3Story + "PalaceThrone") is { } throne)
-            {
-                AddResident("I3Palace", () => PirateKing(throne.transform).gameObject);
-                for (int i = 0; i < 2; i++)
-                {
-                    int k = i;
-                    AddResident("I3Palace", () => PalaceGuard(k, throne.transform).gameObject);
-                }
-            }
-
-            // Old Snapper, asleep in its pond under the crag falls until someone comes for the gold (not once beaten).
-            if (BeatBefore("3.8") && Island3Point("SnapperPond") is { } pond)
-                AddResident("I3Snapper", () =>
-                {
-                    Creature boss = SpawnCreature(CreatureKind.OldSnapper, pond.position, pond.eulerAngles.y, "Old Snapper");
-                    boss?.ServerSleep();
-                    return boss != null ? boss.gameObject : null;
-                });
-            Debug.Log($"[Story] Skull Cove populated: {_residents.Count} residents");
         }
     }
 }

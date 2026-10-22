@@ -378,8 +378,6 @@ namespace PleaseDontDrown.Dev
             // Characters and creatures by their shown names first (a pirate "One-Eye", the Kleptopus).
             foreach (Story.StoryNpc n in Story.StoryNpc.All)
                 if (n != null && n.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0) return n.transform;
-            foreach (Creatures.Creature c in Creatures.Creature.All)
-                if (c != null && c.DisplayName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0) return c.transform;
             foreach (Vehicle v in Vehicle.All)
                 if (v != null && v.DisplayName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0) return v.transform;
             foreach (Item i in Item.All)

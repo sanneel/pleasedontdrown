@@ -48,7 +48,6 @@ namespace PleaseDontDrown.Editor
         // cabinet whose inside face is at z 3.6. The bartender stood at z 3.72 with her feet at the deck (0.26): in the
         // counter to the chest and sunk into the floor.
         private const float BarStaffFloor = 0.45f;
-        private static readonly Vector3 HotelBaristaAt = new(.25f, BarStaffFloor, 3.25f);
         private const float BarWipeZ = 3.72f, BarWipeTop = 1.56f;
 
         private static void BuildHotelBar(Transform hotel)
@@ -92,17 +91,6 @@ namespace PleaseDontDrown.Editor
                 Primitive(PrimitiveType.Cube, "BarMenuLeg", root, new Vector3(-5.3f + side, 1.2f, 5.06f), new Vector3(.08f, 1.9f, .08f), wood);
             Primitive(PrimitiveType.Cube, "BarMenuFrame", root, new Vector3(-5.3f, 2.25f, 5.08f), new Vector3(1.72f, 1.32f, .05f), wood);
 
-            // The bartender behind the counter, facing the front stools.
-            root.gameObject.AddComponent<NetworkObject>();
-            BuildBarista(root, AvatarLook.Bodies.Bartender);
-            Transform barista = PlaceHotelBarista(root);
-
-            // The stools you sit on, two guests on stools of their own (GameSceneBuilder.BarDining.cs), and the armchairs
-            // at the four tables: seats too.
-            var bar = barista.GetComponent<Barista>();
-            SetRefs(bar, "_seats", BuildBarStools(root, hotel, bar).ToArray());
-            AddBarTables(root, hotel, bar);
-            SetHotelBarMenu(bar);
         }
 
         /// <summary>
@@ -131,18 +119,6 @@ namespace PleaseDontDrown.Editor
                     Collider(root, "ClubPost", new Vector3(x, 2.0f, z), new Vector3(.35f, 3.5f, .35f));
         }
 
-        /// <summary>The bartender on the staff floor a hand's breadth behind the counter, wiping just inside its edge
-        /// (where her arm reaches), the rag put down there.</summary>
-        private static Transform PlaceHotelBarista(Transform root)
-        {
-            Transform barista = root.Find("Barista");
-            barista.localPosition = HotelBaristaAt;
-            root.Find("WipeFrom").localPosition = new Vector3(.05f, BarWipeTop + .045f, BarWipeZ); // (the rag 3.5 cm under the palm)
-            root.Find("WipeTo").localPosition = new Vector3(.6f, BarWipeTop + .045f, BarWipeZ);
-            barista.Find("Rag").localPosition = new Vector3(.3f, BarWipeTop + .007f - HotelBaristaAt.y, BarWipeZ - HotelBaristaAt.z);
-            return barista;
-        }
-
         /// <summary>Batch: the saved scene's hotel bar given the colliders and the bartender's place above (the rest of the
         /// bar as it is). Run again after a merge.</summary>
         public static void HotelBarFixBatch()
@@ -160,52 +136,10 @@ namespace PleaseDontDrown.Editor
             TripoBarColliders(root);
             foreach (Transform t in root.Cast<Transform>().Where(t => t.name == "ClubChair").ToArray())
                 Object.DestroyImmediate(t.gameObject); // (the armchairs are seats with boxes of their own: AddBarTables)
-            Transform barista = PlaceHotelBarista(root);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
-            Debug.Log($"[HotelBar] PASS: {removed} old colliders replaced; bartender at {barista.position:F2} (feet on the staff floor)");
+            Debug.Log($"[HotelBar] PASS: {removed} old colliders replaced");
         }
 
-        /// <summary>One stool: a chair that never moves, the seat at the cushion, its order put down on the counter in front.</summary>
-        private static BarSeat BuildBarStool(Transform parent, Transform bar, int index, Vector3 local, float yaw, Barista barista)
-        {
-            var go = new GameObject("BarStool" + index);
-            go.transform.SetParent(parent, false);
-            go.transform.SetPositionAndRotation(bar.TransformPoint(local), bar.rotation * Quaternion.Euler(0f, yaw, 0f));
-            var body = go.AddComponent<Rigidbody>();
-            body.isKinematic = true;
-            body.useGravity = false;
-            body.constraints = RigidbodyConstraints.FreezeAll; // it's a stool: whoever simulates it, it stays put
-            go.AddComponent<NetworkObject>();
-            go.AddComponent<ItemSync>();
-
-            BoxCollider box = BarStoolLooks(go.transform);
-            var seat = new GameObject("Seat").transform;
-            seat.SetParent(go.transform, false);
-            seat.localPosition = new Vector3(0f, BarStoolSeat, 0f);
-            // In front of the stool, on the counter (its edge half a metre ahead): the plate (0.1 round) just in from the
-            // edge, where a seated arm reaches it (Fun.TableMeal; further in, the goofy body's short arms fell short).
-            var serve = new GameObject("ServePoint").transform;
-            serve.SetParent(go.transform, false);
-            serve.localPosition = new Vector3(0f, CounterTop + 0.1f, BarStoolFromCounter + 0.11f);
-
-            var vehicle = go.AddComponent<Vehicle>();
-            var so = new SerializedObject(vehicle);
-            Require(so, "_displayName").stringValue = "bar stool";
-            Require(so, "_seat").objectReferenceValue = seat;
-            Require(so, "_chair").boolValue = true;
-            Require(so, "_stool").boolValue = true;
-            Require(so, "_thrust").floatValue = 0f;
-            Require(so, "_reverseThrust").floatValue = 0f;
-            Require(so, "_maxSpeed").floatValue = 1f; // (never 0: it divides)
-            Require(so, "_turnRate").floatValue = 0f;
-            so.ApplyModifiedPropertiesWithoutUndo();
-            ConfigureInteractable(go.AddComponent<Interactable>(), new Collider[] { box }, new Renderer[0], 2.5f);
-
-            var barSeat = go.AddComponent<BarSeat>();
-            SetRef(barSeat, "_barista", barista);
-            SetRef(barSeat, "_servePoint", serve);
-            return barSeat;
-        }
     }
 }

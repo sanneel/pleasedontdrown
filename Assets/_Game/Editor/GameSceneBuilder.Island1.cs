@@ -117,29 +117,6 @@ namespace PleaseDontDrown.Editor
                 log.Add($"moved in {ScenePathOf(t)} {p} -> {to}");
                 t.position = to;
             }
-            var flock = parrots != null ? parrots.GetComponent<Fun.ParrotFlock>() : null;
-            if (flock != null)
-            {
-                var so = new SerializedObject(flock);
-                SerializedProperty perches = Require(so, "_perches");
-                var keep = new List<Object>();
-                for (int i = 0; i < perches.arraySize; i++)
-                {
-                    var perch = perches.GetArrayElementAtIndex(i).objectReferenceValue as Transform;
-                    if (perch == null) continue;
-                    var at = new Vector2(perch.position.x, perch.position.z);
-                    if (goneCrowns.Any(c => (c - at).magnitude < 2.5f))
-                    {
-                        log.Add($"removed perch {perch.name} at {perch.position}");
-                        Object.DestroyImmediate(perch.gameObject);
-                        continue;
-                    }
-                    keep.Add(perch);
-                }
-                Require(so, "_skyCentre").vector3Value = new Vector3(IslandCenter.x, 0f, IslandCenter.y - 8f);
-                so.ApplyModifiedPropertiesWithoutUndo();
-                SetRefs(flock, "_perches", keep.ToArray());
-            }
 
             // The robber's run-about area on island 1.
             var director = Object.FindFirstObjectByType<StoryDirector>();

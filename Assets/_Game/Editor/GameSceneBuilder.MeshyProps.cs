@@ -14,7 +14,6 @@ namespace PleaseDontDrown.Editor
     /// </summary>
     public static partial class GameSceneBuilder
     {
-        private const string RobberBackpackPath = "Assets/_Game/Resources/" + RobberBag.ResourceName + ".prefab";
         private static readonly string[] UmbrellaModels = { "umbrella_red", "umbrella_teal", "umbrella_yellow" };
 
         /// <summary>
@@ -55,20 +54,6 @@ namespace PleaseDontDrown.Editor
             EditorUtility.SetDirty(mat);
             if (colour == null) Debug.LogWarning($"[Build] {asset}: no colour texture found on {imported.name}");
             return mat;
-        }
-
-        /// <summary>The thief's backpack, saved where StoryNpc finds it at run time (Resources).</summary>
-        private static void BuildRobberBackpack()
-        {
-            var root = new GameObject(RobberBag.ResourceName);
-            if (PlaceMeshyProp("robber_backpack", root.transform, "Model") != null)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(RobberBackpackPath)!);
-                PrefabUtility.SaveAsPrefabAsset(root, RobberBackpackPath);
-                Debug.Log("[Build] robber backpack: Meshy model");
-            }
-            else AssetDatabase.DeleteAsset(RobberBackpackPath); // back to the code-built bag
-            Object.DestroyImmediate(root);
         }
 
         /// <summary>

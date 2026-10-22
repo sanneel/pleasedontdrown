@@ -130,7 +130,7 @@ namespace PleaseDontDrown.Editor
                 var templateStory = new GameObject("TemporaryHotelStoryTemplate").transform;
                 try
                 {
-                    var template = BuildHotel(templateEnv,npc,templateStory,out var receptionist,out var reception,out var desk,out var patient,out var firstAid,out var door);
+                    var template = BuildHotel(templateEnv,npc,templateStory,out var receptionist,out var desk,out var patient,out var firstAid,out var door);
                     foreach (Transform child in template.Cast<Transform>().ToArray())
                     {
                         if (child.name is "Upper" or "UpperWindow" or "Roof" or "Sign" or "Window") continue;
@@ -148,15 +148,9 @@ namespace PleaseDontDrown.Editor
                 }
                 finally { Object.DestroyImmediate(templateEnv.gameObject); Object.DestroyImmediate(templateStory.gameObject); }
             }
-            var receptionDesk=hotel.Find("ReceptionDesk"); var patientPoint=hotel.Find("PatientPoint");
+            var patientPoint=hotel.Find("PatientPoint");
             var bed=hotel.Find("HospitalBed")?.GetComponent<HospitalBed>();
             if (bed != null) SetRef(bed,"_patientPoint",patientPoint);
-            SetRef(director,"_receptionDesk",receptionDesk);
-            SetRef(director,"_reception",receptionDesk.GetComponent<ShopCounter>());
-            SetRef(receptionDesk.GetComponent<ShopCounter>(),"_spawnPoint",hotel.Find("ShopSpawn"));
-            SetRef(director,"_hotelDoor",hotel.Find("HotelDoor"));
-            SetRef(director,"_infirmary",patientPoint);
-            SetRef(director,"_firstAid",hotel.Find("FirstAidShelf"));
         }
 
         private static void BuildFinishedHotelEntrance(Transform hotel)

@@ -210,11 +210,7 @@ namespace PleaseDontDrown.Story
             StoryNpc npc = Instantiate(_npcPrefab, position, Quaternion.Euler(0f, yaw, 0f));
             Spawn(npc.gameObject);
             string displayName = VictimBrain.RandomName(female);
-            // The hotel's beach: one guest in five is a VIP (gold hat; tips the lifeguards who pull them out).
-            bool vip = Economy.OnHotelIsland(position) && _rng.NextDouble() < 0.2;
-            if (vip) displayName = VictimBrain.VipName(female);
             npc.ServerSetup(displayName, NpcRole.Guest, look);
-            if (vip) npc.ServerSetVip(true);
             npc.StayOutOfBuildings = true; // the tower stairs and the hut aren't part of a stroll
             npc.ServerSetPose(pose);
             npc.ServerSetMood(activity == Activity.Sunbathe ? AvatarMood.Happy : AvatarMood.Neutral);

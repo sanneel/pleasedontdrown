@@ -204,8 +204,6 @@ namespace PleaseDontDrown.Player
 
             if (hands != null)
             {
-                m.Basketball = hands.HeldItem != null && hands.HeldItem.GetComponent<Fun.BasketballDribble>() != null;
-                if (m.Basketball) m.LookPitch = Mathf.Min(m.LookPitch, Fun.BasketballDribble.MaxLookDown);
                 m.Defib = Combat.DefibPaddles.ActiveFor(_hub) != null; // (a shock from a defibrillator on the ground)
                 PlayerHands.GripKind grip = hands.GetGrip(out m.GripLeft, out m.GripRight);
                 m.Holding = grip != PlayerHands.GripKind.None;
@@ -461,19 +459,6 @@ namespace PleaseDontDrown.Player
             _kneelShift = Vector3.Lerp(_kneelShift, shift, 1f - Mathf.Exp(-9f * dt));
             if (_kneelShift.sqrMagnitude < 1e-6f && shift == Vector3.zero) _kneelShift = Vector3.zero;
             body.position = _inCannon ? _cannonBody : transform.TransformPoint(_bodyRest) + _kneelShift;
-        }
-
-        // The ball's visual bounce runs after the item has been placed. Refresh these grips before avatar IK,
-        // so the hands touch this frame's ball rather than its position from the previous frame.
-        private void LateUpdate()
-        {
-            if (_hub == null || _animator == null || _hub.Hands == null || _hub.Hands.HeldItem == null) return;
-            if (!_hub.Hands.HeldItem.TryGetComponent(out Fun.BasketballDribble ball)) return;
-            AvatarMotion m = _animator.Motion;
-            PlayerHands.GripKind kind = ball.GetGrips(_hub, out m.GripLeft, out m.GripRight);
-            m.Holding = m.Basketball = true;
-            m.TwoHanded = kind == PlayerHands.GripKind.TwoHands;
-            _animator.Motion = m;
         }
 
         private bool GroundBelow(Vector3 feet, float distance)

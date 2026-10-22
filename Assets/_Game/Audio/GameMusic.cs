@@ -90,7 +90,7 @@ namespace PleaseDontDrown.Audio
             if (Time.unscaledTime >= _nextCheck)
             {
                 _nextCheck = Time.unscaledTime + 0.5f;
-                _trouble = AnyoneInTrouble() || BossFightOn;
+                _trouble = AnyoneInTrouble();
             }
             // In quickly when someone goes under, out slowly once they're safe.
             _dangerMix = Mathf.MoveTowards(_dangerMix, _trouble ? 1f : 0f, dt * (_trouble ? 0.8f : 0.25f));
@@ -99,9 +99,6 @@ namespace PleaseDontDrown.Audio
             _calm.volume = music * CalmLevel * (1f - 0.3f * _dangerMix);
             _danger.volume = music * DangerLevel * _dangerMix;
         }
-
-        /// <summary>A boss fight near you (a boss creature's, or a mission run like one): the drums play all through it.</summary>
-        private static bool BossFightOn => Creatures.Creature.ActiveBoss != null || Story.StoryDirector.BossBarShown;
 
         /// <summary>A tourist in the water who is past "fine", or one lying ashore who still needs CPR.</summary>
         private static bool AnyoneInTrouble()

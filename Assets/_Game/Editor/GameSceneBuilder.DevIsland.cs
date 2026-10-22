@@ -67,35 +67,11 @@ namespace PleaseDontDrown.Editor
             var shelves = new List<(string item, Transform spot)>();
             GameObject table = Primitive(PrimitiveType.Cube, "GunTable", root, new Vector3(DevFiringLineX + 1f, 0.45f, -47f), new Vector3(0.9f, 0.9f, 14f), wood);
             TagSurface(table, SurfaceKind.Wood);
-            string[] guns = { "Pistol", "SMG", "Shotgun", "Rifle", "Sniper", "Knife" };
+            string[] guns = { "Pistol", "Shotgun" };
             for (int i = 0; i < guns.Length; i++)
                 shelves.Add((guns[i], Point(root, $"Shelf_{guns[i]}", new Vector3(DevFiringLineX + 1f, 1.02f, -52.5f + i * 2.6f), -90f)));
             DevSign(root, "RangeSign", new Vector3(DevFiringLineX + 2.5f, 0f, -47f), 90f, new Vector2(3.2f, 1f), "dev_range", 2.6f);
 
-            GameObject counter = Primitive(PrimitiveType.Cube, "ArmoryCounter", root, new Vector3(-203.5f, 0.55f, -36f), new Vector3(3.2f, 1.1f, 0.8f), metal);
-            TagSurface(counter, SurfaceKind.Wood);
-            counter.AddComponent<NetworkObject>();
-            var armory = counter.AddComponent<ShopCounter>();
-            var armorySpawn = new GameObject("ArmorySpawn").transform;
-            armorySpawn.SetParent(root, false);
-            armorySpawn.position = new Vector3(-203.5f, 1.4f, -36f);
-            SetRef(armory, "_spawnPoint", armorySpawn);
-            var armorySo = new SerializedObject(armory);
-            Require(armorySo, "_title").stringValue = "Dev armory";
-            Require(armorySo, "_startsOpen").boolValue = true;
-            Require(armorySo, "_free").boolValue = true;
-            SerializedProperty products = Require(armorySo, "_products");
-            products.arraySize = guns.Length;
-            for (int i = 0; i < guns.Length; i++)
-            {
-                SerializedProperty product = products.GetArrayElementAtIndex(i);
-                product.FindPropertyRelative("Item").stringValue = guns[i];
-                product.FindPropertyRelative("Price").intValue = 0;
-                product.FindPropertyRelative("Blurb").stringValue = "Free here. Hold a gun and open this again to fit parts.";
-            }
-            armorySo.ApplyModifiedPropertiesWithoutUndo();
-            ConfigureInteractable(counter.AddComponent<Interactable>(), new[] { counter.GetComponent<Collider>() }, new[] { counter.GetComponent<Renderer>() }, 3f);
-            DevSign(root, "ArmorySign", new Vector3(-203.5f, 0f, -36.6f), 180f, new Vector2(2.4f, 0.75f), "dev_armory", 2.2f);
 
             // Targets: sideways lanes so no target hides another. 100 and 150 m stand on platforms in the sea.
             (float metres, float z, float travel)[] targets = { (10f, -53f, 0f), (25f, -50f, 0f), (50f, -47f, 0f), (30f, -41f, 3f), (100f, -50f, 0f), (150f, -44f, 0f) };

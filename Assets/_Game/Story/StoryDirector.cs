@@ -19,7 +19,7 @@ using Random = UnityEngine.Random;
 
 namespace PleaseDontDrown.Story
 {
-    /// <summary>Where one island's story happens and how hard it is.</summary>
+    /// <summary>Where one island's tourists get into trouble and how hard it is.</summary>
     [Serializable]
     public class IslandSetup
     {
@@ -31,17 +31,18 @@ namespace PleaseDontDrown.Story
         [Tooltip("Direction from the sea to this island's beach (bystanders stand at the water's edge that way).")]
         public Vector3 Shoreward = Vector3.forward;
         public TouristProfile Profile = new() { Figure = -1, SecondsToUnconscious = 20f, ConditionSeconds = 60f, BleedSeconds = 60f };
-        [Tooltip("x/z box the robber runs around in (x, z, width, depth).")]
+        [Tooltip("x/z box a robber runs around in (x, z, width, depth).")]
         public Rect LandArea = new(-17f, 8f, 59f, 34f);
         public Transform RobberSpawn;
         public Transform Arrival;
     }
 
     /// <summary>
-    /// Plays the story (host). Beats are coroutines in StoryDirector.Beats.cs, run in order; each sets the objective,
-    /// a marker and waits for something to happen (rescues, a conversation, items handed in, a robber knocked down).
-    /// Everyone sees the objective, the marker, the dialogue and the title cards through SyncVars and RPCs.
-    /// Progress (beat + money) is saved after every beat and a new host continues from there.
+    /// Runs the game's open shift (host): the islands' people, tourists getting into trouble in the sea on whichever
+    /// island the lifeguards are at, what the rescued say afterwards, Sandy at her hut. The old scripted story
+    /// (chapters 1-4) is gone (Docs/23-Scope-Change.md); the new loop (Docs/20-New-Game-Plan.md) is built on this.
+    /// Everyone sees the objective line, the marker, the dialogue and the title cards through SyncVars and RPCs. The
+    /// team's money is saved and a new host continues with it.
     /// </summary>
     public partial class StoryDirector : NetworkBehaviour
     {
@@ -51,31 +52,12 @@ namespace PleaseDontDrown.Story
         [SerializeField] private StoryNpc _sandy;
         [SerializeField] private StoryNpc _receptionist;
 
-        [Header("Places and things")]
-        [SerializeField] private LostAndFound _lostAndFound;
-        [SerializeField] private ShopCounter _reception;
-        [SerializeField] private Transform _receptionDesk;
-        [SerializeField] private Vehicle _jetSki;
-        [SerializeField] private Transform _jetSkiIsland2Dock;
-        [SerializeField] private Vehicle _pirateBoat;
-        [SerializeField] private Transform _pirateBoatStart;
-        [SerializeField] private Transform _pirateLanding;
-        [SerializeField] private Transform _hotelDoor;
-        [SerializeField] private Transform _infirmary;
-        [SerializeField] private Transform _firstAid;
-        [SerializeField] private Transform[] _lostItemSpots = Array.Empty<Transform>();
+        [Header("Places")]
         [SerializeField] private Transform _island2Spawn;
 
         [Header("Islands")]
         [SerializeField] private IslandSetup _island1 = new();
         [SerializeField] private IslandSetup _island2 = new();
-
-        [Header("Tuning")]
-        [SerializeField] private int _pistolPrice = 250;
-        [SerializeField] private int _boatPrice = 350;
-        [SerializeField] private float _spawnGap = 6f;
-
-        private static readonly string[] LostKinds = { "Wallet", "Phone", "Sunglasses", "Watch" };
 
         private readonly SyncVar<string> _chapter = new SyncVar<string>();
         private readonly SyncVar<string> _objective = new SyncVar<string>();
@@ -86,43 +68,32 @@ namespace PleaseDontDrown.Story
         private readonly SyncVar<NetworkObject> _markerTarget = new SyncVar<NetworkObject>();
         private readonly SyncVar<string> _beat = new SyncVar<string>();
 
-        private struct Beat
-        {
-            public string Id;
-            public string Title;
-            public Func<IEnumerator> Run;
-        }
-
-        private readonly List<Beat> _beats = new();
-        private int _beatIndex = -1;
-        private Coroutine _runner;
         private bool _running;
-        // What the beats wait for (host).
+        // What happened to whom (host): what the rescued say afterwards depends on how they were brought back, and who did it.
         private readonly HashSet<VictimBrain> _waveTourists = new();
-        private readonly List<VictimBrain> _rescued = new();
         private readonly Dictionary<VictimBrain, VictimEvent> _howRescued = new();
         private readonly Dictionary<VictimBrain, PlayerHub> _heroOf = new();
-        private readonly List<LostAndFound.HandedIn> _handedIn = new();
         private readonly List<(StoryNpc npc, PlayerHub by)> _talks = new();
-        private readonly List<StoryNpc> _defeated = new();
-        private readonly List<string> _purchases = new();
         private readonly List<GameObject> _spawnedActors = new();
         private IslandSetup _island;
-        private float _nextAmbientLoss;
         private Vector3 _sandyHome;
+        // This shift so far (host): for the lifeguard's log.
+        private int _shiftRescued, _shiftLost, _shiftEarned, _moneySeen;
+
+        /// <summary>Host: tourists rescued and lost and money earned since the shift started.</summary>
+        public (int rescued, int lost, int earned) ShiftStats => (_shiftRescued, _shiftLost, _shiftEarned);
         private float _sandyHomeYaw;
 
         public static StoryDirector Instance { get; private set; }
-        // A running mission's own line wins over the story's (both can be going at once: a test mission mid-story).
+        // A running mission's own line wins over the shift's.
         private bool MissionLine => !string.IsNullOrEmpty(_missionObjective.Value);
         public string Chapter => MissionLine ? _missionTitle.Value : _chapter.Value;
         public string Objective => MissionLine ? _missionObjective.Value : _objective.Value;
         public int Progress => MissionLine ? _missionProgress.Value : _progress.Value;
         public int Goal => MissionLine ? _missionGoal.Value : _goal.Value;
+        /// <summary>"shift" while the open shift runs, empty when it is off.</summary>
         public string BeatId => _beat.Value;
         public string MarkerLabel => _markerLabel.Value;
-        /// <summary>Where the jet ski ride of chapter 1 ends (tests steer at it).</summary>
-        public Vector3 Island2Arrival => _island2.Arrival != null ? _island2.Arrival.position : new Vector3(0f, 0f, -200f);
         /// <summary>Where the objective marker is (follows its target), or null.</summary>
         public Vector3? MarkerPosition
         {
@@ -141,24 +112,10 @@ namespace PleaseDontDrown.Story
         private class SaveData
         {
             public int Version;
-            public bool RentalUnlocked;
-            public string Beat;
             public int Money;
-            public int Rescued, Lost, Returned, Earned; // this chapter so far (for its report card)
         }
 
-        // What the team did in the current chapter (host; saved with the beat).
-        private int _chapterRescued, _chapterLost, _chapterReturned, _chapterEarned;
-        private int _moneySeen;
-
-        /// <summary>Host (tests): tourists rescued / lost and lost things handed in during the current chapter.</summary>
-        public (int rescued, int lost, int returned, int earned) ChapterStats => (_chapterRescued, _chapterLost, _chapterReturned, _chapterEarned);
-
-        private void Awake()
-        {
-            Instance = this;
-            GalaAwake();
-        }
+        private void Awake() => Instance = this;
 
         private void OnDestroy()
         {
@@ -170,18 +127,13 @@ namespace PleaseDontDrown.Story
         public override void OnStartServer()
         {
             base.OnStartServer();
-            BuildBeats();
             var trickShots = GetComponent<Fun.TrickShots>();
             if (trickShots == null) trickShots = gameObject.AddComponent<Fun.TrickShots>();
-            trickShots.SetServerActive(true); // pays for thrown tourists on every island, story or not
+            trickShots.SetServerActive(true);
             VictimBrain.ServerEvent += OnVictimEvent;
-            LostAndFound.ServerHandedIn += OnHandedIn;
             StoryNpc.ServerTalked += OnTalked;
-            StoryNpc.ServerDefeated += OnDefeated;
-            ShopCounter.ServerPurchased += OnPurchased;
             Economy.ServerChanged += OnMoneyChanged;
             PlayerHub.ServerJoined += OnPlayerJoined;
-            StartThreats();
             StartCoroutine(Boot());
         }
 
@@ -191,15 +143,10 @@ namespace PleaseDontDrown.Story
             EndMission();
             _running = false;
             _freePlay = false;
-            ClearWaits();
-            GetComponent<Fun.TrickShots>()?.SetServerActive(false);
-            StopThreats();
             base.OnStopServer();
+            GetComponent<Fun.TrickShots>()?.SetServerActive(false);
             VictimBrain.ServerEvent -= OnVictimEvent;
-            LostAndFound.ServerHandedIn -= OnHandedIn;
             StoryNpc.ServerTalked -= OnTalked;
-            StoryNpc.ServerDefeated -= OnDefeated;
-            ShopCounter.ServerPurchased -= OnPurchased;
             Economy.ServerChanged -= OnMoneyChanged;
             PlayerHub.ServerJoined -= OnPlayerJoined;
         }
@@ -216,34 +163,16 @@ namespace PleaseDontDrown.Story
                 yield break;
             }
             SaveData save = Load();
-            int start = 0;
-            if (save != null)
+            if (save != null && Economy.Instance != null)
             {
-                if (save.Version < 2 && save.Beat != null && save.Beat.StartsWith("1.") && save.Beat != "1.1" && save.Beat != "1.2")
-                    save.Beat = "1.3"; // old thief/drug checkpoints resume at the new rental introduction
-                int found = _beats.FindIndex(b => b.Id == save.Beat);
-                if (found >= 0) start = found;
-                if (Economy.Instance != null) Economy.Instance.ServerSet(save.Money);
-                _chapterRescued = save.Rescued;
-                _chapterLost = save.Lost;
-                _chapterReturned = save.Returned;
-                _chapterEarned = save.Earned;
-                SetRentalAccess(save.RentalUnlocked || save.Beat == "1.10" || save.Beat.StartsWith("2."));
-                Debug.Log($"[Story] continuing from beat {save.Beat} with ${save.Money}");
-                if (save.Beat == "end")
-                {
-                    // The story is done: straight to the open shift on whichever island the team is on.
-                    _moneySeen = Economy.Money;
-                    _beatIndex = _beats.Count - 1;
-                    BeginFreePlay();
-                    yield break;
-                }
+                Economy.Instance.ServerSet(save.Money);
+                Debug.Log($"[Story] continuing with ${save.Money}");
             }
             _moneySeen = Economy.Money;
-            StartAt(start);
+            BeginFreePlay();
         }
 
-        /// <summary>Sandy and the receptionist stand at their posts from the start.</summary>
+        /// <summary>Sandy, the receptionist and the islands' people at their posts from the start.</summary>
         private void SetupResidents()
         {
             if (_sandy != null)
@@ -251,72 +180,24 @@ namespace PleaseDontDrown.Story
                 _sandy.ServerSetup("Sandy", NpcRole.Guide, SandyLook);
                 _sandyHome = _sandy.transform.position;
                 _sandyHomeYaw = _sandy.transform.eulerAngles.y;
-                _sandy.ServerSetPose(AvatarPose.SitChair); // at her window, on her stool
+                SandySits();
             }
             if (_receptionist != null)
+            {
                 _receptionist.ServerSetup("Marisol", NpcRole.Receptionist, ReceptionistLook);
-            if (_receptionist != null) _receptionist.ServerSetTalkable(false);
-            if (_reception != null) _reception.ServerSetAvailable(false);
-            if (_pirateBoat != null) _pirateBoat.ServerSetLocked(true, "Somebody's boat (not yours... yet)");
-            if (Yacht != null) Yacht.ServerSetLocked(true, "The hotel's yacht (the director has the keys)");
-            if (_rentalOperator != null)
-            {
-                _rentalHome = _rentalOperator.transform.position;
-                _rentalOperator.ServerSetup("Milo", NpcRole.Bystander, RentalLook);
-                _rentalOperator.ServerSetTalkable(false);
+                _receptionist.ServerSetTalkable(false);
             }
-            SetRentalAccess(false);
+            PopulateIslands();
         }
 
-        private void StartAt(int index)
+        /// <summary>Back onto her stool at the hut's window.</summary>
+        private void SandySits()
         {
-            StopAllCoroutines(); // the beat and anything it started (waving, delayed lines...)
-            EndMission(); // a mission it was in is gone with it
-            _freePlay = false;
-            ResetTsunamiActors();
-            ClearSacks(); // chapter 3's money sacks and the boat's cargo (3.9, 3.10)
-            if (_cargo.Value != 0) SetCargo(0);
-            SetRentalAccess(_beats[index].Id == "1.10" || _beats[index].Id.StartsWith("2.") || _beats[index].Id.StartsWith("3.") || _beats[index].Id.StartsWith("4."));
-            _hints = null;
-            _waitingForTalk = false;
-            foreach (BeachCrowd crowd in BeachCrowd.All) crowd.ReturnAll(); // anyone lent out for a scene
-            // Interrupted mid-walk: back to the kiosk (not once she has been found out on her island, 4.6 on).
-            if (_sandy != null && index > 0 && (index < _beats.FindIndex(b => b.Id == "4.6") || _beats.FindIndex(b => b.Id == "4.6") < 0)) StartCoroutine(SandyGoesHome());
-            CleanupActors();
-            _running = true;
-            _runner = StartCoroutine(RunFrom(index));
-        }
-
-        private IEnumerator RunFrom(int index)
-        {
-            for (int i = index; i < _beats.Count; i++)
-            {
-                _beatIndex = i;
-                Beat beat = _beats[i];
-                _beat.Value = beat.Id;
-                GalaStateFor(beat.Id);
-                SetChapter(beat.Id.StartsWith("4.") ? "Chapter 4: Finders Keepers" : beat.Id.StartsWith("3.") ? "Chapter 3: Skull Cove" : beat.Id.StartsWith("2.") ? "Chapter 2: The hotel island" : "Chapter 1: The first island");
-                Debug.Log($"[Story] beat {beat.Id}: {beat.Title}");
-                ClearWaits();
-                Save();
-                yield return beat.Run();
-            }
-            _beat.Value = "end";
-            Save();
-            Debug.Log("[Story] finished");
-            BeginFreePlay();
-        }
-
-        private void ClearWaits()
-        {
-            _rescued.Clear();
-            _handedIn.Clear();
-            _talks.Clear();
-            _defeated.Clear();
-            _purchases.Clear();
-            _waveTourists.Clear();
-            _howRescued.Clear();
-            _heroOf.Clear();
+            if (_sandy == null) return;
+            _sandy.ServerTeleport(_sandyHome, _sandyHomeYaw, keepExact: true);
+            _sandy.ServerFace(_sandyHome + Quaternion.Euler(0f, _sandyHomeYaw, 0f) * Vector3.forward * 5f);
+            _sandy.ServerSetPose(AvatarPose.SitChair);
+            _sandy.ServerSetTalkable(true, "Talk to Sandy");
         }
 
         private void CleanupActors()
@@ -324,7 +205,6 @@ namespace PleaseDontDrown.Story
             foreach (GameObject go in _spawnedActors)
                 if (go != null && go.TryGetComponent(out NetworkObject nob) && nob.IsSpawned) Despawn(go);
             _spawnedActors.Clear();
-            CleanupResidents();
         }
 
         /// <summary>Automated tests (-pdd-nosave) never touch the real save.</summary>
@@ -335,12 +215,7 @@ namespace PleaseDontDrown.Story
             if (NoSave) return;
             try
             {
-                var data = new SaveData
-                {
-                    Version = 2, RentalUnlocked = _rentalUnlocked.Value,
-                    Beat = _beat.Value, Money = Economy.Money,
-                    Rescued = _chapterRescued, Lost = _chapterLost, Returned = _chapterReturned, Earned = _chapterEarned
-                };
+                var data = new SaveData { Version = 3, Money = Economy.Money };
                 string tmp = SavePath + ".tmp";
                 File.WriteAllText(tmp, JsonUtility.ToJson(data));
                 if (File.Exists(SavePath)) File.Delete(SavePath);
@@ -368,97 +243,50 @@ namespace PleaseDontDrown.Story
 
         private void OnMoneyChanged(int money)
         {
-            if (money > _moneySeen) _chapterEarned += money - _moneySeen; // what came in (spending isn't un-earning)
+            if (money > _moneySeen) _shiftEarned += money - _moneySeen; // (spending isn't un-earning)
             _moneySeen = money;
             if (_running) Save();
         }
-
-        private void ResetChapterStats()
-        {
-            _chapterRescued = _chapterLost = _chapterReturned = _chapterEarned = 0;
-            _moneySeen = Economy.Money;
-        }
-
-        /// <summary>
-        /// The report card at the end of a chapter, on everyone's screen: what the team did. Waits while it is up,
-        /// then starts counting afresh for the next chapter.
-        /// </summary>
-        private IEnumerator ChapterReport(string title)
-        {
-            Debug.Log($"[Story] {title}: rescued {_chapterRescued}, lost {_chapterLost}, returned {_chapterReturned}, earned ${_chapterEarned}");
-            ReportObservers(title, _chapterRescued, _chapterLost, _chapterReturned, _chapterEarned, Economy.Money);
-            yield return new WaitForSeconds(StoryHud.ReportSeconds);
-            ResetChapterStats();
-        }
-
-        [ObserversRpc]
-        private void ReportObservers(string title, int rescued, int lost, int returned, int earned, int money) =>
-            StoryHud.ShowReport(title, rescued, lost, returned, earned, money);
 
         // ------------------------------------------------------------------ events (host)
 
         private void OnVictimEvent(VictimBrain victim, VictimEvent e, PlayerHub credit)
         {
-            bool rescued = e is VictimEvent.Saved or VictimEvent.SelfRescue or VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized;
-            if (!_freePlay)
-            {
-                if (rescued && victim.State != VictimState.Injured) _rescued.Add(victim);
-                if (rescued) _howRescued[victim] = e; // what they say afterwards depends on it (pumped, slapped, zapped...)
-                if (rescued && credit != null) _heroOf[victim] = credit;
-            }
-            // For the chapter's report card (someone pulled out and then revived is one rescue, not two).
+            // Someone pulled out and then revived is one rescue, not two.
             if (e is VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized or VictimEvent.SelfRescue ||
-                (e == VictimEvent.Saved && victim.State == VictimState.Saved)) _chapterRescued++;
-            if (e is VictimEvent.Lost or VictimEvent.TakenByRival) _chapterLost++;
-            // Tourists drop things now and then when they're pulled out (their wallet was in their trunks...).
-            if (rescued && _island == _island1 && Random.value < 0.35f)
-                StartCoroutine(DropLostItemLater(victim.Name, victim.transform.position));
+                (e == VictimEvent.Saved && victim != null && victim.State == VictimState.Saved)) _shiftRescued++;
+            if (e is VictimEvent.Lost or VictimEvent.TakenByRival) _shiftLost++;
+            bool rescued = e is VictimEvent.Saved or VictimEvent.SelfRescue or VictimEvent.Revived or VictimEvent.Zapped or VictimEvent.Hospitalized;
+            if (!rescued || victim == null) return;
+            _howRescued[victim] = e; // what they say afterwards depends on it (pumped, slapped, zapped...)
+            if (credit != null) _heroOf[victim] = credit;
+            // Pulled out and still out cold: they talk once they're brought round (Revived/Zapped comes then).
+            if (e == VictimEvent.Saved && victim.State != VictimState.Saved) return;
+            if (_freePlay && _waveTourists.Remove(victim)) StartCoroutine(Reaction(victim, GagOf(victim)));
         }
 
-        private void OnHandedIn(LostAndFound.HandedIn info)
-        {
-            if (!_freePlay) _handedIn.Add(info);
-            _chapterReturned++;
-        }
         private void OnTalked(StoryNpc npc, PlayerHub by)
         {
-            if (!_freePlay) _talks.Add((npc, by));
-            if (npc == _sandy && !_waitingForTalk && _running) StartCoroutine(SandyChats(by));
+            _talks.Add((npc, by));
+            if (_talks.Count > 16) _talks.RemoveAt(0);
+            if (npc == _sandy && _running) StartCoroutine(SandyChats());
         }
-
-        private static readonly string[] SandyReformedLines =
-        {
-            "Community service, dear. I hand things BACK now. It's horrible.",
-            "Found something? I'll give it to its owner. For free. *twitch*",
-            "Don't look at me like that. I'm taking swimming lessons.",
-            "You pumped my chest on that beach. I still think about it. Don't make it weird."
-        };
 
         private static readonly string[] SandyLines =
         {
-            "Found something? Put it on the counter out front, I'll pay you.",
-            "Tourists! They'd lose their heads if they weren't screwed on.",
+            "Tourists! They'd drown in a puddle if you let them.",
             "Keep an eye on the water, dear. I'll shout if I see anything.",
-            "I've run this Lost & Found for twenty years. Twenty!",
-            "The bell's right outside. When it rings, you run."
+            "The bell's right outside. When it rings, you run.",
+            "Out cold? Push on the chest, hard and fast. The men... a good smack helps too.",
+            "Whatever happens out there, dear, bring them to me. I'll take care of them."
         };
 
-        /// <summary>Talking to Sandy outside a scene: she takes any lost things you carry, or just has a chat.</summary>
-        private IEnumerator SandyChats(PlayerHub by)
+        private IEnumerator SandyChats()
         {
-            if (_lostAndFound != null && _lostAndFound.ServerHandIn(by, _sandy.HeadPosition))
-            {
-                yield return Say(_sandy, "Ooh, lovely. Somebody will be very happy. Here you go.");
-                yield break;
-            }
-            // After the story (chapter 4 done): community service at her old kiosk, honest at last. Mostly.
-            string[] lines = _freePlay ? SandyReformedLines : SandyLines;
-            yield return Say(_sandy, lines[Random.Range(0, lines.Length)]);
+            yield return Say(_sandy, SandyLines[Random.Range(0, SandyLines.Length)]);
         }
-        private void OnDefeated(StoryNpc npc, PlayerHub by) { if (!_freePlay) _defeated.Add(npc); }
-        private void OnPurchased(ShopCounter shop, PlayerHub by, string item) { if (!_freePlay) _purchases.Add(item); }
 
-        // ------------------------------------------------------------------ helpers for beats (host)
+        // ------------------------------------------------------------------ helpers (host)
 
         private void SetChapter(string title) => _chapter.Value = title;
 
@@ -508,18 +336,6 @@ namespace PleaseDontDrown.Story
         [ObserversRpc]
         private void TitleObservers(string title, string subtitle) => StoryHud.ShowTitle(title, subtitle);
 
-        private bool _waitingForTalk;
-
-        private IEnumerator WaitTalk(StoryNpc npc, string prompt)
-        {
-            _talks.Clear();
-            _waitingForTalk = true;
-            npc.ServerSetTalkable(true, prompt);
-            while (!_talks.Exists(t => t.npc == npc)) yield return null;
-            _waitingForTalk = false;
-            _talks.Clear();
-        }
-
         private static readonly string[] WomenPirates = { "Olga", "Tess", "Bess", "Rita", "Anne", "Mary", "Grace", "Peg", "Sally", "Meg", "Molly", "Nell", "Kate", "Rosie" };
 
         /// <summary>
@@ -534,9 +350,7 @@ namespace PleaseDontDrown.Story
             byte[] men = { AvatarLook.Bodies.PirateMarksman, AvatarLook.Bodies.PirateFat, AvatarLook.Bodies.PirateQuartermaster };
             int sum = 0;
             foreach (char c in name) sum += c;
-            int pick = sum % men.Length; // (the same body every time for the same name)
-            AvatarLook man = PirateLookOf(men[pick]);
-            return man;
+            return PirateLookOf(men[sum % men.Length]); // (the same body every time for the same name)
         }
 
         private StoryNpc SpawnNpc(string displayName, NpcRole role, AvatarLook look, Vector3 position, float yaw, int health = 0)
@@ -559,78 +373,10 @@ namespace PleaseDontDrown.Story
             if (thing.TryGetComponent(out NetworkObject nob) && nob.IsSpawned) Despawn(thing.gameObject);
         }
 
-        private Item SpawnItem(string itemName, Vector3 position, Vector3 velocity = default)
+        private IEnumerator RemoveLater(Component thing, float seconds)
         {
-            Item prefab = GameContent.Items != null ? GameContent.Items.Find(itemName) : null;
-            if (prefab == null)
-            {
-                Debug.LogError($"[Story] no item '{itemName}' in the catalog");
-                return null;
-            }
-            Item item = Instantiate(prefab, position, Quaternion.Euler(Random.Range(0f, 360f), Random.Range(0f, 360f), 0f));
-            Spawn(item.gameObject);
-            if (velocity != Vector3.zero) StartCoroutine(Launch(item, velocity));
-            return item;
-        }
-
-        private static IEnumerator Launch(Item item, Vector3 velocity)
-        {
-            yield return new WaitForFixedUpdate();
-            if (item != null && !item.Sync.Body.isKinematic)
-            {
-                item.Sync.Body.maxDepenetrationVelocity = 3f; // pushed out of something gently, never shot out
-                item.Sync.Body.linearVelocity = velocity;
-                item.Sync.Body.angularVelocity = Random.insideUnitSphere * 6f;
-            }
-        }
-
-        /// <summary>Bursting bag / pockets: items fly up and scatter around a point.</summary>
-        private List<Item> Scatter(Vector3 from, params (string item, string owner, bool stolen)[] things)
-        {
-            var list = new List<Item>();
-            float turn = Random.Range(0f, 360f);
-            for (int n = 0; n < things.Length; n++)
-            {
-                var t = things[n];
-                // Each thing starts on its own side, clear of whoever dropped them and of the others: three things
-                // made in one spot (inside a kneeling robber) shove each other apart hard enough to leave the island.
-                Vector3 side = Quaternion.Euler(0f, turn + n * 360f / things.Length, 0f) * Vector3.forward;
-                Vector2 r = new Vector2(side.x, side.z) * Random.Range(1.2f, 2.4f);
-                Item item = SpawnItem(t.item, from + side * 0.7f + Vector3.up * (1.3f + 0.15f * n), new Vector3(r.x, 4.5f, r.y));
-                if (item == null) continue;
-                if (item.TryGetComponent(out LostItem lost)) lost.ServerSetup(t.owner, t.stolen);
-                list.Add(item);
-            }
-            return list;
-        }
-
-        private IEnumerator DropLostItemLater(string owner, Vector3 near)
-        {
-            yield return new WaitForSeconds(Random.Range(2f, 5f));
-            // In the shallows near where they came ashore.
-            Vector3 p = near + new Vector3(Random.Range(-3f, 3f), 0.5f, Random.Range(-2f, 2f));
-            Item item = SpawnItem(LostKinds[Random.Range(0, LostKinds.Length)], p);
-            if (item != null && item.TryGetComponent(out LostItem lost)) lost.ServerSetup(owner, false);
-            Debug.Log($"[Story] {owner} dropped a {item?.DisplayName} at {p:F1}");
-        }
-
-        /// <summary>Now and then a lost thing turns up on the beach of island 1 (at most three lying around).</summary>
-        private void AmbientLostItems()
-        {
-            if (_island != _island1 || _lostItemSpots.Length == 0 || Time.time < _nextAmbientLoss) return;
-            _nextAmbientLoss = Time.time + Random.Range(50f, 80f);
-            int lying = 0;
-            foreach (Item i in Item.All)
-                if (!i.IsHeld && i.TryGetComponent(out LostItem l) && !l.IsStolen) lying++;
-            if (lying >= 3) return;
-            Transform spot = _lostItemSpots[Random.Range(0, _lostItemSpots.Length)];
-            Item item = SpawnItem(LostKinds[Random.Range(0, LostKinds.Length)], spot.position + Vector3.up * 0.4f + Random.insideUnitSphere * 1.5f);
-            if (item != null && item.TryGetComponent(out LostItem lost)) lost.ServerSetup(VictimBrain.RandomName(), false);
-        }
-
-        private void Update()
-        {
-            if (IsServerInitialized && _running) AmbientLostItems();
+            yield return new WaitForSeconds(seconds);
+            Remove(thing);
         }
 
         // ------------------------------------------------------------------ rescues
@@ -654,11 +400,6 @@ namespace PleaseDontDrown.Story
                 Despawn(swimmer.gameObject);
             }
             else if (!rescue.TryFindSeaSpot(island.SeaX, island.SeaZ, minDepth, maxDepth, out spot)) return null;
-            // A VIP guest: "VIP Mrs. Astor" (the gold hat comes with the flag). A VIP swimmer from the beach stays one.
-            if (swimmer != null) profile.Vip = swimmer.IsVip; // (the beach crowd has its one in five already)
-            if (profile.Vip && (profile.Name == null || !profile.Name.StartsWith("VIP ")))
-                profile.Name = !string.IsNullOrEmpty(profile.Name) && swimmer == null ? "VIP " + profile.Name
-                    : VictimBrain.VipName(profile.Look != 0 ? AvatarLook.Unpack(profile.Look).Feminine : profile.Figure == 1);
             VictimBrain v = rescue.SpawnVictim(spot, yaw, VictimState.Distressed, 30f, 1f, profile);
             if (v == null) return null;
             _waveTourists.Add(v);
@@ -689,7 +430,7 @@ namespace PleaseDontDrown.Story
             return p;
         }
 
-        private TouristProfile Profile(IslandSetup island, int figure, bool silent = false, float flatline = -1f)
+        private static TouristProfile Profile(IslandSetup island, int figure, bool silent = false, float flatline = -1f)
         {
             TouristProfile p = island.Profile;
             p.Figure = figure;
@@ -700,51 +441,19 @@ namespace PleaseDontDrown.Story
 
         // ------------------------------------------------------------------ players
 
-        /// <summary>A friend joined while the story is already going: tell them where it is, and put them with the team.</summary>
+        /// <summary>A friend joined while the shift is going: tell them what's on.</summary>
         private void OnPlayerJoined(PlayerHub player)
         {
-            if (!_running || _beatIndex < 0 || player.Owner == null || player.Owner.IsLocalClient) return;
-            // Not a coroutine of ours: StartAt stops those whenever the beat is changed by hand.
-            player.StartCoroutine(Welcome(player));
+            if (!_running || player.Owner == null || player.Owner.IsLocalClient) return;
+            player.StartCoroutine(Welcome(player)); // (not ours: stopping the shift doesn't cut it short)
         }
 
         private IEnumerator Welcome(PlayerHub player)
         {
             yield return new WaitForSeconds(2.5f); // their copy has the scene and everyone in it by now
-            if (player == null || !_running || _beatIndex < 0 || _beatIndex >= _beats.Count) yield break;
-            if (_freePlay)
-            {
-                WelcomeTarget(player.Owner, "OPEN SHIFT", "Fish them out, trickshot them back",
-                    $"You joined <b>{GetHostName()}</b>'s open shift. Rescue tourists and launch them back into the sea for bonus pay. ${Economy.Money} in the team's wallet.", player.transform.position, false);
-                yield break;
-            }
-            Beat beat = _beats[_beatIndex];
-            bool second = beat.Id.StartsWith("2.");
-            string chapterNo = beat.Id.Substring(0, beat.Id.IndexOf('.'));
-            // Next to a teammate who's standing on land; if they're all at sea, the island's own landing.
-            Vector3 at = second && _island2Spawn != null ? Island2SpawnPoint : chapterNo == "3" ? Island3Arrival : chapterNo == "4" ? Island4Arrival : player.transform.position;
-            foreach (PlayerHub mate in PlayerHub.All)
-            {
-                if (mate == player || mate == null || !Shore.IsAshore(mate.transform.position)) continue;
-                Vector3 beside = mate.transform.position + mate.Head.right * 1.6f;
-                float ground = Shore.GroundHeightAt(beside + Vector3.up * 3f);
-                if (float.IsNaN(ground) || !Shore.IsAshore(beside)) continue;
-                at = new Vector3(beside.x, ground + 0.2f, beside.z);
-                break;
-            }
-            bool move = (at - player.transform.position).sqrMagnitude > 20f * 20f;
-            int inChapter = 0, done = 0;
-            for (int i = 0; i < _beats.Count; i++)
-            {
-                if (!_beats[i].Id.StartsWith(chapterNo + ".")) continue;
-                inChapter++;
-                if (i < _beatIndex) done++;
-            }
-            string host = GetHostName();
-            string recap = $"You joined <b>{host}</b>'s shift: part {done + 1} of {inChapter}, \"{beat.Title}\". " +
-                           $"So far this chapter: {_chapterRescued} rescued, {_chapterLost} lost, ${Economy.Money} in the team's wallet.";
-            Debug.Log($"[Story] {player.DisplayName} joined at beat {beat.Id}{(move ? " (moved to the team)" : "")}");
-            WelcomeTarget(player.Owner, "CHAPTER " + chapterNo, beat.Title, recap, at, move);
+            if (player == null || !_running) yield break;
+            WelcomeTarget(player.Owner, "ON SHIFT", "Keep them alive out there",
+                $"You joined <b>{GetHostName()}</b>'s shift. ${Economy.Money} in the team's wallet.");
         }
 
         private static string GetHostName()
@@ -755,12 +464,10 @@ namespace PleaseDontDrown.Story
         }
 
         [TargetRpc]
-        private void WelcomeTarget(NetworkConnection target, string chapter, string beatTitle, string recap, Vector3 position, bool move)
+        private void WelcomeTarget(NetworkConnection target, string title, string subtitle, string recap)
         {
-            StoryHud.ShowTitle(chapter, "You joined at: " + beatTitle);
+            StoryHud.ShowTitle(title, subtitle);
             PlayerHud.ShowToast(recap, 9f);
-            PlayerHub local = PlayerHub.Local;
-            if (move && local != null && local.Motor != null && local.Motor.Seat == null) local.Motor.Teleport(position);
         }
 
         [ObserversRpc]
@@ -771,57 +478,19 @@ namespace PleaseDontDrown.Story
             local.Motor.Teleport(position + new Vector3(Random.Range(-1.5f, 1.5f), 0.2f, Random.Range(-1.5f, 1.5f)));
         }
 
-        /// <summary>
-        /// The island 2 landing, stood on whatever ground is there now: a point saved under the sand (the island was
-        /// raised after it was placed) dropped arrivals through it into the sea.
-        /// </summary>
-        private Vector3 Island2SpawnPoint
-        {
-            get
-            {
-                Vector3 p = _island2Spawn.position;
-                float ground = Shore.GroundHeightAt(p + Vector3.up * 4f);
-                return float.IsNaN(ground) ? p : new Vector3(p.x, Mathf.Max(p.y, ground + 0.2f), p.z);
-            }
-        }
-
-        /// <summary>Resuming a save on island 2: bring everyone (and the jet ski) over.</summary>
-        private void EnsureOnIsland2()
-        {
-            PopulateIsland2();
-            if (_island2Spawn == null) return;
-            bool anyFar = false;
-            foreach (PlayerHub p in PlayerHub.All)
-                if ((p.transform.position - _island2Spawn.position).sqrMagnitude > 160f * 160f) anyFar = true;
-            if (!anyFar) return;
-            TeleportObservers(Island2SpawnPoint);
-            if (_jetSki != null && _jetSkiIsland2Dock != null) _jetSki.ServerPlace(_jetSkiIsland2Dock.position, _jetSkiIsland2Dock.eulerAngles.y);
-            // Resuming a save: the keys (handed over in chapter 1) come along too, so the jet ski still goes.
-            bool haveKeys = false; // keys in someone's hands or lying on this island (not the dev island's spare set)
-            foreach (Item item in Item.All)
-                if (item.DisplayName == "Jet Ski Keys" && (item.IsHeld || (item.transform.position - _island2Spawn.position).sqrMagnitude < 80f * 80f))
-                    haveKeys = true;
-            if (!haveKeys) SpawnItem("Jet Ski Keys", _island2Spawn.position + Vector3.up * 1.2f, Vector3.zero);
-            if (RescueService.Instance != null)
-                RescueService.Instance.ServerAnnounce($"Story continues on the hotel island ({_beat.Value}). Purple travel pads or Esc > Travel go to the other islands; Esc > Restart the story starts over.");
-        }
-
         // ------------------------------------------------------------------ console
 
         public override void OnStartClient()
         {
             base.OnStartClient();
-            DevCommands.Register("story", "[skip | goto <beat> | reset | off | list]", "Story mode: status, skip a beat, jump to one, start over.", StoryCommand, owner: this);
-            DevCommands.Register("report", "", "Show the end-of-chapter report card on this screen (to look at it).", _ =>
-                StoryHud.ShowReport("CHAPTER 1 COMPLETE", Mathf.Max(10, _chapterRescued), 1, 12, 1155, Economy.Money), owner: this);
+            DevCommands.Register("story", "[off | on]", "The open shift: status, stop it, start it again.", StoryCommand, owner: this);
             DevCommands.Register("robber", "", "Spawn a robber running around nearby (test).", _ => CheatServer("robber", 0), cheat: true, owner: this);
             DevCommands.Register("shark", "", "A shark bites the nearest tourist in the water (test).", _ => CheatServer("shark", 0), cheat: true, owner: this);
-            DevCommands.Register("pirates", "", "Send the pirate boat (test).", _ => CheatServer("pirates", 0), cheat: true, owner: this);
-            DevCommands.Register("whack", "[hits]", "Hit the nearest robber/pirate (automated tests).", args =>
+            DevCommands.Register("whack", "[hits]", "Hit the nearest character who can be hurt (automated tests).", args =>
                 CheatServer("whack", args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 1), cheat: true, owner: this);
             DevCommands.Register("bring", "<item name part>", "Bring matching loose items to your feet (automated tests).", args =>
                 CheatServer("bring:" + (args.Length > 0 ? args[0] : ""), 0), cheat: true, owner: this);
-            DevCommands.Register("npcs", "", "List story characters.", _ =>
+            DevCommands.Register("npcs", "", "List the characters.", _ =>
             {
                 foreach (StoryNpc n in StoryNpc.All)
                     DevCommands.Print($"  {n.Name,-14} {n.Role,-12} pose {n.Pose,-7} hp {n.Health}/{n.MaxHealth}  at {n.transform.position:F1}{(n.IsMoving ? "  moving " + n.PathInfo : "")}");
@@ -848,18 +517,6 @@ namespace PleaseDontDrown.Story
                 me.Look.LookAt(p + Vector3.up * 0.4f);
                 DevCommands.Print($"at {target.name} {p:F1}");
             }, cheat: true, owner: this);
-            DevCommands.Register("mkpoint", "<name> [dx dy dz]", "Make an island 3 story point here (tests of places part C hasn't built yet, e.g. PalaceThrone).", args =>
-            {
-                if (args.Length == 0) throw new ArgumentException("name?");
-                PlayerHub me = PlayerHub.Local;
-                Transform story = GameObject.Find("Environment/Island3/Story")?.transform;
-                if (me == null || story == null) throw new InvalidOperationException("no player or no island 3");
-                Vector3 offset = args.Length >= 4 ? new Vector3(DevCommands.ParseFloat(args, 1), DevCommands.ParseFloat(args, 2), DevCommands.ParseFloat(args, 3)) : Vector3.zero;
-                var point = new GameObject(args[0]).transform;
-                point.SetParent(story, true);
-                point.SetPositionAndRotation(me.transform.position + offset, Quaternion.Euler(0f, me.transform.eulerAngles.y + 180f, 0f));
-                DevCommands.Print($"point {args[0]} at {point.position:F1}");
-            }, cheat: true, owner: this);
             DevCommands.Register("aimat", "<name part> [head]", "Look at a character's chest, or head (gun tests).", args =>
             {
                 if (args.Length == 0) throw new ArgumentException("who?");
@@ -868,12 +525,11 @@ namespace PleaseDontDrown.Story
                 if (target == null || me == null) throw new InvalidOperationException($"nothing called '{args[0]}'");
                 bool head = args.Length > 1 && args[1] == "head";
                 Vector3 chest = target.TryGetComponent(out StoryNpc npc) ? npc.HeadPosition - Vector3.up * (head ? 0.02f : 0.35f)
-                    : target.TryGetComponent(out Creature creature) ? creature.TopPosition - Vector3.up * 0.6f
-                    : target.TryGetComponent(out Items.Item _) ? target.position : target.position + Vector3.up; // (an item: itself, e.g. on the ground)
+                    : target.TryGetComponent(out Item _) ? target.position : target.position + Vector3.up; // (an item: itself, e.g. on the ground)
                 me.Look.LookAt(chest);
                 DevCommands.Print($"aiming at {target.name} {(chest - me.Head.position).magnitude:F1} m away");
             }, cheat: true, owner: this);
-            DevCommands.Register("tourist", "<f|m> [silent] [flatline]", "Spawn a story tourist in trouble near you.", args =>
+            DevCommands.Register("tourist", "<f|m> [silent] [flatline]", "Spawn a tourist in trouble near you.", args =>
             {
                 int figure = args.Length > 0 && args[0].StartsWith("f") ? 1 : args.Length > 0 && args[0].StartsWith("m") ? 0 : -1;
                 bool silent = Array.IndexOf(args, "silent") >= 0;
@@ -881,24 +537,14 @@ namespace PleaseDontDrown.Story
                 CheatServer($"tourist:{figure}:{(silent ? 1 : 0)}:{(flat ? 1 : 0)}", 0);
             }, cheat: true, owner: this);
             RegisterMissionCommands();
-            RegisterThreatCommands();
-            RegisterKillCommands();
-            RegisterGalaCommands();
-            DevCommands.Register("finalboss", "<2|3>", "Skip the final boss ahead: 2 = the airlift won, 3 = Grabby beaten (tests, pictures).", args =>
-                CheatServer("finalboss", args.Length > 0 ? Mathf.RoundToInt(DevCommands.ParseFloat(args, 0)) : 2), cheat: true, owner: this);
-            DevCommands.Register("chapter4check", "", "Host: plays chapter 4 through with your lifeguard and checks each beat (log: [Check]).", _ =>
-                CheatServer("chapter4check", 0), cheat: true, owner: this);
         }
 
         public override void OnStopClient()
         {
             base.OnStopClient();
-            foreach (string c in new[] { "story", "report", "robber", "shark", "pirates", "tourist", "whack", "npcs", "bring", "goto", "aimat", "chapter4check", "finalboss" })
+            foreach (string c in new[] { "story", "robber", "shark", "tourist", "whack", "npcs", "bring", "goto", "aimat" })
                 DevCommands.Unregister(c, this);
             UnregisterMissionCommands();
-            UnregisterThreatCommands();
-            UnregisterKillCommands();
-            UnregisterGalaCommands();
         }
 
         private static Transform FindByName(string part)
@@ -909,9 +555,6 @@ namespace PleaseDontDrown.Story
             foreach (Vehicle v in Vehicle.All) if (v.name.Equals(part, StringComparison.OrdinalIgnoreCase)) return v.transform; // "goto TableSeat3"
             foreach (Vehicle v in Vehicle.All) if (Match(v.DisplayName)) return v.transform;
             foreach (StoryNpc n in StoryNpc.All) if (Match(n.Name)) return n.transform;
-            foreach (Creature c in Creature.All) if (Match(c.DisplayName)) return c.transform;
-            // Chapter 3's places by their exact name ("goto RopeSwing", "goto Island3GunShop").
-            if (GameObject.Find("Environment/Island3/Story/" + part) is { } place) return place.transform;
             foreach (Item i in Item.All) if (!i.IsHeld && Match(i.DisplayName)) return i.transform;
             return null;
         }
@@ -920,17 +563,10 @@ namespace PleaseDontDrown.Story
         {
             if (args.Length == 0)
             {
-                DevCommands.Print($"beat {_beat.Value}  {_chapter.Value}: {_objective.Value} {(_goal.Value > 0 ? $"{_progress.Value}/{_goal.Value}" : "")}  money ${Economy.Money}");
+                DevCommands.Print($"{(_beat.Value == "shift" ? "shift on" : "shift off")}  {_chapter.Value}: {_objective.Value}  money ${Economy.Money}");
                 return;
             }
-            if (args[0] == "list")
-            {
-                DevCommands.Print("1.1 meet Sandy, 1.2 five rescues, 1.3 thief, 1.4 return loot, 1.5 three men, 1.6 silent one, 1.7 drugs, 1.8 one more, " +
-                                  "1.9 thief again, 1.10 jet ski; 2.1 check in, 2.2 buy pistol, 2.3 three guests, 2.4 shark, 2.5 two more, 2.5b the Kleptopus, 2.5c the gala fund, 2.6 gala night (pirates), 2.7 the yacht; " +
-                                  "3.1 sneak in, 3.2 the THIEF, 3.3 gun stall, 3.4 cage fight, 3.5 jungle, 3.6 river, 3.7 Old Snapper, 3.7b the Pirate King, 3.8 gold vault, 3.9 load the gold, 3.10 back to the hotel; 4.1 Finders Keepers, 4.2 rescue race, 4.3 warehouse, 4.4 Blackout Berry, 4.5 the THIEF talks");
-                return;
-            }
-            if (!DevCommands.CheatsAllowed && args[0] != "reset") throw new InvalidOperationException("cheats are off");
+            if (!DevCommands.CheatsAllowed) throw new InvalidOperationException("cheats are off");
             CheatServer("story:" + string.Join(" ", args), 0);
         }
 
@@ -953,54 +589,12 @@ namespace PleaseDontDrown.Story
             if (what.StartsWith("story:"))
             {
                 string[] args = what.Substring(6).Split(' ');
-                switch (args[0])
-                {
-                    case "skip":
-                        if (_beatIndex + 1 < _beats.Count) StartAt(_beatIndex + 1);
-                        break;
-                    case "goto" when args.Length > 1:
-                        int index = _beats.FindIndex(b => b.Id == args[1]);
-                        if (index >= 0) StartAt(index);
-                        else Debug.LogWarning($"[Story] no beat '{args[1]}'");
-                        break;
-                    case "reset":
-                        if (Economy.Instance != null) Economy.Instance.ServerSet(0);
-                        ResetChapterStats();
-                        // Everyone back to the station beach for chapter 1.
-                        if (Dev.DevIsland.Instance != null && Dev.DevIsland.Instance.Home != null)
-                            TeleportObservers(Dev.DevIsland.Instance.Home.position);
-                        StartAt(0);
-                        break;
-                    case "off":
-                        StopAllCoroutines();
-                        EndMission();
-                        _running = false;
-                        _freePlay = false;
-                        CleanupActors();
-                        SetObjective("Free play (story off)");
-                        NoMarker();
-                        break;
-                }
+                if (args[0] == "off") StopFreePlay();
+                else if (args[0] == "on") BeginFreePlay();
                 return;
             }
             if (!DevCommands.CheatsAllowed && !force) return;
             if (ServerMissionCheat(what, value, by)) return;
-            if (ServerThreatCheat(what, value, by)) return;
-            if (ServerKillCheat(what, by)) return;
-            if (ServerGalaCheat(what, value, by)) return;
-            if (what == "finalboss")
-            {
-                // Tests and pictures: skip the final boss ahead (2: the airlift won, 3: Grabby beaten).
-                if (value >= 2 && _bossPhase == 1) _raceYours = AirliftGoal;
-                if (value >= 3 && _grabby != null && !_grabby.IsDead && by != null)
-                    ((Combat.IDamageable)_grabby).ServerTakeHit(_grabby.Health + 1, Combat.DamageKind.Bullet, by, _grabby.TopPosition, Vector3.down);
-                return;
-            }
-            if (what == "chapter4check")
-            {
-                if (by != null) by.StartCoroutine(Chapter4Check(by)); // not ours: jumping to 4.1 stops all of ours
-                return;
-            }
             // 6 m ahead on the level (looking down must not put things underground).
             Vector3 at = by != null ? by.transform.position + Vector3.ProjectOnPlane(by.Head.forward, Vector3.up).normalized * 6f : Vector3.zero;
             if (what == "robber")
@@ -1018,8 +612,6 @@ namespace PleaseDontDrown.Story
                 Shark shark = SpawnShark(target.transform.position + new Vector3(12f, 0f, -10f), target.transform.position, 8f);
                 shark.ServerAttack(target);
             }
-            else if (what == "pirates")
-                StartCoroutine(PirateRaid(null));
             else if (what.StartsWith("bring:") && by != null)
             {
                 string filter = what.Substring(6);

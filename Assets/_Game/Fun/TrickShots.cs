@@ -56,7 +56,7 @@ namespace PleaseDontDrown.Fun
         {
             if (!_serverActive || StoryDirector.Instance == null || !StoryDirector.Instance.IsServerInitialized) return;
             float dt = Time.deltaTime;
-            if (dt <= 0f || TsunamiState.Active) { _tracks.Clear(); return; } // a wave carrying people off is not a trick
+            if (dt <= 0f) return;
             foreach (VictimBrain v in VictimBrain.All)
             {
                 if (v == null || v.Item == null) continue;

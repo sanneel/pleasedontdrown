@@ -148,17 +148,6 @@ namespace PleaseDontDrown.Editor
                     Render(camera, p[2]);
                     continue;
                 }
-                if (p[0] == "bjhand")
-                {
-                    // bjhand <seat 0-4> <my cards, comma separated ids> <dealer's> <over 0|1> <bet> [result words]: a blackjack
-                    // hand on the casino table (card id = suit * 13 + rank, 52 = face down).
-                    var table = Object.FindAnyObjectByType<Fun.BlackjackTable>();
-                    if (table == null) { Debug.LogWarning("[Review] no blackjack table"); continue; }
-                    byte[] Cards(string csv) => System.Array.ConvertAll(csv.Split(','), byte.Parse);
-                    table.ReviewHand(int.Parse(p[1]) + 100, byte.Parse(p[1]), Cards(p[2]), Cards(p[3]), p[4] == "1",
-                        p.Length > 6 ? string.Join(" ", p, 6, p.Length - 6) : "", int.Parse(p[5]));
-                    continue;
-                }
                 if (p[0] == "hide")
                 {
                     // hide <name part>: stops drawing everything whose name contains it (e.g. "_Door", to look through doorways).
@@ -369,7 +358,6 @@ namespace PleaseDontDrown.Editor
                 "sandycode" => CodeBuilt(Story.StoryDirector.SandyLook),
                 "receptionist" => Story.StoryDirector.ReceptionistLook,
                 "robber" => Story.StoryDirector.RobberLook,
-                "barista" => Fun.Barista.MockLook,
                 "pirate" => Story.StoryDirector.PirateLook(seed),
                 _ => AvatarLook.Lifeguard
             };
@@ -387,11 +375,6 @@ namespace PleaseDontDrown.Editor
             go.transform.position = new Vector3(F(2), p[3] == "g" ? groundY : F(3), F(4));
             var rig = go.AddComponent<AvatarRig>();
             rig.Build(look);
-            if (lookSpec[0] == "robber")
-            {
-                Story.RobberBag.Wear(Story.RobberBag.Create(), rig); // as in the story
-                if (look.Body != AvatarLook.Bodies.Robber) Story.RobberDisguise.Create(rig);
-            }
             var animator = go.AddComponent<AvatarAnimator>();
             animator.Rig = rig;
             string pose = p.Length > 6 ? p[6] : "idle";

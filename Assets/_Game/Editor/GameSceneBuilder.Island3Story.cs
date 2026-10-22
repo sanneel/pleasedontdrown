@@ -74,7 +74,6 @@ namespace PleaseDontDrown.Editor
                 stallAt = OnGround(c);
                 break;
             }
-            BuildGunStall(story, stallAt, Quaternion.LookRotation(new Vector3(arrival.x - stallAt.x, 0f, arrival.z - stallAt.z)).eulerAngles.y, wood);
             taken.Add(new Vector3(stallAt.x, stallAt.z, 4f));
 
             // The jungle walk: from the end of the west road, in among the trees, to the river.
@@ -95,7 +94,6 @@ namespace PleaseDontDrown.Editor
             Point(story, "RiverBankB", Ground(bankB) + Vector3.up * 0.2f, Mathf.Atan2(-across.x, -across.y) * Mathf.Rad2Deg);
             Point(story, "Gator_0", new Vector3(cross.x + riverDir.x * 9f, WaterLevel - 0.45f, cross.y + riverDir.y * 9f), 0f);
             Point(story, "Gator_1", new Vector3(cross.x - riverDir.x * 10f, WaterLevel - 0.45f, cross.y - riverDir.y * 10f), 0f);
-            BuildRopeSwing(story, Ground(bankA), Ground(bankB), wood, rope);
             taken.Add(new Vector3(bankA.x, bankA.y, 4f));
             taken.Add(new Vector3(bankB.x, bankB.y, 4f));
 
@@ -103,7 +101,6 @@ namespace PleaseDontDrown.Editor
             Point(story, "SnapperPond", new Vector3(Island3Spring.x, WaterLevel - 0.9f, Island3Spring.y), 180f);
             Point(story, "UpRiver", Ground(Island3Spring + (bankB - Island3Spring).normalized * 14f) + Vector3.up * 0.2f, 0f);
             Point(story, "CaveMouth", new Vector3(CragFalls.x, WaterLevel, CragFalls.y - 5f), 0f);
-            Point(story, "CaveLedge", new Vector3(CragFalls.x, VaultFloor + 0.1f, CragFalls.y + VaultDepth - 5f), 0f);
         }
 
         /// <summary>Review pictures of chapter 3's places (added to the island 3 set).</summary>
@@ -132,84 +129,5 @@ namespace PleaseDontDrown.Editor
             }
         }
 
-        private static void BuildGunStall(Transform parent, Vector3 at, float yaw, Material wood)
-        {
-            Material canvas = GetMaterial("PirateTarpRed", new Color(0.62f, 0.17f, 0.14f));
-            var stall = new GameObject("Island3GunShop").transform;
-            stall.SetParent(parent, false);
-            stall.SetPositionAndRotation(at, Quaternion.Euler(0f, yaw, 0f));
-            GameObject counter = Primitive(PrimitiveType.Cube, "Counter", stall, new Vector3(0f, 0.55f, 0f), new Vector3(3.2f, 1.1f, 0.9f), wood);
-            foreach (float x in new[] { -1.5f, 1.5f })
-                foreach (float z in new[] { -1.4f, 0.4f })
-                    Primitive(PrimitiveType.Cube, "AwningPost", stall, new Vector3(x, 1.4f, z), new Vector3(0.12f, 2.8f, 0.12f), wood);
-            Primitive(PrimitiveType.Cube, "Awning", stall, new Vector3(0f, 2.85f, -0.5f), new Vector3(3.6f, 0.08f, 2.4f), canvas, keepCollider: false)
-                .transform.localRotation = Quaternion.Euler(-8f, 0f, 0f);
-            TextMesh sign = WorldText(stall, "Sign", new Vector3(0f, 2.45f, 0.48f), "GUNS & SILENCERS", 80, 0.035f, new Color(1f, 0.9f, 0.6f));
-            sign.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-
-            // The shop lives on the stall's root so the director finds it by name; the counter is what you look at.
-            var shopGo = counter;
-            shopGo.AddComponent<NetworkObject>();
-            ShopCounter shop = shopGo.AddComponent<ShopCounter>();
-            var spawn = new GameObject("ShopSpawn").transform;
-            spawn.SetParent(stall, false);
-            spawn.localPosition = new Vector3(0.6f, 1.3f, 0f);
-            SetRef(shop, "_spawnPoint", spawn);
-            var so = new SerializedObject(shop);
-            Require(so, "_title").stringValue = "Skull Cove guns";
-            SerializedProperty products = Require(so, "_products");
-            (string item, int price, string blurb)[] stock =
-            {
-                ("Pistol", 250, "Every pirate has one. Hold it and buy a suppressor from the parts list."),
-                ("Shotgun", 500, "For the big ones. Takes a suppressor too."),
-                ("SMG", 700, "Sprays. Loud without a suppressor."),
-            };
-            products.arraySize = stock.Length;
-            for (int i = 0; i < stock.Length; i++)
-            {
-                SerializedProperty product = products.GetArrayElementAtIndex(i);
-                product.FindPropertyRelative("Item").stringValue = stock[i].item;
-                product.FindPropertyRelative("Price").intValue = stock[i].price;
-                product.FindPropertyRelative("Blurb").stringValue = stock[i].blurb;
-            }
-            so.ApplyModifiedPropertiesWithoutUndo();
-            ConfigureInteractable(shopGo.AddComponent<Interactable>(), new[] { counter.GetComponent<Collider>() }, new[] { counter.GetComponent<Renderer>() }, 3f);
-        }
-
-        /// <summary>A rope tree over the river: a post on each bank, a beam across, a rope hanging near each bank.</summary>
-        private static void BuildRopeSwing(Transform parent, Vector3 bankA, Vector3 bankB, Material wood, Material rope)
-        {
-            var swing = new GameObject("RopeSwing").transform;
-            swing.SetParent(parent, false);
-            float top = Mathf.Max(bankA.y, bankB.y) + 7.5f;
-            foreach (Vector3 bank in new[] { bankA, bankB })
-                Primitive(PrimitiveType.Cylinder, "RopePost", swing, new Vector3(bank.x, (bank.y + top) * 0.5f, bank.z), new Vector3(0.35f, (top - bank.y) * 0.5f, 0.35f), wood);
-            Vector3 mid = (bankA + bankB) * 0.5f;
-            Vector3 span = new(bankB.x - bankA.x, 0f, bankB.z - bankA.z);
-            Primitive(PrimitiveType.Cylinder, "RopeBeam", swing, new Vector3(mid.x, top, mid.z), new Vector3(0.3f, span.magnitude * 0.5f + 0.3f, 0.3f), wood, keepCollider: false)
-                .transform.rotation = Quaternion.FromToRotation(Vector3.up, span.normalized);
-            foreach ((Vector3 from, Vector3 to, string name) in new[] { (bankA, bankB, "RopeA"), (bankB, bankA, "RopeB") })
-            {
-                // The rope hangs from the beam a third of the way out, its end pulled in to the bank (tied to the post).
-                Vector3 pivot = Vector3.Lerp(new Vector3(from.x, top, from.z), new Vector3(to.x, top, to.z), 0.5f);
-                Vector3 grip = from + Vector3.up * 1.6f + (to - from).normalized * 0.8f;
-                Vector3 d = grip - pivot;
-                GameObject r = Primitive(PrimitiveType.Cylinder, name, swing, (pivot + grip) * 0.5f, new Vector3(0.12f, d.magnitude * 0.5f, 0.12f), rope);
-                r.transform.rotation = Quaternion.FromToRotation(Vector3.up, d.normalized);
-                // Its collider is what you look at to grab it (a thicker one than the rope you see).
-                var capsule = r.GetComponent<CapsuleCollider>();
-                if (capsule != null) { capsule.radius = 2.5f; capsule.isTrigger = false; }
-                var handler = r.AddComponent<RopeSwing>();
-                var target = new GameObject(name + "_Lands").transform;
-                target.SetParent(swing, false);
-                target.position = to + Vector3.up * 0.3f + (from - to).normalized * 0.8f;
-                var pivotPoint = new GameObject(name + "_Pivot").transform;
-                pivotPoint.SetParent(swing, false);
-                pivotPoint.position = pivot;
-                SetRef(handler, "_landing", target);
-                SetRef(handler, "_pivot", pivotPoint);
-                ConfigureInteractable(r.AddComponent<Interactable>(), new[] { r.GetComponent<Collider>() }, new[] { r.GetComponent<Renderer>() }, 3.5f);
-            }
-        }
     }
 }

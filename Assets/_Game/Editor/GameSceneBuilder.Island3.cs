@@ -363,7 +363,6 @@ namespace PleaseDontDrown.Editor
                     float x0 = Island3MinX + ix * step, z0 = Island3MinZ + iz * step;
                     // The cave is cut out: its rock shell (BuildMoneyCave) stands in for the cliff and plateau there.
                     if (InCave(x0, z0, 13f, -4f, 34f) && InCave(x0 + step, z0 + step, 13f, -4f, 34f)) continue;
-                    if (InVaultHole(x0 + step * 0.5f, z0 + step * 0.5f)) continue; // the vault's door behind the crag falls
                     int a = iz * nx + ix, b = a + nx;
                     triangles.Add(a); triangles.Add(b); triangles.Add(a + 1);
                     triangles.Add(a + 1); triangles.Add(b); triangles.Add(b + 1);
@@ -416,7 +415,6 @@ namespace PleaseDontDrown.Editor
             BuildMoneyCave(root);
             BuildPlateauWater(root);
             BuildCragFalls(root, taken);
-            BuildGoldVault(root);
             Transform arrival = BuildPirateDock(root, taken);
             BuildIsland3Story(root, arrival.position, taken); // chapter 3's places (before the trees, which keep clear of them)
             BuildIsland3Night(root); // the night arrival: mountain dock, lookout tower, sleepers (Island3Night)

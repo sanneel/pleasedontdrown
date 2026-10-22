@@ -405,12 +405,12 @@ namespace PleaseDontDrown.UI
                 Divider(x, ref y, w);
             }
 
-            // The numbers: this chapter's so far (only the host counts them) and the team's money.
+            // The numbers: this shift's so far (only the host counts them) and the team's money.
             bool counted = story != null && story.IsServerInitialized;
-            var stats = counted ? story.ChapterStats : default;
-            Hud.Label(new Rect(x, y, w, 24f), counted ? "THIS CHAPTER" : "THE TEAM", 17f, Hud.Muted, TextAnchor.MiddleLeft, heavy: true, shadow: false);
+            var stats = counted ? story.ShiftStats : default;
+            Hud.Label(new Rect(x, y, w, 24f), counted ? "THIS SHIFT" : "THE TEAM", 17f, Hud.Muted, TextAnchor.MiddleLeft, heavy: true, shadow: false);
             y += 32f;
-            int tiles = counted ? 5 : 1;
+            int tiles = counted ? 4 : 1;
             const float gap = 14f, tall = 98f;
             float tile = counted ? (w - (tiles - 1) * gap) / tiles : 240f, tx = x;
             void Tile(string number, string label, Color color)
@@ -422,7 +422,6 @@ namespace PleaseDontDrown.UI
             {
                 Tile(stats.rescued.ToString(), "RESCUED", Hud.Paper);
                 Tile(stats.lost.ToString(), "LOST", stats.lost > 0 ? Hud.Danger : Hud.Paper);
-                Tile(stats.returned.ToString(), "RETURNED", Hud.Paper);
                 Tile("$" + stats.earned.ToString("N0"), "EARNED", Hud.Teal);
             }
             Tile("$" + Story.Economy.Money.ToString("N0"), "TEAM FUNDS", Hud.Sand);

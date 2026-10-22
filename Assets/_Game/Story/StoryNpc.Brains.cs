@@ -11,21 +11,18 @@ namespace PleaseDontDrown.Story
     /// Host-side behaviour per role:
     ///  * Robber: when told to flee, keeps running away from the nearest lifeguard inside an area (land only),
     ///    picking open routes, taunting now and then. Hits stagger him; the story decides what happens when he's down.
-    ///  * Pirate: goes for the nearest lifeguard and punches (knockback, nobody dies); otherwise marches on the hotel.
     ///  * Bystander: stands at the water's edge pointing and yelling for help.
     /// Guides and receptionists just stand, face you and talk (the story drives them).
     /// </summary>
     public partial class StoryNpc
     {
         private static readonly string[] Taunts = { "Can't catch me!", "Too slow, lifeguard!", "Hah!", "Nope!", "Catch me if you can!" };
-        private static readonly string[] PirateShouts = { "ARRR!", "Hand over the loot!", "Yarr!", "Get 'em, lads!" };
 
         private readonly RaycastHit[] _brainHits = new RaycastHit[8];
         private float _nextThink;
         private Vector3 _home;
         private Rect _area = new Rect(-40f, 5f, 80f, 40f);
         private bool _fleeing;
-        private bool _aggressive;
         private float _nextShout;
         private string _shoutText;
         private Vector3 _shoutAt;
@@ -34,7 +31,7 @@ namespace PleaseDontDrown.Story
         private void ServerSetupBrain()
         {
             _home = transform.position;
-            _fleeing = _aggressive = false;
+            _fleeing = false;
             _shoutText = null;
         }
 
@@ -46,18 +43,6 @@ namespace PleaseDontDrown.Story
             _area = area;
             _nextThink = 0f;
             if (!flee) _moveTarget = null;
-        }
-
-        /// <summary>
-        /// Host (pirate): attack lifeguards with fists; with nobody around, head for <paramref name="home"/>. (A
-        /// pirate with a weapon: <see cref="ServerFight"/> with a <see cref="FighterProfile"/>.)
-        /// </summary>
-        [Server]
-        public void ServerAggressive(bool aggressive, Vector3 home)
-        {
-            _home = home;
-            if (aggressive) ServerFight(FighterProfile.Pirate(NpcWeaponKind.Fists), home);
-            else ServerStopFighting();
         }
 
         /// <summary>Host (bystander): keep shouting this, facing <paramref name="at"/>. Null text stops.</summary>
@@ -74,7 +59,6 @@ namespace PleaseDontDrown.Story
         private void OnServerHit(PlayerHub attacker)
         {
             _nextThink = 0f; // react right away (robber: run; pirate: turn on whoever hit us)
-            if (!IsDefeated) GuardOnHit(attacker); // (a guard put down in one quiet shot raises no alarm)
             if (_role.Value == NpcRole.Robber && _health.Value > 0 && Random.value < 0.4f)
                 ShoutObservers(_health.Value == 1 ? "OK OK, ENOUGH!" : "Hey, ow!", false);
         }
@@ -86,17 +70,6 @@ namespace PleaseDontDrown.Story
                 _nextShout = Time.time + _shoutInterval;
                 ShoutObservers(_shoutText, true);
                 GestureObservers(AvatarGesture.Wave, _shoutAt);
-            }
-            if (_fighting)
-            {
-                FightThink(dt); // StoryNpc.Combat: anyone set to fight (pirates, drunks, the cage fighter)
-                return;
-            }
-            if (_asleep && SleepThink(dt)) return; // StoryNpc.Sleep: asleep, or just woken and looking about
-            if (_guarding && _pose.Value == AvatarPose.Normal && Time.time >= _staggerUntil)
-            {
-                GuardThink(dt); // StoryNpc.Perception: on watch
-                return;
             }
             if (IsDefeated || _pose.Value != AvatarPose.Normal || Time.time < _nextThink) return;
 
