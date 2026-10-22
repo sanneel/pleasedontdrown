@@ -196,7 +196,8 @@ namespace PleaseDontDrown.Combat
             Transform root = CharacterRoot(hit);
             if (_log) Debug.Log($"[Wound] hit {hit.name} at {point:F2}: {(root != null ? root.name : "not a character")}");
             if (root == null) return;
-            float width = kind == ProjectileKind.Heavy ? 0.05f : kind == ProjectileKind.Pellet ? 0.022f : 0.036f;
+            // (Bigger than a real entry wound, so it reads as a hole from a few metres: the user, 2026-10-22, "add HOLEs".)
+            float width = kind == ProjectileKind.Heavy ? 0.08f : kind == ProjectileKind.Pellet ? 0.035f : 0.06f;
             var watch = System.Diagnostics.Stopwatch.StartNew();
             Instance.AddWound(root, point, direction.normalized, width * Random.Range(0.9f, 1.15f), kind);
             _lastMs = (float)watch.Elapsed.TotalMilliseconds;
@@ -295,7 +296,7 @@ namespace PleaseDontDrown.Combat
             if (up.sqrMagnitude < 1e-4f) up = Vector3.ProjectOnPlane(Random.onUnitSphere, normal);
             up.Normalize();
             Vector3 right = Vector3.Cross(normal, up);
-            float run = Random.Range(0.05f, 0.12f) * (width / 0.036f) * runShare;
+            float run = Random.Range(0.06f, 0.13f) * (width / 0.06f) * runShare;
 
             var wound = new Wound { Born = Time.time, Width = width, Run = run, Normal = normal };
             float below = width * 0.5f + run;
@@ -666,8 +667,10 @@ namespace PleaseDontDrown.Combat
 
         // ------------------------------------------------------------------ pictures
 
-        private static readonly Color HoleCore = new(0.06f, 0.012f, 0.01f);
-        private static readonly Color Torn = new(0.42f, 0.04f, 0.03f);
+        private static readonly Color HoleCore = new(0.012f, 0.003f, 0.003f);
+        private static readonly Color Torn = new(0.55f, 0.07f, 0.06f);
+        private static readonly Color Wall = new(0.2f, 0.015f, 0.015f);
+        private static readonly Color Bruise = new(0.3f, 0.05f, 0.07f);
         private static readonly Color Blood = new(0.5f, 0.02f, 0.025f);
         private static readonly Color Dried = new(0.22f, 0.02f, 0.02f);
 
@@ -687,14 +690,27 @@ namespace PleaseDontDrown.Combat
                         float dx = x - cx, dy = y - cy;
                         float angle = Mathf.Atan2(dy, dx);
                         float r = Mathf.Sqrt(dx * dx + dy * dy);
-                        // A ragged edge: the radius wobbles with angle.
+                        // A ragged edge: the radii wobble with angle.
                         float wob = Mathf.PerlinNoise(Mathf.Cos(angle) * 2.2f + 5f, Mathf.Sin(angle) * 2.2f + 5f);
-                        float coreR = 9f + wob * 4f, ringR = 17f + wob * 7f;
                         float speck = Mathf.PerlinNoise(x * 0.23f, y * 0.23f);
-                        if (r < coreR) c = Color.Lerp(HoleCore, Torn, r / coreR * 0.4f);
-                        else if (r < ringR) c = Color.Lerp(Torn, Blood, (r - coreR) / (ringR - coreR)) * (0.8f + speck * 0.4f);
-                        else if (r < 30f && speck > 0.42f + (r - ringR) / 30f) c = Color.Lerp(Blood, Dried, speck); // smear and flecks
+                        // The hole: black in the middle, its inner wall going from black to a deep dark red (it reads as
+                        // going into the body), a raised torn rim, a dark bruise round it, flecks thrown off.
+                        float coreR = 12f + wob * 3f, wallR = coreR + 6f, rimR = wallR + 6f + wob * 4f, bruiseR = rimR + 12f;
+                        if (r < coreR) c = HoleCore;
+                        else if (r < wallR)
+                        {
+                            float t = (r - coreR) / (wallR - coreR);
+                            c = Color.Lerp(HoleCore, Wall, t * t);
+                        }
+                        else if (r < rimR)
+                        {
+                            float t = (r - wallR) / (rimR - wallR);
+                            c = Color.Lerp(Torn, Blood, t) * (0.85f + speck * 0.3f);
+                        }
+                        else if (r < bruiseR && speck > 0.3f + (r - rimR) / bruiseR) c = Color.Lerp(Bruise, Dried, speck);
+                        else if (r < bruiseR + 14f && speck > 0.62f + (r - bruiseR) / 40f) c = Color.Lerp(Blood, Dried, speck); // flecks
                         if (c.r > 0f || c.g > 0f) c.a = 1f;
+                        bool hole = r < rimR;
 
                         // The run: from the hole straight down, wobbling, narrowing, ending in a drop.
                         if (y < cy)
@@ -704,7 +720,7 @@ namespace PleaseDontDrown.Combat
                             float half = Mathf.Lerp(8f, 4.2f, k);
                             float tip = y < 18 ? Mathf.Sqrt(Mathf.Max(0f, 1f - (y - 10f) * (y - 10f) / 64f)) * 7.5f : 0f; // the drop at the end
                             float edge = Mathf.Max(half, tip);
-                            if (Mathf.Abs(x - mid) < edge && y > 2)
+                            if (Mathf.Abs(x - mid) < edge && y > 2 && !hole) // (it runs from the rim, not across the hole)
                             {
                                 float sheen = 1f - Mathf.Abs(x - mid) / edge;
                                 c = Color.Lerp(Dried, Blood, 0.35f + sheen * 0.65f);

@@ -899,8 +899,9 @@ namespace PleaseDontDrown.Editor
 
             Material casing = Load("Casing", Shader.Find("Universal Render Pipeline/Particles/Lit"));
             casing.SetColor("_BaseColor", Color.white);
-            casing.SetFloat("_Metallic", 0.85f);
-            casing.SetFloat("_Smoothness", 0.72f);
+            // (Less metallic than real brass: with little to reflect on an open beach, full metal read as brown specks.)
+            casing.SetFloat("_Metallic", 0.45f);
+            casing.SetFloat("_Smoothness", 0.62f);
             casing.SetFloat("_Cull", 0f);
             casing.SetFloat("_Surface", 0f);
             EditorUtility.SetDirty(casing);

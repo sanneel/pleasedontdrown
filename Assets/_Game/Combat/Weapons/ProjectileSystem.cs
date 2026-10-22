@@ -367,8 +367,11 @@ namespace PleaseDontDrown.Combat
         /// <summary>
         /// Flash at the muzzle (and a short light, unless suppressed): a star of burning gas turned a new way each shot,
         /// a white-hot core, smaller flames blown out ahead, a few burning grains, and a wisp of smoke off the barrel.
+        /// <paramref name="ownView"/>: our own gun in first person, half a metre from the eye. It gets a smaller flash, a
+        /// softer light and no smoke: puffs blown forward from a quick string of shots stacked up into a white cloud right
+        /// across the view (the user, 2026-10-22: "wtf is happening").
         /// </summary>
-        public void MuzzleFlash(Vector3 point, Vector3 forward, float size, bool suppressed)
+        public void MuzzleFlash(Vector3 point, Vector3 forward, float size, bool suppressed, bool ownView = false)
         {
             var emit = new ParticleSystem.EmitParams { applyShapeToPosition = false };
             if (suppressed)
@@ -380,16 +383,17 @@ namespace PleaseDontDrown.Combat
                 emit.rotation = Random.Range(0f, 360f);
                 emit.startColor = new Color(1f, 0.85f, 0.6f, 0.45f);
                 _flashes.Emit(emit, 1);
-                Wisp(point, forward, size * 0.6f);
+                if (!ownView) Wisp(point, forward, size * 0.6f);
                 return;
             }
+            float flame = ownView ? 0.55f : 1f;
             // The star, then smaller ones blown out along the barrel's line.
             for (int i = 0; i < 4; i++)
             {
                 float k = i / 3f;
                 emit.position = point + forward * ((0.02f + k * 0.16f) * size);
                 emit.velocity = forward * Random.Range(1f, 2.5f);
-                emit.startSize = Random.Range(0.26f, 0.36f) * size * (1f - k * 0.55f);
+                emit.startSize = Random.Range(0.26f, 0.36f) * size * flame * (1f - k * 0.55f);
                 emit.startLifetime = Random.Range(0.035f, 0.05f);
                 emit.rotation = Random.Range(0f, 360f);
                 emit.startColor = new Color(1f, Random.Range(0.72f, 0.86f), Random.Range(0.35f, 0.5f));
@@ -398,15 +402,18 @@ namespace PleaseDontDrown.Combat
             // White-hot core.
             emit.position = point + forward * 0.015f;
             emit.velocity = Vector3.zero;
-            emit.startSize = 0.11f * size;
+            emit.startSize = 0.11f * size * flame;
             emit.startLifetime = 0.03f;
             emit.startColor = new Color(1f, 0.97f, 0.9f);
             _flashes.Emit(emit, 1);
             Sparks(point + forward * 0.03f, forward, Mathf.RoundToInt(3 * size), 0.6f);
-            Wisp(point, forward, size);
+            if (!ownView) Wisp(point, forward, size);
 
+            // A short flash of light on whatever is near (softer for our own gun: right under our eyes, sand a metre
+            // away went white).
             _flashLight.transform.position = point + forward * 0.1f;
-            _flashLight.intensity = 3f * size;
+            _flashLight.range = ownView ? 4f : 7f;
+            _flashLight.intensity = (ownView ? 0.9f : 2f) * size;
             _flashLight.enabled = true;
             _flashLightUntil = Time.time + 0.045f;
         }
@@ -417,12 +424,13 @@ namespace PleaseDontDrown.Combat
             var emit = new ParticleSystem.EmitParams { applyShapeToPosition = false };
             for (int i = 0; i < 2; i++)
             {
-                emit.position = point + forward * Random.Range(0.02f, 0.12f);
-                emit.velocity = forward * Random.Range(0.4f, 1.2f) + Vector3.up * Random.Range(0.1f, 0.3f) + Random.insideUnitSphere * 0.1f;
-                emit.startSize = Random.Range(0.1f, 0.18f) * size;
-                emit.startLifetime = Random.Range(0.7f, 1.3f);
-                float grey = Random.Range(0.75f, 0.88f);
-                emit.startColor = new Color(grey, grey, grey, Random.Range(0.1f, 0.18f));
+                // Curling up off the barrel rather than blown far ahead.
+                emit.position = point + forward * Random.Range(0.02f, 0.08f);
+                emit.velocity = forward * Random.Range(0.15f, 0.4f) + Vector3.up * Random.Range(0.15f, 0.35f) + Random.insideUnitSphere * 0.08f;
+                emit.startSize = Random.Range(0.08f, 0.14f) * size;
+                emit.startLifetime = Random.Range(0.6f, 1.1f);
+                float grey = Random.Range(0.72f, 0.85f);
+                emit.startColor = new Color(grey, grey, grey, Random.Range(0.06f, 0.11f));
                 _smoke.Emit(emit, 1);
             }
         }
@@ -502,7 +510,7 @@ namespace PleaseDontDrown.Combat
                 startSize = shell ? 0.068f : 0.021f,
                 startLifetime = Random.Range(9f, 12f),
                 rotation3D = new Vector3(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f)),
-                startColor = shell ? new Color(0.62f, 0.07f, 0.05f) : new Color(0.86f, 0.62f, 0.26f)
+                startColor = shell ? new Color(0.75f, 0.1f, 0.07f) : new Color(1f, 0.78f, 0.36f)
             };
             _casings.Emit(emit, 1);
         }

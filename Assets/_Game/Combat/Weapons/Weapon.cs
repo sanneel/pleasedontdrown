@@ -570,7 +570,10 @@ namespace PleaseDontDrown.Combat
         {
             WeaponBarrel barrel = Barrel;
             Transform muzzle = Muzzle;
-            ProjectileSystem.Instance.MuzzleFlash(muzzle.position, muzzle.forward, _flashSize, barrel.Suppressed);
+            // (Our own gun in first person: smaller flash, softer light, no smoke across the view.)
+            PlayerHub holder = _item.Holder;
+            bool ownView = Local == this && holder != null && (holder.Look == null || !holder.Look.ThirdPerson);
+            ProjectileSystem.Instance.MuzzleFlash(muzzle.position, muzzle.forward, _flashSize, barrel.Suppressed, ownView);
             if (_ejectPort != null) StartCoroutine(Eject(_sound == GunSound.Shotgun ? 0.32f : 0.02f));
             if (_audio != null)
             {
