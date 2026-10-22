@@ -25,6 +25,7 @@ namespace PleaseDontDrown.Core
             _cries = null;
             _hitTick = _headDing = _killThunk = _fleshHit = null;
             _knifeSwish = _stab = null;
+            _casingMetal = _casingSand = null;
             _stepVariant = 0;
         }
 
@@ -550,6 +551,54 @@ namespace PleaseDontDrown.Core
                     return (thud * 0.8f + scrape) * Mathf.Clamp01(t / 0.002f);
                 });
             }
+        }
+
+        // ------------------------------------------------------------------ spent cases landing
+
+        private static AudioClip[] _casingMetal, _casingSand;
+
+        /// <summary>
+        /// A spent brass case landing: on wood or stone a bright little ring (a thin brass tube's inharmonic modes) with a
+        /// smaller bounce after it; on sand only a soft tick. Three of each so a burst doesn't sound like one clip.
+        /// </summary>
+        public static AudioClip CasingDrop(World.SurfaceKind surface, int variant)
+        {
+            variant = Mathf.Abs(variant) % 3;
+            if (surface == World.SurfaceKind.Sand)
+            {
+                if (_casingSand == null || _casingSand[variant] == null)
+                {
+                    _casingSand ??= new AudioClip[3];
+                    _casingSand[variant] = Noise($"CasingSand{variant}", 0.05f, 300 + variant, 0.35f, 0.08f, 90f, 0.45f);
+                }
+                return _casingSand[variant];
+            }
+            if (_casingMetal == null || _casingMetal[variant] == null)
+            {
+                _casingMetal ??= new AudioClip[3];
+                float pitch = 1f + (variant - 1) * 0.07f;
+                var rng = new System.Random(500 + variant);
+                float hp = 0f;
+                _casingMetal[variant] = Build($"CasingMetal{variant}", 0.42f, t =>
+                {
+                    float Ring(float at, float level)
+                    {
+                        float u = t - at;
+                        if (u < 0f) return 0f;
+                        float ring = Mathf.Sin(2f * Mathf.PI * 4150f * pitch * u) * Mathf.Exp(-u * 28f)
+                                     + Mathf.Sin(2f * Mathf.PI * 6870f * pitch * u) * Mathf.Exp(-u * 40f) * 0.7f
+                                     + Mathf.Sin(2f * Mathf.PI * 9610f * pitch * u) * Mathf.Exp(-u * 60f) * 0.45f
+                                     + Mathf.Sin(2f * Mathf.PI * 12300f * pitch * u) * Mathf.Exp(-u * 90f) * 0.3f;
+                        return ring * level * Mathf.Clamp01(u / 0.0008f);
+                    }
+                    float n = (float)(rng.NextDouble() * 2.0 - 1.0);
+                    hp += (n - hp) * 0.4f;
+                    float click = (n - hp) * Mathf.Exp(-t / 0.002f) * 0.8f;
+                    float x = Ring(0f, 0.32f) + Ring(0.085f + variant * 0.012f, 0.14f) + Ring(0.15f + variant * 0.01f, 0.05f) + click;
+                    return x * 0.8f;
+                });
+            }
+            return _casingMetal[variant];
         }
 
         private static AudioClip Noise(string name, float seconds, int seed, float brightStart, float brightEnd, float decay, float gain)

@@ -206,7 +206,7 @@ namespace PleaseDontDrown.Combat
                 Weapon w = Local;
                 DevCommands.Print($"{w.DisplayName}: {w._localAmmo}/{w.MagazineSize} (host says {w._ammo.Value}), damage {w.Damage} x{w._pellets}, " +
                                   $"sight {w.Sight.Name}, barrel {w.Barrel.Name}, laser {w.HasLaser}, aim {w._aim:F2}, reloading {w._reloading}, " +
-                                  $"projectiles in flight {ProjectileSystem.LiveCount}");
+                                  $"projectiles in flight {ProjectileSystem.LiveCount}, {ProjectileSystem.CasingReport()}");
             });
         }
 
@@ -530,6 +530,8 @@ namespace PleaseDontDrown.Combat
             float pushShare = (1f - (1f - _aimKickPosition) * _aim) * barrel.KickScale;
             _motion.Kick(new Vector3(side * _kick.x, _kick.y, -_kick.z) * pushShare,
                 new Vector3(-_kickTurn.y, side * _kickTurn.x, -side * _kickTurn.x) * turnShare);
+            // The shot punches the view a touch (a short jolt, rolling a random way), more for the big guns.
+            if (holder.Look != null) holder.Look.Shake(0.07f * _flashSize * (1f - 0.4f * _aim), Random.value < 0.5f ? -1f : 1f);
             // Heavy guns shove you back a little.
             if (_kickBack > 0f && holder.Motor != null) holder.Motor.Knockback(-forward * _kickBack);
             if (_shooterPush > 0f && holder.Motor != null) holder.Motor.AddImpulse(-forward * _shooterPush);

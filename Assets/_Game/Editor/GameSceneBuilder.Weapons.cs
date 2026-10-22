@@ -856,6 +856,56 @@ namespace PleaseDontDrown.Editor
             }
             Make("ProjectileTracer", new Color(1f, 0.86f, 0.4f));
             Make("BulletHole", new Color(0.1f, 0.085f, 0.075f));
+            BuildShotMaterials();
+        }
+
+        /// <summary>
+        /// Bullet wounds on bodies and blood spatter (URP Lit, cut out, wet), and spent casings (URP particles lit,
+        /// metallic, drawn both sides). Their pictures are made at runtime (BulletWounds, ProjectileSystem).
+        /// </summary>
+        [MenuItem("Please Don't Drown/Build shot materials")]
+        public static void BuildShotMaterials()
+        {
+            const string dir = "Assets/_Game/Resources";
+            Directory.CreateDirectory(dir);
+            Material Load(string name, Shader shader)
+            {
+                string path = $"{dir}/{name}.mat";
+                var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (mat == null)
+                {
+                    mat = new Material(shader);
+                    AssetDatabase.CreateAsset(mat, path);
+                }
+                mat.shader = shader;
+                return mat;
+            }
+
+            Material wound = Load("BulletWound", Shader.Find("Universal Render Pipeline/Lit"));
+            wound.SetColor("_BaseColor", Color.white);
+            wound.SetFloat("_AlphaClip", 1f);
+            wound.SetFloat("_Cutoff", 0.5f);
+            wound.EnableKeyword("_ALPHATEST_ON");
+            wound.SetFloat("_Smoothness", 0.2f); // (shinier, the sun's highlight washed the dark red out to salmon)
+            // No sky in it: a dark red mirroring a bright sky (someone lying face up) read as pale pink.
+            wound.SetFloat("_EnvironmentReflections", 0f);
+            wound.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+            wound.SetFloat("_Metallic", 0f);
+            wound.SetFloat("_Cull", 2f);
+            wound.SetOverrideTag("RenderType", "TransparentCutout");
+            wound.renderQueue = (int)UnityEngine.Rendering.RenderQueue.AlphaTest;
+            wound.enableInstancing = true;
+            EditorUtility.SetDirty(wound);
+
+            Material casing = Load("Casing", Shader.Find("Universal Render Pipeline/Particles/Lit"));
+            casing.SetColor("_BaseColor", Color.white);
+            casing.SetFloat("_Metallic", 0.85f);
+            casing.SetFloat("_Smoothness", 0.72f);
+            casing.SetFloat("_Cull", 0f);
+            casing.SetFloat("_Surface", 0f);
+            EditorUtility.SetDirty(casing);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[ShotMaterials] BulletWound and Casing built");
         }
     }
 }

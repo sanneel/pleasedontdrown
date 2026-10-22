@@ -33,15 +33,19 @@ namespace PleaseDontDrown.Story
 
         private void HitFeel(Vector3 point, Vector3 push, int damage, bool bullet, bool head, bool killed, int healthLeft, PlayerHub attacker)
         {
-            // The body flashes.
-            _flashAt = Time.time;
-            _flashing = true;
+            // A blow makes the body flash. A bullet doesn't: it leaves a wound where it went in (Combat.BulletWounds), and
+            // the whole body turning red read as a cartoon (the user, 2026-10-22: "Unreal Engine type of shooting, very realistic").
+            if (!bullet)
+            {
+                _flashAt = Time.time;
+                _flashing = true;
+            }
 
-            // A ball throws a red puff back out of the wound.
+            // A ball throws a little blood back out of the wound (the bullet's own hit makes the wound and the rest).
             if (bullet)
             {
                 Vector3 normal = push.sqrMagnitude > 0.01f ? -push : Vector3.up;
-                ProjectileSystem.Instance.Puff(point, (normal + Vector3.up * 0.3f).normalized, new Color(0.62f, 0.06f, 0.05f), head ? 14 : 9, head ? 1.3f : 1f);
+                ProjectileSystem.Instance.BloodMist(point, (normal + Vector3.up * 0.2f).normalized, head ? 0.8f : 0.5f);
                 AudioSource.PlayClipAtPoint(ProceduralAudio.BulletFlesh, point, 1f);
             }
 

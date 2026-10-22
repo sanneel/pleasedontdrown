@@ -36,7 +36,15 @@ namespace PleaseDontDrown.Combat
 
     public static class DamageUtil
     {
-        /// <summary>The damageable a collider belongs to (colliders on children count).</summary>
-        public static IDamageable Find(Collider c) => c != null ? c.GetComponentInParent<IDamageable>() : null;
+        /// <summary>
+        /// The damageable a collider belongs to (colliders on children count, and so do a tourist's arms and legs, which
+        /// hang outside the body's hierarchy on joints: a bullet in the leg missed them).
+        /// </summary>
+        public static IDamageable Find(Collider c)
+        {
+            if (c == null) return null;
+            if (c.GetComponentInParent<IDamageable>() is { } found) return found;
+            return Items.Item.FromCollider(c) is { } item ? item.GetComponent<IDamageable>() : null;
+        }
     }
 }
