@@ -83,6 +83,14 @@ namespace PleaseDontDrown.Dev
             }, cheat: true);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void RegisterAnimInfo() =>
+            DevCommands.Register("animinfo", "", "What the local lifeguard's body animation is doing (clips, action, gesture; tests).", _ =>
+            {
+                PlayerHub me = PlayerHub.Local;
+                DevCommands.Print(me != null && me.Avatar != null && me.Avatar.Animator != null ? me.Avatar.Animator.ClipDebug : "no avatar");
+            });
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void RegisterHeld() =>
             DevCommands.Register("heldinfo", "", "Where the held item is drawn and whether its renderers are on (tests).", _ =>
             {

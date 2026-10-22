@@ -50,7 +50,37 @@ namespace PleaseDontDrown.Editor
                 clip.keepOriginalPositionY = true;
                 clip.keepOriginalPositionXZ = true;
             }
+            // Punches come both ways: a "<take> Mirror" copy throws it with the other hand.
+            if (Array.IndexOf(Mirrored, Path.GetFileNameWithoutExtension(assetPath)) >= 0 && clips.Length > 0)
+            {
+                var all = new System.Collections.Generic.List<ModelImporterClipAnimation>(clips);
+                foreach (ModelImporterClipAnimation clip in clips)
+                {
+                    if (clip.name.StartsWith("__preview__")) continue;
+                    var copy = new ModelImporterClipAnimation
+                    {
+                        name = clip.name + " Mirror", takeName = clip.takeName, firstFrame = clip.firstFrame, lastFrame = clip.lastFrame,
+                        loopTime = clip.loopTime, loopPose = clip.loopPose, lockRootRotation = true, lockRootHeightY = true,
+                        lockRootPositionXZ = true, keepOriginalOrientation = true, keepOriginalPositionY = true,
+                        keepOriginalPositionXZ = true, mirror = true
+                    };
+                    all.Add(copy);
+                }
+                clips = all.ToArray();
+            }
             model.clipAnimations = clips;
         }
+
+        /// <summary>Batch: import the Mixamo files again (after changing the rules above).</summary>
+        public static void ReimportBatch()
+        {
+            foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { Folder.TrimEnd('/') }))
+                AssetDatabase.ImportAsset(AssetDatabase.GUIDToAssetPath(guid), ImportAssetOptions.ForceUpdate);
+            UnityEngine.Debug.Log("[Mixamo] reimported");
+            EditorApplication.Exit(0);
+        }
+
+        /// <summary>Clips that also get a mirrored copy (the other hand): file names.</summary>
+        private static readonly string[] Mirrored = { "Jab", "Hook", "Uppercut" };
     }
 }

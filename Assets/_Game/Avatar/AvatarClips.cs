@@ -49,9 +49,12 @@ namespace PleaseDontDrown.Avatars
             if (string.IsNullOrEmpty(file)) return null;
             if (_cache.TryGetValue(file, out AnimationClip clip)) return clip;
             clip = null;
-            // (An FBX holds its take and a "__preview__" copy: the real one.)
-            foreach (AnimationClip c in Resources.LoadAll<AnimationClip>("Mixamo/" + file))
-                if (c != null && !c.name.StartsWith("__preview__")) { clip = c; break; }
+            // (An FBX holds its take and a "__preview__" copy: the real one. "<file> Mirror": its mirrored copy, the
+            // other hand, made by Editor.MixamoImport for the punches.)
+            bool mirror = file.EndsWith(" Mirror");
+            string path = mirror ? file.Substring(0, file.Length - " Mirror".Length) : file;
+            foreach (AnimationClip c in Resources.LoadAll<AnimationClip>("Mixamo/" + path))
+                if (c != null && !c.name.StartsWith("__preview__") && c.name.EndsWith(" Mirror") == mirror) { clip = c; break; }
             _cache[file] = clip;
             return clip;
         }

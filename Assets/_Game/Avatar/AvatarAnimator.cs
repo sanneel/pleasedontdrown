@@ -99,7 +99,7 @@ namespace PleaseDontDrown.Avatars
         private int _seed;
         // What the clips' action is this frame and how much of the body it has (the hand-made layer for the same thing
         // steps back by as much).
-        private enum ClipAct : byte { None, Down, GetUp, Tread }
+        private enum ClipAct : byte { None, Down, GetUp, Tread, Punch }
         private ClipAct _clipAct;
         private float _clipActShare;
         private readonly Quaternion[] _clipPose = new Quaternion[AvatarClips.PosedBones.Length];
@@ -357,6 +357,7 @@ namespace PleaseDontDrown.Avatars
             if (_clipMix > 0f && (_clips == null || !_clips.Prepare())) _clipMix = 0f;
             _clipAct = ClipAct.None;
             _clipActShare = 0f;
+            _clipFists = 0f;
             _cprHands = 0f;
             float clipMix = _clipMix * _clipMix * (3f - 2f * _clipMix);
             if (_clipMix > 0f)
@@ -528,6 +529,8 @@ namespace PleaseDontDrown.Avatars
                 offset = Vector3.Lerp(from, to, k);
                 offset.y = 0f;
             }
+            else if (ClipPunch(ground.magnitude, out file, out time, out weight, out yaw))
+                _clipAct = ClipAct.Punch;
             else if (_swim > 0.001f)
             {
                 _clipAct = ClipAct.Tread;
@@ -545,12 +548,119 @@ namespace PleaseDontDrown.Avatars
             if (_clipAct == ClipAct.None) KeepFacing(hips, 30f, 1f - Mathf.Clamp01(ground.magnitude / 0.5f));
             if (_clipAct == ClipAct.Tread)
                 hips.position += Vector3.up * (_swim * 0.18f * s); // as high in the water as the hand-made treading
-            if (_clipAct == ClipAct.None) FeetOnGround(hips, dt);
+            if (_clipAct is ClipAct.None or ClipAct.Punch) FeetOnGround(hips, dt);
+            if (_clipAct == ClipAct.Punch)
+            {
+                // (The uppercut clip spins the body 130 degrees round with it: kept facing the target. It drives up,
+                // so the fist still goes where it should.)
+                if (_clipUppercut) KeepFacing(hips, 35f, _clipFists);
+                EyesOnTarget(_clipFists);
+            }
             KeepLegsAboveGround(hips, s);
             GestureLayer();
             // (No hand-made habits on the clips: the idles and the talking clips have their own life. Laid over them, a
             // stretch held both arms straight up, eyes were shaded with the arms still out: the user, 2026-10-20.)
             PoseHands();
+        }
+
+        // Punches from the boxing clips (Resources/Mixamo, the mirrored copies made by Editor.MixamoImport): the clip for
+        // each kind and hand, and where in it the blow starts, lands and is back in the guard (measured with
+        // ClipCheck.CurveBatch: the fist furthest out). Overhand: the hook (there's no overhand clip).
+        private static readonly (string right, string left, float from, float peak, float to)[] PunchClips =
+        {
+            ("Jab Mirror", "Jab", 0.25f, 0.42f, 0.95f),          // straight
+            ("Hook", "Hook Mirror", 0.12f, 0.30f, 0.90f),        // hook
+            ("Uppercut Mirror", "Uppercut", 0.35f, 0.57f, 0.82f), // uppercut (ends before its follow-through throws the head back)
+            ("Hook", "Hook Mirror", 0.12f, 0.30f, 0.90f),        // overhand
+        };
+        private const string GuardClip = "Fight Idle";
+        /// <summary>Degrees the boxing clips are turned back toward the way the lifeguard faces.</summary>
+        private const float PunchTurnBack = 10f, GuardTurnBack = 40f;
+        /// <summary>After a punch the fists stay up (the guard clip) this long, standing.</summary>
+        private const float GuardHold = 1.2f;
+        /// <summary>The fist lands this long after the button (Combat.PlayerCombat.StrikeTime): the clip's blow is timed to it.</summary>
+        private const float PunchLands = 0.1f;
+        private float _guardUntil;
+        /// <summary>Tests: what the clips are doing on this body.</summary>
+        public string ClipDebug => $"clips {_clipMix:F2} (want {WantsClipsDebug()}), act {_clipAct}, action {_clips?.CurrentAction ?? "-"}, fists {_clipFists:F2}, gesture {_gesture} {Now - _gestureStart:F2}s ago, holding {Motion.Holding}, stance {Motion.Stance}, grounded {Motion.Grounded}, pose {Motion.Pose}";
+        private string WantsClipsDebug()
+        {
+            AvatarMotion m = Motion;
+            return $"{UseClips || (AvatarClips.Enabled && Application.isPlaying)}/{AvatarClips.Available} climb {m.Climbing} seated {m.Seated} defib {m.Defib} carry {m.CarryingPerson} fly {m.Flying} star {m.StarJump} eat {m.Eating} drink {m.Drinking} charge {m.Charge:F2} seat {_seat:F2} kneel {_kneel:F2} sit {_sit:F2} chair {_chair:F2} lie {_lie:F2}/{_lieFront:F2} carried {_carried:F2} fly {_fly:F2} crouch {m.Crouch:F2} cpr {m.Cpr}/{_cpr:F2} swim {m.Swimming} scared {m.Pose == AvatarPose.Scared} handsUp {_handsUp:F2}";
+        }
+        private bool _clipUppercut;
+        private float _clipFists; // 0..1 how much of the body a boxing clip has this frame (fists closed, no hand-made punch)
+
+        /// <summary>
+        /// Boxing: the head keeps looking where the lifeguard faces (a little down), whatever the clip does with it (the
+        /// uppercut's follow-through threw it right back to the sky).
+        /// </summary>
+        private void EyesOnTarget(float weight)
+        {
+            Transform head = B(Bone.Head), mouth = B(Bone.Mouth);
+            if (head == null || mouth == null || weight <= 0f) return;
+            Vector3 face = mouth.position - head.position;
+            face -= Vector3.up * Vector3.Dot(face, Vector3.up) * 0.5f; // (the lips sit low on the head: half its height off)
+            if (face.sqrMagnitude < 1e-6f) return;
+            Vector3 want = Quaternion.AngleAxis(8f, transform.right) * transform.forward;
+            Quaternion fix = Quaternion.FromToRotation(face.normalized, want);
+            head.rotation = Quaternion.Slerp(Quaternion.identity, fix, 0.85f * weight) * head.rotation;
+        }
+
+        /// <summary>
+        /// A punch from the boxing clips: the whole body throws it (weight shifting, hips and shoulders turning, a real
+        /// guard), the fist landing when the game says it lands, then the guard for a moment. Standing or walking
+        /// slowly only (running, the hand-made punch: a whole-body clip would stop the legs). Not for story fighters
+        /// squared up (their wind-up tells are hand-made, StoryNpc.Combat).
+        /// </summary>
+        private bool ClipPunch(float speed, out string file, out float time, out float weight, out float yaw)
+        {
+            file = null;
+            time = weight = yaw = 0f;
+            AvatarMotion m = Motion;
+            if (m.Stance != FightStance.None || m.Swimming || m.Pose != AvatarPose.Normal || m.Holding) { _guardUntil = 0f; return false; }
+            float still = 1f - Mathf.InverseLerp(0.8f, 2.2f, speed);
+            if (still <= 0.01f) return false;
+            float since = Now - _gestureStart;
+            int kind = _gesture switch
+            {
+                AvatarGesture.Punch or AvatarGesture.PunchLeft => 0,
+                AvatarGesture.Hook or AvatarGesture.HookLeft => 1,
+                AvatarGesture.Uppercut or AvatarGesture.UppercutLeft => 2,
+                AvatarGesture.Overhand or AvatarGesture.OverhandLeft => 3,
+                _ => -1
+            };
+            if (kind >= 0)
+            {
+                var c = PunchClips[kind];
+                bool left = _gesture is AvatarGesture.PunchLeft or AvatarGesture.HookLeft or AvatarGesture.UppercutLeft or AvatarGesture.OverhandLeft;
+                float rate = (c.peak - c.from) / PunchLands;
+                float t = c.from + since * rate;
+                if (t < c.to && AvatarClips.Get(left ? c.left : c.right) != null)
+                {
+                    file = left ? c.left : c.right;
+                    time = t;
+                    _clipUppercut = kind == 2;
+                    // The clips stand side-on (a boxer's stance, the hips 30-40 degrees round): a little of it turned
+                    // back toward where the lifeguard faces (more and the jab misses where it's aimed).
+                    yaw = file.EndsWith(" Mirror") ? PunchTurnBack : -PunchTurnBack;
+                    weight = still * Mathf.Clamp01(since / 0.035f);
+                    _guardUntil = Now + (c.to - t) / rate + GuardHold;
+                    _clipFists = weight;
+                    return true;
+                }
+            }
+            if (Now < _guardUntil && AvatarClips.Get(GuardClip) != null)
+            {
+                file = GuardClip;
+                time = Now + _variety.Phase;
+                _clipUppercut = false;
+                yaw = -GuardTurnBack; // (its stance is 66 degrees side-on: seen from behind, all back)
+                weight = still * Mathf.Clamp01((_guardUntil - Now) / 0.4f);
+                _clipFists = weight;
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -1782,6 +1892,7 @@ namespace PleaseDontDrown.Avatars
                 HandPose rest = _rig.Look.IsGoofy ? HandPose.Lerp(HandPose.Relaxed, HandPose.LooseFist, 0.6f) : HandPose.Relaxed;
                 HandPose pose = HandPose.Lerp(rest, HandPose.LooseFist, _run * _move * (1f - _swim));
                 pose = HandPose.Lerp(pose, HandPose.Swim, _swim);
+                pose = HandPose.Lerp(pose, HandPose.Fist, _clipFists); // boxing: fists (the clips' hands are open)
                 Quaternion? rotation = null;
                 float weight = 0f;
 
@@ -2837,7 +2948,8 @@ namespace PleaseDontDrown.Avatars
             Vector3 fwd = transform.forward, up = Vector3.up, right = transform.right;
             bool squared = Motion.Stance != FightStance.None && Motion.Pose == AvatarPose.Normal && !Motion.Swimming;
             _stanceW = Mathf.MoveTowards(_stanceW, squared ? 1f : 0f, Time.deltaTime * (squared ? 5f : 3f));
-            if (ActiveStrike(out StrikeKind strikeKind, out bool strikeLeft, out float strikeTime))
+            if (_clipFists > 0.5f) { } // a punch (or the guard after it) from the boxing clips (ClipPunch)
+            else if (ActiveStrike(out StrikeKind strikeKind, out bool strikeLeft, out float strikeTime))
                 Strike(strikeKind, strikeLeft, strikeTime, upperL, foreL, upperR, foreR, la, lb);
             else if (_stanceW > 0.001f) PoseFightStance(upperL, foreL, upperR, foreR, la, lb);
             else if (GestureActive(AvatarGesture.Zap, 0.6f))

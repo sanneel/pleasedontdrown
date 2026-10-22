@@ -149,16 +149,18 @@ namespace PleaseDontDrown.Editor
                     AnimationClip clip = AvatarClips.Get(file);
                     if (clip == null) continue;
                     var go = new GameObject("Curve");
-                    AvatarRig rig = Spawn(go, AvatarLook.Bodies.Lola);
+                    AvatarRig rig = Spawn(go, BodiesArg(AvatarLook.Bodies.Lola.ToString())[0]);
                     var clips = new AvatarClips(rig);
                     clips.Prepare();
-                    for (float t = 0f; t <= clip.length + 0.001f; t += 0.1f)
+                    for (float t = 0f; t <= clip.length + 0.001f; t += 0.05f)
                     {
                         rig.ResetPose();
                         clips.Action(file, t, 1f);
                         clips.Evaluate(0f, 0f);
                         Transform hips = rig[AvatarRig.Bone.Hips];
-                        Debug.Log($"[ClipCurve] {file} {t:0.0}: hips {hips.position:F2} facing {AvatarClips.FacingYaw(hips.rotation):0}");
+                        Vector3 hl = rig[AvatarRig.Bone.HandL].position - hips.position, hr = rig[AvatarRig.Bone.HandR].position - hips.position;
+                        Debug.Log($"[ClipCurve] {file} {t:0.0}: hips {hips.position:F2} facing {AvatarClips.FacingYaw(hips.rotation):0}, " +
+                                  $"left hand {hl:F2} ({new Vector2(hl.x, hl.z).magnitude:F2} out), right hand {hr:F2} ({new Vector2(hr.x, hr.z).magnitude:F2} out)");
                     }
                     clips.Release();
                     Object.DestroyImmediate(go);

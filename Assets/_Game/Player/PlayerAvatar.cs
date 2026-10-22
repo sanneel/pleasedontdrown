@@ -174,7 +174,10 @@ namespace PleaseDontDrown.Player
                 Velocity = _velocity,
                 FacingYaw = head.eulerAngles.y,
                 LookPitch = -Mathf.Asin(Mathf.Clamp(look.y, -1f, 1f)) * Mathf.Rad2Deg,
-                Crouch = Mathf.Clamp01(Mathf.InverseLerp(_standEyeHeight, _crouchEyeHeight, head.localPosition.y))
+                // (From a little under the standing eye height: stood up straight the eye is at 1.6 m, which read as 8%
+                // crouched, and crouching keeps the body off the motion-captured clips: the player's own lifeguard never
+                // got them, punches and all.)
+                Crouch = Mathf.Clamp01(Mathf.InverseLerp(_standEyeHeight - 0.08f, _crouchEyeHeight, head.localPosition.y))
             };
 
             if (local && motor != null && motor.enabled)
