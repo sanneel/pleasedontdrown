@@ -42,28 +42,25 @@ namespace PleaseDontDrown.Story
             {
                 Vector3 normal = push.sqrMagnitude > 0.01f ? -push : Vector3.up;
                 ProjectileSystem.Instance.Puff(point, (normal + Vector3.up * 0.3f).normalized, new Color(0.62f, 0.06f, 0.05f), head ? 14 : 9, head ? 1.3f : 1f);
-                if (_audio != null) _audio.PlayOneShot(ProceduralAudio.FleshHit, 0.9f);
+                AudioSource.PlayClipAtPoint(ProceduralAudio.BulletFlesh, point, 1f);
             }
 
             // The damage pops up over the head (a little to the side each time, so a burst doesn't stack), about the same
             // size on screen near or far (world-sized, a number at arm's length filled the view).
-            Vector3 above = HeadPosition + Vector3.up * 0.35f + Random.insideUnitSphere * 0.15f;
-            float size = PopupSize(above);
-            if (head) FloatingText.Spawn(above + Vector3.up * 0.15f * size, $"HEADSHOT  -{damage}", new Color(1f, 0.82f, 0.2f), 1.45f * size, 1.2f);
-            else if (damage > 0 && bullet) FloatingText.Spawn(above, $"-{damage}", new Color(1f, 0.95f, 0.85f), 1.15f * size, 0.9f);
-            // (Punches: no number. A flurry put a cloud of them over every head in a brawl; the health bar shows it.)
+            // (No numbers, no HEADSHOT over the head and no health bar: the user, 2026-10-22, "make shooting people or
+            // punching them more realistic and remove unnecessary things".)
 
             // Ours? The host says it landed.
             if (attacker != null && attacker == PlayerHub.Local)
             {
                 bool kill = killed || healthLeft <= 0;
+                // The crosshair marks it, and the thud comes close (no ding, no chime).
                 WeaponHud.ShowHitMarker(head, kill);
                 Camera cam = Camera.main;
                 Vector3 ear = cam != null ? cam.transform.position : transform.position;
-                AudioSource.PlayClipAtPoint(kill ? ProceduralAudio.KillThunk : head ? ProceduralAudio.HeadDing : ProceduralAudio.HitTick, ear, kill ? 0.9f : 0.75f);
+                AudioSource.PlayClipAtPoint(bullet ? ProceduralAudio.BulletFlesh : ProceduralAudio.HitTick, ear + (point - ear).normalized * 2f, bullet ? 0.55f : 0.35f);
             }
 
-            if (_healthBar == null && _maxHealth.Value > 0) _healthBar = NpcHealthBar.Attach(this);
             if (_healthBar != null) _healthBar.Hit(damage);
         }
 

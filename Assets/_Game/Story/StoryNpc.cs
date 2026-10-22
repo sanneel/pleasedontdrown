@@ -587,11 +587,8 @@ namespace PleaseDontDrown.Story
         {
             if (_animator != null) _animator.Flinch(push * (head ? 1.6f : bullet ? 1.3f : 1f));
             if (_audio != null && !bullet) _audio.PlayOneShot(ProceduralAudio.Punch, 1f);
-            // Words for the knockout and the kill only (an OW!/OOF! on every punch of a flurry piled up over the heads;
-            // the flash, the health bar and the hit marker say a punch landed).
-            string text = killed ? "KILLED!" : healthLeft <= 0 ? "K.O.!" : null;
-            Color colour = killed ? new Color(0.9f, 0.15f, 0.12f) : new Color(1f, 0.6f, 0.3f);
-            if (text != null) FloatingText.Spawn(HeadPosition + Vector3.up * 0.55f, text, colour, (healthLeft <= 0 ? 1.4f : 0.9f) * PopupSize(HeadPosition), 1.2f);
+            // (No words: K.O.! and KILLED! popped up over them, the user, 2026-10-22: "remove the text while hitting
+            // someone, make it more realistic". The body says it: the flinch, the fall.)
             HitFeel(point, push, damage, bullet, head, killed, healthLeft, attacker);
         }
 

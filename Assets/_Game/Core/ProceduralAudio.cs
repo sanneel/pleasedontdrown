@@ -18,6 +18,7 @@ namespace PleaseDontDrown.Core
             _bell = _click = _cough = _thump = null;
             _crunch = _rustle = _bonk = _creak = _shut = null;
             _zap = _punch = _cash = _engine = null;
+            _bulletFlesh = null;
             _shots = null;
             _suppressed = _dryFire = _aimIn = _aimOut = _magOut = _magIn = _rack = _impact = null;
             _steps = null;
@@ -267,13 +268,68 @@ namespace PleaseDontDrown.Core
             return buzz * Mathf.Exp(-9f * u) * 0.6f;
         });
 
-        /// <summary>Cartoon punch: a slap of noise over a low thud.</summary>
-        public static AudioClip Punch => _punch != null ? _punch : _punch = Build("Punch", 0.25f, t =>
+        /// <summary>
+        /// A punch landing: the knuckles' slap on skin, the thud of the body taking it, a scuff of clothes. (It was a
+        /// cartoon boing of a thud: the user, 2026-10-22, "make punching more realistic".)
+        /// </summary>
+        public static AudioClip Punch
         {
-            float thud = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(140f, 60f, t / 0.25f) * t) * Mathf.Exp(-16f * t);
-            float slap = (Mathf.PerlinNoise(t * 9000f, 0.7f) * 2f - 1f) * Mathf.Exp(-60f * t);
-            return (thud * 0.9f + slap * 0.7f) * Mathf.Clamp01(t / 0.002f);
-        });
+            get
+            {
+                if (_punch != null) return _punch;
+                var rng = new System.Random(271);
+                float hp = 0f, body = 0f, cloth = 0f, phase = 0f;
+                return _punch = Build("Punch", 0.3f, t =>
+                {
+                    float u = t - 0.004f; // (the mastering fades the first few milliseconds)
+                    if (u < 0f) return 0f;
+                    float n = (float)(rng.NextDouble() * 2.0 - 1.0);
+                    hp += (n - hp) * 0.25f;
+                    body += (n - body) * 0.09f;
+                    cloth += (n - cloth) * 0.4f;
+                    phase += 2f * Mathf.PI * Mathf.Lerp(105f, 55f, Mathf.Clamp01(u / 0.035f)) / Audio.SoundClip.Rate;
+                    float slap = (n - hp) * Mathf.Exp(-u / 0.005f) * 1f;
+                    float thud = Mathf.Sin(phase) * Mathf.Exp(-u / 0.032f) * 0.9f; // (short: longer it rang like a drum)
+                    float mass = body * Mathf.Exp(-u / 0.03f) * 3.6f;
+                    float scuff = (cloth - body) * Mathf.Exp(-u / 0.07f) * 0.25f;
+                    float x = slap + thud + mass + scuff;
+                    return (float)System.Math.Tanh(1.4f * x) * 0.8f;
+                });
+            }
+        }
+
+        private static AudioClip _bulletFlesh;
+
+        /// <summary>
+        /// A bullet going into someone: a sharp snap, a wet thwack and a heavy thump under it, heard where it lands.
+        /// </summary>
+        public static AudioClip BulletFlesh
+        {
+            get
+            {
+                if (_bulletFlesh != null) return _bulletFlesh;
+                var rng = new System.Random(919);
+                float hp = 0f, mid = 0f, mid2 = 0f, wet = 0f, phase = 0f;
+                return _bulletFlesh = Build("BulletFlesh", 0.32f, t =>
+                {
+                    float u = t - 0.004f;
+                    if (u < 0f) return 0f;
+                    float n = (float)(rng.NextDouble() * 2.0 - 1.0);
+                    hp += (n - hp) * 0.3f;
+                    mid += (n - mid) * 0.35f;
+                    mid2 += (mid - mid2) * 0.35f;
+                    wet += (n - wet) * 0.12f;
+                    phase += 2f * Mathf.PI * Mathf.Lerp(130f, 60f, Mathf.Clamp01(u / 0.025f)) / Audio.SoundClip.Rate;
+                    float snap = (n - hp) * Mathf.Exp(-u / 0.0035f) * 0.9f;
+                    float thwack = mid2 * Mathf.Exp(-u / 0.03f) * 3.2f;
+                    float thump = Mathf.Sin(phase) * Mathf.Exp(-u / 0.022f) * 0.75f; // (short: longer it rang like a drum)
+                    float d = (u - 0.03f) / 0.03f;
+                    float squish = wet * Mathf.Exp(-d * d) * 1.2f;
+                    float x = snap + thwack + thump + squish;
+                    return (float)System.Math.Tanh(1.5f * x) * 0.85f;
+                });
+            }
+        }
 
         // ------------------------------------------------------------------ hits landing (the shooter's confirmation)
 
@@ -318,32 +374,52 @@ namespace PleaseDontDrown.Core
         private static AudioClip[] _shots;
         private static AudioClip _suppressed, _dryFire, _aimIn, _aimOut, _magOut, _magIn, _rack, _impact;
 
-        /// <summary>A gunshot per kind of gun: a sharp crack, a low punch and a tail that rings out.</summary>
+        /// <summary>
+        /// A gunshot per kind of gun, built the way a real one sounds outdoors: the supersonic crack (a couple of
+        /// milliseconds, every frequency), the muzzle blast (a burst of noise darkening as it goes), the low boom under
+        /// it falling in pitch, the action cycling (pistol, SMG, rifle), and the echo off the beach and the buildings
+        /// coming back a moment later. Soft-clipped like a recording that's a little too hot.
+        /// </summary>
         public static AudioClip Shot(Combat.GunSound kind)
         {
             _shots ??= new AudioClip[5];
             int i = (int)kind;
             if (_shots[i] != null) return _shots[i];
-            // length, crack brightness, crack decay, punch start/end Hz, tail decay, tail gain
-            (float len, float bright, float crackDecay, float f0, float f1, float tailDecay, float tail) = kind switch
+            // length, boom from/to Hz, boom decay, blast decay, crack, echo, echo decay, the action clacks
+            (float len, float boom0, float boom1, float boomDecay, float blastDecay, float crackGain, float echo, float echoDecay, bool action) = kind switch
             {
-                Combat.GunSound.Smg => (0.85f, 0.9f, 55f, 170f, 70f, 8f, 0.55f),
-                Combat.GunSound.Shotgun => (1.8f, 0.7f, 30f, 95f, 38f, 4f, 0.9f),
-                Combat.GunSound.Rifle => (1.5f, 0.97f, 45f, 130f, 50f, 5f, 0.75f),
-                Combat.GunSound.Sniper => (2.4f, 1f, 35f, 90f, 32f, 2.8f, 0.9f),
-                _ => (1.1f, 0.93f, 50f, 150f, 60f, 6f, 0.65f)
+                Combat.GunSound.Smg => (1.1f, 135f, 62f, 0.04f, 0.022f, 0.9f, 0.42f, 0.3f, true),
+                Combat.GunSound.Shotgun => (2.1f, 80f, 38f, 0.085f, 0.06f, 0.85f, 0.95f, 0.6f, false),
+                Combat.GunSound.Rifle => (2f, 95f, 45f, 0.06f, 0.035f, 1.15f, 0.8f, 0.55f, true),
+                Combat.GunSound.Sniper => (2.7f, 70f, 32f, 0.09f, 0.045f, 1.2f, 1f, 0.8f, false),
+                _ => (1.5f, 120f, 55f, 0.05f, 0.028f, 1f, 0.55f, 0.42f, true)
             };
             var rng = new System.Random(700 + i);
-            float low = 0f, band = 0f;
+            float lp = 0f, dark = 0f, darker = 0f, phase = 0f;
             return _shots[i] = Build($"Shot{kind}", len, t =>
             {
+                float u = t - 0.004f; // (the mastering fades the first few milliseconds)
+                if (u < 0f) return 0f;
                 float n = (float)(rng.NextDouble() * 2.0 - 1.0);
-                low += (n - low) * Mathf.Lerp(bright, 0.05f, Mathf.Clamp01(t / len));
-                band += (low - band) * 0.25f;
-                float crack = n * Mathf.Exp(-crackDecay * t);
-                float punch = Mathf.Sin(2f * Mathf.PI * Mathf.Lerp(f0, f1, Mathf.Clamp01(t / 0.12f)) * t) * Mathf.Exp(-22f * t);
-                float ring = band * 2.2f * Mathf.Exp(-tailDecay * t) * tail;
-                return (crack * 0.8f + punch * 0.9f + ring) * Mathf.Clamp01(t / 0.0015f) * 0.38f;
+                lp += (n - lp) * Mathf.Lerp(0.55f, 0.1f, Mathf.Clamp01(u / 0.03f));
+                dark += (n - dark) * 0.06f;
+                darker += (dark - darker) * 0.22f;
+                phase += 2f * Mathf.PI * Mathf.Lerp(boom0, boom1, Mathf.Clamp01(u / 0.08f)) / Audio.SoundClip.Rate;
+                float crack = n * Mathf.Exp(-u / 0.0018f) * crackGain;
+                float blast = lp * Mathf.Exp(-u / blastDecay) * 2.4f;
+                float boom = Mathf.Sin(phase) * Mathf.Exp(-u / boomDecay) * 1.3f;
+                float clack = 0f;
+                if (action && u > 0.05f)
+                {
+                    float m = u - 0.05f;
+                    clack += (Mathf.Sin(2f * Mathf.PI * 2700f * m) + 0.5f * Mathf.Sin(2f * Mathf.PI * 4100f * m)) * Mathf.Exp(-m / 0.003f) * 0.16f;
+                    if (u > 0.078f) { float m2 = u - 0.078f; clack += Mathf.Sin(2f * Mathf.PI * 2200f * m2) * Mathf.Exp(-m2 / 0.004f) * 0.12f; }
+                }
+                float e1 = u > 0.06f ? Mathf.Exp(-(u - 0.06f) / echoDecay) * (1f - Mathf.Exp(-(u - 0.06f) / 0.02f)) : 0f;
+                float e2 = u > 0.21f ? Mathf.Exp(-(u - 0.21f) / 0.07f) * 0.7f : 0f;
+                float tail = darker * 1.9f * echo * (e1 + e2); // (the echo well under the shot: about -16 dB)
+                float x = crack + blast + boom + clack + tail;
+                return (float)System.Math.Tanh(1.5f * x) * 0.85f;
             });
         }
 

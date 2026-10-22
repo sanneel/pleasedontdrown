@@ -834,7 +834,6 @@ namespace PleaseDontDrown.Story
             // (Once in a while, not on every blocked jab of a flurry: a stack of words over one head.)
             if (Time.time - _blockShownAt < 1.2f) return;
             _blockShownAt = Time.time;
-            UI.FloatingText.Spawn(at + Vector3.up * 0.3f, "BLOCKED", new Color(0.7f, 0.85f, 1f), 0.8f, 0.8f);
         }
 
         [ObserversRpc]

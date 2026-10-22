@@ -86,6 +86,8 @@ namespace PleaseDontDrown.Editor
                 Export(dir, "gun-shotgun", ProceduralAudio.Shot(GunSound.Shotgun));
                 Export(dir, "gun-sniper", ProceduralAudio.Shot(GunSound.Sniper));
                 Export(dir, "gun-suppressed", ProceduralAudio.GunshotSuppressed);
+                Export(dir, "hit-punch", ProceduralAudio.Punch);
+                Export(dir, "hit-bullet-flesh", ProceduralAudio.BulletFlesh);
                 Export(dir, "gun-mag-out", ProceduralAudio.MagOut);
                 Export(dir, "gun-mag-in", ProceduralAudio.MagIn);
                 Export(dir, "gun-rack", ProceduralAudio.Rack);

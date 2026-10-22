@@ -21,7 +21,6 @@ namespace PleaseDontDrown.Combat
     public partial class PlayerCombat
     {
         private const float ComboWindow = 3f, ComboDaze = 2.5f, BonkDazeImpact = 9f;
-        private static readonly string[] Ows = { "OW!", "HEY!", "MY HEAD!", "WHO THREW THAT?!", "OUCH!" };
 
         private float _dazedUntil = float.NegativeInfinity;
         private bool _wasDazed;
@@ -97,10 +96,7 @@ namespace PleaseDontDrown.Combat
                 combat.ServerKnockback(away.normalized * Mathf.Min(6f, impact * 0.4f) + Vector3.up * 1.5f, _hub.DisplayName);
                 if (impact > BonkDazeImpact && !combat.IsDazed) combat.ServerDaze(1.8f, _hub.DisplayName, "bonked you on the head");
             }
-            else if (target.TryGetComponent(out StoryNpc npc))
-            {
-                npc.ServerShout(Ows[Random.Range(0, Ows.Length)], false);
-            }
+            else if (target.TryGetComponent(out StoryNpc npc) && npc != null) { } // (the bonk is heard: no shouted words)
             BonkObservers(point, impact);
         }
 

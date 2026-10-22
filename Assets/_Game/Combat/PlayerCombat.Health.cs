@@ -212,7 +212,6 @@ namespace PleaseDontDrown.Combat
         {
             if (_audio != null) _audio.PlayOneShot(FunSounds.SlideDown, 0.9f);
             Vector3 head = _hub.Head != null ? _hub.Head.position : transform.position + Vector3.up * 1.6f;
-            FloatingText.Spawn(head + Vector3.up * 0.4f, "DOWN!", new Color(1f, 0.45f, 0.35f), 1.2f, 1.8f);
             if (!IsOwner) return;
             if (_hub.Hands != null && _hub.Hands.HeldItem != null) _hub.Hands.Drop();
             PlayerHud.ShowToast(string.IsNullOrEmpty(byWhom) ? "You're down!" : $"<b>{byWhom}</b> put you down!", 3f, ToastKind.Warning);
@@ -227,7 +226,6 @@ namespace PleaseDontDrown.Combat
             // Getting up takes a moment (sit up, feet in, up from a crouch): no running off out of the lying pose.
             if (IsOwner && _hub.Motor != null) _hub.Motor.Stun(0.9f);
             Vector3 head = _hub.Head != null ? _hub.Head.position : transform.position + Vector3.up * 1.6f;
-            FloatingText.Spawn(head + Vector3.up * 0.4f, "BACK UP!", new Color(0.55f, 1f, 0.6f), 1f, 1.4f);
         }
 
         [ObserversRpc]

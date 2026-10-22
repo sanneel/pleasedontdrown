@@ -767,13 +767,9 @@ namespace PleaseDontDrown.Rescue
         /// <summary>How long a shot-down tourist's body lies there before it goes.</summary>
         private const float DeadBodySeconds = 90f;
 
-        /// <summary>Called out over a tourist shot while flying through the air (thrown, launched, bounced).</summary>
-        private static readonly string[] AirShots =
-            { "CLAY PIGEON!", "PULL!", "SKEET SHOT!", "AIR STRIKE!", "FLYING TOURIST!", "ABSOLUTELY UNNECESSARY", "BIRD WATCHER", "DUCK SEASON!" };
-
         /// <summary>
         /// Host: a bullet (or a blow). Slapstick, never gore: the first hit knocks them out cold (CPR still brings them
-        /// round), enough of them and they're done for, a limp body. A tourist shot in mid-air gets a trickshot name.
+        /// round), enough of them and they're done for, a limp body. A hit in mid-air counts double.
         /// (The shove itself is the gun's: whoever simulates the body pushes it, Combat.Weapon.)
         /// </summary>
         public bool ServerTakeHit(int damage, DamageKind kind, PlayerHub attacker, Vector3 point, Vector3 direction)
@@ -785,7 +781,7 @@ namespace PleaseDontDrown.Rescue
             bool flying = !_item.IsHeld && !wet && (float.IsNaN(ground) || transform.position.y - ground > 0.9f);
             // (A hit in mid-air is the trick: it counts double.)
             _health -= Mathf.Max(1, damage) * (flying ? 2 : 1);
-            ShotObservers(point, flying ? AirShots[Random.Range(0, AirShots.Length)] : null);
+            ShotObservers(point, kind == DamageKind.Bullet);
             if (_health <= 0)
             {
                 _dead.Value = true;
@@ -801,12 +797,12 @@ namespace PleaseDontDrown.Rescue
             return true;
         }
 
+        /// <summary>Every machine: the hit heard where it landed. (No words over them: an "OW!" and a trickshot name popped
+        /// up in yellow on every hit, the user, 2026-10-22: "make it more realistic, remove unnecessary things".)</summary>
         [ObserversRpc]
-        private void ShotObservers(Vector3 point, string airShot)
+        private void ShotObservers(Vector3 point, bool bullet)
         {
-            FloatingText.Spawn(point + Vector3.up * 0.3f, "OW!", new Color(1f, 0.86f, 0.3f), 0.9f, 0.8f);
-            if (!string.IsNullOrEmpty(airShot))
-                FloatingText.Spawn(point + Vector3.up * 1.1f, airShot, new Color(1f, 0.55f, 0.15f), 1.6f, 2.2f);
+            AudioSource.PlayClipAtPoint(bullet ? ProceduralAudio.BulletFlesh : ProceduralAudio.Punch, point, 1f);
         }
 
         /// <summary>Host: knocked out in a fight on land (a bar brawler): lying there, to be carried to the infirmary.</summary>

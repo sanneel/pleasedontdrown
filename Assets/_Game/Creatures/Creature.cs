@@ -314,9 +314,8 @@ namespace PleaseDontDrown.Creatures
         private void HitObservers(Vector3 point, int dealt, string part)
         {
             if (_audio != null) _audio.PlayOneShot(dealt <= 0 ? Core.ProceduralAudio.Thump : Core.ProceduralAudio.Bonk, 1f);
-            string text = dealt <= 0 ? (part == "Shell" ? "CLANK!" : "NO EFFECT") : part == "Head" && dealt >= 20 ? $"WEAK SPOT! -{dealt}" : $"-{dealt}";
-            Color colour = dealt <= 0 ? new Color(0.7f, 0.8f, 0.95f) : part == "Head" ? new Color(1f, 0.85f, 0.2f) : new Color(1f, 0.6f, 0.3f);
-            FloatingText.Spawn(point + Vector3.up * 0.3f, text, colour, dealt >= 20 ? 1.2f : 0.9f, 1f);
+            if (dealt > 0) AudioSource.PlayClipAtPoint(Core.ProceduralAudio.BulletFlesh, point, 0.8f);
+            // (No numbers or words over it: the user, 2026-10-22, "remove unnecessary things".)
         }
 
         [ObserversRpc]
